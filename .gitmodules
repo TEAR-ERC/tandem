@@ -1,0 +1,9 @@
+[submodule "submodules/mneme"]
+	path = submodules/mneme
+	url = https://github.com/TEAR-ERC/mneme.git
+[submodule "submodules/utils"]
+	path = submodules/utils
+	url = https://github.com/TUM-I5/utils.git
+[submodule "submodules/xdmfwriter"]
+	path = submodules/xdmfwriter
+	url = https://github.com/TUM-I5/XdmfWriter.git
