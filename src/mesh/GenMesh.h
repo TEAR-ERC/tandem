@@ -3,127 +3,137 @@
 
 #include <cstddef>
 #include <array>
+#include <algorithm>
 
 #include <mpi.h>
 
 #include "parallel/Distribute.h"
 #include "util/MultiIndex.h"
-#include "SimplexMesh.h"
+#include "GlobalSimplexMesh.h"
 
 namespace tndm {
 
 template<std::size_t D> struct TessInfo;
 template<> struct TessInfo<1> {
     static constexpr int NumSimplices = 1;
-    static constexpr int NumCorners   = 2;
+    static constexpr int NumInVertGIDs = 2;
 };
 template<> struct TessInfo<2> {
     static constexpr int NumSimplices = 2;
-    static constexpr int NumCorners   = 4;
+    static constexpr int NumInVertGIDs = 4;
 };
 template<> struct TessInfo<3> {
     static constexpr int NumSimplices = 5;
-    static constexpr int NumCorners   = 8;
+    static constexpr int NumInVertGIDs = 8;
 };
 
-/**
-* @brief Tessellate a line (D=1) / rectangle (D=2) / cuboid (D=3) into D-simplices.
-*
-* @param corners global vertex ids
-* @param isOdd
-*
-* @return tessellation
-*/
-template<std::size_t D>
-std::array<Simplex<D>,TessInfo<D>::NumSimplices> tessellate(std::array<int,TessInfo<D>::NumCorners> const& corners, bool isOdd);
-
 
 /**
- * @brief Uniform SimplexMesh generation in D dimensions.
+ * @brief Mesh generation class for cuboid meshes
  *
- * @tparam D dimension
- * @param N array of (cuboid) elements in dimension d
- *
- * @return Mesh of D-simplices
+ * @tparam D simplex/space dimension
  */
 template<std::size_t D>
-SimplexMesh<D> generateUniformMesh(std::array<int,D> N) {
-    using vertex_t = typename SimplexMesh<D>::vertex_t;
+class GenMesh {
+public:
+    using mesh_t = GlobalSimplexMesh<D,double,int>;
+    using vertex_t = typename mesh_t::vertex_t;
+    using simplex_t = typename mesh_t::simplex_t;
 
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    /**
+    * @brief Tessellate a line (D=1) / rectangle (D=2) / cuboid (D=3) into D-simplices.
+    *
+    * @param corners global vertex ids
+    * @param isOdd
+    *
+    * @return tessellation
+    */
+    static std::array<simplex_t,TessInfo<D>::NumSimplices> tessellate(std::array<int,TessInfo<D>::NumInVertGIDs> const& vertGIDs, bool isOdd);
 
-    // We start with a mesh of cuboids with numElemsGlobal elements
-    unsigned numElemsGlobal = 1u;
-    for (auto& n : N) {
-        numElemsGlobal *= n;
-    }
 
-    // vertices live on grid with size (N_1+1) x ... x (N_d+1)
-    std::array<int,D> Np1;
-    for (std::size_t d = 0; d < D; ++d) {
-        Np1[d] = N[d] + 1;
-    }
+    /**
+     * @brief Uniform SimplexMesh generation in D dimensions.
+     *
+     * @param N array of (cuboid) elements in dimension d
+     *
+     * @return Mesh of D-simplices
+     */
+    static mesh_t uniformMesh(std::array<int,D> N) {
+        int rank, size;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // A cuboid has multi-index (n_1,...,n_d)
-    // For parallel mesh generation we flatten the index and equally distribute cuboids
-    auto range = distribute(Range(numElemsGlobal), rank, size);
-
-    // We have 2 vertices per dim, therefore 2^D vertices per (D-)cuboid
-    constexpr int numCorners = (1 << D);
-    std::array<int,D> C;
-    std::fill(C.begin(), C.end(), 2);
-    const auto first = unflatten(range.from, N);
-
-    // Function returns local vertex id \in [0,numVertices)
-    // (see numVertices below)
-    auto vertex_lid = [&first,&Np1](std::array<int,D> const& v) {
-        return flatten(v-first, Np1);
-    };
-
-    // Map global vertex id to position
-    auto vertex_pos = [&N](std::array<int,D> const& v) {
-        vertex_t vert;
+        // vertices live on grid with size (N_1+1) x ... x (N_d+1)
+        std::array<int,D> Np1;
         for (std::size_t d = 0; d < D; ++d) {
-            vert[d] = static_cast<double>(v[d]) / N[d];
+            Np1[d] = N[d] + 1;
         }
-        return vert;
-    };
-
-    // Preallocate local vertices and elements
-    const auto maxE = unflatten(range.to-1, N);
-    const auto maxCorner = maxE + unflatten(numCorners-1, C);
-    const int numVertices = vertex_lid(maxCorner)+1;
-    const int numElements = range.length() * TessInfo<D>::NumSimplices;
-    std::vector<vertex_t> vertices(numVertices);
-    std::vector<Simplex<D>> elements(numElements);
-    auto elementIn = elements.begin();
-
-    for (auto eflat : range) {
-        auto e = unflatten(eflat, N);
-        std::array<int,numCorners> corners;
-        // Insert 2^D vertices, if not present
-        for (int corner = 0; corner < numCorners; ++corner) {
-            auto v = e + unflatten(corner, C);
-            auto lid = vertex_lid(v);
-            corners[corner] = lid;
-            vertices[lid] = vertex_pos(v);
-        }
-        bool isOdd = false;
-        for (auto&& ee : e) {
-            isOdd ^= (ee%2 == 1);
+        unsigned numVertsGlobal = 1u;
+        for (auto& np1 : Np1) {
+            numVertsGlobal *= np1;
         }
 
-        // Tessellate cuboid into D-simplices
-        auto simplices = tessellate<D>(corners, isOdd);
-        for (auto&& plex : simplices) {
-            *(elementIn++) = plex;
+        // A vertex has multi-index (v_1,...,v_d)
+        // For parallel mesh generation we flatten the index and equally distribute vertices
+        auto vertsLocal = distribute(Range(numVertsGlobal), rank, size);
+
+        const int numVertices = vertsLocal.length();
+        std::vector<vertex_t> vertices(numVertices);
+
+        // Map global vertex id to position
+        auto vertex_pos = [&N](std::array<int,D> const& v) {
+            vertex_t vert;
+            for (std::size_t d = 0; d < D; ++d) {
+                vert[d] = static_cast<double>(v[d]) / N[d];
+            }
+            return vert;
+        };
+
+        for (auto vflat : vertsLocal) {
+            auto v = unflatten(vflat, Np1);
+            vertices[vflat-vertsLocal.from] = vertex_pos(v);
         }
+
+        // elements live on grid with size N_1 x ... x N_d
+        unsigned numElemsGlobal = 1u;
+        for (auto& n : N) {
+            numElemsGlobal *= n;
+        }
+
+        // An element (cuboid for D=3) has multi-index (n_1,...,n_d)
+        // For parallel mesh generation we flatten the index and equally distribute elements
+        auto elemsLocal = distribute(Range(numElemsGlobal), rank, size);
+
+        // We have 2 vertices per dim i.e. 2^D vertices per element
+        constexpr int numVertGIDs = (1 << D);
+        std::array<int,D> D2;
+        std::fill(D2.begin(), D2.end(), 2);
+
+        const int numElements = elemsLocal.length() * TessInfo<D>::NumSimplices;
+        std::vector<simplex_t> elements(numElements);
+
+        for (auto eflat : elemsLocal) {
+            auto e = unflatten(eflat, N);
+            std::array<int,numVertGIDs> vertGIDs;
+            // Get 2^D vertices
+            for (int vflat = 0; vflat < numVertGIDs; ++vflat) {
+                auto v = e + unflatten(vflat, D2);
+                vertGIDs[vflat] = flatten(v,Np1);
+            }
+            bool isOdd = false;
+            for (auto&& ee : e) {
+                isOdd ^= (ee%2 == 1);
+            }
+
+            // Tessellate cuboid into D-simplices
+            auto simplices = tessellate(vertGIDs, isOdd);
+            std::copy(simplices.begin(), simplices.end(),
+                      elements.begin()+TessInfo<D>::NumSimplices*(eflat-elemsLocal.from));
+        }
+
+        return mesh_t(std::move(vertices), std::move(elements));
     }
-
-    return SimplexMesh<D>(std::move(vertices), std::move(elements));
-}
+};
 
 }
 

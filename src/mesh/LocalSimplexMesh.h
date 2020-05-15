@@ -1,5 +1,5 @@
-#ifndef SIMPLEXMESH_H
-#define SIMPLEXMESH_H
+#ifndef LOCALSIMPLEXMESH_H
+#define LOCALSIMPLEXMESH_H
 
 #include <cstddef>
 #include <vector>
@@ -12,13 +12,13 @@
 namespace tndm {
 
 template<std::size_t D>
-class SimplexMesh {
+class LocalSimplexMesh {
 public:
-    using vertex_t = Eigen::Matrix<double, 4, 1>;
+    using vertex_t = Eigen::Matrix<double, 3, 1>;
+    using simplex_t = Simplex<D>;
 
-    SimplexMesh(std::vector<vertex_t>&& vertices, std::vector<Simplex<D>>&& elements)
+    LocalSimplexMesh(std::vector<vertex_t>&& vertices, std::vector<Simplex<D>>&& elements)
         : verts(std::move(vertices)), elems(std::move(elements)) {}
-
 
     template<unsigned d>
     std::array<vertex_t,d+1> vertices(unsigned lid) const {
@@ -33,8 +33,9 @@ public:
         return vs;
     }
 
-    template<typename RealT,std::size_t Dout>
+    template<typename RealT, std::size_t Dout = D>
     std::vector<RealT> flatVertices() const {
+        static_assert(Dout >= D);
         std::vector<RealT> vout;
         vout.reserve(Dout*verts.size());
         for (auto& v : verts) {
@@ -76,4 +77,4 @@ private:
 
 }
 
-#endif // SIMPLEXMESH_H
+#endif // LOCALSIMPLEXMESH_H
