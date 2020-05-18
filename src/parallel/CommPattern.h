@@ -20,7 +20,7 @@ public:
     std::vector<int> const& getSDispls() const { return sdispls; }
 
     template<typename T>
-    std::vector<T> exchange(std::vector<T>& dataToSend, MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
+    [[nodiscard]] std::vector<T> exchange(std::vector<T>& dataToSend, MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
         std::vector<T> recvdData(rdispls[procs-1] + recvcounts[procs-1]);
         MPI_Alltoallv(dataToSend.data(), sendcounts.data(), sdispls.data(), mpiType,
                       recvdData.data(), recvcounts.data(), rdispls.data(), mpiType, comm);

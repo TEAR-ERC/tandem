@@ -8,6 +8,8 @@
 #include <set>
 #include <numeric>
 
+#include <mpi.h>
+
 #include "parallel/DistributedCSR.h"
 #include "parallel/MPITraits.h"
 #include "parallel/MetisPartitioner.h"
@@ -31,6 +33,7 @@ public:
         MPI_Comm_size(comm, &procs);
 
         vtxdist = makeDist(numVertices());
+
     }
 
     std::size_t numVertices() const { return verts.size(); }
@@ -164,10 +167,22 @@ private:
         AllToAllV alltoallv(std::move(requestcounts));
         auto recvdVGIDs = alltoallv.exchange(vGIDsRequested);
 
+        std::vector<std::size_t> numSharedRanks(numVertices(), 0);
+        for (int p = 0; p < procs; ++p) {
+            if (p == rank) {
+                continue;
+            }
+            for (int i = alltoallv.getRDispls()[p]; i < alltoallv.getRDispls()[p+1]; ++i) {
+                assert(recvdVGIDs[i] >= vtxdist[rank] && recvdVGIDs[i] < vtxdist[rank+1]);
+                ++numSharedRanks[recvdVGIDs[i]-vtxdist[rank]];
+            }
+        }
+
         alltoallv.swap();
 
         int numVertsToSend = std::accumulate(alltoallv.getSendcounts().begin(),
                                              alltoallv.getSendcounts().end(), 0);
+
         std::vector<vertex_t> vertsToSend;
         vertsToSend.reserve(numVertsToSend);
         for (auto& vGID : recvdVGIDs) {
@@ -177,6 +192,10 @@ private:
 
         mpi_array_type<RealT> mpi_vertex_t(D);
         auto recvdVerts = alltoallv.exchange(vertsToSend, mpi_vertex_t.get());
+
+        auto recvdNumSharedRanks = alltoallv.exchange(numSharedRanks);
+
+
 
         return std::make_pair(vGIDsRequested, recvdVerts);
     }
