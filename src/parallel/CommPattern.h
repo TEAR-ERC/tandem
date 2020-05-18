@@ -15,7 +15,9 @@ public:
     void swap();
 
     std::vector<int> const& getRecvcounts() const { return recvcounts; }
+    std::vector<int> const& getRDispls() const { return rdispls; }
     std::vector<int> const& getSendcounts() const { return sendcounts; }
+    std::vector<int> const& getSDispls() const { return sdispls; }
 
     template<typename T>
     std::vector<T> exchange(std::vector<T>& dataToSend, MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
