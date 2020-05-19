@@ -10,17 +10,20 @@ AllToAllV::AllToAllV(std::vector<int>&& sndcnts, MPI_Comm comm)
     assert(sendcounts.size() == procs);
 
     recvcounts.resize(procs);
-    sdispls.resize(procs);
-    rdispls.resize(procs);
-
     MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, comm);
 
-    sdispls[0] = 0;
-    rdispls[0] = 0;
-    for (int p = 1; p < procs+1; ++p) {
-        sdispls[p] = sdispls[p-1] + sendcounts[p-1];
-        rdispls[p] = rdispls[p-1] + recvcounts[p-1];
-    }
+    sdispls.make(sendcounts);
+    rdispls.make(recvcounts);
+}
+
+AllToAllV::AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts, MPI_Comm comm)
+    : sendcounts(std::move(sndcnts)), comm(comm), recvcounts(std::move(recvcnts)) {
+    MPI_Comm_size(comm, &procs);
+    assert(sendcounts.size() == procs);
+    assert(recvcounts.size() == procs);
+
+    sdispls.make(sendcounts);
+    rdispls.make(recvcounts);
 }
 
 void AllToAllV::swap() {

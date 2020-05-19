@@ -93,17 +93,23 @@ public:
         }
         assert(eIt == enumeration.end());
 
-        AllToAllV alltoallv(std::move(sendcounts));
+        AllToAllV a2a(std::move(sendcounts));
         mpi_array_type<IntT> mpi_simplex_t(D+1);
-        elems = alltoallv.exchange(elemsToSend, mpi_simplex_t.get());
+        elems = a2a.exchange(elemsToSend, mpi_simplex_t.get());
     }
 
     LocalSimplexMesh<D> getLocalMesh() const {
         using loc_vertex_t = typename LocalSimplexMesh<D>::vertex_t;
         using loc_simplex_t = typename LocalSimplexMesh<D>::simplex_t;
 
-        auto [vGIDs, localVertices] = getLocalVertices();
-        auto g2l = makeG2LMap(vGIDs);
+        auto [GIDs, a2a] = getGIDs();
+        auto requestedGIDs = a2a.exchange(GIDs);
+        a2a.swap();
+
+        auto localVertices = getLocalVertices(requestedGIDs, a2a);
+        auto [sharedRanks,sharedRanksLayout] = getSharedRanks(requestedGIDs, a2a);
+
+        auto g2l = makeG2LMap(GIDs);
 
         std::vector<loc_vertex_t> locVerts(localVertices.size());
         auto locVertsIt = locVerts.begin();
@@ -139,9 +145,8 @@ private:
         return g2l;
     }
 
-    auto getLocalVertices() const {
-        int procs, rank;
-        MPI_Comm_rank(comm, &rank);
+    auto getGIDs() const {
+        int procs;
         MPI_Comm_size(comm, &procs);
 
         std::set<IntT> requiredVertices;
@@ -153,51 +158,79 @@ private:
 
         auto rvIt = requiredVertices.begin();
         std::vector<int> requestcounts(procs, 0);
-        std::vector<IntT> vGIDsRequested;
-        vGIDsRequested.reserve(requiredVertices.size());
+        std::vector<IntT> GIDs;
+        GIDs.reserve(requiredVertices.size());
         for (int p = 0; p < procs; ++p) {
             while (*rvIt < vtxdist[p+1] && rvIt != requiredVertices.end()) {
                 ++requestcounts[p];
-                vGIDsRequested.push_back(*rvIt);
+                GIDs.push_back(*rvIt);
                 ++rvIt;
             }
         }
         assert(rvIt == requiredVertices.end());
 
-        AllToAllV alltoallv(std::move(requestcounts));
-        auto recvdVGIDs = alltoallv.exchange(vGIDsRequested);
+        AllToAllV a2a(std::move(requestcounts));
+        return std::make_pair(std::move(GIDs), std::move(a2a));
+    }
 
-        std::vector<std::size_t> numSharedRanks(numVertices(), 0);
-        for (int p = 0; p < procs; ++p) {
-            if (p == rank) {
-                continue;
-            }
-            for (int i = alltoallv.getRDispls()[p]; i < alltoallv.getRDispls()[p+1]; ++i) {
-                assert(recvdVGIDs[i] >= vtxdist[rank] && recvdVGIDs[i] < vtxdist[rank+1]);
-                ++numSharedRanks[recvdVGIDs[i]-vtxdist[rank]];
-            }
-        }
+    auto getLocalVertices(std::vector<IntT> const& requestedGIDs, AllToAllV const& a2a) const {
+        int rank;
+        MPI_Comm_rank(comm, &rank);
 
-        alltoallv.swap();
-
-        int numVertsToSend = std::accumulate(alltoallv.getSendcounts().begin(),
-                                             alltoallv.getSendcounts().end(), 0);
-
-        std::vector<vertex_t> vertsToSend;
-        vertsToSend.reserve(numVertsToSend);
-        for (auto& vGID : recvdVGIDs) {
+        std::vector<vertex_t> requestedVertices;
+        requestedVertices.reserve(requestedGIDs.size());
+        for (auto& vGID : requestedGIDs) {
             assert(vGID >= vtxdist[rank] && vGID < vtxdist[rank+1]);
-            vertsToSend.emplace_back(verts[vGID-vtxdist[rank]]);
+            requestedVertices.emplace_back(verts[vGID-vtxdist[rank]]);
         }
 
         mpi_array_type<RealT> mpi_vertex_t(D);
-        auto recvdVerts = alltoallv.exchange(vertsToSend, mpi_vertex_t.get());
+        return a2a.exchange(requestedVertices, mpi_vertex_t.get());
+    }
 
-        auto recvdNumSharedRanks = alltoallv.exchange(numSharedRanks);
+    auto getSharedRanks(std::vector<IntT> const& requestedGIDs, AllToAllV const& a2a) const {
+        int procs, rank;
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &procs);
 
+        std::vector<std::vector<int>> sharedRanksInfo(numVertices());
+        for (auto [p,i] : a2a.getSDispls()) {
+            assert(requestedGIDs[i] >= vtxdist[rank] && requestedGIDs[i] < vtxdist[rank+1]);
+            sharedRanksInfo[requestedGIDs[i]-vtxdist[rank]].emplace_back(p);
+        }
 
+        std::vector<int> sharedRanksSendCount;
+        sharedRanksSendCount.reserve(requestedGIDs.size());
+        std::size_t totalSharedRanksSendCount = 0;
+        for (auto& vGID : requestedGIDs) {
+            assert(vGID >= vtxdist[rank] && vGID < vtxdist[rank+1]);
+            sharedRanksSendCount.emplace_back(sharedRanksInfo[vGID-vtxdist[rank]].size());
+            totalSharedRanksSendCount += sharedRanksInfo[vGID-vtxdist[rank]].size();
+        }
 
-        return std::make_pair(vGIDsRequested, recvdVerts);
+        auto sharedRanksRecvCount = a2a.exchange(sharedRanksSendCount);
+
+        std::vector<int> requestedSharedRanks(totalSharedRanksSendCount);
+        auto requestedSharedRanksIt = requestedSharedRanks.begin();
+        for (auto& vGID : requestedGIDs) {
+            requestedSharedRanksIt = std::copy(sharedRanksInfo[vGID-vtxdist[rank]].begin(),
+                                          sharedRanksInfo[vGID-vtxdist[rank]].end(),
+                                          requestedSharedRanksIt);
+        }
+        std::vector<int> sendcounts(procs, 0);
+        std::vector<int> recvcounts(procs, 0);
+        for (auto [p,i] : a2a.getSDispls()) {
+            sendcounts[p] += sharedRanksSendCount[i];
+        }
+        for (auto [p,i] : a2a.getRDispls()) {
+            recvcounts[p] += sharedRanksRecvCount[i];
+        }
+
+        AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts));
+        auto sharedRanks = a2aSharedRanks.exchange(requestedSharedRanks);
+        Displacements sharedRanksDispls(sharedRanksRecvCount);
+
+        return std::make_pair(std::move(sharedRanks), std::move(sharedRanksDispls));
     }
 
     std::vector<std::size_t> makeDist(std::size_t num) const {

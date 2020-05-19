@@ -4,20 +4,24 @@
 #include <vector>
 #include <mpi.h>
 
+#include "mneme/displacements.hpp"
 #include "MPITraits.h"
+
+using mneme::Displacements;
 
 namespace tndm {
 
 class AllToAllV {
 public:
     AllToAllV(std::vector<int>&& sndcnts, MPI_Comm comm = MPI_COMM_WORLD);
+    AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts, MPI_Comm comm = MPI_COMM_WORLD);
 
     void swap();
 
-    std::vector<int> const& getRecvcounts() const { return recvcounts; }
-    std::vector<int> const& getRDispls() const { return rdispls; }
-    std::vector<int> const& getSendcounts() const { return sendcounts; }
-    std::vector<int> const& getSDispls() const { return sdispls; }
+    auto const& getRecvcounts() const { return recvcounts; }
+    auto const& getRDispls() const { return rdispls; }
+    auto const& getSendcounts() const { return sendcounts; }
+    auto const& getSDispls() const { return sdispls; }
 
     template<typename T>
     [[nodiscard]] std::vector<T> exchange(std::vector<T>& dataToSend, MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
@@ -32,8 +36,8 @@ private:
     MPI_Comm comm;
     int procs;
     std::vector<int> recvcounts;
-    std::vector<int> sdispls;
-    std::vector<int> rdispls;
+    Displacements<int> sdispls;
+    Displacements<int> rdispls;
 };
 
 }

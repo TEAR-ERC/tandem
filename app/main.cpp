@@ -19,17 +19,16 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-
-    std::array<int,2> N = {128,128};
-    auto globalMesh = GenMesh<2>::uniformMesh(N);
-    //std::array<int,3> N = {128,128,128};
-    //auto globalMesh = GenMesh<3>::uniformMesh(N);
+    //std::array<int,2> N = {128,128};
+    //auto globalMesh = GenMesh<2>::uniformMesh(N);
+    std::array<int,3> N = {4,4,4};
+    auto globalMesh = GenMesh<3>::uniformMesh(N);
     globalMesh.repartition();
     auto mesh = globalMesh.getLocalMesh();
 
     std::vector<const char*> variableNames{"x"};
-    XdmfWriter<TRIANGLE> writer(rank, "test", variableNames);
-    //XdmfWriter<TETRAHEDRON> writer(rank, "test", variableNames);
+    //XdmfWriter<TRIANGLE> writer(rank, "test", variableNames);
+    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
     auto flatVerts = mesh.flatVertices<double,3>();
     auto flatElems = mesh.flatElements<unsigned int>();
     writer.init(mesh.numElements(), flatElems.data(),
