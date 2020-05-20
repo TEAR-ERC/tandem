@@ -21,19 +21,11 @@ template <std::size_t D> class LocalFaces {
 public:
     LocalFaces() {}
     LocalFaces(std::vector<Simplex<D>>&& faces) : faces(std::move(faces)) {}
+    LocalFaces(std::vector<Simplex<D>>&& faces, Displacements<int>&& ranklayout)
+        : faces(std::move(faces)), ranklayout(std::move(ranklayout)) {}
 
-    void setSharedRanks(std::vector<int>&& sharedRks, Displacements<int>&& sharedRksDispls) {
-        sharedRanks = std::move(sharedRks);
-        sharedRanksDispls = std::move(sharedRksDispls);
-    }
-
-    auto getSharedRanks(std::size_t lid) const {
-        assert(lid < size());
-        auto from = sharedRanksDispls[lid];
-        return span(&sharedRanks[from], sharedRanksDispls.count(lid));
-    }
-
-    void setG2L(std::unordered_map<int, int> const* G2L) { g2l = G2L; }
+    std::vector<Simplex<D>> const& getFaces() const { return faces; }
+    Displacements<int> const& getRankLayout() const { return ranklayout; }
 
     Simplex<D> const& operator[](std::size_t lid) const {
         assert(lid < size());
@@ -46,9 +38,7 @@ public:
 
 private:
     std::vector<Simplex<D>> faces;
-    std::unordered_map<int, int> const* g2l = nullptr;
-    std::vector<int> sharedRanks;
-    Displacements<int> sharedRanksDispls;
+    Displacements<int> ranklayout;
 };
 
 } // namespace tndm

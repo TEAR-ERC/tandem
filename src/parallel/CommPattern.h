@@ -15,6 +15,7 @@ class AllToAllV {
 public:
     AllToAllV(std::vector<int>&& sndcnts, MPI_Comm comm = MPI_COMM_WORLD);
     AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts, MPI_Comm comm = MPI_COMM_WORLD);
+    AllToAllV(Displacements<int> const& sdispls, MPI_Comm comm = MPI_COMM_WORLD);
 
     void swap();
 
@@ -23,8 +24,9 @@ public:
     auto const& getSendcounts() const { return sendcounts; }
     auto const& getSDispls() const { return sdispls; }
 
-    template<typename T>
-    [[nodiscard]] std::vector<T> exchange(std::vector<T>& dataToSend, MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
+    template <typename T>
+    [[nodiscard]] std::vector<T> exchange(std::vector<T> const& dataToSend,
+                                          MPI_Datatype const& mpiType = mpi_type_t<T>()) const {
         std::vector<T> recvdData(rdispls[procs-1] + recvcounts[procs-1]);
         MPI_Alltoallv(dataToSend.data(), sendcounts.data(), sdispls.data(), mpiType,
                       recvdData.data(), recvcounts.data(), rdispls.data(), mpiType, comm);

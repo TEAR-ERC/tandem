@@ -1,15 +1,16 @@
 #ifndef GENMESH_H
 #define GENMESH_H
 
-#include <cstddef>
-#include <array>
-#include <algorithm>
+#include "GlobalSimplexMesh.h"
+#include "MeshData.h"
+#include "parallel/Distribute.h"
+#include "util/MultiIndex.h"
 
 #include <mpi.h>
 
-#include "parallel/Distribute.h"
-#include "util/MultiIndex.h"
-#include "GlobalSimplexMesh.h"
+#include <algorithm>
+#include <array>
+#include <cstddef>
 
 namespace tndm {
 
@@ -36,9 +37,11 @@ template<> struct TessInfo<3> {
 template<std::size_t D>
 class GenMesh {
 public:
-    using mesh_t = GlobalSimplexMesh<D,double>;
-    using vertex_t = typename mesh_t::vertex_t;
+    using mesh_t = GlobalSimplexMesh<D>;
+    using vertex_t = std::array<double, D>;
     using simplex_t = typename mesh_t::simplex_t;
+
+    std::vector<vertex_t> const& getVertices() const { return vertices; }
 
     /**
     * @brief Tessellate a line (D=1) / rectangle (D=2) / cuboid (D=3) into D-simplices.
@@ -58,7 +61,7 @@ public:
      *
      * @return Mesh of D-simplices
      */
-    static mesh_t uniformMesh(std::array<int,D> N) {
+    mesh_t uniformMesh(std::array<int, D> N) {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -78,7 +81,7 @@ public:
         auto vertsLocal = distribute(Range(numVertsGlobal), rank, size);
 
         const int numVertices = vertsLocal.length();
-        std::vector<vertex_t> vertices(numVertices);
+        vertices.resize(numVertices);
 
         // Map global vertex id to position
         auto vertex_pos = [&N](std::array<int,D> const& v) {
@@ -131,8 +134,11 @@ public:
                       elements.begin()+TessInfo<D>::NumSimplices*(eflat-elemsLocal.from));
         }
 
-        return mesh_t(std::move(vertices), std::move(elements));
+        return mesh_t(vertices.size(), std::move(elements));
     }
+
+private:
+    std::vector<vertex_t> vertices;
 };
 
 }
