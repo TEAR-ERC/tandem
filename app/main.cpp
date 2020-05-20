@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     auto mesh = globalMesh.getLocalMesh();
 
     std::vector<const char*> variableNames{"x"};
-    //XdmfWriter<TRIANGLE> writer(rank, "test", variableNames);
+    //XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
     XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
     auto flatVerts = mesh.flatVertices<double,3>();
     auto flatElems = mesh.flatElements<unsigned int>();

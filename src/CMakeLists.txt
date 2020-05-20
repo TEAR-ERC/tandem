@@ -2,6 +2,7 @@ add_library(tandem-lib
     mesh/GenMesh.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
+    parallel/SortedDistribution.cpp
 )
 
 find_package (MPI REQUIRED)

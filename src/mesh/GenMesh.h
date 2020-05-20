@@ -36,7 +36,7 @@ template<> struct TessInfo<3> {
 template<std::size_t D>
 class GenMesh {
 public:
-    using mesh_t = GlobalSimplexMesh<D,double,int>;
+    using mesh_t = GlobalSimplexMesh<D,double>;
     using vertex_t = typename mesh_t::vertex_t;
     using simplex_t = typename mesh_t::simplex_t;
 

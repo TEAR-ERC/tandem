@@ -5,54 +5,79 @@
 #include <cassert>
 #include <array>
 #include <algorithm>
+#include <utility>
+
+#include "util/Math.h"
 
 namespace tndm {
 
-template<std::size_t D>
-class Simplex {
+template<std::size_t D> class SimplexBase : public std::array<int,D+1> {
 public:
-    Simplex() {}
+    using base_t = std::array<int,D+1>;
 
-    Simplex(std::initializer_list<int> l) {
+    SimplexBase() {}
+
+    SimplexBase(std::initializer_list<int> l) {
         assert(l.size() == D+1);
-        std::copy(l.begin(), l.end(), points.begin());
-        std::sort(points.begin(), points.end());
+        std::copy(l.begin(), l.end(), base_t::begin());
+        std::sort(base_t::begin(), base_t::end());
     }
 
-    Simplex(std::array<int,D+1> const& other) {
-        points = other;
-        std::sort(points.begin(), points.end());
+    SimplexBase(std::array<int,D+1> const& other) : base_t(other) { sort(); }
+    SimplexBase(SimplexBase<D> const& other) : base_t(other) { }
+    SimplexBase(SimplexBase<D>&& other) : base_t(std::move(other)) { }
+    SimplexBase<D>& operator=(SimplexBase<D> const& other) {
+        std::copy(other.begin(), other.end(), this->begin());
+        return *this;
     }
-
-    auto downward() {
-        std::array<Simplex<D-1>,D+1> dws;
-        for (std::size_t f = 0; f < D+1; ++f) {
-            dws[f] = downward(f);
-        }
-        return dws;
-    }
-
-    Simplex<D-1> downward(int f) {
-        Simplex<D-1> dw;
-        auto out = dw.points.begin();
-        for (std::size_t j = 0; j < D+1; ++j) {
-            if (j == f) {
-                continue;
-            }
-            *(out++) = points[j];
-        }
-        return dw;
-    }
-
-    auto begin() const noexcept { return points.cbegin(); }
-    auto end() const noexcept { return points.cend(); }
 
 private:
-    friend class Simplex<D+1>;
-    std::array<int,D+1> points;
+    void sort() {
+        std::sort(base_t::begin(), base_t::end());
+    }
 };
 
-template<> struct Simplex<0> {};
+template<std::size_t D> class Simplex : public SimplexBase<D> {
+public:
+    using SimplexBase<D>::SimplexBase;
+
+    template<std::size_t DD = D-1>
+    auto downward() const {
+        static_assert(DD < D);
+
+        // Choose k out of n vertices
+        constexpr int n = D+1;
+        constexpr int k = DD+1;
+        std::array<Simplex<DD>,binom(n,k)> dws;
+        auto i = dws.begin();
+        
+        Choose<k> choose(n);
+        do {
+            auto j = i->begin();
+            for (auto& c : choose.current()) {
+                *(j++) = (*this)[c];
+            }
+            ++i;
+        } while (choose.next());
+
+        return dws;
+    }
+};
+
+template<> class Simplex<0> : public SimplexBase<0> {
+};
+
+template<std::size_t D> struct SimplexHash {
+    std::size_t operator()(Simplex<D> const& plex) const noexcept {
+        std::hash<typename Simplex<D>::value_type> hasher;
+        std::size_t hash = hasher(plex[0]);
+        // From boost::hash_combine
+        for (auto it = plex.begin()+1; it != plex.end(); ++it) {
+            hash ^= hasher(*it) + 0x9e3779b9 + ((*it) << 6) + ((*it) >> 2);
+        }
+        return hash;
+    }
+};
 
 }
 
