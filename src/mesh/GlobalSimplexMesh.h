@@ -12,14 +12,15 @@
 
 #include <mpi.h>
 
-#include <cstddef>
-#include <vector>
 #include <array>
-#include <utility>
-#include <set>
-#include <numeric>
+#include <cstddef>
 #include <functional>
 #include <iterator>
+#include <numeric>
+#include <set>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace tndm {
 
@@ -103,23 +104,10 @@ public:
     }
 
     LocalSimplexMesh<D> getLocalMesh() const {
-        using loc_vertex_t = typename LocalSimplexMesh<D>::vertex_t;
-        using loc_simplex_t = typename LocalSimplexMesh<D>::simplex_t;
+        auto localFaces = getAllLocalFaces(std::make_index_sequence<D>{});
 
-        SortedDistributionToRank v2r(vtxdist);
-        auto vertex2rank = [&v2r](Simplex<0> const& plex) {
-            return v2r(plex[0]);
-        };
-        auto [GIDs, a2a] = getGIDs<0>(vertex2rank);
-        mpi_array_type<int> mpi_vertex_plex_t(1);
-        auto requestedGIDs = a2a.exchange(GIDs, mpi_vertex_plex_t.get());
-        a2a.swap();
-
+        /*auto g2l = makeG2LMap(GIDs);
         auto localVertices = getLocalVertices(requestedGIDs, a2a);
-        //auto [sharedRanks,sharedRanksLayout] = getSharedRanks(requestedGIDs, a2a);
-
-        auto g2l = makeG2LMap(GIDs);
-
         std::vector<loc_vertex_t> locVerts(localVertices.size());
         auto locVertsIt = locVerts.begin();
         for (auto& vert : localVertices) {
@@ -139,24 +127,44 @@ public:
                 localPlex[d] = g2l[ elem[d] ];
             }
             locElems.emplace_back(std::move(localPlex));
-        }
+        }*/
 
-        return LocalSimplexMesh<D>(std::move(locVerts), std::move(locElems));
+        return LocalSimplexMesh<D>(std::move(localFaces));
     }
 
 private:
-    template<std::size_t DD>
-    auto makeG2LMap(std::vector<Simplex<DD>> const& GIDs) const {
-        std::unordered_map<int, int> g2l;
-        int local = 0;
-        for (auto& GID : GIDs) {
-            g2l[GID[0]] = local++;
-        }
-        return g2l;
+    template <std::size_t... Is> auto getAllLocalFaces(std::index_sequence<Is...>) const {
+        std::vector<Simplex<D>> elemsCopy(elems);
+        return std::make_tuple(getLocalFaces<Is>()..., LocalFaces(std::move(elemsCopy)));
     }
 
-    template<std::size_t DD>
-    auto getGIDs(std::function<int(Simplex<DD> const&)> const& plex2rank) const {
+    template <std::size_t DD> auto getPlex2Rank() const {
+        if constexpr (DD == 0) {
+            SortedDistributionToRank v2r(vtxdist);
+            return [v2r](Simplex<0> const& plex) { return v2r(plex[0]); };
+        } else {
+            return SimplexHash<DD>();
+        }
+    }
+
+    template <std::size_t DD> auto getLocalFaces() const {
+        auto plex2rank = getPlex2Rank<DD>();
+
+        auto [faces, a2a] = getFaces<DD>(plex2rank);
+
+        mpi_array_type<int> mpi_vertex_plex_t(1);
+        auto requestedFaces = a2a.exchange(faces, mpi_vertex_plex_t.get());
+        a2a.swap();
+
+        auto [sharedRanks, sharedRanksLayout] = getSharedRanks<DD>(requestedFaces, a2a);
+
+        LocalFaces<DD> lf(std::move(faces));
+        lf.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksLayout));
+        return lf;
+    }
+
+    template <std::size_t DD>
+    auto getFaces(std::function<int(Simplex<DD> const&)> const& plex2rank) const {
         int procs;
         MPI_Comm_size(comm, &procs);
 
@@ -201,24 +209,23 @@ private:
         return a2a.exchange(requestedVertices, mpi_vertex_t.get());
     }
 
-    auto getSharedRanks(std::vector<int> const& requestedGIDs, AllToAllV const& a2a) const {
+    template <std::size_t DD>
+    auto getSharedRanks(std::vector<Simplex<DD>> const& requestedGIDs, AllToAllV const& a2a) const {
         int procs, rank;
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &procs);
 
-        std::vector<std::vector<int>> sharedRanksInfo(numVertices());
+        std::unordered_map<Simplex<DD>, std::vector<int>, SimplexHash<DD>> sharedRanksInfo;
         for (auto [p,i] : a2a.getSDispls()) {
-            assert(requestedGIDs[i] >= vtxdist[rank] && requestedGIDs[i] < vtxdist[rank+1]);
-            sharedRanksInfo[requestedGIDs[i]-vtxdist[rank]].emplace_back(p);
+            sharedRanksInfo[requestedGIDs[i]].emplace_back(p);
         }
 
         std::vector<int> sharedRanksSendCount;
         sharedRanksSendCount.reserve(requestedGIDs.size());
         std::size_t totalSharedRanksSendCount = 0;
         for (auto& vGID : requestedGIDs) {
-            assert(vGID >= vtxdist[rank] && vGID < vtxdist[rank+1]);
-            sharedRanksSendCount.emplace_back(sharedRanksInfo[vGID-vtxdist[rank]].size());
-            totalSharedRanksSendCount += sharedRanksInfo[vGID-vtxdist[rank]].size();
+            sharedRanksSendCount.emplace_back(sharedRanksInfo[vGID].size());
+            totalSharedRanksSendCount += sharedRanksInfo[vGID].size();
         }
 
         auto sharedRanksRecvCount = a2a.exchange(sharedRanksSendCount);
@@ -226,8 +233,7 @@ private:
         std::vector<int> requestedSharedRanks;
         requestedSharedRanks.reserve(totalSharedRanksSendCount);
         for (auto& vGID : requestedGIDs) {
-            std::copy(sharedRanksInfo[vGID-vtxdist[rank]].begin(),
-                      sharedRanksInfo[vGID-vtxdist[rank]].end(),
+            std::copy(sharedRanksInfo[vGID].begin(), sharedRanksInfo[vGID].end(),
                       std::back_inserter(requestedSharedRanks));
         }
         std::vector<int> sendcounts(procs, 0);

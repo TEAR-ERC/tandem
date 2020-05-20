@@ -14,7 +14,7 @@ class SortedDistributionToRank {
 public:
     SortedDistributionToRank(std::vector<std::size_t> const& dist) : dist(dist), guessSize(dist.back() / (dist.size()-1)) {}
 
-    int operator()(std::size_t id);
+    int operator()(std::size_t id) const;
 
 private:
     std::vector<std::size_t> const& dist;

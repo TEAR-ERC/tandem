@@ -29,11 +29,11 @@ int main(int argc, char** argv) {
     std::vector<const char*> variableNames{"x"};
     //XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
     XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
-    auto flatVerts = mesh.flatVertices<double,3>();
+    /*auto flatVerts = mesh.flatVertices<double,3>();
     auto flatElems = mesh.flatElements<unsigned int>();
     writer.init(mesh.numElements(), flatElems.data(),
                 mesh.numVertices(), flatVerts.data());
-    writer.addTimeStep(0.0);
+    writer.addTimeStep(0.0);*/
 
     MPI_Finalize();
 

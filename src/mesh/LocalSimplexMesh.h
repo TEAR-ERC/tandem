@@ -1,39 +1,45 @@
 #ifndef LOCALSIMPLEXMESH_H
 #define LOCALSIMPLEXMESH_H
 
-#include <cstddef>
-#include <vector>
-#include <utility>
-
-#include <Eigen/Core>
-
+#include "LocalFaces.h"
 #include "Simplex.h"
 
+#include <array>
+#include <cstddef>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 namespace tndm {
+
+namespace detail {
+
+template <std::size_t... Is> auto lfTuple(std::index_sequence<Is...>) {
+    return std::tuple<LocalFaces<Is>...>{};
+}
+template <std::size_t D> auto lfTuple() { return lfTuple(std::make_index_sequence<D>{}); }
+} // namespace detail
 
 template<std::size_t D>
 class LocalSimplexMesh {
 public:
-    using vertex_t = Eigen::Matrix<double, 3, 1>;
-    using simplex_t = Simplex<D>;
+    using storage_t = decltype(detail::lfTuple<D + 1>());
 
-    LocalSimplexMesh(std::vector<vertex_t>&& vertices, std::vector<Simplex<D>>&& elements)
-        : verts(std::move(vertices)), elems(std::move(elements)) {}
-
-    template<unsigned d>
-    std::array<vertex_t,d+1> vertices(unsigned lid) const {
-        static_assert(d == D);
-
-        auto& plex = elems[lid];
-        std::array<vertex_t,d+1> vs;
-        auto out = vs.begin();
-        for (auto& p : plex) {
-            (*out)++ = verts[p];
+    LocalSimplexMesh(storage_t&& localFaces) : lfs(std::move(localFaces)) {
+        int local = 0;
+        for (auto& v : vertices()) {
+            g2l[v[0]] = local++;
         }
-        return vs;
+        setG2L(std::make_index_sequence<D + 1>{});
     }
 
-    template<typename RealT, std::size_t Dout = D>
+    template <std::size_t DD> auto faces() const { return std::get<DD>(lfs); }
+
+    auto vertices() const { return faces<0>(); }
+    auto edges() const { return faces<1>(); }
+    auto facets() const { return faces<D - 1>(); }
+
+    /*template<typename RealT, std::size_t Dout = D>
     std::vector<RealT> flatVertices() const {
         static_assert(Dout >= D);
         std::vector<RealT> vout;
@@ -68,13 +74,17 @@ public:
 
     std::size_t numElements() const {
         return elems.size();
-    }
+    }*/
 
 private:
-    std::vector<vertex_t> verts;
-    std::vector<Simplex<D>> elems;
+    template <std::size_t... Is> void setG2L(std::index_sequence<Is...>) {
+        (faces<Is>().setG2L(&g2l), ...);
+    }
+
+    storage_t lfs;
+    std::unordered_map<int, int> g2l;
 };
 
-}
+} // namespace tndm
 
 #endif // LOCALSIMPLEXMESH_H

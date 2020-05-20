@@ -17,7 +17,7 @@ std::vector<std::size_t> makeSortedDistribution(std::size_t num, MPI_Comm comm) 
     return dist;
 }
 
-int SortedDistributionToRank::operator()(std::size_t id) {
+int SortedDistributionToRank::operator()(std::size_t id) const {
     int guess = static_cast<int>(id / guessSize);
     auto procs = dist.size()-1;
     while (guess > 0 && id < dist[guess]) {
@@ -28,5 +28,4 @@ int SortedDistributionToRank::operator()(std::size_t id) {
     }
     return guess;
 }
-
 }
