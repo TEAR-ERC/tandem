@@ -20,9 +20,10 @@ template <typename IntT, std::size_t D>
 std::vector<IntT> flatElements(LocalSimplexMesh<D> const& mesh) {
     std::vector<IntT> eout;
     eout.reserve((D + 1) * mesh.elements().size());
-    for (auto& e : mesh.elements()) {
-        for (auto& p : e) {
-            eout.push_back(static_cast<IntT>(mesh.g2l(p)));
+    for (auto& elem : mesh.elements()) {
+        auto lids = mesh.template downward<0>(elem);
+        for (auto& lid : lids) {
+            eout.push_back(static_cast<IntT>(lid));
         }
     }
     return eout;
@@ -50,12 +51,17 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    constexpr std::size_t D = 3;
+    std::vector<const char*> variableNames{"x"};
+
+    constexpr std::size_t D = 2;
+    XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
+    std::array<int, 2> N = {128, 128};
+
+    // constexpr std::size_t D = 3;
+    // XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
+    // std::array<int, 3> N = {128, 128, 128};
 
     GenMesh<D> meshGen;
-    // std::array<int,2> N = {128,128};
-    // std::array<int, 3> N = {64, 64, 64};
-    std::array<int, 3> N = {4, 4, 4};
     auto globalMesh = meshGen.uniformMesh(N);
     globalMesh.repartition();
     auto mesh = globalMesh.getLocalMesh();
@@ -65,20 +71,15 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::vector<double> data;
-    data.reserve(mesh.elements().size());
-    for (auto& e : mesh.elements()) {
-        double numShared = 0.0;
-        for (auto& p : e) {
-            auto lid = mesh.g2l(p);
-            numShared += mesh.vertices().getSharedRanks(lid).size();
+    std::vector<double> data(mesh.numElements(), 0.0);
+    for (std::size_t fid = 0; fid < mesh.numFacets(); ++fid) {
+        auto& eids = mesh.upward<D - 1>(fid);
+        for (auto& eid : eids) {
+            assert(eid < data.size());
+            data[eid] += mesh.facets().getSharedRanks(fid).size();
         }
-        data.push_back(numShared);
     }
 
-    std::vector<const char*> variableNames{"x"};
-    //XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
-    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
     auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices());
     auto flatElems = flatElements<unsigned int, D>(mesh);
     writer.init(mesh.elements().size(), flatElems.data(), vertexData->getVertices().size(),

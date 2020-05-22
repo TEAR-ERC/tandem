@@ -37,12 +37,24 @@ private:
     }
 };
 
+template <std::size_t DD, std::size_t D> struct Downward;
+
 template<std::size_t D> class Simplex : public SimplexBase<D> {
 public:
     using SimplexBase<D>::SimplexBase;
 
     template<std::size_t DD = D-1>
     auto downward() const {
+        Downward<DD, D> down;
+        return down(*this);
+    }
+};
+
+template <> class Simplex<0> : public SimplexBase<0> {};
+
+template <std::size_t DD, std::size_t D> struct Downward {
+    auto operator()(Simplex<D> const& plex) {
+        static_assert(0 <= DD);
         static_assert(DD < D);
 
         // Choose k out of n vertices
@@ -55,7 +67,7 @@ public:
         do {
             auto j = i->begin();
             for (auto& c : choose.current()) {
-                *(j++) = (*this)[c];
+                *(j++) = plex[c];
             }
             ++i;
         } while (choose.next());
@@ -64,7 +76,16 @@ public:
     }
 };
 
-template<> class Simplex<0> : public SimplexBase<0> {
+template <std::size_t D> struct Downward<0, D> {
+    auto operator()(Simplex<D> const& plex) {
+        static_assert(0 < D);
+
+        std::array<Simplex<0>, D + 1> dws;
+        for (std::size_t d = 0; d < D + 1; ++d) {
+            dws[d][0] = plex[d];
+        }
+        return dws;
+    }
 };
 
 template<std::size_t D> struct SimplexHash {
