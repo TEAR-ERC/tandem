@@ -31,13 +31,13 @@ namespace tndm {
 template <std::size_t D> class GlobalSimplexMesh {
 public:
     using simplex_t = Simplex<D>;
-    static_assert(sizeof(simplex_t) == (D+1)*sizeof(int));
+    static_assert(sizeof(simplex_t) == (D + 1) * sizeof(uint64_t));
 
-    GlobalSimplexMesh(std::vector<simplex_t>&& elements, std::unique_ptr<MeshData> vertexData,
-                      std::unique_ptr<MeshData> elementData = nullptr,
+    GlobalSimplexMesh(std::vector<simplex_t>&& elements, std::unique_ptr<MeshData> vertexDat,
+                      std::unique_ptr<MeshData> elementDat = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
-        : elems(std::move(elements)), vertexData(std::move(vertexData)),
-          elementData(std::move(elementData)), comm(comm) {
+        : elems(std::move(elements)), vertexData(std::move(vertexDat)),
+          elementData(std::move(elementDat)), comm(comm) {
         assert(vertexData != nullptr);
         vtxdist = makeSortedDistribution(vertexData->size());
     }
@@ -99,7 +99,7 @@ public:
         assert(eIt == enumeration.end());
 
         AllToAllV a2a(std::move(sendcounts), comm);
-        mpi_array_type<int> mpi_simplex_t(D+1);
+        mpi_array_type<uint64_t> mpi_simplex_t(D + 1);
         elems = a2a.exchange(elemsToSend, mpi_simplex_t.get());
 
         if (elementData) {
@@ -130,7 +130,7 @@ private:
         }
     }
 
-    int getVertexLID(Simplex<0> const& plex) const {
+    std::size_t getVertexLID(Simplex<0> const& plex) const {
         int rank;
         MPI_Comm_rank(comm, &rank);
         assert(plex[0] >= vtxdist[rank] && plex[0] < vtxdist[rank + 1]);
@@ -166,7 +166,7 @@ private:
 
         // Exchange data
         AllToAllV a2a(counts, comm);
-        mpi_array_type<int> mpi_plex_t(DD + 1);
+        mpi_array_type<uint64_t> mpi_plex_t(DD + 1);
         auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
         a2a.swap();
 

@@ -55,11 +55,11 @@ int main(int argc, char** argv) {
 
     constexpr std::size_t D = 2;
     XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
-    std::array<int, 2> N = {128, 128};
+    std::array<uint64_t, 2> N = {128, 128};
 
     // constexpr std::size_t D = 3;
     // XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
-    // std::array<int, 3> N = {128, 128, 128};
+    // std::array<uint64_t, 3> N = {128, 128, 128};
 
     GenMesh<D> meshGen;
     auto globalMesh = meshGen.uniformMesh(N);

@@ -51,8 +51,8 @@ public:
     *
     * @return tessellation
     */
-    static std::array<simplex_t,TessInfo<D>::NumSimplices> tessellate(std::array<int,TessInfo<D>::NumInVertGIDs> const& vertGIDs, bool isOdd);
-
+    static std::array<simplex_t, TessInfo<D>::NumSimplices>
+    tessellate(std::array<uint64_t, TessInfo<D>::NumInVertGIDs> const& vertGIDs, bool isOdd);
 
     /**
      * @brief Uniform SimplexMesh generation in D dimensions.
@@ -61,17 +61,17 @@ public:
      *
      * @return Mesh of D-simplices
      */
-    mesh_t uniformMesh(std::array<int, D> N) {
+    mesh_t uniformMesh(std::array<uint64_t, D> N) {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
 
         // vertices live on grid with size (N_1+1) x ... x (N_d+1)
-        std::array<int,D> Np1;
+        std::array<uint64_t, D> Np1;
         for (std::size_t d = 0; d < D; ++d) {
             Np1[d] = N[d] + 1;
         }
-        unsigned numVertsGlobal = 1u;
+        std::size_t numVertsGlobal = 1u;
         for (auto& np1 : Np1) {
             numVertsGlobal *= np1;
         }
@@ -80,11 +80,11 @@ public:
         // For parallel mesh generation we flatten the index and equally distribute vertices
         auto vertsLocal = distribute(Range(numVertsGlobal), rank, size);
 
-        const int numVertices = vertsLocal.length();
+        const std::size_t numVertices = vertsLocal.length();
         std::vector<vertex_t> vertices(numVertices);
 
         // Map global vertex id to position
-        auto vertex_pos = [&N](std::array<int,D> const& v) {
+        auto vertex_pos = [&N](std::array<uint64_t, D> const& v) {
             vertex_t vert;
             for (std::size_t d = 0; d < D; ++d) {
                 vert[d] = static_cast<double>(v[d]) / N[d];
@@ -108,18 +108,18 @@ public:
         auto elemsLocal = distribute(Range(numElemsGlobal), rank, size);
 
         // We have 2 vertices per dim i.e. 2^D vertices per element
-        constexpr int numVertGIDs = (1 << D);
-        std::array<int,D> D2;
+        constexpr uint64_t numVertGIDs = (1 << D);
+        std::array<uint64_t, D> D2;
         std::fill(D2.begin(), D2.end(), 2);
 
-        const int numElements = elemsLocal.length() * TessInfo<D>::NumSimplices;
+        const std::size_t numElements = elemsLocal.length() * TessInfo<D>::NumSimplices;
         std::vector<simplex_t> elements(numElements);
 
         for (auto eflat : elemsLocal) {
             auto e = unflatten(eflat, N);
-            std::array<int,numVertGIDs> vertGIDs;
+            std::array<uint64_t, numVertGIDs> vertGIDs;
             // Get 2^D vertices
-            for (int vflat = 0; vflat < numVertGIDs; ++vflat) {
+            for (uint64_t vflat = 0; vflat < numVertGIDs; ++vflat) {
                 auto v = e + unflatten(vflat, D2);
                 vertGIDs[vflat] = flatten(v,Np1);
             }

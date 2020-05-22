@@ -1,29 +1,30 @@
 #ifndef SIMPLEX_H
 #define SIMPLEX_H
 
-#include <cstddef>
-#include <cassert>
-#include <array>
 #include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <utility>
 
 #include "util/Math.h"
 
 namespace tndm {
 
-template<std::size_t D> class SimplexBase : public std::array<int,D+1> {
+template <std::size_t D> class SimplexBase : public std::array<uint64_t, D + 1> {
 public:
-    using base_t = std::array<int,D+1>;
+    using base_t = std::array<uint64_t, D + 1>;
 
     SimplexBase() {}
 
-    SimplexBase(std::initializer_list<int> l) {
+    SimplexBase(std::initializer_list<uint64_t> l) {
         assert(l.size() == D+1);
         std::copy(l.begin(), l.end(), base_t::begin());
         std::sort(base_t::begin(), base_t::end());
     }
 
-    SimplexBase(std::array<int,D+1> const& other) : base_t(other) { sort(); }
+    SimplexBase(std::array<uint64_t, D + 1> const& other) : base_t(other) { sort(); }
     SimplexBase(SimplexBase<D> const& other) : base_t(other) { }
     SimplexBase(SimplexBase<D>&& other) : base_t(std::move(other)) { }
     SimplexBase<D>& operator=(SimplexBase<D> const& other) {
