@@ -34,9 +34,12 @@ public:
     static_assert(sizeof(simplex_t) == (D+1)*sizeof(int));
 
     GlobalSimplexMesh(std::vector<simplex_t>&& elements, std::unique_ptr<MeshData> vertexData,
+                      std::unique_ptr<MeshData> elementData = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
-        : elems(std::move(elements)), meshData{std::move(vertexData)}, comm(comm) {
-        vtxdist = makeSortedDistribution(meshData[0]->size());
+        : elems(std::move(elements)), vertexData(std::move(vertexData)),
+          elementData(std::move(elementData)), comm(comm) {
+        assert(vertexData != nullptr);
+        vtxdist = makeSortedDistribution(vertexData->size());
     }
 
     std::size_t numElements() const { return elems.size(); }
@@ -99,8 +102,8 @@ public:
         mpi_array_type<int> mpi_simplex_t(D+1);
         elems = a2a.exchange(elemsToSend, mpi_simplex_t.get());
 
-        if (meshData[D]) {
-            meshData[D] = meshData[D]->redistributed(enumeration, a2a);
+        if (elementData) {
+            elementData = elementData->redistributed(enumeration, a2a);
         }
     }
 
@@ -127,15 +130,11 @@ private:
         }
     }
 
-    template <std::size_t DD> int getPlex2LID(Simplex<DD> const& plex) const {
-        if constexpr (DD == 0) {
-            int rank;
-            MPI_Comm_rank(comm, &rank);
-            assert(plex[0] >= vtxdist[rank] && plex[0] < vtxdist[rank + 1]);
-            return plex[0] - vtxdist[rank];
-        }
-        assert(false);
-        return 0;
+    int getVertexLID(Simplex<0> const& plex) const {
+        int rank;
+        MPI_Comm_rank(comm, &rank);
+        assert(plex[0] >= vtxdist[rank] && plex[0] < vtxdist[rank + 1]);
+        return plex[0] - vtxdist[rank];
     }
 
     template <std::size_t DD> auto getFaces() const {
@@ -172,13 +171,15 @@ private:
         a2a.swap();
 
         auto lf = LocalFaces<DD>(std::move(faces));
-        if (meshData[DD]) {
-            std::vector<std::size_t> lids;
-            lids.reserve(requestedFaces.size());
-            for (auto& face : requestedFaces) {
-                lids.emplace_back(getPlex2LID<DD>(face));
+        if constexpr (DD == 0) {
+            if (vertexData) {
+                std::vector<std::size_t> lids;
+                lids.reserve(requestedFaces.size());
+                for (auto& face : requestedFaces) {
+                    lids.emplace_back(getVertexLID(face));
+                }
+                lf.setMeshData(vertexData->redistributed(lids, a2a));
             }
-            lf.setMeshData(meshData[DD]->redistributed(lids, a2a));
         }
 
         getSharedRanks(lf, requestedFaces, a2a);
@@ -229,7 +230,8 @@ private:
     }
 
     std::vector<simplex_t> elems;
-    std::array<std::unique_ptr<MeshData>, D + 1> meshData;
+    std::unique_ptr<MeshData> vertexData;
+    std::unique_ptr<MeshData> elementData;
     MPI_Comm comm;
     std::vector<std::size_t> vtxdist;
 };
