@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <memory>
 
 namespace tndm {
 
@@ -38,10 +39,9 @@ template<std::size_t D>
 class GenMesh {
 public:
     using mesh_t = GlobalSimplexMesh<D>;
-    using vertex_t = std::array<double, D>;
     using simplex_t = typename mesh_t::simplex_t;
-
-    std::vector<vertex_t> const& getVertices() const { return vertices; }
+    using vertex_data_t = VertexData<D>;
+    using vertex_t = typename vertex_data_t::vertex_t;
 
     /**
     * @brief Tessellate a line (D=1) / rectangle (D=2) / cuboid (D=3) into D-simplices.
@@ -81,7 +81,7 @@ public:
         auto vertsLocal = distribute(Range(numVertsGlobal), rank, size);
 
         const int numVertices = vertsLocal.length();
-        vertices.resize(numVertices);
+        std::vector<vertex_t> vertices(numVertices);
 
         // Map global vertex id to position
         auto vertex_pos = [&N](std::array<int,D> const& v) {
@@ -134,11 +134,9 @@ public:
                       elements.begin()+TessInfo<D>::NumSimplices*(eflat-elemsLocal.from));
         }
 
-        return mesh_t(vertices.size(), std::move(elements));
+        auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
+        return mesh_t(std::move(elements), std::move(vertexData));
     }
-
-private:
-    std::vector<vertex_t> vertices;
 };
 
 }

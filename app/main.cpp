@@ -11,7 +11,7 @@
 
 using tndm::GenMesh;
 using tndm::LocalSimplexMesh;
-using tndm::MeshData;
+using tndm::VertexData;
 using xdmfwriter::TETRAHEDRON;
 using xdmfwriter::TRIANGLE;
 using xdmfwriter::XdmfWriter;
@@ -53,15 +53,17 @@ int main(int argc, char** argv) {
     constexpr std::size_t D = 3;
 
     GenMesh<D> meshGen;
-    //std::array<int,2> N = {128,128};
-    std::array<int, 3> N = {32, 32, 32};
+    // std::array<int,2> N = {128,128};
+    // std::array<int, 3> N = {64, 64, 64};
+    std::array<int, 3> N = {4, 4, 4};
     auto globalMesh = meshGen.uniformMesh(N);
     globalMesh.repartition();
     auto mesh = globalMesh.getLocalMesh();
 
-    MeshData<0> vertexMeshData(mesh.faces<0>());
-    auto vertices = vertexMeshData.getLocalData(meshGen.getVertices(), globalMesh);
-    auto [sharedRanks, sharedRanksDispls] = vertexMeshData.getSharedRanks();
+    auto vertexData = dynamic_cast<VertexData<D> const*>(mesh.vertices().data());
+    if (!vertexData) {
+        return 1;
+    }
 
     std::vector<double> data;
     data.reserve(mesh.elements().size());
@@ -69,7 +71,7 @@ int main(int argc, char** argv) {
         double numShared = 0.0;
         for (auto& p : e) {
             auto lid = mesh.g2l(p);
-            numShared += sharedRanksDispls.count(lid);
+            numShared += mesh.vertices().getSharedRanks(lid).size();
         }
         data.push_back(numShared);
     }
@@ -77,9 +79,10 @@ int main(int argc, char** argv) {
     std::vector<const char*> variableNames{"x"};
     //XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
     XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
-    auto flatVerts = flatVertices<double, D, 3>(vertices);
+    auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices());
     auto flatElems = flatElements<unsigned int, D>(mesh);
-    writer.init(mesh.elements().size(), flatElems.data(), vertices.size(), flatVerts.data());
+    writer.init(mesh.elements().size(), flatElems.data(), vertexData->getVertices().size(),
+                flatVerts.data());
     writer.addTimeStep(0.0);
     writer.writeData(0, data.data());
     writer.flush();

@@ -9,80 +9,45 @@
 
 #include <array>
 #include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace tndm {
 
-template <std::size_t DD> class MeshData {
+class MeshData {
 public:
-    MeshData(LocalFaces<DD> const& faces, MPI_Comm comm = MPI_COMM_WORLD)
-        : fs(faces), comm(comm), a2a(faces.getRankLayout(), comm) {
-        mpi_array_type<int> mpi_vertex_plex_t(1);
-        requestedFaces = a2a.exchange(faces.getFaces(), mpi_vertex_plex_t.get());
-        a2a.swap();
+    virtual ~MeshData() {}
+    virtual std::size_t size() const = 0;
+    virtual std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
+                                                    AllToAllV const& a2a) const = 0;
+};
+
+template <std::size_t SpaceD> class VertexData : public MeshData {
+public:
+    using vertex_t = std::array<double, SpaceD>;
+
+    VertexData(std::vector<vertex_t>&& vertices) : vertices(std::move(vertices)) {}
+    virtual ~VertexData() {}
+
+    std::size_t size() const override { return vertices.size(); }
+
+    std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
+                                            AllToAllV const& a2a) const override {
+        std::vector<std::array<double, SpaceD>> requestedVertices;
+        requestedVertices.reserve(lids.size());
+        for (auto& lid : lids) {
+            requestedVertices.emplace_back(vertices[lid]);
+        }
+
+        mpi_array_type<double> mpi_t(SpaceD);
+        auto newVertices = a2a.exchange(requestedVertices, mpi_t.get());
+        return std::make_unique<VertexData>(std::move(newVertices));
     }
 
-    template <typename T, std::size_t N, std::size_t D>
-    auto getLocalData(std::vector<std::array<T, N>> const& globalData,
-                      GlobalSimplexMesh<D> const& globalMesh) const {
-        int rank;
-        MPI_Comm_rank(comm, &rank);
-
-        std::vector<std::array<T, N>> requestedData;
-        requestedData.reserve(requestedFaces.size());
-        for (auto& face : requestedFaces) {
-            requestedData.emplace_back(globalData[globalMesh.template simplex2Location<DD>(face)]);
-        }
-
-        mpi_array_type<T> mpi_t(N);
-        return a2a.exchange(requestedData, mpi_t.get());
-    }
-
-    auto getSharedRanks() const {
-        int procs;
-        MPI_Comm_size(comm, &procs);
-
-        std::unordered_map<Simplex<DD>, std::vector<int>, SimplexHash<DD>> sharedRanksInfo;
-        for (auto [p, i] : a2a.getSDispls()) {
-            sharedRanksInfo[requestedFaces[i]].emplace_back(p);
-        }
-
-        std::vector<int> sharedRanksSendCount;
-        sharedRanksSendCount.reserve(requestedFaces.size());
-        std::size_t totalSharedRanksSendCount = 0;
-        for (auto& face : requestedFaces) {
-            sharedRanksSendCount.emplace_back(sharedRanksInfo[face].size());
-            totalSharedRanksSendCount += sharedRanksInfo[face].size();
-        }
-
-        auto sharedRanksRecvCount = a2a.exchange(sharedRanksSendCount);
-
-        std::vector<int> requestedSharedRanks;
-        requestedSharedRanks.reserve(totalSharedRanksSendCount);
-        for (auto& face : requestedFaces) {
-            std::copy(sharedRanksInfo[face].begin(), sharedRanksInfo[face].end(),
-                      std::back_inserter(requestedSharedRanks));
-        }
-        std::vector<int> sendcounts(procs, 0);
-        std::vector<int> recvcounts(procs, 0);
-        for (auto [p, i] : a2a.getSDispls()) {
-            sendcounts[p] += sharedRanksSendCount[i];
-        }
-        for (auto [p, i] : a2a.getRDispls()) {
-            recvcounts[p] += sharedRanksRecvCount[i];
-        }
-
-        AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts));
-        auto sharedRanks = a2aSharedRanks.exchange(requestedSharedRanks);
-        Displacements sharedRanksDispls(sharedRanksRecvCount);
-
-        return std::make_pair(std::move(sharedRanks), std::move(sharedRanksDispls));
-    }
+    std::vector<vertex_t> const& getVertices() const { return vertices; }
 
 private:
-    LocalFaces<DD> const& fs;
-    MPI_Comm comm;
-    AllToAllV a2a;
-    std::vector<Simplex<DD>> requestedFaces;
+    std::vector<vertex_t> vertices;
 };
 
 } // namespace tndm
