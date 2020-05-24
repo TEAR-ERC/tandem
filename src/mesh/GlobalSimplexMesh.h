@@ -32,17 +32,26 @@ template <std::size_t D> class GlobalSimplexMesh {
 public:
     using simplex_t = Simplex<D>;
     static_assert(sizeof(simplex_t) == (D + 1) * sizeof(uint64_t));
+    template <std::size_t DD> using global_mesh_ptr = std::unique_ptr<GlobalSimplexMesh<DD>>;
 
-    GlobalSimplexMesh(std::vector<simplex_t>&& elements, std::unique_ptr<MeshData> vertexDat,
+    GlobalSimplexMesh(std::vector<simplex_t>&& elements,
+                      std::unique_ptr<MeshData> vertexDat = nullptr,
                       std::unique_ptr<MeshData> elementDat = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
         : elems(std::move(elements)), vertexData(std::move(vertexDat)),
-          elementData(std::move(elementDat)), comm(comm) {
-        assert(vertexData != nullptr);
-        vtxdist = makeSortedDistribution(vertexData->size());
+          elementData(std::move(elementDat)), comm(comm), isPartitionedByHash(false) {
+        if (vertexData) {
+            vtxdist = makeSortedDistribution(vertexData->size());
+        }
     }
 
+    auto const& getElements() const { return elems; }
     std::size_t numElements() const { return elems.size(); }
+
+    template <std::size_t DD> void setBoundaryMesh(global_mesh_ptr<DD> boundaryMesh) {
+        static_assert(0 < DD && DD < D);
+        std::get<DD>(boundaryMeshes) = std::move(boundaryMesh);
+    }
 
     template<typename OutIntT>
     DistributedCSR<OutIntT> distributedCSR() const {
@@ -70,12 +79,50 @@ public:
     }
 
     void repartition() {
+        auto distCSR = distributedCSR<idx_t>();
+        auto partition = MetisPartitioner::partition(distCSR, D);
+
+        doPartition(partition);
+        isPartitionedByHash = false;
+    }
+
+    void repartitionByHash() {
+        if (isPartitionedByHash) {
+            return;
+        }
+        std::vector<idx_t> partition;
+        partition.reserve(numElements());
+        auto plex2rank = getPlex2Rank<D>();
+        for (auto& e : elems) {
+            partition.emplace_back(plex2rank(e));
+        }
+
+        doPartition(partition);
+        isPartitionedByHash = true;
+    }
+
+    std::unique_ptr<LocalSimplexMesh<D>> getLocalMesh() const {
+        auto localFaces = getAllLocalFaces(std::make_index_sequence<D>{});
+
+        return std::make_unique<LocalSimplexMesh<D>>(std::move(localFaces));
+    }
+
+private:
+    template <std::size_t DD> friend class GlobalSimplexMesh;
+
+    auto makeG2LMap() const {
+        std::unordered_map<Simplex<D>, std::size_t, SimplexHash<D>> map;
+        std::size_t local = 0;
+        for (auto& e : elems) {
+            map[e] = local++;
+        }
+        return map;
+    }
+
+    void doPartition(std::vector<idx_t> const& partition) {
         int procs, rank;
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &procs);
-
-        auto distCSR = distributedCSR<idx_t>();
-        auto partition = MetisPartitioner::partition(distCSR, D);
         assert(partition.size() == numElements());
 
         std::vector<std::size_t> enumeration(partition.size());
@@ -107,25 +154,22 @@ public:
         }
     }
 
-    LocalSimplexMesh<D> getLocalMesh() const {
-        auto localFaces = getAllLocalFaces(std::make_index_sequence<D>{});
-
-        return LocalSimplexMesh<D>(std::move(localFaces));
-    }
-
-private:
     template <std::size_t... Is> auto getAllLocalFaces(std::index_sequence<Is...>) const {
         std::vector<Simplex<D>> elemsCopy(elems);
         return std::make_tuple(getFaces<Is>()..., LocalFaces<D>(std::move(elemsCopy)));
     }
 
     template <std::size_t DD> auto getPlex2Rank() const {
+        int procs;
+        MPI_Comm_size(comm, &procs);
         if constexpr (DD == 0) {
-            SortedDistributionToRank v2r(vtxdist);
-            return [v2r](Simplex<0> const& plex) { return v2r(plex[0]); };
+            if (vtxdist.size() > 0) {
+                SortedDistributionToRank v2r(vtxdist);
+                return std::function([v2r](Simplex<0> const& plex) -> int { return v2r(plex[0]); });
+            }
+            return std::function(
+                [procs](Simplex<0> const& plex) -> int { return plex[0] % procs; });
         } else {
-            int procs;
-            MPI_Comm_size(comm, &procs);
             return [procs](Simplex<DD> const& plex) { return SimplexHash<DD>()(plex) % procs; };
         }
     }
@@ -180,6 +224,23 @@ private:
                 }
                 lf.setMeshData(vertexData->redistributed(lids, a2a));
             }
+        } else if constexpr (0 < DD && DD < D) {
+            auto& boundaryMesh = std::get<DD>(boundaryMeshes);
+            if (boundaryMesh && boundaryMesh->elementData) {
+                boundaryMesh->repartitionByHash();
+                auto map = boundaryMesh->makeG2LMap();
+                std::vector<std::size_t> lids;
+                lids.reserve(requestedFaces.size());
+                for (auto& face : requestedFaces) {
+                    auto it = map.find(face);
+                    if (it == map.end()) {
+                        lids.emplace_back(std::numeric_limits<std::size_t>::max());
+                    } else {
+                        lids.emplace_back(it->second);
+                    }
+                }
+                lf.setMeshData(boundaryMesh->elementData->redistributed(lids, a2a));
+            }
         }
 
         getSharedRanks(lf, requestedFaces, a2a);
@@ -233,7 +294,9 @@ private:
     std::unique_ptr<MeshData> vertexData;
     std::unique_ptr<MeshData> elementData;
     MPI_Comm comm;
+    bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;
+    ntuple_t<global_mesh_ptr, D> boundaryMeshes;
 };
 }
 

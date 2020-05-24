@@ -9,6 +9,7 @@
 
 #include "xdmfwriter/XdmfWriter.h"
 
+using tndm::BoundaryData;
 using tndm::GenMesh;
 using tndm::LocalSimplexMesh;
 using tndm::VertexData;
@@ -51,41 +52,46 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    std::vector<const char*> variableNames{"x"};
+    std::vector<const char*> variableNames{"x", "bc"};
 
-    constexpr std::size_t D = 2;
-    XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
-    std::array<uint64_t, 2> N = {128, 128};
+    // constexpr std::size_t D = 2;
+    // XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
+    // std::array<uint64_t, 2> N = {128, 128};
 
-    // constexpr std::size_t D = 3;
-    // XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
-    // std::array<uint64_t, 3> N = {128, 128, 128};
+    constexpr std::size_t D = 3;
+    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
+    std::array<uint64_t, 3> N = {16, 16, 16};
 
-    GenMesh<D> meshGen;
-    auto globalMesh = meshGen.uniformMesh(N);
-    globalMesh.repartition();
-    auto mesh = globalMesh.getLocalMesh();
+    GenMesh<D> meshGen(N);
+    auto globalMesh = meshGen.uniformMesh();
+    globalMesh->repartition();
 
-    auto vertexData = dynamic_cast<VertexData<D> const*>(mesh.vertices().data());
-    if (!vertexData) {
+    auto mesh = globalMesh->getLocalMesh();
+
+    auto vertexData = dynamic_cast<VertexData<D> const*>(mesh->vertices().data());
+    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
+    if (!vertexData || !boundaryData) {
         return 1;
     }
 
-    std::vector<double> data(mesh.numElements(), 0.0);
-    for (std::size_t fid = 0; fid < mesh.numFacets(); ++fid) {
-        auto& eids = mesh.upward<D - 1>(fid);
+    std::vector<double> data(mesh->numElements(), 0.0);
+    std::vector<double> bc(mesh->numElements(), 0.0);
+    for (std::size_t fid = 0; fid < mesh->numFacets(); ++fid) {
+        auto& eids = mesh->upward<D - 1>(fid);
         for (auto& eid : eids) {
             assert(eid < data.size());
-            data[eid] += mesh.facets().getSharedRanks(fid).size();
+            data[eid] += mesh->facets().getSharedRanks(fid).size();
+            bc[eid] += boundaryData->getBoundaryConditions()[fid];
         }
     }
 
     auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices());
-    auto flatElems = flatElements<unsigned int, D>(mesh);
-    writer.init(mesh.elements().size(), flatElems.data(), vertexData->getVertices().size(),
+    auto flatElems = flatElements<unsigned int, D>(*mesh);
+    writer.init(mesh->elements().size(), flatElems.data(), vertexData->getVertices().size(),
                 flatVerts.data());
     writer.addTimeStep(0.0);
     writer.writeData(0, data.data());
+    writer.writeData(1, bc.data());
     writer.flush();
 
     MPI_Finalize();

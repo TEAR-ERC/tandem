@@ -36,6 +36,7 @@ public:
         std::vector<std::array<double, SpaceD>> requestedVertices;
         requestedVertices.reserve(lids.size());
         for (auto& lid : lids) {
+            assert(lid < vertices.size());
             requestedVertices.emplace_back(vertices[lid]);
         }
 
@@ -48,6 +49,35 @@ public:
 
 private:
     std::vector<vertex_t> vertices;
+};
+
+class BoundaryData : public MeshData {
+public:
+    BoundaryData(std::vector<int>&& BCs) : boundaryConditions(std::move(BCs)) {}
+    virtual ~BoundaryData() {}
+
+    std::size_t size() const override { return boundaryConditions.size(); }
+
+    std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
+                                            AllToAllV const& a2a) const override {
+        std::vector<int> requestedBCs;
+        requestedBCs.reserve(lids.size());
+        for (auto& lid : lids) {
+            if (lid == std::numeric_limits<std::size_t>::max()) {
+                requestedBCs.emplace_back(0);
+            } else {
+                requestedBCs.emplace_back(boundaryConditions[lid]);
+            }
+        }
+
+        auto newBCs = a2a.exchange(requestedBCs);
+        return std::make_unique<BoundaryData>(std::move(newBCs));
+    }
+
+    std::vector<int> const& getBoundaryConditions() const { return boundaryConditions; }
+
+private:
+    std::vector<int> boundaryConditions;
 };
 
 } // namespace tndm

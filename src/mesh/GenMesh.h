@@ -40,6 +40,9 @@ class GenMesh {
 public:
     using mesh_t = GlobalSimplexMesh<D>;
     using simplex_t = typename mesh_t::simplex_t;
+    using boundary_mesh_t = GlobalSimplexMesh<D - 1>;
+    using boundary_simplex_t = typename boundary_mesh_t::simplex_t;
+    using boundary_data_t = BoundaryData;
     using vertex_data_t = VertexData<D>;
     using vertex_t = typename vertex_data_t::vertex_t;
 
@@ -55,22 +58,27 @@ public:
     tessellate(std::array<uint64_t, TessInfo<D>::NumInVertGIDs> const& vertGIDs, bool isOdd);
 
     /**
-     * @brief Uniform SimplexMesh generation in D dimensions.
+     * @brief
      *
      * @param N array of (cuboid) elements in dimension d
-     *
-     * @return Mesh of D-simplices
      */
-    mesh_t uniformMesh(std::array<uint64_t, D> N) {
+    GenMesh(std::array<uint64_t, D> const& N) : N(N) {
+        // vertices live on grid with size (N_1+1) x ... x (N_d+1)
+        for (std::size_t d = 0; d < D; ++d) {
+            Np1[d] = N[d] + 1;
+        }
+    }
+
+    /**
+     * @brief Uniform SimplexMesh generation in D dimensions.
+     *
+     * @return Mesh of D-simplices and boundary mesh of (D-1)-simplices
+     */
+    std::unique_ptr<mesh_t> uniformMesh() {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-        // vertices live on grid with size (N_1+1) x ... x (N_d+1)
-        std::array<uint64_t, D> Np1;
-        for (std::size_t d = 0; d < D; ++d) {
-            Np1[d] = N[d] + 1;
-        }
         std::size_t numVertsGlobal = 1u;
         for (auto& np1 : Np1) {
             numVertsGlobal *= np1;
@@ -84,7 +92,7 @@ public:
         std::vector<vertex_t> vertices(numVertices);
 
         // Map global vertex id to position
-        auto vertex_pos = [&N](std::array<uint64_t, D> const& v) {
+        auto vertex_pos = [&](std::array<uint64_t, D> const& v) {
             vertex_t vert;
             for (std::size_t d = 0; d < D; ++d) {
                 vert[d] = static_cast<double>(v[d]) / N[d];
@@ -135,8 +143,38 @@ public:
         }
 
         auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
-        return mesh_t(std::move(elements), std::move(vertexData));
+        auto mesh = std::make_unique<mesh_t>(std::move(elements), std::move(vertexData));
+        auto boundaryMesh = extractBoundaryMesh(*mesh);
+        mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
+        return mesh;
     }
+
+    std::unique_ptr<boundary_mesh_t> extractBoundaryMesh(mesh_t const& mesh) {
+        std::vector<boundary_simplex_t> boundaryElements;
+        std::vector<int> boundaryConditions;
+        for (auto& elem : mesh.getElements()) {
+            for (auto& face : elem.downward()) {
+                for (std::size_t d = 0; d < D; ++d) {
+                    bool faceAtBnd = true;
+                    for (auto& vflat : face) {
+                        auto v = unflatten(vflat, Np1);
+                        faceAtBnd = faceAtBnd && ((v[d] == 0) || (v[d] == Np1[d] - 1));
+                    }
+                    if (faceAtBnd) {
+                        boundaryElements.emplace_back(face);
+                        boundaryConditions.emplace_back(d + 1);
+                    }
+                }
+            }
+        }
+        auto boundaryData = std::make_unique<boundary_data_t>(std::move(boundaryConditions));
+        return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
+                                                 std::move(boundaryData));
+    }
+
+private:
+    std::array<uint64_t, D> N;
+    std::array<uint64_t, D> Np1;
 };
 
 }
