@@ -14,6 +14,11 @@
 
 namespace tndm {
 
+/**
+ * @brief Class that holds a distributed D-simplex mesh with ghost entities.
+ *
+ * @tparam D simplex dimension
+ */
 template<std::size_t D>
 class LocalSimplexMesh {
 public:

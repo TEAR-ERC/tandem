@@ -3,6 +3,8 @@
 
 #include <vector>
 
+namespace tndm {
+
 template<typename T>
 struct DistributedCSR {
     std::vector<T> dist;
@@ -10,5 +12,6 @@ struct DistributedCSR {
     std::vector<T> rowPtr;
 };
 
+} // namespace tndm
 
 #endif // DISTRIBUTEDCSR_H

@@ -28,6 +28,19 @@
 
 namespace tndm {
 
+/**
+ * @brief Class that holds a distributed D-simplex mesh.
+ *
+ * Global means that vertices and elements (an element is a D-simplex) exist only once in the
+ * distributed memory space. Moreover, vertices and elements are distributed independently, that is,
+ * the vertices required by an element may not reside on the same rank.
+ *
+ * One may attach vertex data and element data to a global mesh. If you need facet data or edge
+ * data, then you have to add a boundary mesh. (The element data on the boundary mesh is then going
+ * to be the edge or facet data.)
+ *
+ * @tparam D simplex dimension
+ */
 template <std::size_t D> class GlobalSimplexMesh {
 public:
     using simplex_t = Simplex<D>;
@@ -53,6 +66,13 @@ public:
         std::get<DD>(boundaryMeshes) = std::move(boundaryMesh);
     }
 
+    /**
+     * @brief Mesh topology for partitioning.
+     *
+     * @tparam OutIntT Integer type of distributed CSR.
+     *
+     * @return Returns mesh in distributed CSR format as required by ParMETIS.
+     */
     template<typename OutIntT>
     DistributedCSR<OutIntT> distributedCSR() const {
         DistributedCSR<OutIntT> csr;
@@ -78,6 +98,9 @@ public:
         return csr;
     }
 
+    /**
+     * @brief Use ParMETIS to optimise mesh partitioning.
+     */
     void repartition() {
         auto distCSR = distributedCSR<idx_t>();
         auto partition = MetisPartitioner::partition(distCSR, D);
@@ -86,6 +109,11 @@ public:
         isPartitionedByHash = false;
     }
 
+    /**
+     * @brief Partition elements by their hash value (SimplexHash).
+     *
+     * Should only be used for efficient element data queries. Otherwise use repartition().
+     */
     void repartitionByHash() {
         if (isPartitionedByHash) {
             return;
@@ -101,6 +129,11 @@ public:
         isPartitionedByHash = true;
     }
 
+    /**
+     * @brief Local mesh construction with ghost entities.
+     *
+     * @return
+     */
     std::unique_ptr<LocalSimplexMesh<D>> getLocalMesh() const {
         auto localFaces = getAllLocalFaces(std::make_index_sequence<D>{});
 

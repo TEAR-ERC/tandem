@@ -3,6 +3,8 @@
 
 #include <mpi.h>
 
+namespace tndm {
+
 template<typename T> struct mpi_type;
 template<typename T> inline MPI_Datatype mpi_type_t() { return mpi_type<T>::type(); }
 
@@ -35,5 +37,6 @@ private:
     MPI_Datatype type;
 };
 
+} // namespace tndm
 
 #endif // MPITRAITS_H
