@@ -53,8 +53,7 @@ TEST_CASE("Basis") {
     SUBCASE("Dubiner polynomials on tetrahedron") {
         for (auto& t : tetraBFs) {
             for (auto& p : testPoints) {
-                CHECK(TetraDubinerP(t.first[0], t.first[1], t.first[2], p[0], p[1], p[2]) ==
-                      doctest::Approx(t.second(p)));
+                CHECK(TetraDubinerP(t.first, p) == doctest::Approx(t.second(p)));
             }
         }
     }
@@ -110,7 +109,7 @@ TEST_CASE("Basis") {
     SUBCASE("Dubiner polynomials gradients on tetrahedron") {
         for (auto& t : gradTetraBFs) {
             for (auto& p : testPoints) {
-                auto grad = gradTetraDubinerP(t.first[0], t.first[1], t.first[2], p[0], p[1], p[2]);
+                auto grad = gradTetraDubinerP(t.first, p);
                 auto refGrad = t.second(p);
                 for (std::size_t d = 0; d < grad.size(); ++d) {
                     CHECK(grad[d] == doctest::Approx(refGrad[d]));

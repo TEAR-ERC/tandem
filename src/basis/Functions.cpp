@@ -90,31 +90,31 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
     return {Pm, ddxPm, ddyPm};
 }
 
-double TetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta, double zeta) {
-    double r_num = 2.0 * xi - 1.0 + eta + zeta;
-    double s_num = 2.0 * eta - 1.0 + zeta;
-    double t = 2.0 * zeta - 1.0;
-    double sigmatheta = 1.0 - eta - zeta;
-    double theta = 1.0 - zeta;
+double TetraDubinerP(std::array<unsigned, 3> const& i, std::array<double, 3> const& xi) {
+    double r_num = 2.0 * xi[0] - 1.0 + xi[1] + xi[2];
+    double s_num = 2.0 * xi[1] - 1.0 + xi[2];
+    double t = 2.0 * xi[2] - 1.0;
+    double sigmatheta = 1.0 - xi[1] - xi[2];
+    double theta = 1.0 - xi[2];
 
-    double ti = SingularityFreeJacobiP(i, 0, 0, r_num, sigmatheta);
-    double tij = SingularityFreeJacobiP(j, 2 * i + 1, 0, s_num, theta);
-    double tijk = SingularityFreeJacobiP(k, 2 * i + 2 * j + 2, 0, t, 1.0);
+    double ti = SingularityFreeJacobiP(i[0], 0, 0, r_num, sigmatheta);
+    double tij = SingularityFreeJacobiP(i[1], 2 * i[0] + 1, 0, s_num, theta);
+    double tijk = SingularityFreeJacobiP(i[2], 2 * i[0] + 2 * i[1] + 2, 0, t, 1.0);
 
     return ti * tij * tijk;
 }
 
-std::array<double, 3> gradTetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta,
-                                        double zeta) {
-    double r_num = 2.0 * xi - 1.0 + eta + zeta;
-    double s_num = 2.0 * eta - 1.0 + zeta;
-    double t = 2.0 * zeta - 1.0;
-    double sigmatheta = 1.0 - eta - zeta;
-    double theta = 1.0 - zeta;
+std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
+                                        std::array<double, 3> const& xi) {
+    double r_num = 2.0 * xi[0] - 1.0 + xi[1] + xi[2];
+    double s_num = 2.0 * xi[1] - 1.0 + xi[2];
+    double t = 2.0 * xi[2] - 1.0;
+    double sigmatheta = 1.0 - xi[1] - xi[2];
+    double theta = 1.0 - xi[2];
 
-    auto ti = SingularityFreeJacobiPAndDerivatives(i, 0, 0, r_num, sigmatheta);
-    auto tij = SingularityFreeJacobiPAndDerivatives(j, 2 * i + 1, 0, s_num, theta);
-    auto tijk = SingularityFreeJacobiPAndDerivatives(k, 2 * i + 2 * j + 2, 0, t, 1.0);
+    auto ti = SingularityFreeJacobiPAndDerivatives(i[0], 0, 0, r_num, sigmatheta);
+    auto tij = SingularityFreeJacobiPAndDerivatives(i[1], 2 * i[0] + 1, 0, s_num, theta);
+    auto tijk = SingularityFreeJacobiPAndDerivatives(i[2], 2 * i[0] + 2 * i[1] + 2, 0, t, 1.0);
 
     auto ddalpha = [&](double dr_num, double dsigmatheta, double ds_num, double dtheta, double dt) {
         return (ti[1] * dr_num + ti[2] * dsigmatheta) * tij[0] * tijk[0] +

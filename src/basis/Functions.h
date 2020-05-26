@@ -85,20 +85,30 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
                                                            double x, double y);
 
 /**
- * @brief Evaluate Dubiner basis on tetrahedron
+ * @brief Evaluate Dubiner basis on reference tetrahedron
+ *
+ * Reference tetrahedron is (0,0,0), (1,0,0), (0,1,0), (0,0,1).
  *
  * Singularity-free variant inspired by
  * R. C. Kirby, "Singularity-free evaluation of collapsed-coordinate orthogonal polynomials",
  * ACM TOMS 37.1, Article 5, doi: 10.1145/1644001.1644006
  *
+ * @param i multi-index specifying the polynomial degree
+ * @param point in reference tetrahedron
+ *
+ * @return Function value at xi
  */
-double TetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta, double zeta);
+double TetraDubinerP(std::array<unsigned, 3> const& i, std::array<double, 3> const& xi);
 
 /**
  * @brief Gradient of Dubiner basis on tetrahedron
+ *
+ * See TetraDubinerP.
+ *
+ * @return Gradient at xi
  */
-std::array<double, 3> gradTetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta,
-                                        double zeta);
+std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
+                                        std::array<double, 3> const& xi);
 
 } // namespace tndm
 
