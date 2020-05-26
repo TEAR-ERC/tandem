@@ -1,0 +1,129 @@
+#include "Functions.h"
+
+namespace tndm {
+
+unsigned factorial(unsigned n) {
+    unsigned f = 1;
+    while (n > 0) {
+        f *= n;
+        --n;
+    }
+    return f;
+}
+
+double JacobiP(unsigned n, unsigned a, unsigned b, double x) {
+    if (n == 0) {
+        return 1.0;
+    }
+    double Pm_2;
+    double Pm_1 = 1.0;
+    double Pm = 0.5 * a - 0.5 * b + (1.0 + 0.5 * (a + b)) * x;
+    double a2_b2 = static_cast<double>(a * a) - static_cast<double>(b * b);
+    for (unsigned m = 2; m <= n; ++m) {
+        Pm_2 = Pm_1;
+        Pm_1 = Pm;
+        Pm = ((2.0 * m + a + b - 1.0) * (a2_b2 + (2.0 * m + a + b) * (2.0 * m + a + b - 2.0) * x) *
+                  Pm_1 -
+              2.0 * (m + a - 1.0) * (m + b - 1.0) * (2.0 * m + a + b) * Pm_2) /
+             (2.0 * m * (m + a + b) * (2.0 * m + a + b - 2.0));
+    }
+    return Pm;
+}
+
+std::array<double, 5> SingularityFreeJacobiPFactors(unsigned m, unsigned a, unsigned b) {
+    double c_0 = 2.0 * m + a + b;
+    double c_1 = c_0 - 1.0;
+    double c_2 = static_cast<double>(a * a) - static_cast<double>(b * b);
+    double c_3 = c_0 * (c_0 - 2.0);
+    double c_4 = 2.0 * (m + a - 1.0) * (m + b - 1.0) * c_0;
+    double c_5 = 2.0 * m * (m + a + b) * (c_0 - 2.0);
+    return {c_1, c_2, c_3, c_4, c_5};
+}
+
+double SingularityFreeJacobiPRecursion(unsigned m, unsigned a, unsigned b, double x, double y,
+                                       std::array<double, 5> const& c, double Pm_1, double Pm_2) {
+    return (c[0] * (c[1] * y + c[2] * x) * Pm_1 - c[3] * y * y * Pm_2) / c[4];
+}
+
+double SingularityFreeJacobiP(unsigned n, unsigned a, unsigned b, double x, double y) {
+    if (n == 0) {
+        return 1.0;
+    }
+    double Pm_2;
+    double Pm_1 = 1.0;
+    double Pm = (0.5 * a - 0.5 * b) * y + (1.0 + 0.5 * (a + b)) * x;
+    for (unsigned m = 2; m <= n; ++m) {
+        Pm_2 = Pm_1;
+        Pm_1 = Pm;
+        auto c = SingularityFreeJacobiPFactors(n, a, b);
+        Pm = SingularityFreeJacobiPRecursion(m, a, b, x, y, c, Pm_1, Pm_2);
+    }
+    return Pm;
+}
+
+std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned a, unsigned b,
+                                                           double x, double y) {
+    if (n == 0) {
+        return {1.0, 0.0, 0.0};
+    }
+    double Pm_2, ddxPm_2, ddyPm_2;
+    double Pm_1 = 1.0, ddxPm_1 = 0.0, ddyPm_1 = 0.0;
+    double Pm = SingularityFreeJacobiP(1, a, b, x, y);
+    double ddxPm = 1.0 + 0.5 * (a + b);
+    double ddyPm = 0.5 * (static_cast<double>(a) - static_cast<double>(b));
+    double c_2 = static_cast<double>(a * a) - static_cast<double>(b * b);
+    for (unsigned m = 2; m <= n; ++m) {
+        Pm_2 = Pm_1;
+        Pm_1 = Pm;
+        ddxPm_2 = ddxPm_1;
+        ddxPm_1 = ddxPm;
+        ddyPm_2 = ddyPm_1;
+        ddyPm_1 = ddyPm;
+        auto c = SingularityFreeJacobiPFactors(n, a, b);
+        Pm = SingularityFreeJacobiPRecursion(m, a, b, x, y, c, Pm_1, Pm_2);
+        ddxPm = (c[0] * (c[2] * Pm_1 + (c[1] * y + c[2] * x) * ddxPm_1) - c[3] * y * y * ddxPm_2) /
+                c[4];
+        ddyPm = (c[0] * (c[1] * Pm_1 + (c[1] * y + c[2] * x) * ddyPm_1) -
+                 c[3] * (2.0 * y * Pm_2 + y * y * ddyPm_2)) /
+                c[4];
+    }
+    return {Pm, ddxPm, ddyPm};
+}
+
+double TetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta, double zeta) {
+    double r_num = 2.0 * xi - 1.0 + eta + zeta;
+    double s_num = 2.0 * eta - 1.0 + zeta;
+    double t = 2.0 * zeta - 1.0;
+    double sigmatheta = 1.0 - eta - zeta;
+    double theta = 1.0 - zeta;
+
+    double ti = SingularityFreeJacobiP(i, 0, 0, r_num, sigmatheta);
+    double tij = SingularityFreeJacobiP(j, 2 * i + 1, 0, s_num, theta);
+    double tijk = SingularityFreeJacobiP(k, 2 * i + 2 * j + 2, 0, t, 1.0);
+
+    return ti * tij * tijk;
+}
+
+std::array<double, 3> gradTetraDubinerP(unsigned i, unsigned j, unsigned k, double xi, double eta,
+                                        double zeta) {
+    double r_num = 2.0 * xi - 1.0 + eta + zeta;
+    double s_num = 2.0 * eta - 1.0 + zeta;
+    double t = 2.0 * zeta - 1.0;
+    double sigmatheta = 1.0 - eta - zeta;
+    double theta = 1.0 - zeta;
+
+    auto ti = SingularityFreeJacobiPAndDerivatives(i, 0, 0, r_num, sigmatheta);
+    auto tij = SingularityFreeJacobiPAndDerivatives(j, 2 * i + 1, 0, s_num, theta);
+    auto tijk = SingularityFreeJacobiPAndDerivatives(k, 2 * i + 2 * j + 2, 0, t, 1.0);
+
+    auto ddalpha = [&](double dr_num, double dsigmatheta, double ds_num, double dtheta, double dt) {
+        return (ti[1] * dr_num + ti[2] * dsigmatheta) * tij[0] * tijk[0] +
+               ti[0] * (tij[1] * ds_num + tij[2] * dtheta) * tijk[0] +
+               ti[0] * tij[0] * (tijk[1] * dt);
+    };
+
+    return {ddalpha(2.0, 0.0, 0.0, 0.0, 0.0), ddalpha(1.0, -1.0, 2.0, 0.0, 0.0),
+            ddalpha(1.0, -1.0, 1.0, -1.0, 2.0)};
+}
+
+} // namespace tndm

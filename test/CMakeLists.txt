@@ -8,6 +8,10 @@ target_include_directories(test-runner PUBLIC
 )
 target_link_libraries(test-runner PUBLIC tandem-lib)
 
+add_executable(test-basis basis.cpp)
+target_link_libraries(test-basis test-runner)
+doctest_discover_tests(test-basis)
+
 add_executable(test-parallel parallel.cpp)
 target_link_libraries(test-parallel test-runner)
 doctest_discover_tests(test-parallel)

@@ -1,4 +1,5 @@
 add_library(tandem-lib
+    basis/Functions.cpp
     mesh/GenMesh.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
