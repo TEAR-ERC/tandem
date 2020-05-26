@@ -30,6 +30,10 @@ double JacobiP(unsigned n, unsigned a, unsigned b, double x) {
     return Pm;
 }
 
+double JacobiPDerivative(unsigned n, unsigned a, unsigned b, double x) {
+    return (n == 0) ? 0.0 : 0.5 * (n + a + b + 1.0) * JacobiP(n - 1, a + 1, b + 1, x);
+}
+
 std::array<double, 5> SingularityFreeJacobiPFactors(unsigned m, unsigned a, unsigned b) {
     double c_0 = 2.0 * m + a + b;
     double c_1 = c_0 - 1.0;

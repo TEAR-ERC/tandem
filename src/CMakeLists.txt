@@ -1,5 +1,6 @@
 add_library(tandem-lib
     basis/Functions.cpp
+    basis/Quadrature.cpp
     mesh/GenMesh.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp

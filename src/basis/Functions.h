@@ -52,6 +52,11 @@ unsigned factorial(unsigned n);
 double JacobiP(unsigned n, unsigned a, unsigned b, double x);
 
 /**
+ * @brief Evaluates derivative of Jacobi polynomial.
+ */
+double JacobiPDerivative(unsigned n, unsigned a, unsigned b, double x);
+
+/**
  * @brief Factors in recursion formulas used by SingularityFreeJacobiP functions.
  */
 std::array<double, 5> SingularityFreeJacobiPFactors(unsigned m, unsigned a, unsigned b);
