@@ -1,10 +1,11 @@
 #include "doctest.h"
-#include "util/Math.h"
+#include "util/Combinatorics.h"
 
+using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::Choose;
 
-TEST_CASE("Math") {
+TEST_CASE("Combinatorics") {
     SUBCASE("binom") {
         CHECK(binom(4,3) == 4);
         CHECK(binom(4,1) == 4);
@@ -48,5 +49,47 @@ TEST_CASE("Math") {
             CHECK(choose.current()[2] == 2);
             CHECK(choose.current()[3] == 3);
         } while (choose.next());
+    }
+
+    SUBCASE("all integer sums: 1 operand") {
+        int N = 6;
+        AllIntegerSums<1> sums(N);
+        auto it = sums.begin();
+        for (int i = 0; i <= N; ++i) {
+            CHECK((*it)[0] == i);
+            ++it;
+        }
+        CHECK(it == sums.end());
+    }
+
+    SUBCASE("all integer sums: 2 operands") {
+        int N = 7;
+        AllIntegerSums<2> sums(N);
+        auto it = sums.begin();
+        for (int i = 0; i <= N; ++i) {
+            for (unsigned j = 0; j <= i; ++j) {
+                CHECK((*it)[0] == i - j);
+                CHECK((*it)[1] == j);
+                ++it;
+            }
+        }
+        CHECK(it == sums.end());
+    }
+
+    SUBCASE("all integer sums: 3 operands") {
+        int N = 5;
+        AllIntegerSums<3> sums(N);
+        auto it = sums.begin();
+        for (unsigned i = 0; i <= N; ++i) {
+            for (unsigned j = 0; j <= i; ++j) {
+                for (unsigned k = 0; k <= j; ++k) {
+                    CHECK((*it)[0] == i - j);
+                    CHECK((*it)[1] == j - k);
+                    CHECK((*it)[2] == k);
+                    ++it;
+                }
+            }
+        }
+        CHECK(it == sums.end());
     }
 }

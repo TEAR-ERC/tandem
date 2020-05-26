@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <utility>
 
-#include "util/Math.h"
+#include "util/Combinatorics.h"
 
 namespace tndm {
 
