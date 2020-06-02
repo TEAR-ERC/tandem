@@ -94,6 +94,33 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
     return {Pm, ddxPm, ddyPm};
 }
 
+double TriDubinerP(std::array<unsigned, 2> const& i, std::array<double, 2> const& xi) {
+    double r_num = 2.0 * xi[0] - 1.0 + xi[1];
+    double s = 2.0 * xi[1] - 1.0;
+    double theta = 1.0 - xi[1];
+
+    double ti = SingularityFreeJacobiP(i[0], 0, 0, r_num, theta);
+    double tij = SingularityFreeJacobiP(i[1], 2 * i[0] + 1, 0, s, 1.0);
+
+    return ti * tij;
+}
+
+std::array<double, 2> gradTriDubinerP(std::array<unsigned, 2> const& i,
+                                      std::array<double, 2> const& xi) {
+    double r_num = 2.0 * xi[0] - 1.0 + xi[1];
+    double s = 2.0 * xi[1] - 1.0;
+    double theta = 1.0 - xi[1];
+
+    auto ti = SingularityFreeJacobiPAndDerivatives(i[0], 0, 0, r_num, theta);
+    auto tij = SingularityFreeJacobiPAndDerivatives(i[1], 2 * i[0] + 1, 0, s, 1.0);
+
+    auto ddalpha = [&](double dr_num, double dtheta, double dt) {
+        return (ti[1] * dr_num + ti[2] * dtheta) * tij[0] + ti[0] * tij[1] * dt;
+    };
+
+    return {ddalpha(2.0, 0.0, 0.0), ddalpha(1.0, -1.0, 2.0)};
+}
+
 double TetraDubinerP(std::array<unsigned, 3> const& i, std::array<double, 3> const& xi) {
     double r_num = 2.0 * xi[0] - 1.0 + xi[1] + xi[2];
     double s_num = 2.0 * xi[1] - 1.0 + xi[2];

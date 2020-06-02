@@ -90,6 +90,28 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
                                                            double x, double y);
 
 /**
+ * @brief Evaluate Dubiner basis on reference triangle
+ *
+ * Reference triangle is (0,0), (1,0), (0,1).
+ *
+ * @param i multi-index specifying the polynomial degree
+ * @param point in reference triangle
+ *
+ * @return Function value at xi
+ */
+double TriDubinerP(std::array<unsigned, 2> const& i, std::array<double, 2> const& xi);
+
+/**
+ * @brief Gradient of Dubiner basis on triangle
+ *
+ * See TriDubinerP.
+ *
+ * @return Gradient at xi
+ */
+std::array<double, 2> gradTriDubinerP(std::array<unsigned, 2> const& i,
+                                      std::array<double, 2> const& xi);
+
+/**
  * @brief Evaluate Dubiner basis on reference tetrahedron
  *
  * Reference tetrahedron is (0,0,0), (1,0,0), (0,1,0), (0,0,1).
@@ -114,6 +136,37 @@ double TetraDubinerP(std::array<unsigned, 3> const& i, std::array<double, 3> con
  */
 std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
                                         std::array<double, 3> const& xi);
+
+/**
+ * @brief Templated Dubiner basis for D=2 or D=3
+ *
+ */
+template <std::size_t D>
+std::array<double, D> DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& xi) {
+    if constexpr (D == 2) {
+        return TriDubinerP(i, xi);
+    } else if (D == 3) {
+        return TetraDubinerP(i, xi);
+    } else {
+        static_assert("Not implemented");
+    }
+}
+
+/**
+ * @brief Templated gradient for D=2 or D=3
+ *
+ */
+template <std::size_t D>
+std::array<double, D> gradDubinerP(std::array<unsigned, D> const& i,
+                                   std::array<double, D> const& xi) {
+    if constexpr (D == 2) {
+        return gradTriDubinerP(i, xi);
+    } else if (D == 3) {
+        return gradTetraDubinerP(i, xi);
+    } else {
+        static_assert("Not implemented");
+    }
+}
 
 } // namespace tndm
 

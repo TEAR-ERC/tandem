@@ -57,6 +57,8 @@ public:
     std::vector<double>& points() { return points_; }
     std::vector<double>& weights() { return weights_; }
 
+    std::size_t size() const { return points_.size(); }
+
 private:
     std::vector<double> points_;
     std::vector<double> weights_;
@@ -84,6 +86,8 @@ public:
 
     std::vector<std::array<double, D>>& points() { return points_; }
     std::vector<double>& weights() { return weights_; }
+
+    std::size_t size() const { return points_.size(); }
 
 private:
     std::vector<std::array<double, D>> points_;
