@@ -142,7 +142,7 @@ std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
  *
  */
 template <std::size_t D>
-std::array<double, D> DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& xi) {
+double DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& xi) {
     if constexpr (D == 2) {
         return TriDubinerP(i, xi);
     } else if (D == 3) {
