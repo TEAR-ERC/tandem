@@ -47,6 +47,20 @@ IntervalQuadratureRule GaussJacobi(unsigned n, unsigned a, unsigned b) {
     return rule;
 }
 
+SimplexQuadratureRule<1> IntervalQuadrature(unsigned n) {
+    SimplexQuadratureRule<1> rule(n);
+
+    auto gj = GaussJacobi(n, 0, 0);
+    gj.changeInterval(0.0, 1.0);
+
+    for (std::size_t i = 0; i < n; ++i) {
+        rule.points()[i][0] = gj.points()[i];
+        rule.weights()[i] = gj.weights()[i];
+    }
+
+    return rule;
+}
+
 SimplexQuadratureRule<2> TriangleQuadrature(unsigned n) {
     SimplexQuadratureRule<2> rule(n * n);
 

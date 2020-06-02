@@ -95,6 +95,11 @@ private:
 };
 
 /**
+ * @brief Returns quadrature rule on the reference interval [0,1].
+ */
+SimplexQuadratureRule<1> IntervalQuadrature(unsigned n);
+
+/**
  * @brief Returns quadrature rule on the reference triangle with vertices (0,0),(1,0),(0,1).
  */
 SimplexQuadratureRule<2> TriangleQuadrature(unsigned n);
