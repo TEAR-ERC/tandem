@@ -1,8 +1,6 @@
 #ifndef MESHDATA_H
 #define MESHDATA_H
 
-#include "GlobalSimplexMesh.h"
-#include "LocalFaces.h"
 #include "parallel/CommPattern.h"
 
 #include <mpi.h>

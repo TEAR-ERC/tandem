@@ -2,6 +2,7 @@
 #define LOCALSIMPLEXMESH_H
 
 #include "LocalFaces.h"
+#include "MeshData.h"
 #include "Simplex.h"
 #include "util/Utility.h"
 
