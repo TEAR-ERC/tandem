@@ -20,7 +20,7 @@ public:
     Curvilinear(
         LocalSimplexMesh<D> const& mesh,
         std::function<vertex_t(vertex_t const&)> transform = [](vertex_t const& v) { return v; },
-        bool quadratic = false);
+        unsigned degree = 1);
 
     std::array<double, D> map(std::size_t eleNo, std::array<double, D> const& xi);
     std::array<double, D * D> jacobian(std::size_t eleNo, std::array<double, D> const& xi);
@@ -31,7 +31,7 @@ public:
     std::array<double, D> facetParam(std::size_t faceNo, std::array<double, D - 1> const& chi);
 
 private:
-    std::size_t degree;
+    const unsigned N;
 
     struct Verts {
         using type = std::array<double, D>;

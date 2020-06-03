@@ -138,12 +138,13 @@ std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
                                         std::array<double, 3> const& xi);
 
 /**
- * @brief Templated Dubiner basis for D=2 or D=3
- *
+ * @brief Templated Dubiner basis for D=1,2,3.
  */
 template <std::size_t D>
 double DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& xi) {
-    if constexpr (D == 2) {
+    if constexpr (D == 1) {
+        return JacobiP(i[0], 0, 0, xi[0]);
+    } else if constexpr (D == 2) {
         return TriDubinerP(i, xi);
     } else if (D == 3) {
         return TetraDubinerP(i, xi);
@@ -153,13 +154,14 @@ double DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& x
 }
 
 /**
- * @brief Templated gradient for D=2 or D=3
- *
+ * @brief Templated gradient for D=1,2,3.
  */
 template <std::size_t D>
 std::array<double, D> gradDubinerP(std::array<unsigned, D> const& i,
                                    std::array<double, D> const& xi) {
-    if constexpr (D == 2) {
+    if constexpr (D == 1) {
+        return {JacobiPDerivative(i[0], 0, 0, xi[0])};
+    } else if constexpr (D == 2) {
         return gradTriDubinerP(i, xi);
     } else if (D == 3) {
         return gradTetraDubinerP(i, xi);

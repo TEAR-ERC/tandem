@@ -1,5 +1,6 @@
 #include "basis/Functions.h"
 #include "basis/Quadrature.h"
+#include "basis/SimplexNodes.h"
 
 #include "doctest.h"
 #include <array>
@@ -7,13 +8,7 @@
 #include <functional>
 #include <vector>
 
-using tndm::GaussJacobi;
-using tndm::gradTetraDubinerP;
-using tndm::gradTriDubinerP;
-using tndm::TetraDubinerP;
-using tndm::TetrahedronQuadrature;
-using tndm::TriangleQuadrature;
-using tndm::TriDubinerP;
+using namespace tndm;
 
 using TriBasisFunction = std::function<double(std::array<double, 2> const&)>;
 using GradTriBasisFunction = std::function<std::array<double, 2>(std::array<double, 2> const&)>;
@@ -240,5 +235,87 @@ TEST_CASE("Basis") {
         CHECK(doctest::Approx(intBFPair(0, 9)) == 0.0);
         CHECK(doctest::Approx(intBFPair(6, 3)) == 0.0);
         CHECK(doctest::Approx(intBFPair(0, 1)) == 0.0);
+    }
+}
+
+TEST_CASE("Nodes") {
+    SUBCASE("LGL nodes") {
+        auto glPoints2 = LegendreGaussLobattoPoints(2, 0, 0);
+        CHECK(glPoints2.size() == 2);
+        CHECK(glPoints2[0] == doctest::Approx(-1.0));
+        CHECK(glPoints2[1] == doctest::Approx(1.0));
+
+        auto glPoints3 = LegendreGaussLobattoPoints(3, 0, 0);
+        CHECK(glPoints3.size() == 3);
+        CHECK(glPoints3[0] == doctest::Approx(-1.0));
+        CHECK(glPoints3[1] == doctest::Approx(0.0));
+        CHECK(glPoints3[2] == doctest::Approx(1.0));
+
+        auto glPoints5 = LegendreGaussLobattoPoints(5, 0, 0);
+        CHECK(glPoints5.size() == 5);
+        CHECK(glPoints5[0] == doctest::Approx(-1.0));
+        CHECK(glPoints5[1] == doctest::Approx(-sqrt(3.0 / 7.0)));
+        CHECK(glPoints5[2] == doctest::Approx(0.0));
+        CHECK(glPoints5[3] == doctest::Approx(sqrt(3.0 / 7.0)));
+        CHECK(glPoints5[4] == doctest::Approx(1.0));
+    }
+
+    auto checkNodes = [](auto& nodes, auto& refNodes) {
+        REQUIRE(nodes.size() == refNodes.size());
+        for (std::size_t i = 0; i < nodes.size(); ++i) {
+            for (std::size_t j = 0; j < 2; ++j) {
+                CHECK(nodes[i][j] == doctest::Approx(refNodes[i][j]));
+            }
+        }
+    };
+
+    SUBCASE("Triangle nodes P1") {
+        std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
+        auto nodes = simplexNodes<2>(1);
+        checkNodes(nodes, refNodes);
+    }
+
+    SUBCASE("Triangle nodes P2") {
+        std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {0.5, 0.0}, {0.0, 0.5},
+                                                    {1.0, 0.0}, {0.5, 0.5}, {0.0, 1.0}};
+        auto nodes = simplexNodes<2>(2);
+        checkNodes(nodes, refNodes);
+    }
+
+    SUBCASE("Triangle nodes P3") {
+        std::vector<std::array<double, 2>> refNodes{
+            {0.00000000000000000000, 0.00000000000000000000},
+            {0.27639320225002095288, 0.00000000000000000000},
+            {0.00000000000000000000, 0.27639320225002095288},
+            {0.72360679774997904712, 0.00000000000000000000},
+            {0.33333333333333325932, 0.33333333333333325932},
+            {0.00000000000000000000, 0.72360679774997882507},
+            {1.00000000000000000000, 0.00000000000000000000},
+            {0.72360679774997893610, 0.27639320225002106390},
+            {0.27639320225002095288, 0.72360679774997904712},
+            {0.00000000000000000000, 1.00000000000000000000}};
+        auto nodes = simplexNodes<2>(3);
+        checkNodes(nodes, refNodes);
+    }
+
+    SUBCASE("Triangle nodes P4") {
+        std::vector<std::array<double, 2>> refNodes{
+            {0.00000000000000000000, 0.00000000000000000000},
+            {0.17267316464601145665, 0.00000000000000000000},
+            {0.00000000000000000000, 0.17267316464601145665},
+            {0.50000000000000000000, 0.00000000000000000000},
+            {0.22420824622234719614, 0.22420824622234719614},
+            {0.00000000000000000000, 0.50000000000000000000},
+            {0.82732683535398865438, 0.00000000000000005551},
+            {0.55158350755530560772, 0.22420824622234719614},
+            {0.22420824622234719614, 0.55158350755530560772},
+            {0.00000000000000005551, 0.82732683535398854335},
+            {1.00000000000000000000, 0.00000000000000000000},
+            {0.82732683535398865438, 0.17267316464601140114},
+            {0.50000000000000000000, 0.50000000000000000000},
+            {0.17267316464601140114, 0.82732683535398865438},
+            {0.00000000000000000000, 1.00000000000000000000}};
+        auto nodes = simplexNodes<2>(4);
+        checkNodes(nodes, refNodes);
     }
 }

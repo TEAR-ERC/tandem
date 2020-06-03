@@ -1,6 +1,7 @@
 #include "Curvilinear.h"
 #include "Vector.h"
 #include "basis/Functions.h"
+#include "basis/SimplexNodes.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>
@@ -12,10 +13,12 @@ namespace tndm {
 
 template <std::size_t D>
 Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
-                            std::function<vertex_t(vertex_t const&)> transform, bool quadratic) {
+                            std::function<vertex_t(vertex_t const&)> transform, unsigned degree)
+    : N(degree) {
     // Get vertices
-    degree = (quadratic) ? 2 : 1;
-    std::size_t vertsPerElement = binom(degree + D, D);
+    std::vector<std::array<double, D>> refNodes = simplexNodes<D>(degree);
+    std::size_t vertsPerElement = refNodes.size();
+    assert(binom(N + D, D) == refNodes.size());
 
     storage.resize(mesh.numElements() * vertsPerElement);
     vertices.setStorage(storage, 0, mesh.numElements(), vertsPerElement);
@@ -28,48 +31,27 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
     std::size_t vertexNo = 0;
     for (auto const& element : mesh.elements()) {
         auto vlids = mesh.template downward<0>(element);
-        assert(vlids.size() == vertsPerElement);
-        std::size_t localVertexNo = vertexNo;
+        std::array<std::array<double, D>, D + 1> verts;
+        std::size_t localVertexNo = 0;
         for (auto const& vlid : vlids) {
-            storage[localVertexNo++] = vertexData->getVertices()[vlid];
+            verts[localVertexNo++] = vertexData->getVertices()[vlid];
         }
-        if (quadratic) {
-            if constexpr (D == 2) {
-                storage[localVertexNo++] = 0.5 * (storage[vertexNo] + storage[vertexNo + 1]);
-                storage[localVertexNo++] = 0.5 * (storage[vertexNo] + storage[vertexNo + 2]);
-                storage[localVertexNo++] = 0.5 * (storage[vertexNo + 1] + storage[vertexNo + 2]);
-            } else {
-                throw std::runtime_error("Not implemented");
+        for (auto& refNode : refNodes) {
+            auto& vert = storage[vertexNo];
+            vert = (1.0 - std::accumulate(refNode.begin(), refNode.end(), 0.0)) * verts[0];
+            for (std::size_t d = 0; d < D; ++d) {
+                vert = vert + refNode[d] * verts[d + 1];
             }
+            vert = transform(vert);
+            ++vertexNo;
         }
-        for (std::size_t i = 0; i < vertsPerElement; ++i) {
-            storage[vertexNo + i] = transform(storage[vertexNo + i]);
-        }
-        vertexNo += vertsPerElement;
     }
 
     // Compute Vandermonde matrix
     Simplex<D> refPlex = Simplex<D>::referenceSimplex();
     f2v = refPlex.downward();
 
-    vandermonde.resize(vertsPerElement, vertsPerElement);
-
-    std::vector<std::array<double, D>> quadraticRefVertices(vertsPerElement);
-    for (std::size_t i = 0; i < D + 1; ++i) {
-        quadraticRefVertices[i] = refVertices[i];
-    }
-    if (quadratic) {
-        quadraticRefVertices[D + 1] = 0.5 * (refVertices[0] + refVertices[1]);
-        quadraticRefVertices[D + 2] = 0.5 * (refVertices[0] + refVertices[2]);
-        quadraticRefVertices[D + 3] = 0.5 * (refVertices[1] + refVertices[2]);
-    }
-
-    for (std::size_t i = 0; i < vertsPerElement; ++i) {
-        std::size_t bf = 0;
-        for (auto j : AllIntegerSums<D>(degree)) {
-            vandermonde(i, bf++) = DubinerP(j, quadraticRefVertices[i]);
-        }
-    }
+    vandermonde = Vandermonde(N, refNodes);
     vandermondeInvT = vandermonde.inverse().transpose();
 
     // Compute reference normals
@@ -109,11 +91,11 @@ std::array<double, D> Curvilinear<D>::map(std::size_t eleNo, std::array<double, 
 
     Eigen::VectorXd phi(vandermondeInvT.cols());
     std::size_t bf = 0;
-    for (auto j : AllIntegerSums<D>(degree)) {
+    for (auto j : AllIntegerSums<D>(N)) {
         phi(bf++) = DubinerP(j, xi);
     }
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == D * vandermondeInvT.rows());
+    assert(vertexSpan.size() == vandermondeInvT.rows());
 
     std::array<double, D> result;
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
@@ -129,15 +111,15 @@ std::array<double, D * D> Curvilinear<D>::jacobian(std::size_t eleNo,
 
     Eigen::MatrixXd phi(vandermondeInvT.cols(), D);
     std::size_t bf = 0;
-    for (auto j : AllIntegerSums<D>(degree)) {
+    for (auto j : AllIntegerSums<D>(N)) {
         auto dphi = gradDubinerP(j, xi);
-        for (std::size_t d = 0; d < 3; ++d) {
+        for (std::size_t d = 0; d < D; ++d) {
             phi(bf, d) = dphi[d];
         }
         ++bf;
     }
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == D * vandermondeInvT.rows());
+    assert(vertexSpan.size() == vandermondeInvT.rows());
 
     std::array<double, D * D> result;
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
@@ -180,6 +162,6 @@ std::array<double, D> Curvilinear<D>::facetParam(std::size_t faceNo,
 }
 
 template class Curvilinear<2u>;
-template class Curvilinear<3u>;
+// template class Curvilinear<3u>;
 
 } // namespace tndm
