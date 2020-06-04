@@ -1,19 +1,22 @@
 #include "SimplexNodes.h"
 #include "Functions.h"
 #include "Quadrature.h"
+#include "geometry/Affine.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>
 #include <iterator>
-#define _USE_MATH_DEFINES
-#include <cmath>
+
+using Eigen::ColPivHouseholderQR;
+using Eigen::Dynamic;
+using Eigen::Map;
+using Eigen::Matrix;
+using Eigen::MatrixXd;
+using Eigen::RowMajor;
+using Eigen::VectorXd;
 
 namespace tndm {
 
-/**
- * Port of
- * https://github.com/tcew/nodal-dg/blob/master/Codes1.1/Codes2D/Nodes2D.m
- */
 template <> std::vector<std::array<double, 2>> simplexNodes(unsigned degree, double alpha) {
     assert(degree > 0);
 
@@ -25,53 +28,53 @@ template <> std::vector<std::array<double, 2>> simplexNodes(unsigned degree, dou
 
     unsigned numNodes = binom(degree + 2, 2);
     std::vector<std::array<double, 2>> result(numNodes);
-    Eigen::Map<Eigen::MatrixXd> resultMap(result.data()->data(), 2, numNodes);
+    Map<Matrix<double, Dynamic, Dynamic, RowMajor>> resultMap(result.data()->data(), numNodes, 2);
 
-    Eigen::VectorXd L1(numNodes);
-    Eigen::VectorXd L2(numNodes);
-    Eigen::VectorXd L3(numNodes);
+    MatrixXd L(numNodes, 3);
 
     std::size_t idx = 0;
     for (auto i : AllIntegerSums<2>(degree)) {
-        L1(idx) = i[1] / static_cast<double>(degree);
-        L3(idx) = i[0] / static_cast<double>(degree);
+        L(idx, 2) = i[1] / static_cast<double>(degree);
+        L(idx, 1) = i[0] / static_cast<double>(degree);
+        L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2);
         ++idx;
     }
-    L2 = Eigen::VectorXd::Ones(numNodes) - L1 - L3;
-    resultMap.row(0) = -L2 + L3;
-    resultMap.row(1) = (-L2 - L3 + 2.0 * L1) / sqrt(3.0);
 
-    auto blend1 = 4.0 * L2.cwiseProduct(L3);
-    auto blend2 = 4.0 * L1.cwiseProduct(L3);
-    auto blend3 = 4.0 * L1.cwiseProduct(L2);
+    const std::array<std::array<double, 2>, 3> equilateralVerts{
+        {{-1.0, -1.0 / sqrt(3.0)}, {1.0, -1.0 / sqrt(3.0)}, {0.0, 2.0 / sqrt(3.0)}}};
+    const Map<const Matrix<double, 3, 2, RowMajor>> equiMap(equilateralVerts.data()->data());
 
-    auto factor = [&numNodes, &alpha](auto& blend, auto& L) {
-        return blend.cwiseProduct(Eigen::VectorXd::Ones(numNodes) +
-                                  (alpha * alpha) * L.cwiseProduct(L));
-    };
+    std::array<std::array<double, 2>, 3> tangents;
+    for (std::size_t d = 0; d < 3; ++d) {
+        tangents[d] = normalize(equilateralVerts[(d + 1) % 3] - equilateralVerts[d]);
+    }
+    const Map<const Matrix<double, 3, 2, RowMajor>> tangentMap(tangents.data()->data());
 
     Warpfactor warpfactor(degree);
-    auto warp1 = warpfactor(L3 - L2);
-    auto warp2 = warpfactor(L1 - L3);
-    auto warp3 = warpfactor(L2 - L1);
-    warp1 = warp1.cwiseProduct(factor(blend1, L1));
-    warp2 = warp2.cwiseProduct(factor(blend2, L2));
-    warp3 = warp3.cwiseProduct(factor(blend3, L3));
+    MatrixXd warp(numNodes, 3);
+    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
+        warp.col(d) = warpfactor(L.col((d + 1) % warp.cols()) - L.col(d));
+    }
 
-    resultMap.row(0) += warp1 + cos(2.0 * M_PI / 3.0) * warp2 + cos(4.0 * M_PI / 3.0) * warp3;
-    resultMap.row(1) += sin(2.0 * M_PI / 3.0) * warp2 + sin(4.0 * M_PI / 3.0) * warp3;
+    MatrixXd blend(numNodes, 3);
+    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
+        blend.col(d) = 4.0 * L.col(d).cwiseProduct(L.col((d + 1) % warp.cols()));
+    }
 
-    // to reference triangle
-    L1 = (sqrt(3.0) * resultMap.row(1) + Eigen::MatrixXd::Ones(1, numNodes)) / 3.0;
-    L2 = (-3.0 * resultMap.row(0) - sqrt(3.0) * resultMap.row(1) +
-          Eigen::MatrixXd::Constant(1, numNodes, 2.0)) /
-         6.0;
-    L3 = (3.0 * resultMap.row(0) - sqrt(3.0) * resultMap.row(1) +
-          Eigen::MatrixXd::Constant(1, numNodes, 2.0)) /
-         6.0;
+    auto factor = [&numNodes, &alpha](auto const& blend, auto const& L) {
+        return blend.cwiseProduct(VectorXd::Ones(numNodes) + (alpha * alpha) * L.cwiseProduct(L));
+    };
+    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
+        warp.col(d) = warp.col(d).cwiseProduct(factor(blend.col(d), L.col((d + 2) % warp.cols())));
+        // warp.col(d) = warp.col(d).cwiseProduct(factor(blend.col(d), L.col(d)));
+    }
 
-    resultMap.row(0) = 0.5 * (-L2 + L3 - L1 + Eigen::VectorXd::Ones(numNodes));
-    resultMap.row(1) = 0.5 * (-L2 - L3 + L1 + Eigen::VectorXd::Ones(numNodes));
+    resultMap = L * equiMap + warp * tangentMap;
+
+    GeneralPlexToRefPlex equiToRef(equilateralVerts);
+    for (std::size_t n = 0; n < numNodes; ++n) {
+        result[n] = equiToRef(result[n]);
+    }
 
     return result;
 }
@@ -89,10 +92,10 @@ std::vector<double> LegendreGaussLobattoPoints(unsigned n, unsigned a, unsigned 
 }
 
 template <std::size_t D>
-Eigen::MatrixXd Vandermonde(unsigned degree, std::vector<std::array<double, D>> const& points) {
+MatrixXd Vandermonde(unsigned degree, std::vector<std::array<double, D>> const& points) {
     assert(binom(degree + D, D) == points.size());
 
-    Eigen::MatrixXd vandermonde(points.size(), binom(degree + D, D));
+    MatrixXd vandermonde(points.size(), binom(degree + D, D));
 
     for (std::size_t i = 0; i < points.size(); ++i) {
         std::size_t bf = 0;
@@ -110,23 +113,23 @@ Warpfactor::Warpfactor(unsigned N) : diff(N + 1) {
         eqPoints[i][0] = 2 * i / static_cast<double>(N) - 1.0;
     }
     auto vandermonde = Vandermonde(N, eqPoints);
-    LQR = Eigen::ColPivHouseholderQR<Eigen::MatrixXd>(vandermonde.transpose());
+    LQR = ColPivHouseholderQR<MatrixXd>(vandermonde.transpose());
     auto glPoints = LegendreGaussLobattoPoints(N + 1, 0, 0);
     for (unsigned i = 0; i < N + 1; ++i) {
         diff[i] = glPoints[i] - eqPoints[i][0];
     }
 }
 
-Eigen::VectorXd Warpfactor::operator()(Eigen::VectorXd const& r) {
+VectorXd Warpfactor::operator()(VectorXd const& r) {
     const auto Np1 = diff.rows();
-    Eigen::MatrixXd phi(Np1, r.size());
+    MatrixXd phi(Np1, r.size());
     for (unsigned i = 0; i < Np1; ++i) {
         for (unsigned j = 0; j < r.rows(); ++j) {
             phi(i, j) = JacobiP(i, 0, 0, r(j));
         }
     }
-    Eigen::MatrixXd L = LQR.solve(phi);
-    Eigen::VectorXd warp = L.transpose() * diff;
+    MatrixXd L = LQR.solve(phi);
+    VectorXd warp = L.transpose() * diff;
     assert(warp.size() == r.size());
     for (unsigned i = 0; i < warp.size(); ++i) {
         if (std::fabs(r[i]) < 1.0 - std::numeric_limits<double>::epsilon()) {
@@ -136,7 +139,7 @@ Eigen::VectorXd Warpfactor::operator()(Eigen::VectorXd const& r) {
     return warp;
 }
 
-template Eigen::MatrixXd Vandermonde<2u>(unsigned, std::vector<std::array<double, 2u>> const&);
-template Eigen::MatrixXd Vandermonde<3u>(unsigned, std::vector<std::array<double, 3u>> const&);
+template MatrixXd Vandermonde<2u>(unsigned, std::vector<std::array<double, 2u>> const&);
+template MatrixXd Vandermonde<3u>(unsigned, std::vector<std::array<double, 3u>> const&);
 
 } // namespace tndm

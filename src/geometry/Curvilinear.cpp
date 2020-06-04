@@ -1,4 +1,5 @@
 #include "Curvilinear.h"
+#include "Affine.h"
 #include "Vector.h"
 #include "basis/Functions.h"
 #include "basis/SimplexNodes.h"
@@ -36,13 +37,9 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
         for (auto const& vlid : vlids) {
             verts[localVertexNo++] = vertexData->getVertices()[vlid];
         }
+        RefPlexToGeneralPlex<D> map(verts);
         for (auto& refNode : refNodes) {
-            auto& vert = storage[vertexNo];
-            vert = (1.0 - std::accumulate(refNode.begin(), refNode.end(), 0.0)) * verts[0];
-            for (std::size_t d = 0; d < D; ++d) {
-                vert = vert + refNode[d] * verts[d + 1];
-            }
-            vert = transform(vert);
+            storage[vertexNo] = transform(map(refNode));
             ++vertexNo;
         }
     }

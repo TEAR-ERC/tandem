@@ -47,6 +47,15 @@ RealT dot(std::array<RealT, D> const& lhs, std::array<RealT, D> const& rhs) {
     return result;
 }
 
+template <typename RealT, std::size_t D> RealT norm(std::array<RealT, D> const& x) {
+    return sqrt(dot(x, x));
+}
+
+template <typename RealT, std::size_t D>
+std::array<RealT, D> normalize(std::array<RealT, D> const& x) {
+    return x * (1.0 / norm(x));
+}
+
 template <typename RealT>
 std::array<RealT, 3u> cross(std::array<RealT, 3u> const& lhs, std::array<RealT, 3u> const& rhs) {
     std::array<RealT, 3u> c;
