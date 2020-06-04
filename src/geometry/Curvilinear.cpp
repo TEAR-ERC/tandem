@@ -2,7 +2,8 @@
 #include "Affine.h"
 #include "Vector.h"
 #include "basis/Functions.h"
-#include "basis/SimplexNodes.h"
+#include "basis/Nodal.h"
+#include "basis/WarpAndBlend.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>
@@ -17,7 +18,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
                             std::function<vertex_t(vertex_t const&)> transform, unsigned degree)
     : N(degree) {
     // Get vertices
-    std::vector<std::array<double, D>> refNodes = simplexNodes<D>(degree);
+    std::vector<std::array<double, D>> refNodes = warpAndBlendNodes<D>(degree);
     std::size_t vertsPerElement = refNodes.size();
     assert(binom(N + D, D) == refNodes.size());
 

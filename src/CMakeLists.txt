@@ -1,7 +1,8 @@
 add_library(tandem-lib
     basis/Functions.cpp
+    basis/Nodal.cpp
     basis/Quadrature.cpp
-    basis/SimplexNodes.cpp
+    basis/WarpAndBlend.cpp
     mesh/GenMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp

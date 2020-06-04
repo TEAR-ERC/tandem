@@ -1,6 +1,7 @@
 #include "basis/Functions.h"
+#include "basis/Nodal.h"
 #include "basis/Quadrature.h"
-#include "basis/SimplexNodes.h"
+#include "basis/WarpAndBlend.h"
 
 #include "doctest.h"
 #include <array>
@@ -271,14 +272,14 @@ TEST_CASE("Nodes") {
 
     SUBCASE("Triangle nodes P1") {
         std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
-        auto nodes = simplexNodes<2>(1);
+        auto nodes = warpAndBlendNodes<2>(1);
         checkNodes(nodes, refNodes);
     }
 
     SUBCASE("Triangle nodes P2") {
         std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {0.5, 0.0}, {0.0, 0.5},
                                                     {1.0, 0.0}, {0.5, 0.5}, {0.0, 1.0}};
-        auto nodes = simplexNodes<2>(2);
+        auto nodes = warpAndBlendNodes<2>(2);
         checkNodes(nodes, refNodes);
     }
 
@@ -294,7 +295,7 @@ TEST_CASE("Nodes") {
             {0.72360679774997893610, 0.27639320225002106390},
             {0.27639320225002095288, 0.72360679774997904712},
             {0.00000000000000000000, 1.00000000000000000000}};
-        auto nodes = simplexNodes<2>(3);
+        auto nodes = warpAndBlendNodes<2>(3);
         checkNodes(nodes, refNodes);
     }
 
@@ -315,7 +316,7 @@ TEST_CASE("Nodes") {
             {0.50000000000000000000, 0.50000000000000000000},
             {0.17267316464601140114, 0.82732683535398865438},
             {0.00000000000000000000, 1.00000000000000000000}};
-        auto nodes = simplexNodes<2>(4);
+        auto nodes = warpAndBlendNodes<2>(4);
         checkNodes(nodes, refNodes);
     }
 }

@@ -1,5 +1,5 @@
-#ifndef SIMPLEXNODES_H
-#define SIMPLEXNODES_H
+#ifndef WARPANDBLEND_H
+#define WARPANDBLEND_H
 
 #include <Eigen/Dense>
 
@@ -17,22 +17,7 @@ namespace tndm {
  * @param alpha See Book. Passing -1.0 automatically employs the optimal value until N=14
  */
 template <std::size_t D>
-std::vector<std::array<double, D>> simplexNodes(unsigned degree, double alpha = -1.0);
-
-/**
- * @brief Returns Legendre-Gauss-Lobatto points on [-1,1]
- *
- * @param n Number of points with n >= 2
- * @param a
- * @param b
- */
-std::vector<double> LegendreGaussLobattoPoints(unsigned n, unsigned a, unsigned b);
-
-/**
- * @brief Compute generalized Vandermonde matrix.
- */
-template <std::size_t D>
-Eigen::MatrixXd Vandermonde(unsigned degree, std::vector<std::array<double, D>> const& points);
+std::vector<std::array<double, D>> warpAndBlendNodes(unsigned degree, double alpha = -1.0);
 
 /**
  * @brief Helper class for simplexNodes.
@@ -49,4 +34,4 @@ private:
 
 } // namespace tndm
 
-#endif // SIMPLEXNODES_H
+#endif // WARPANDBLEND_H

@@ -1,11 +1,8 @@
-#include "SimplexNodes.h"
+#include "WarpAndBlend.h"
 #include "Functions.h"
-#include "Quadrature.h"
+#include "Nodal.h"
 #include "geometry/Affine.h"
 #include "util/Combinatorics.h"
-
-#include <algorithm>
-#include <iterator>
 
 using Eigen::ColPivHouseholderQR;
 using Eigen::Dynamic;
@@ -17,7 +14,7 @@ using Eigen::VectorXd;
 
 namespace tndm {
 
-template <> std::vector<std::array<double, 2>> simplexNodes(unsigned degree, double alpha) {
+template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree, double alpha) {
     assert(degree > 0);
 
     const double alphaOpt[] = {0.0000, 0.0000, 1.4152, 0.1001, 0.2751, 0.9800, 1.0999, 1.2832,
@@ -79,34 +76,6 @@ template <> std::vector<std::array<double, 2>> simplexNodes(unsigned degree, dou
     return result;
 }
 
-std::vector<double> LegendreGaussLobattoPoints(unsigned n, unsigned a, unsigned b) {
-    assert(n >= 2);
-
-    auto gjPoints = GaussJacobi(n - 2, a + 1, b + 1).points();
-    std::vector<double> glPoints;
-    glPoints.reserve(n);
-    glPoints.push_back(-1.0);
-    std::copy(gjPoints.rbegin(), gjPoints.rend(), std::back_inserter(glPoints));
-    glPoints.push_back(1.0);
-    return glPoints;
-}
-
-template <std::size_t D>
-MatrixXd Vandermonde(unsigned degree, std::vector<std::array<double, D>> const& points) {
-    assert(binom(degree + D, D) == points.size());
-
-    MatrixXd vandermonde(points.size(), binom(degree + D, D));
-
-    for (std::size_t i = 0; i < points.size(); ++i) {
-        std::size_t bf = 0;
-        for (auto j : AllIntegerSums<D>(degree)) {
-            vandermonde(i, bf++) = DubinerP(j, points[i]);
-        }
-    }
-
-    return vandermonde;
-}
-
 Warpfactor::Warpfactor(unsigned N) : diff(N + 1) {
     std::vector<std::array<double, 1>> eqPoints(N + 1);
     for (unsigned i = 0; i < N + 1; ++i) {
@@ -138,8 +107,5 @@ VectorXd Warpfactor::operator()(VectorXd const& r) {
     }
     return warp;
 }
-
-template MatrixXd Vandermonde<2u>(unsigned, std::vector<std::array<double, 2u>> const&);
-template MatrixXd Vandermonde<3u>(unsigned, std::vector<std::array<double, 3u>> const&);
 
 } // namespace tndm
