@@ -32,6 +32,19 @@ private:
     Eigen::ColPivHouseholderQR<Eigen::MatrixXd> LQR;
 };
 
+inline std::array<std::array<double, 2>, 3> equilateralTriangle() {
+    return {{{-1.0, -1.0 / sqrt(3.0)}, {1.0, -1.0 / sqrt(3.0)}, {0.0, 2.0 / sqrt(3.0)}}};
+}
+
+inline std::array<std::array<double, 3>, 4> equilateralTetrahedron() {
+    return {{{-1.0, -1.0 / sqrt(3.0), -1.0 / sqrt(6.0)},
+             {1.0, -1.0 / sqrt(3.0), -1.0 / sqrt(6.0)},
+             {0.0, 2.0 / sqrt(3.0), -1.0 / sqrt(6.0)},
+             {0.0, 0.0, 3.0 / sqrt(6.0)}}};
+}
+
+Eigen::MatrixXd warpAndBlendTriangle(unsigned degree, double alpha, Eigen::MatrixXd const& L);
+
 } // namespace tndm
 
 #endif // WARPANDBLEND_H

@@ -2,6 +2,7 @@
 #include "Functions.h"
 #include "Nodal.h"
 #include "geometry/Affine.h"
+#include "mesh/Simplex.h"
 #include "util/Combinatorics.h"
 
 using Eigen::ColPivHouseholderQR;
@@ -37,38 +38,96 @@ template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree
         ++idx;
     }
 
-    const std::array<std::array<double, 2>, 3> equilateralVerts{
-        {{-1.0, -1.0 / sqrt(3.0)}, {1.0, -1.0 / sqrt(3.0)}, {0.0, 2.0 / sqrt(3.0)}}};
+    auto equilateralVerts = equilateralTriangle();
     const Map<const Matrix<double, 3, 2, RowMajor>> equiMap(equilateralVerts.data()->data());
 
-    std::array<std::array<double, 2>, 3> tangents;
-    for (std::size_t d = 0; d < 3; ++d) {
-        tangents[d] = normalize(equilateralVerts[(d + 1) % 3] - equilateralVerts[d]);
-    }
-    const Map<const Matrix<double, 3, 2, RowMajor>> tangentMap(tangents.data()->data());
-
-    Warpfactor warpfactor(degree);
-    MatrixXd warp(numNodes, 3);
-    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
-        warp.col(d) = warpfactor(L.col((d + 1) % warp.cols()) - L.col(d));
-    }
-
-    MatrixXd blend(numNodes, 3);
-    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
-        blend.col(d) = 4.0 * L.col(d).cwiseProduct(L.col((d + 1) % warp.cols()));
-    }
-
-    auto factor = [&numNodes, &alpha](auto const& blend, auto const& L) {
-        return blend.cwiseProduct(VectorXd::Ones(numNodes) + (alpha * alpha) * L.cwiseProduct(L));
-    };
-    for (Eigen::Index d = 0; d < warp.cols(); ++d) {
-        warp.col(d) = warp.col(d).cwiseProduct(factor(blend.col(d), L.col((d + 2) % warp.cols())));
-        // warp.col(d) = warp.col(d).cwiseProduct(factor(blend.col(d), L.col(d)));
-    }
-
-    resultMap = L * equiMap + warp * tangentMap;
+    resultMap = L * equiMap + warpAndBlendTriangle(degree, alpha, L);
 
     GeneralPlexToRefPlex equiToRef(equilateralVerts);
+    for (std::size_t n = 0; n < numNodes; ++n) {
+        result[n] = equiToRef(result[n]);
+    }
+
+    return result;
+}
+
+template <> std::vector<std::array<double, 3>> warpAndBlendNodes(unsigned degree, double alpha) {
+    assert(degree > 0);
+
+    const double alphaOpt[] = {0.0,    0.0,     0.0,    0.1002, 1.1332, 1.5608, 1.3413, 1.2577,
+                               1.1603, 1.10153, 0.6080, 0.4523, 0.8856, 0.8717, 0.9655};
+    if (alpha < 0.0) {
+        alpha = (degree < 15) ? alphaOpt[degree - 1] : 1.0;
+    }
+
+    unsigned numNodes = binom(degree + 3, 3);
+    std::vector<std::array<double, 3>> result(numNodes);
+    Map<Matrix<double, Dynamic, Dynamic, RowMajor>> resultMap(result.data()->data(), numNodes, 3);
+
+    MatrixXd L(numNodes, 4);
+    std::size_t idx = 0;
+    for (auto i : AllIntegerSums<3>(degree)) {
+        L(idx, 3) = i[2] / static_cast<double>(degree);
+        L(idx, 2) = i[1] / static_cast<double>(degree);
+        L(idx, 1) = i[0] / static_cast<double>(degree);
+        L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2) - L(idx, 3);
+        ++idx;
+    }
+
+    auto eqVerts = equilateralTetrahedron();
+    const Map<const Matrix<double, 4, 3, RowMajor>> equiMap(eqVerts.data()->data());
+
+    resultMap = MatrixXd::Zero(numNodes, 3);
+
+    auto refTet = Simplex<3>::referenceSimplex();
+    MatrixXd Lface(numNodes, 3);
+    MatrixXd warp(numNodes, 3);
+    VectorXd blend(numNodes);
+    VectorXd denom(numNodes);
+    VectorXd mask(numNodes);
+    VectorXd factor(numNodes);
+    for (auto const& facet : refTet.downward()) {
+        Matrix<double, 2, 3> tangents;
+        tangents.row(0) = (equiMap.row(facet[1]) - equiMap.row(facet[0])).normalized();
+        tangents.row(1) =
+            (equiMap.row(facet[2]) - 0.5 * (equiMap.row(facet[1]) + equiMap.row(facet[0])))
+                .normalized();
+
+        Lface << L.col(facet[0]), L.col(facet[1]), L.col(facet[2]);
+        warp = warpAndBlendTriangle(degree, alpha, Lface) * tangents;
+
+        std::vector<uint64_t> mv;
+        std::set_difference(refTet.begin(), refTet.end(), facet.begin(), facet.end(),
+                            std::inserter(mv, mv.begin()));
+        assert(mv.size() == 1);
+
+        blend = Lface.col(0);
+        for (unsigned i = 1; i < 3; ++i) {
+            blend = blend.cwiseProduct(Lface.col(i));
+        }
+        denom = (Lface.col(0) + 0.5 * L.col(mv[0]));
+        for (unsigned i = 1; i < 3; ++i) {
+            denom = denom.cwiseProduct(Lface.col(i) + 0.5 * L.col(mv[0]));
+        }
+        double alpha2 = alpha * alpha;
+        factor = VectorXd::Ones(numNodes) + alpha2 * L.col(mv[0]).cwiseProduct(L.col(mv[0]));
+
+        for (Eigen::Index i = 0; i < numNodes; ++i) {
+            if (std::fabs(denom(i)) < std::numeric_limits<double>::epsilon()) {
+                blend(i) = 1.0;
+                mask(i) = 0.0;
+            } else {
+                blend(i) = factor(i) * blend(i) / denom(i);
+                mask(i) = 1.0;
+            }
+        }
+
+        resultMap = mask.asDiagonal() * resultMap + blend.asDiagonal() * warp;
+    }
+
+    resultMap += L * equiMap;
+
+    GeneralPlexToRefPlex equiToRef(eqVerts);
     for (std::size_t n = 0; n < numNodes; ++n) {
         result[n] = equiToRef(result[n]);
     }
@@ -106,6 +165,35 @@ VectorXd Warpfactor::operator()(VectorXd const& r) {
         }
     }
     return warp;
+}
+
+Eigen::MatrixXd warpAndBlendTriangle(unsigned degree, double alpha, Eigen::MatrixXd const& L) {
+    const auto numNodes = L.rows();
+    const auto equilateralVerts = equilateralTriangle();
+    const auto refTri = Simplex<2>::referenceSimplex();
+
+    Warpfactor warpfactor(degree);
+    MatrixXd result = MatrixXd::Zero(numNodes, 2);
+    VectorXd warp(numNodes);
+    VectorXd blend(numNodes);
+
+    for (auto const& facet : refTri.downward()) {
+        warp = warpfactor(L.col(facet[1]) - L.col(facet[0]));
+
+        blend = 4.0 * L.col(facet[0]).cwiseProduct(L.col(facet[1]));
+
+        std::vector<uint64_t> mv;
+        std::set_difference(refTri.begin(), refTri.end(), facet.begin(), facet.end(),
+                            std::inserter(mv, mv.begin()));
+        assert(mv.size() == 1);
+        blend = blend.cwiseProduct(VectorXd::Ones(numNodes) +
+                                   (alpha * alpha) * L.col(mv[0]).cwiseProduct(L.col(mv[0])));
+
+        auto tangent = normalize(equilateralVerts[facet[1]] - equilateralVerts[facet[0]]);
+        result += warp.cwiseProduct(blend) * Map<Matrix<double, 1, 2>>(tangent.data());
+    }
+
+    return result;
 }
 
 } // namespace tndm

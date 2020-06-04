@@ -23,6 +23,17 @@ std::vector<double> LegendreGaussLobattoPoints(unsigned n, unsigned a, unsigned 
 template <std::size_t D>
 Eigen::MatrixXd Vandermonde(unsigned degree, std::vector<std::array<double, D>> const& points);
 
+template <std::size_t D> class LebesgueFunction {
+public:
+    LebesgueFunction(unsigned degree, std::vector<std::array<double, D>> const& nodes);
+    double operator()(std::array<double, D> const& xi);
+
+private:
+    unsigned degree;
+    Eigen::MatrixXd vInvT;
+    Eigen::VectorXd phi, L;
+};
+
 } // namespace tndm
 
 #endif // BASIS_NODAL_H
