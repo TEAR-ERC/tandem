@@ -4,62 +4,31 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 
+#include <argparse.hpp>
 #include <mpi.h>
 
 #include <cmath>
+#include <functional>
+#include <iomanip>
 #include <iostream>
+#include <vector>
 
+using tndm::createSimplexQuadratureRule;
 using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
-using tndm::IntervalQuadrature;
-using tndm::TriangleQuadrature;
 
-int main(int argc, char** argv) {
-    MPI_Init(&argc, &argv);
-
-    if (argc < 2) {
-        std::cerr << "Usage: test-gauss <n>" << std::endl;
-        return -1;
-    }
-    uint64_t n = atoi(argv[1]);
-
-    constexpr double pi = 3.1415926535897932384626433832795028841971693993751058;
-
-    constexpr std::size_t D = 2;
-    std::array<uint64_t, 2> N = {n, n};
-    auto transform = [](Curvilinear<D>::vertex_t const& v) {
-        double x = 2.0 * v[0] - 1.0;
-        double y = 2.0 * v[1] - 1.0;
-        return Curvilinear<D>::vertex_t{x * sqrt(1.0 - y * y / 2.0), y * sqrt(1.0 - x * x / 2.0)};
-    };
-    unsigned degree = 4;
-    auto rule = IntervalQuadrature(degree);
-    auto reference = pi;
-
-    // constexpr std::size_t D = 3;
-    // std::array<uint64_t, 3> N = {n, n, n};
-    // auto transform = [](Curvilinear<D>::vertex_t const& v) {
-    // double x = 2.0 * v[0] - 1.0;
-    // double y = 2.0 * v[1] - 1.0;
-    // double z = 2.0 * v[2] - 1.0;
-    // return Curvilinear<D>::vertex_t{
-    // x * sqrt(1.0 - y * y / 2.0 - z * z / 2.0 + y * y * z * z / 3.0),
-    // y * sqrt(1.0 - x * x / 2.0 - z * z / 2.0 + x * x * z * z / 3.0),
-    // z * sqrt(1.0 - x * x / 2.0 - y * y / 2.0 + x * x * y * y / 3.0)};
-    //};
-    // auto rule = TriangleQuadrature(2);
-    // auto reference = 4.0 * pi / 3.0;
-
-    GenMesh<D> meshGen(N);
+template <std::size_t D, typename Func>
+double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree) {
+    GenMesh<D> meshGen(size);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
     auto mesh = globalMesh->getLocalMesh();
 
     Curvilinear<D> cl(*mesh, transform, degree);
-    // Curvilinear<D> cl(*mesh, transform);
 
+    auto rule = createSimplexQuadratureRule<D - 1u>(degree + 1);
     auto& pts = rule.points();
     auto& wgts = rule.weights();
 
@@ -75,9 +44,108 @@ int main(int argc, char** argv) {
         volume += localSum / D;
     }
 
-    std::cout << "Reference area: " << reference << std::endl;
-    std::cout << "Computed area: " << volume << std::endl;
-    std::cout << "Error: " << std::fabs(reference - volume) << std::endl;
+    return volume;
+}
+
+int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+
+    argparse::ArgumentParser program("test-gauss");
+    program.add_argument("-D", "--dim")
+        .help("Simplex dimension (D=2: triangle, D=3: tet)")
+        .default_value(2ul)
+        .action([](std::string const& value) { return std::stoul(value); });
+    program.add_argument("-N", "--degree")
+        .help("Polynomial degree for geometry approximation")
+        .default_value(1ul)
+        .action([](std::string const& value) { return std::stoul(value); });
+    program.add_argument("-c", "--csv")
+        .help("Print in CSV format")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("--csv-headless")
+        .help("Print in CSV without header")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("n")
+        .help("Number of elements per dimension")
+        .remaining()
+        .action([](std::string const& value) { return std::stoul(value); });
+
+    try {
+        program.parse_args(argc, argv);
+    } catch (std::runtime_error& err) {
+        std::cout << err.what() << std::endl;
+        std::cout << program;
+        return 0;
+    }
+
+    auto D = program.get<unsigned long>("-D");
+    auto N = program.get<unsigned long>("-N");
+    auto csv = program.get<bool>("-c");
+    auto csvHeadless = program.get<bool>("--csv-headless");
+    auto n = program.get<std::vector<unsigned long>>("n");
+
+    constexpr double pi = 3.1415926535897932384626433832795028841971693993751058;
+
+    double reference = 0.0;
+    std::function<double(unsigned long)> testFun;
+    if (D == 2) {
+        auto transform = [](Curvilinear<2>::vertex_t const& v) {
+            double x = 2.0 * v[0] - 1.0;
+            double y = 2.0 * v[1] - 1.0;
+            return Curvilinear<2>::vertex_t{x * sqrt(1.0 - y * y / 2.0),
+                                            y * sqrt(1.0 - x * x / 2.0)};
+        };
+        reference = pi;
+        testFun = [&transform, &N](unsigned long n) {
+            std::array<uint64_t, 2> size = {n, n};
+            return test(size, transform, N);
+        };
+    } else if (D == 3) {
+        auto transform = [](Curvilinear<3>::vertex_t const& v) {
+            double x = 2.0 * v[0] - 1.0;
+            double y = 2.0 * v[1] - 1.0;
+            double z = 2.0 * v[2] - 1.0;
+            return Curvilinear<3>::vertex_t{
+                x * sqrt(1.0 - y * y / 2.0 - z * z / 2.0 + y * y * z * z / 3.0),
+                y * sqrt(1.0 - x * x / 2.0 - z * z / 2.0 + x * x * z * z / 3.0),
+                z * sqrt(1.0 - x * x / 2.0 - y * y / 2.0 + x * x * y * y / 3.0)};
+        };
+        reference = 4.0 * pi / 3.0;
+        testFun = [&transform, &N](unsigned long n) {
+            std::array<uint64_t, 3> size = {n, n, n};
+            return test(size, transform, N);
+        };
+    } else {
+        std::cerr << "Test for simplex dimension " << D << " is not implemented." << std::endl;
+        return -1;
+    }
+
+    if (csv && !csvHeadless) {
+        std::cout << "D,degree,n,computed,error" << std::endl;
+    }
+    std::cout << std::setprecision(16);
+
+    for (auto& nn : n) {
+        double volumeLocal = testFun(nn);
+        double volume;
+        MPI_Reduce(&volumeLocal, &volume, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            double error = std::fabs(reference - volume);
+            if (csv || csvHeadless) {
+                std::cout << D << "," << N << "," << nn << "," << volume << "," << error
+                          << std::endl;
+            } else {
+                std::cout << "n = " << nn << ":" << std::endl;
+                std::cout << "\tReference area: " << reference << std::endl;
+                std::cout << "\tComputed area: " << volume << std::endl;
+                std::cout << "\tError: " << error << std::endl;
+            }
+        }
+    }
 
     MPI_Finalize();
 

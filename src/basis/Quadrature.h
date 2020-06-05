@@ -110,6 +110,19 @@ SimplexQuadratureRule<2> TriangleQuadrature(unsigned n);
  */
 SimplexQuadratureRule<3> TetrahedronQuadrature(unsigned n);
 
+/**
+ * @brief Factory function for quadrature rules
+ */
+template <std::size_t D> auto createSimplexQuadratureRule(unsigned n) {
+    if constexpr (D == 1) {
+        return IntervalQuadrature(n);
+    } else if constexpr (D == 2) {
+        return TriangleQuadrature(n);
+    } else if constexpr (D == 3) {
+        return TetrahedronQuadrature(n);
+    }
+}
+
 } // namespace tndm
 
 #endif // QUADRATURE_H

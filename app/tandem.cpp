@@ -1,13 +1,14 @@
-#include <iostream>
-
-#include <mpi.h>
-#include <parmetis.h>
-
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/MeshData.h"
 
 #include "xdmfwriter/XdmfWriter.h"
+
+#include <mpi.h>
+#include <parmetis.h>
+
+#include <cmath>
+#include <iostream>
 
 using tndm::BoundaryData;
 using tndm::GenMesh;
@@ -29,15 +30,16 @@ std::vector<IntT> flatElements(LocalSimplexMesh<D> const& mesh) {
     }
     return eout;
 }
-template <typename RealT, std::size_t D, std::size_t Dout = D>
-std::vector<RealT> flatVertices(std::vector<std::array<double, D>> const& verts) {
+template <typename RealT, std::size_t D, std::size_t Dout, typename Func>
+std::vector<RealT> flatVertices(std::vector<std::array<double, D>> const& verts, Func transform) {
     static_assert(Dout >= D);
     std::vector<RealT> vout;
     vout.reserve(Dout * verts.size());
     for (auto& v : verts) {
         std::size_t d;
+        auto vt = transform(v);
         for (d = 0; d < D; ++d) {
-            vout.push_back(static_cast<RealT>(v[d]));
+            vout.push_back(static_cast<RealT>(vt[d]));
         }
         for (; d < Dout; ++d) {
             vout.push_back(0.0);
@@ -54,13 +56,27 @@ int main(int argc, char** argv) {
 
     std::vector<const char*> variableNames{"x", "bc"};
 
-    // constexpr std::size_t D = 2;
-    // XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
-    // std::array<uint64_t, 2> N = {128, 128};
+    constexpr std::size_t D = 2;
+    XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
+    std::array<uint64_t, 2> N = {16, 16};
+    auto transform = [](std::array<double, 2> const& v) {
+        double x = 2.0 * v[0] - 1.0;
+        double y = 2.0 * v[1] - 1.0;
+        return std::array<double, 2>{x * sqrt(1.0 - y * y / 2.0), y * sqrt(1.0 - x * x / 2.0)};
+    };
 
-    constexpr std::size_t D = 3;
+    /*constexpr std::size_t D = 3;
     XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
     std::array<uint64_t, 3> N = {16, 16, 16};
+    auto transform = [](std::array<double, 3> const& v) {
+        double x = 2.0 * v[0] - 1.0;
+        double y = 2.0 * v[1] - 1.0;
+        double z = 2.0 * v[2] - 1.0;
+        return std::array<double, 3>{
+            x * sqrt(1.0 - y * y / 2.0 - z * z / 2.0 + y * y * z * z / 3.0),
+            y * sqrt(1.0 - x * x / 2.0 - z * z / 2.0 + x * x * z * z / 3.0),
+            z * sqrt(1.0 - x * x / 2.0 - y * y / 2.0 + x * x * y * y / 3.0)};
+    };*/
 
     GenMesh<D> meshGen(N);
     auto globalMesh = meshGen.uniformMesh();
@@ -85,7 +101,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices());
+    auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices(), transform);
     auto flatElems = flatElements<unsigned int, D>(*mesh);
     writer.init(mesh->elements().size(), flatElems.data(), vertexData->getVertices().size(),
                 flatVerts.data());

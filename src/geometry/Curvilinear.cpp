@@ -160,6 +160,6 @@ std::array<double, D> Curvilinear<D>::facetParam(std::size_t faceNo,
 }
 
 template class Curvilinear<2u>;
-// template class Curvilinear<3u>;
+template class Curvilinear<3u>;
 
 } // namespace tndm
