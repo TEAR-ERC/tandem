@@ -15,13 +15,24 @@ using Eigen::VectorXd;
 
 namespace tndm {
 
+double warpAndBlendAlpha(std::size_t D, unsigned degree) {
+    assert(D == 2 || D == 3);
+    assert(degree > 0);
+
+    constexpr double alphaOpt2[] = {0.0000, 0.0000, 1.4152, 0.1001, 0.2751, 0.9800, 1.0999, 1.2832,
+                                    1.3648, 1.4773, 1.4959, 1.5743, 1.5770, 1.6223, 1.6258};
+    constexpr double alphaOpt3[] = {0.0,    0.0,     0.0,    0.1002, 1.1332, 1.5608, 1.3413, 1.2577,
+                                    1.1603, 1.10153, 0.6080, 0.4523, 0.8856, 0.8717, 0.9655};
+
+    const double* alphaOpt = (D == 2) ? alphaOpt2 : alphaOpt3;
+    return (degree < 15) ? alphaOpt[degree - 1] : 5.0 / 3.0;
+}
+
 template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree, double alpha) {
     assert(degree > 0);
 
-    const double alphaOpt[] = {0.0000, 0.0000, 1.4152, 0.1001, 0.2751, 0.9800, 1.0999, 1.2832,
-                               1.3648, 1.4773, 1.4959, 1.5743, 1.5770, 1.6223, 1.6258};
     if (alpha < 0.0) {
-        alpha = (degree < 15) ? alphaOpt[degree - 1] : 5.0 / 3.0;
+        alpha = warpAndBlendAlpha(2, degree);
     }
 
     unsigned numNodes = binom(degree + 2, 2);
@@ -54,10 +65,8 @@ template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree
 template <> std::vector<std::array<double, 3>> warpAndBlendNodes(unsigned degree, double alpha) {
     assert(degree > 0);
 
-    const double alphaOpt[] = {0.0,    0.0,     0.0,    0.1002, 1.1332, 1.5608, 1.3413, 1.2577,
-                               1.1603, 1.10153, 0.6080, 0.4523, 0.8856, 0.8717, 0.9655};
     if (alpha < 0.0) {
-        alpha = (degree < 15) ? alphaOpt[degree - 1] : 1.0;
+        alpha = warpAndBlendAlpha(3, degree);
     }
 
     unsigned numNodes = binom(degree + 3, 3);

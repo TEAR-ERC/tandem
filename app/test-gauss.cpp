@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
         .help("Polynomial degree for geometry approximation")
         .default_value(1ul)
         .action([](std::string const& value) { return std::stoul(value); });
-    program.add_argument("-c", "--csv")
+    program.add_argument("--csv")
         .help("Print in CSV format")
         .default_value(false)
         .implicit_value(true);
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 
     auto D = program.get<unsigned long>("-D");
     auto N = program.get<unsigned long>("-N");
-    auto csv = program.get<bool>("-c");
+    auto csv = program.get<bool>("--csv");
     auto csvHeadless = program.get<bool>("--csv-headless");
     auto n = program.get<std::vector<unsigned long>>("n");
 

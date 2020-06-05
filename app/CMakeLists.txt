@@ -7,3 +7,6 @@ target_link_libraries(tensors PRIVATE tandem-lib)
 
 add_executable(test-gauss test-gauss.cpp)
 target_link_libraries(test-gauss PRIVATE tandem-lib)
+
+add_executable(warp-blend-opt warp-blend-opt.cpp)
+target_link_libraries(warp-blend-opt PRIVATE tandem-lib)

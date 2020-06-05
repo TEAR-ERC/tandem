@@ -9,6 +9,14 @@
 namespace tndm {
 
 /**
+ * @brief Returns tabulated ("optimal") alpha value.
+ *
+ * @param D simplex dimension (D = 2 or D = 3)
+ * @param degree polynomial degree
+ */
+double warpAndBlendAlpha(std::size_t D, unsigned degree);
+
+/**
  * @brief Returns warp & blend nodes.
  *
  * From Hesthaven and Warburton, "Nodal Discontinuous Galerkin Methods", Springer, 2008.
