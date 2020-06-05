@@ -12,7 +12,7 @@
 
 using tndm::LebesgueFunction;
 using tndm::warpAndBlendAlpha;
-using tndm::warpAndBlendNodes;
+using tndm::WarpAndBlendFactory;
 
 template <typename Func>
 double GoldenSectionSearch(Func f, double a, double b, double tol = 1.0e-5) {
@@ -178,14 +178,14 @@ int main(int argc, char** argv) {
     if (D == 2) {
         sample2 = generateSample<2>(sampleSize);
         lebesgueConstant = [&sample2](int degree, double alpha) {
-            auto nodes = warpAndBlendNodes<2>(degree, alpha);
-            return estimateLebesgueConstant(degree, nodes, sample2);
+            auto factory = WarpAndBlendFactory<2>([alpha](unsigned) { return alpha; });
+            return estimateLebesgueConstant(degree, factory(degree), sample2);
         };
     } else if (D == 3) {
         sample3 = generateSample<3>(sampleSize);
         lebesgueConstant = [&sample3](int degree, double alpha) {
-            auto nodes = warpAndBlendNodes<3>(degree, alpha);
-            return estimateLebesgueConstant(degree, nodes, sample3);
+            auto factory = WarpAndBlendFactory<3>([alpha](unsigned) { return alpha; });
+            return estimateLebesgueConstant(degree, factory(degree), sample3);
         };
     } else {
         std::cerr << "Test for simplex dimension " << D << " is not implemented." << std::endl;

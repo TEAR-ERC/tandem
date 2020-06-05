@@ -2,8 +2,6 @@
 #include "Affine.h"
 #include "Vector.h"
 #include "basis/Functions.h"
-#include "basis/Nodal.h"
-#include "basis/WarpAndBlend.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>
@@ -15,10 +13,11 @@ namespace tndm {
 
 template <std::size_t D>
 Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
-                            std::function<vertex_t(vertex_t const&)> transform, unsigned degree)
+                            std::function<vertex_t(vertex_t const&)> transform, unsigned degree,
+                            NodesFactory<D> const& nodesFactory)
     : N(degree) {
     // Get vertices
-    std::vector<std::array<double, D>> refNodes = warpAndBlendNodes<D>(degree);
+    std::vector<std::array<double, D>> refNodes = nodesFactory(degree);
     std::size_t vertsPerElement = refNodes.size();
     assert(binom(N + D, D) == refNodes.size());
 

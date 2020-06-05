@@ -34,6 +34,11 @@ private:
     Eigen::VectorXd phi, L;
 };
 
+template <std::size_t D> class NodesFactory {
+public:
+    virtual std::vector<std::array<double, D>> operator()(unsigned degree) const = 0;
+};
+
 } // namespace tndm
 
 #endif // BASIS_NODAL_H

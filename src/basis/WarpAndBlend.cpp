@@ -1,6 +1,5 @@
 #include "WarpAndBlend.h"
 #include "Functions.h"
-#include "Nodal.h"
 #include "geometry/Affine.h"
 #include "mesh/Simplex.h"
 #include "util/Combinatorics.h"
@@ -18,22 +17,27 @@ namespace tndm {
 double warpAndBlendAlpha(std::size_t D, unsigned degree) {
     assert(D == 2 || D == 3);
     assert(degree > 0);
+    constexpr double alphaOpt2[] = {
+        0.0000,  0.0000,  1.4152,  0.1001,  0.2751,  0.9800,  1.0999,  1.2832,  1.3648,  1.4773,
+        1.4959,  1.5743,  1.5770,  1.6223,  1.6258,  1.64831, 1.76303, 1.92727, 1.92962, 1.91251,
+        1.91289, 1.89479, 1.89255, 1.88016, 1.87555, 1.86613, 1.86106, 1.85368, 1.84874, 1.84319};
 
-    constexpr double alphaOpt2[] = {0.0000, 0.0000, 1.4152, 0.1001, 0.2751, 0.9800, 1.0999, 1.2832,
-                                    1.3648, 1.4773, 1.4959, 1.5743, 1.5770, 1.6223, 1.6258};
     constexpr double alphaOpt3[] = {0.0,    0.0,     0.0,    0.1002, 1.1332, 1.5608, 1.3413, 1.2577,
                                     1.1603, 1.10153, 0.6080, 0.4523, 0.8856, 0.8717, 0.9655};
 
-    const double* alphaOpt = (D == 2) ? alphaOpt2 : alphaOpt3;
-    return (degree < 15) ? alphaOpt[degree - 1] : 5.0 / 3.0;
+    const auto tabAlpha = [&degree](const double* alphaOpt, unsigned numEntries) {
+        return (degree <= numEntries) ? alphaOpt[degree - 1u] : 5.0 / 3.0;
+    };
+
+    return (D == 2) ? tabAlpha(alphaOpt2, sizeof(alphaOpt2) / sizeof(double))
+                    : tabAlpha(alphaOpt3, sizeof(alphaOpt3) / sizeof(double));
 }
 
-template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree, double alpha) {
+template <>
+std::vector<std::array<double, 2>> WarpAndBlendFactory<2>::operator()(unsigned degree) const {
     assert(degree > 0);
 
-    if (alpha < 0.0) {
-        alpha = warpAndBlendAlpha(2, degree);
-    }
+    double alpha = alphaFun(degree);
 
     unsigned numNodes = binom(degree + 2, 2);
     std::vector<std::array<double, 2>> result(numNodes);
@@ -62,12 +66,11 @@ template <> std::vector<std::array<double, 2>> warpAndBlendNodes(unsigned degree
     return result;
 }
 
-template <> std::vector<std::array<double, 3>> warpAndBlendNodes(unsigned degree, double alpha) {
+template <>
+std::vector<std::array<double, 3>> WarpAndBlendFactory<3>::operator()(unsigned degree) const {
     assert(degree > 0);
 
-    if (alpha < 0.0) {
-        alpha = warpAndBlendAlpha(3, degree);
-    }
+    double alpha = alphaFun(degree);
 
     unsigned numNodes = binom(degree + 3, 3);
     std::vector<std::array<double, 3>> result(numNodes);

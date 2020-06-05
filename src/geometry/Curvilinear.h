@@ -1,6 +1,8 @@
 #ifndef CURVILINEAR_H
 #define CURVILINEAR_H
 
+#include "basis/Nodal.h"
+#include "basis/WarpAndBlend.h"
 #include "mesh/LocalSimplexMesh.h"
 
 #include <mneme/storage.hpp>
@@ -20,7 +22,7 @@ public:
     Curvilinear(
         LocalSimplexMesh<D> const& mesh,
         std::function<vertex_t(vertex_t const&)> transform = [](vertex_t const& v) { return v; },
-        unsigned degree = 1);
+        unsigned degree = 1, NodesFactory<D> const& nodesFactory = WarpAndBlendFactory<D>());
 
     std::array<double, D> map(std::size_t eleNo, std::array<double, D> const& xi);
     std::array<double, D * D> jacobian(std::size_t eleNo, std::array<double, D> const& xi);
