@@ -1,0 +1,21 @@
+notifications:
+  email:
+    on_success: always
+    on_failure: always
+
+language: cpp
+compiler: gcc
+dist: bionic
+env:
+  - "CC=gcc-9 CXX=g++-9"
+
+before_install:
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update
+  - sudo apt-get -y install gcc-9 g++-9 cmake
+script:
+  - mkdir build && cd build
+  - cmake ..
+  - make -j2
+  - make test
+
