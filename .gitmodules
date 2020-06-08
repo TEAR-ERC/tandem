@@ -7,3 +7,6 @@
 [submodule "submodules/xdmfwriter"]
 	path = submodules/xdmfwriter
 	url = https://github.com/TUM-I5/XdmfWriter.git
+[submodule "submodules/yateto"]
+	path = submodules/yateto
+	url = https://github.com/SeisSol/yateto.git
