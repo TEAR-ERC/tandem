@@ -4,7 +4,9 @@
 #include "basis/WarpAndBlend.h"
 
 #include "doctest.h"
+
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <vector>
@@ -236,6 +238,34 @@ TEST_CASE("Basis") {
         CHECK(doctest::Approx(intBFPair(0, 9)) == 0.0);
         CHECK(doctest::Approx(intBFPair(6, 3)) == 0.0);
         CHECK(doctest::Approx(intBFPair(0, 1)) == 0.0);
+    }
+
+    auto testOrder = [](auto ruleFactory) {
+        for (unsigned n = 1; n < 15; ++n) {
+            auto rule = ruleFactory(n);
+            auto& pts = rule.points();
+            auto& wgts = rule.weights();
+            unsigned maxDegree = 2u * n - 1u;
+            unsigned dim = pts[0].size();
+            double integral = 0.0;
+            for (std::size_t q = 0; q < pts.size(); ++q) {
+                integral += rangeProduct(maxDegree + 1u, maxDegree + dim) *
+                            std::pow(pts[q][0], maxDegree) * wgts[q];
+            }
+            CHECK(integral == doctest::Approx(1.0));
+        }
+    };
+
+    SUBCASE("Interval quadrature order test") {
+        testOrder([](unsigned n) { return IntervalQuadrature(n); });
+    }
+
+    SUBCASE("Triangle quadrature order test") {
+        testOrder([](unsigned n) { return TriangleQuadrature(n); });
+    }
+
+    SUBCASE("Tetrahedron quadrature order test") {
+        testOrder([](unsigned n) { return TetrahedronQuadrature(n); });
     }
 }
 

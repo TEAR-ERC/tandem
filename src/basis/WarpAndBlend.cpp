@@ -148,15 +148,20 @@ std::vector<std::array<double, 3>> WarpAndBlendFactory<3>::operator()(unsigned d
 }
 
 Warpfactor::Warpfactor(unsigned N) : diff(N + 1) {
-    std::vector<std::array<double, 1>> eqPoints(N + 1);
+    std::vector<double> eqPoints(N + 1);
     for (unsigned i = 0; i < N + 1; ++i) {
-        eqPoints[i][0] = 2 * i / static_cast<double>(N) - 1.0;
+        eqPoints[i] = 2 * i / static_cast<double>(N) - 1.0;
     }
-    auto vandermonde = Vandermonde(N, eqPoints);
-    LQR = ColPivHouseholderQR<MatrixXd>(vandermonde.transpose());
+    MatrixXd vandermondeT(N + 1, N + 1);
+    for (unsigned i = 0; i <= N; ++i) {
+        for (unsigned j = 0; j <= N; ++j) {
+            vandermondeT(j, i) = JacobiP(j, 0, 0, eqPoints[i]);
+        }
+    }
+    LQR = ColPivHouseholderQR<MatrixXd>(vandermondeT);
     auto glPoints = LegendreGaussLobattoPoints(N + 1, 0, 0);
     for (unsigned i = 0; i < N + 1; ++i) {
-        diff[i] = glPoints[i] - eqPoints[i][0];
+        diff[i] = glPoints[i] - eqPoints[i];
     }
 }
 

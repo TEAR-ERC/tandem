@@ -34,8 +34,14 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 namespace tndm {
+
+/**
+ * @brief Computes \prod_{i=from}^{to} i. Returns 1 if from > to.
+ */
+uint64_t rangeProduct(uint64_t from, uint64_t to);
 
 /**
  * @brief Factorial operation
@@ -44,7 +50,9 @@ namespace tndm {
  *
  * @return n!
  */
-unsigned factorial(unsigned n);
+inline uint64_t factorial(uint64_t n) {
+    return rangeProduct(1, n);
+}
 
 /**
  * @brief Evaluates Jacobi polynomial P_{n}^{(a,b)}(x).
@@ -139,11 +147,16 @@ std::array<double, 3> gradTetraDubinerP(std::array<unsigned, 3> const& i,
 
 /**
  * @brief Templated Dubiner basis for D=1,2,3.
+ *
+ * Reference element is given by vertices
+ * D = 1: (0), (1)
+ * D = 2: (0,0), (1,0), (0,1)
+ * D = 3: (0,0,0), (1,0,0), (0,1,0), (0,0,1)
  */
 template <std::size_t D>
 double DubinerP(std::array<unsigned, D> const& i, std::array<double, D> const& xi) {
     if constexpr (D == 1) {
-        return JacobiP(i[0], 0, 0, xi[0]);
+        return JacobiP(i[0], 0, 0, 2.0 * xi[0] - 1.0);
     } else if constexpr (D == 2) {
         return TriDubinerP(i, xi);
     } else if (D == 3) {
@@ -160,7 +173,7 @@ template <std::size_t D>
 std::array<double, D> gradDubinerP(std::array<unsigned, D> const& i,
                                    std::array<double, D> const& xi) {
     if constexpr (D == 1) {
-        return {JacobiPDerivative(i[0], 0, 0, xi[0])};
+        return {JacobiPDerivative(i[0], 0, 0, 2.0 * xi[0] - 1.0)};
     } else if constexpr (D == 2) {
         return gradTriDubinerP(i, xi);
     } else if (D == 3) {

@@ -148,11 +148,11 @@ std::array<double, D> Curvilinear<D>::facetParam(std::size_t faceNo,
     auto& f = f2v[faceNo];
     std::array<double, D> xi;
     double chiSum = 0.0;
-    for (std::size_t d = 0; d < D - 1; ++d) {
+    for (std::size_t d = 0; d < chi.size(); ++d) {
         chiSum += chi[d];
     }
     xi = (1.0 - chiSum) * refVertices[f[0]];
-    for (std::size_t d = 0; d < D - 1; ++d) {
+    for (std::size_t d = 0; d < chi.size(); ++d) {
         xi = xi + chi[d] * refVertices[f[d + 1]];
     }
     return xi;

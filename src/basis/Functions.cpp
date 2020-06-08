@@ -2,13 +2,12 @@
 
 namespace tndm {
 
-unsigned factorial(unsigned n) {
-    unsigned f = 1;
-    while (n > 0) {
-        f *= n;
-        --n;
+uint64_t rangeProduct(uint64_t from, uint64_t to) {
+    uint64_t product = 1;
+    for (; from <= to; ++from) {
+        product *= from;
     }
-    return f;
+    return product;
 }
 
 double JacobiP(unsigned n, unsigned a, unsigned b, double x) {

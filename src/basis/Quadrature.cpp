@@ -26,9 +26,11 @@ void IntervalQuadratureRule::changeInterval(double start, double stop) {
 
 IntervalQuadratureRule GaussJacobi(unsigned n, unsigned a, unsigned b) {
     IntervalQuadratureRule rule(n);
-    double weightFactor = -(2.0 * n + a + b + 2) * factorial(n + a) * factorial(n + b) *
-                          (1 << (a + b)) /
-                          ((n + a + b + 1.0) * factorial(n + a + b) * factorial(n + 1));
+    //                -(2n + a + b + 2) (n + a)! (n + b)! 2^(a+b)
+    // weightFactor = -------------------------------------------
+    //                   (n + a + b + 1) (n + a + b)! (n + 1)!
+    double weightFactor = -(2.0 * n + a + b + 2) * rangeProduct(n + 1, n + b) * (1 << (a + b)) /
+                          ((n + a + b + 1.0) * rangeProduct(n + a + 1, n + a + b) * (n + 1));
     for (unsigned i = 1; i <= n; ++i) {
         // x = Initial guess for polynomial root
         double x = cos(M_PI * (0.5 * a + i - 0.25) / (0.5 * (1.0 + a + b) + n));
