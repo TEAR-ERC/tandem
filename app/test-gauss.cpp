@@ -18,6 +18,7 @@ using tndm::createSimplexQuadratureRule;
 using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
+using tndm::Managed;
 using tndm::Tensor;
 
 template <std::size_t D, typename Func>
@@ -36,17 +37,15 @@ double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree
     auto& wgts = rule.weights();
 
     auto gradE = cl.evaluateGradientAt(pts);
-    auto J = Tensor(cl.jacobianResultInfo(pts.size()));
-    auto Jview = J.view();
-    auto detJ = Tensor(cl.detJResultInfo(pts.size()));
-    auto detJview = detJ.view();
+    auto J = Managed(cl.jacobianResultInfo(pts.size()));
+    auto detJ = Managed(cl.detJResultInfo(pts.size()));
 
     double volume = 0.0;
     for (std::size_t eleNo = 0; eleNo < mesh->numElements(); ++eleNo) {
         double localSum = 0.0;
 
-        cl.jacobian(eleNo, gradE, Jview);
-        cl.detJ(eleNo, Jview, detJview);
+        cl.jacobian(eleNo, gradE, J);
+        cl.detJ(eleNo, J, detJ);
         for (std::size_t q = 0; q < rule.size(); ++q) {
             localSum += std::fabs(detJ(q)) * wgts[q];
         }

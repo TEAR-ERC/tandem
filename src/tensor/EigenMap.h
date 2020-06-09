@@ -1,8 +1,8 @@
 #ifndef EIGENMAP_20200609_H
 #define EIGENMAP_20200609_H
 
-#include "Matrix.h"
-#include "Vector.h"
+#include "Tensor.h"
+#include "TensorBase.h"
 #include "util/Utility.h"
 
 #include <Eigen/Core>
@@ -34,7 +34,7 @@ template <typename Matrix> struct EigenMapFactory<Matrix, 2u> {
 } // namespace detail
 
 template <typename Tensor> auto EigenMap(Tensor& tensor) {
-    detail::EigenMapFactory<Tensor, Tensor::Dim> factory;
+    detail::EigenMapFactory<Tensor, detail::traits<Tensor>::Dim> factory;
     return factory(tensor);
 }
 
