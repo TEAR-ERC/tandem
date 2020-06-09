@@ -2,6 +2,8 @@
 #include "Affine.h"
 #include "Vector.h"
 #include "basis/Functions.h"
+#include "tensor/EigenMap.h"
+#include "tensor/Reshape.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>
@@ -83,63 +85,117 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
 }
 
 template <std::size_t D>
-std::array<double, D> Curvilinear<D>::map(std::size_t eleNo, std::array<double, D> const& xi) {
-    assert(eleNo < vertices.size());
-
-    Eigen::VectorXd phi(vandermondeInvT.cols());
-    std::size_t bf = 0;
-    for (auto j : AllIntegerSums<D>(N)) {
-        phi(bf++) = DubinerP(j, xi);
-    }
-    auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == vandermondeInvT.rows());
-
-    std::array<double, D> result;
-    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
-                                                                 vandermondeInvT.rows());
-    Eigen::Map<Eigen::Matrix<double, D, 1>>(result.data()) = vertMap * (vandermondeInvT * phi);
-    return result;
-}
-
-template <std::size_t D>
-std::array<double, D * D> Curvilinear<D>::jacobian(std::size_t eleNo,
-                                                   std::array<double, D> const& xi) {
-    assert(eleNo < vertices.size());
-
-    Eigen::MatrixXd phi(vandermondeInvT.cols(), D);
-    std::size_t bf = 0;
-    for (auto j : AllIntegerSums<D>(N)) {
-        auto dphi = gradDubinerP(j, xi);
-        for (std::size_t d = 0; d < D; ++d) {
-            phi(bf, d) = dphi[d];
+Matrix<double> Curvilinear<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points) {
+    Matrix<double> E(vandermondeInvT.cols(), points.size());
+    for (std::size_t p = 0; p < points.size(); ++p) {
+        std::size_t bf = 0;
+        for (auto j : AllIntegerSums<D>(N)) {
+            E(bf++, p) = DubinerP(j, points[p]);
         }
-        ++bf;
     }
+    auto Emap = EigenMap(E);
+    Emap = vandermondeInvT * Emap;
+    return E;
+}
+
+template <std::size_t D>
+Tensor<double, 3u>
+Curvilinear<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points) {
+    Tensor<double, 3u> gradE(
+        {vandermondeInvT.cols(), D, static_cast<std::ptrdiff_t>(points.size())});
+    for (std::size_t p = 0; p < points.size(); ++p) {
+        std::size_t bf = 0;
+        for (auto j : AllIntegerSums<D>(N)) {
+            auto dphi = gradDubinerP(j, points[p]);
+            for (std::size_t d = 0; d < D; ++d) {
+                gradE(bf, d, p) = dphi[d];
+            }
+            ++bf;
+        }
+    }
+
+    assert(vandermondeInvT.cols() == vandermondeInvT.rows());
+    auto matView = reshape(gradE, vandermondeInvT.cols(), D * points.size());
+    auto map = EigenMap(matView);
+    map = vandermondeInvT * map;
+    return gradE;
+}
+
+template <std::size_t D>
+TensorInfo<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) const {
+    return TensorInfo<Matrix<double>>({D, static_cast<std::ptrdiff_t>(numPoints)});
+}
+
+template <std::size_t D>
+void Curvilinear<D>::map(std::size_t eleNo, Matrix<double> const& E,
+                         TensorView<Tensor<double, 2u>>& result) {
+    assert(eleNo < vertices.size());
+    assert(E.cols() == result.shape(1));
+
     auto vertexSpan = vertices[eleNo];
     assert(vertexSpan.size() == vandermondeInvT.rows());
-
-    std::array<double, D * D> result;
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
                                                                  vandermondeInvT.rows());
-    Eigen::Map<Eigen::Matrix<double, D, D>>(result.data()) = vertMap * (vandermondeInvT * phi);
-    return result;
+    EigenMap(result) = vertMap * EigenMap(E);
 }
 
 template <std::size_t D>
-double Curvilinear<D>::detJ(std::size_t eleNo, std::array<double, D> const& xi) {
-    auto J = jacobian(eleNo, xi);
-    return Eigen::Map<Eigen::Matrix<double, D, D>>(J.data()).determinant();
+TensorInfo<Tensor<double, 3u>> Curvilinear<D>::jacobianResultInfo(std::size_t numPoints) const {
+    return TensorInfo<Tensor<double, 3u>>({D, D, static_cast<std::ptrdiff_t>(numPoints)});
 }
 
 template <std::size_t D>
-std::array<double, D> Curvilinear<D>::normal(std::size_t eleNo, std::size_t faceNo,
-                                             std::array<double, D> const& xi) {
-    auto Jraw = jacobian(eleNo, xi);
-    auto J = Eigen::Map<Eigen::Matrix<double, D, D>>(Jraw.data());
-    std::array<double, D> result;
-    Eigen::Map<Eigen::Matrix<double, D, 1>>(result.data()) =
-        std::fabs(J.determinant()) * J.transpose().colPivHouseholderQr().solve(refNormals[faceNo]);
-    return result;
+void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE,
+                              TensorView<Tensor<double, 3u>>& result) {
+    assert(eleNo < vertices.size());
+
+    auto vertexSpan = vertices[eleNo];
+    assert(vertexSpan.size() == vandermondeInvT.rows());
+    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
+                                                                 vandermondeInvT.rows());
+
+    auto gradEMat = reshape(gradE, vandermondeInvT.rows(), D * gradE.shape(2));
+    auto resultMat = reshape(result, D, D * gradE.shape(2));
+    EigenMap(resultMat) = vertMap * EigenMap(gradEMat);
+}
+
+template <std::size_t D>
+void Curvilinear<D>::jacobianInvT(TensorView<Tensor<double, 3u>> const& jacobian,
+                                  TensorView<Tensor<double, 3u>>& result) {
+    for (std::ptrdiff_t i = 0; i < result.shape(2); ++i) {
+        Eigen::Map<const Eigen::Matrix<double, D, D>> Jmap(&jacobian(0, 0, i));
+        Eigen::Map<Eigen::Matrix<double, D, D>> resultMap(&result(0, 0, i));
+        resultMap = Jmap.transpose().inverse();
+    }
+}
+
+template <std::size_t D>
+TensorInfo<Vector<double>> Curvilinear<D>::detJResultInfo(std::size_t numPoints) const {
+    return TensorInfo<Vector<double>>({static_cast<std::ptrdiff_t>(numPoints)});
+}
+
+template <std::size_t D>
+void Curvilinear<D>::detJ(std::size_t eleNo, TensorView<Tensor<double, 3u>> const& jacobian,
+                          TensorView<Tensor<double, 1u>>& result) {
+    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
+        result(i) = Eigen::Map<const Eigen::Matrix<double, D, D>>(&jacobian(0, 0, i)).determinant();
+    }
+}
+
+template <std::size_t D>
+TensorInfo<Matrix<double>> Curvilinear<D>::normalResultInfo(std::size_t numPoints) const {
+    return TensorInfo<Matrix<double>>({D, static_cast<std::ptrdiff_t>(numPoints)});
+}
+
+template <std::size_t D>
+void Curvilinear<D>::normal(std::size_t faceNo, TensorView<Tensor<double, 1u>> const& detJ,
+                            TensorView<Tensor<double, 3u>> const& JinvT,
+                            TensorView<Tensor<double, 2u>>& result) {
+    for (std::ptrdiff_t i = 0; i < detJ.shape(0); ++i) {
+        Eigen::Map<const Eigen::Matrix<double, D, D>> JinvTmap(&JinvT(0, 0, i));
+        Eigen::Map<Eigen::Matrix<double, D, 1>> resultMap(&result(0, i));
+        resultMap = std::fabs(detJ(i)) * JinvTmap * refNormals[faceNo];
+    }
 }
 
 template <std::size_t D>

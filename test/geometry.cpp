@@ -1,5 +1,6 @@
 #include "geometry/Curvilinear.h"
 #include "mesh/GenMesh.h"
+#include "tensor/Tensor.h"
 
 #include "doctest.h"
 
@@ -10,6 +11,7 @@
 
 using tndm::Curvilinear;
 using tndm::GenMesh;
+using tndm::Tensor;
 
 TEST_CASE("Curvilinear") {
     double c = cos(3.14159265359 / 4.0);
@@ -35,15 +37,28 @@ TEST_CASE("Curvilinear") {
             {0, {0.0, 1.0}, {-1.0, 1.0}},  {1, {0.0, 0.0}, {1.0, -1.0}},
             {1, {1.0, 0.0}, {-1.0, 1.0}},  {1, {0.0, 1.0}, {1.0, 1.0}}};
         for (auto& [elNo, xi, x] : test) {
-            auto result = cl.map(elNo, xi);
-            CHECK(result[0] == doctest::Approx(c * x[0] - s * x[1]));
-            CHECK(result[1] == doctest::Approx(c * x[0] + s * x[1]));
+            auto E = cl.evaluateBasisAt({xi});
+            auto result = Tensor(cl.mapResultInfo(1u));
+            auto resultView = result.view();
+            cl.map(elNo, E, resultView);
+            CHECK(result(0, 0) == doctest::Approx(c * x[0] - s * x[1]));
+            CHECK(result(1, 0) == doctest::Approx(c * x[0] + s * x[1]));
         }
     }
 
     SUBCASE("det(J)") {
-        CHECK(std::fabs(cl.detJ(0, {0.25, 0.25})) == doctest::Approx(4.0));
-        CHECK(std::fabs(cl.detJ(1, {0.25, 0.25})) == doctest::Approx(4.0));
+        auto gradE = cl.evaluateGradientAt({{0.25, 0.25}});
+        auto J = Tensor(cl.jacobianResultInfo(1u));
+        auto Jview = J.view();
+        auto detJ = Tensor(cl.detJResultInfo(1u));
+        auto detJview = detJ.view();
+        cl.jacobian(0, gradE, Jview);
+        cl.detJ(0, Jview, detJview);
+        CHECK(std::fabs(detJ(0)) == doctest::Approx(4.0));
+
+        cl.jacobian(1, gradE, Jview);
+        cl.detJ(1, Jview, detJview);
+        CHECK(std::fabs(detJ(0)) == doctest::Approx(4.0));
     }
 
     SUBCASE("Normal") {
@@ -69,9 +84,21 @@ TEST_CASE("Curvilinear") {
             {1, 2, {0.0, 0.0}, {-sqrt(2.0), sqrt(2.0)}},
         };
         for (auto& [eleNo, faceNo, xi, refN] : test) {
-            auto n = cl.normal(eleNo, faceNo, xi);
+            auto gradE = cl.evaluateGradientAt({xi});
+            auto J = Tensor(cl.jacobianResultInfo(1u));
+            auto Jview = J.view();
+            auto JinvT = Tensor(cl.jacobianResultInfo(1u));
+            auto JinvTview = JinvT.view();
+            auto detJ = Tensor(cl.detJResultInfo(1u));
+            auto detJview = detJ.view();
+            auto n = Tensor(cl.normalResultInfo(1u));
+            auto nview = n.view();
+            cl.jacobian(eleNo, gradE, Jview);
+            cl.jacobianInvT(Jview, JinvTview);
+            cl.detJ(eleNo, Jview, detJview);
+            cl.normal(faceNo, detJview, JinvTview, nview);
             for (std::size_t d = 0; d < 2; ++d) {
-                CHECK(n[d] == doctest::Approx(refN[d]));
+                CHECK(n(d, 0) == doctest::Approx(refN[d]));
             }
         }
     }

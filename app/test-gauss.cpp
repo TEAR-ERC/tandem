@@ -3,6 +3,7 @@
 #include "geometry/Vector.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
+#include "tensor/Tensor.h"
 
 #include <argparse.hpp>
 #include <mpi.h>
@@ -17,6 +18,7 @@ using tndm::createSimplexQuadratureRule;
 using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
+using tndm::Tensor;
 
 template <std::size_t D, typename Func>
 double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree) {
@@ -28,20 +30,35 @@ double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree
 
     Curvilinear<D> cl(*mesh, transform, degree);
 
-    auto rule = createSimplexQuadratureRule<D - 1u>(degree + 1);
+    // auto rule = createSimplexQuadratureRule<D - 1u>(degree + 1);
+    auto rule = createSimplexQuadratureRule<D>(degree + 1);
     auto& pts = rule.points();
     auto& wgts = rule.weights();
+
+    auto gradE = cl.evaluateGradientAt(pts);
+    auto J = Tensor(cl.jacobianResultInfo(pts.size()));
+    auto Jview = J.view();
+    auto detJ = Tensor(cl.detJResultInfo(pts.size()));
+    auto detJview = detJ.view();
 
     double volume = 0.0;
     for (std::size_t eleNo = 0; eleNo < mesh->numElements(); ++eleNo) {
         double localSum = 0.0;
-        for (std::size_t f = 0; f < D + 1; ++f) {
-            for (std::size_t q = 0; q < rule.size(); ++q) {
-                auto xi = cl.facetParam(f, pts[q]);
-                localSum += dot(cl.map(eleNo, xi), cl.normal(eleNo, f, xi)) * wgts[q];
-            }
+
+        cl.jacobian(eleNo, gradE, Jview);
+        cl.detJ(eleNo, Jview, detJview);
+        for (std::size_t q = 0; q < rule.size(); ++q) {
+            localSum += std::fabs(detJ(q)) * wgts[q];
         }
-        volume += localSum / D;
+        volume += localSum;
+
+        // for (std::size_t f = 0; f < D + 1; ++f) {
+        for (std::size_t q = 0; q < rule.size(); ++q) {
+            // auto xi = cl.facetParam(f, pts[q]);
+            // localSum += dot(cl.map(eleNo, xi), cl.normal(eleNo, f, xi)) * wgts[q];
+        }
+        //}
+        // volume += localSum / D;
     }
 
     return volume;

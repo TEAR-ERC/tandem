@@ -18,6 +18,9 @@ template <template <std::size_t> typename T, std::size_t N> auto NTuple() {
 template <template <std::size_t> typename T, std::size_t N>
 using ntuple_t = decltype(detail::NTuple<T, N>());
 
+template <typename T, typename U>
+using copy_const = std::conditional_t<std::is_const_v<T>, std::add_const_t<U>, U>;
+
 } // namespace tndm
 
 #endif // UTILITY_H
