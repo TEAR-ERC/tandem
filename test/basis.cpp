@@ -4,11 +4,14 @@
 #include "basis/WarpAndBlend.h"
 
 #include "doctest.h"
+#include "util/Combinatorics.h"
 
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <numeric>
+#include <type_traits>
 #include <vector>
 
 using namespace tndm;
@@ -240,32 +243,47 @@ TEST_CASE("Basis") {
         CHECK(doctest::Approx(intBFPair(0, 1)) == 0.0);
     }
 
-    auto testOrder = [](auto ruleFactory) {
-        for (unsigned n = 1; n < 15; ++n) {
-            auto rule = ruleFactory(n);
+    auto testOrder = [](auto D) {
+        for (unsigned n = 1; n < 12; ++n) {
+            auto rule = createSimplexQuadratureRule<D()>(n);
             auto& pts = rule.points();
             auto& wgts = rule.weights();
             unsigned maxDegree = 2u * n - 1u;
             unsigned dim = pts[0].size();
-            double integral = 0.0;
-            for (std::size_t q = 0; q < pts.size(); ++q) {
-                integral += rangeProduct(maxDegree + 1u, maxDegree + dim) *
-                            std::pow(pts[q][0], maxDegree) * wgts[q];
+            // Test integrated all monomials x_1^{j_1} * ... * x_D^{j_D}
+            for (auto&& j : AllIntegerSums<D()>(maxDegree)) {
+                double integral = 0.0;
+                for (std::size_t q = 0; q < pts.size(); ++q) {
+                    double mono = 1.0;
+                    for (std::size_t d = 0; d < D(); ++d) {
+                        mono *= std::pow(pts[q][d], j[d]);
+                    }
+                    integral += mono * wgts[q];
+                }
+                // Solution is (at least up to D=3)
+                // j_1!*...*j_D! / (j_1 + ... + j_D + D)! =
+                //   j_1!*...*j_{D-1}! / ((j_{D-1} + 1)*...*(j_1 + ... + j_D + D))
+                std::sort(j.begin(), j.end());
+                auto jsum = std::accumulate(j.begin(), j.end(), 0u);
+                double reference = 1.0 / rangeProduct(j[D()-1u] + 1u, jsum + D());
+                for (std::size_t d = 0; d < D()-1u; ++d) {
+                   reference *= factorial(j[d]);
+                }
+                CHECK(integral == doctest::Approx(reference));
             }
-            CHECK(integral == doctest::Approx(1.0));
         }
     };
 
     SUBCASE("Interval quadrature order test") {
-        testOrder([](unsigned n) { return IntervalQuadrature(n); });
+        testOrder(std::integral_constant<std::size_t, 1u>());
     }
 
     SUBCASE("Triangle quadrature order test") {
-        testOrder([](unsigned n) { return TriangleQuadrature(n); });
+        testOrder(std::integral_constant<std::size_t, 2u>());
     }
 
     SUBCASE("Tetrahedron quadrature order test") {
-        testOrder([](unsigned n) { return TetrahedronQuadrature(n); });
+        testOrder(std::integral_constant<std::size_t, 3u>());
     }
 }
 
