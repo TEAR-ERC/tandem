@@ -30,6 +30,8 @@ SOFTWARE.
 #pragma once
 #include <algorithm>
 #include <any>
+#include <cerrno>
+#include <charconv>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
@@ -71,10 +73,28 @@ struct is_container<
 template <typename T>
 static constexpr bool is_container_v = is_container<T>::value;
 
+namespace {
+
+template <typename T> constexpr bool standard_signed_integer = false;
+template <> constexpr bool standard_signed_integer<signed char> = true;
+template <> constexpr bool standard_signed_integer<short int> = true;
+template <> constexpr bool standard_signed_integer<int> = true;
+template <> constexpr bool standard_signed_integer<long int> = true;
+template <> constexpr bool standard_signed_integer<long long int> = true;
+
+template <typename T> constexpr bool standard_unsigned_integer = false;
+template <> constexpr bool standard_unsigned_integer<unsigned char> = true;
+template <> constexpr bool standard_unsigned_integer<unsigned short int> = true;
+template <> constexpr bool standard_unsigned_integer<unsigned int> = true;
+template <> constexpr bool standard_unsigned_integer<unsigned long int> = true;
+template <>
+constexpr bool standard_unsigned_integer<unsigned long long int> = true;
+
+}
+
 template <typename T>
-struct is_string_like
-    : std::conjunction<std::is_constructible<std::string, T>,
-                       std::is_convertible<T, std::string_view>> {};
+constexpr bool standard_integer =
+    standard_signed_integer<T> || standard_unsigned_integer<T>;
 
 template <class F, class Tuple, class Extra, size_t... I>
 constexpr decltype(auto) apply_plus_one_impl(F &&f, Tuple &&t, Extra &&x,
@@ -91,6 +111,159 @@ constexpr decltype(auto) apply_plus_one(F &&f, Tuple &&t, Extra &&x) {
           std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
 }
 
+constexpr auto pointer_range(std::string_view s) noexcept {
+  return std::tuple(s.data(), s.data() + s.size());
+}
+
+template <class CharT, class Traits>
+constexpr bool starts_with(std::basic_string_view<CharT, Traits> prefix,
+                           std::basic_string_view<CharT, Traits> s) noexcept {
+  return s.substr(0, prefix.size()) == prefix;
+}
+
+enum class chars_format {
+  scientific = 0x1,
+  fixed = 0x2,
+  hex = 0x4,
+  general = fixed | scientific
+};
+
+struct consume_hex_prefix_result {
+  bool is_hexadecimal;
+  std::string_view rest;
+};
+
+using namespace std::literals;
+
+constexpr auto consume_hex_prefix(std::string_view s)
+    -> consume_hex_prefix_result {
+  if (starts_with("0x"sv, s) || starts_with("0X"sv, s)) {
+    s.remove_prefix(2);
+    return {true, s};
+  } else {
+    return {false, s};
+  }
+}
+
+template <class T, auto Param>
+inline auto do_from_chars(std::string_view s) -> T {
+  T x;
+  auto [first, last] = pointer_range(s);
+  auto [ptr, ec] = std::from_chars(first, last, x, Param);
+  if (ec == std::errc()) {
+    if (ptr == last)
+      return x;
+    else
+      throw std::invalid_argument{"pattern does not match to the end"};
+  } else if (ec == std::errc::invalid_argument) {
+    throw std::invalid_argument{"pattern not found"};
+  } else if (ec == std::errc::result_out_of_range) {
+    throw std::range_error{"not representable"};
+  } else {
+    return x; // unreachable
+  }
+}
+
+template <class T, auto Param = 0> struct parse_number {
+  auto operator()(std::string_view s) -> T {
+    return do_from_chars<T, Param>(s);
+  }
+};
+
+template <class T> struct parse_number<T, 16> {
+  auto operator()(std::string_view s) -> T {
+    if (auto [ok, rest] = consume_hex_prefix(s); ok)
+      return do_from_chars<T, 16>(rest);
+    else
+      throw std::invalid_argument{"pattern not found"};
+  }
+};
+
+template <class T> struct parse_number<T> {
+  auto operator()(std::string_view s) -> T {
+    if (auto [ok, rest] = consume_hex_prefix(s); ok)
+      return do_from_chars<T, 16>(rest);
+    else if (starts_with("0"sv, s))
+      return do_from_chars<T, 8>(rest);
+    else
+      return do_from_chars<T, 10>(rest);
+  }
+};
+
+namespace {
+
+template <class T> constexpr auto generic_strtod = nullptr;
+template <> constexpr auto generic_strtod<float> = strtof;
+template <> constexpr auto generic_strtod<double> = strtod;
+template <> constexpr auto generic_strtod<long double> = strtold;
+
+}
+
+template <class T> inline auto do_strtod(std::string const &s) -> T {
+  if (isspace(static_cast<unsigned char>(s[0])) || s[0] == '+')
+    throw std::invalid_argument{"pattern not found"};
+
+  auto [first, last] = pointer_range(s);
+  char *ptr;
+
+  errno = 0;
+  if (auto x = generic_strtod<T>(first, &ptr); errno == 0) {
+    if (ptr == last)
+      return x;
+    else
+      throw std::invalid_argument{"pattern does not match to the end"};
+  } else if (errno == ERANGE) {
+    throw std::range_error{"not representable"};
+  } else {
+    return x; // unreachable
+  }
+}
+
+template <class T> struct parse_number<T, chars_format::general> {
+  auto operator()(std::string const &s) -> T {
+    if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
+      throw std::invalid_argument{
+          "chars_format::general does not parse hexfloat"};
+
+    return do_strtod<T>(s);
+  }
+};
+
+template <class T> struct parse_number<T, chars_format::hex> {
+  auto operator()(std::string const &s) -> T {
+    if (auto r = consume_hex_prefix(s); !r.is_hexadecimal)
+      throw std::invalid_argument{"chars_format::hex parses hexfloat"};
+
+    return do_strtod<T>(s);
+  }
+};
+
+template <class T> struct parse_number<T, chars_format::scientific> {
+  auto operator()(std::string const &s) -> T {
+    if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
+      throw std::invalid_argument{
+          "chars_format::scientific does not parse hexfloat"};
+    if (s.find_first_of("eE") == s.npos)
+      throw std::invalid_argument{
+          "chars_format::scientific requires exponent part"};
+
+    return do_strtod<T>(s);
+  }
+};
+
+template <class T> struct parse_number<T, chars_format::fixed> {
+  auto operator()(std::string const &s) -> T {
+    if (auto r = consume_hex_prefix(s); r.is_hexadecimal)
+      throw std::invalid_argument{
+          "chars_format::fixed does not parse hexfloat"};
+    if (s.find_first_of("eE") != s.npos)
+      throw std::invalid_argument{
+          "chars_format::fixed does not parse exponent part"};
+
+    return do_strtod<T>(s);
+  }
+};
+
 } // namespace details
 
 class ArgumentParser;
@@ -101,10 +274,10 @@ class Argument {
       -> std::ostream &;
 
   template <size_t N, size_t... I>
-  explicit Argument(std::string(&&a)[N], std::index_sequence<I...>)
+  explicit Argument(std::string_view(&&a)[N], std::index_sequence<I...>)
       : mIsOptional((is_optional(a[I]) || ...)), mIsRequired(false),
         mIsUsed(false) {
-    ((void)mNames.push_back(std::move(a[I])), ...);
+    ((void)mNames.emplace_back(a[I]), ...);
     std::sort(
         mNames.begin(), mNames.end(), [](const auto &lhs, const auto &rhs) {
           return lhs.size() == rhs.size() ? lhs < rhs : lhs.size() < rhs.size();
@@ -112,14 +285,9 @@ class Argument {
   }
 
 public:
-  Argument() = default;
-
-  template <typename... Args,
-            std::enable_if_t<
-                std::conjunction_v<details::is_string_like<Args>...>, int> = 0>
-  explicit Argument(Args &&... args)
-      : Argument({std::string(std::forward<Args>(args))...},
-                 std::make_index_sequence<sizeof...(Args)>{}) {}
+  template <size_t N>
+  explicit Argument(std::string_view(&&a)[N])
+      : Argument(std::move(a), std::make_index_sequence<N>{}) {}
 
   Argument &help(std::string aHelp) {
     mHelp = std::move(aHelp);
@@ -161,6 +329,45 @@ public:
     return *this;
   }
 
+  template <char Shape, typename T>
+  auto scan() -> std::enable_if_t<std::is_arithmetic_v<T>, Argument &> {
+    static_assert(!(std::is_const_v<T> || std::is_volatile_v<T>),
+                  "T should not be cv-qualified");
+    auto is_one_of = [](char c, auto... x) constexpr {
+      return ((c == x) || ...);
+    };
+
+    if constexpr (is_one_of(Shape, 'd') && details::standard_integer<T>)
+      action(details::parse_number<T, 10>());
+    else if constexpr (is_one_of(Shape, 'i') && details::standard_integer<T>)
+      action(details::parse_number<T>());
+    else if constexpr (is_one_of(Shape, 'u') &&
+                       details::standard_unsigned_integer<T>)
+      action(details::parse_number<T, 10>());
+    else if constexpr (is_one_of(Shape, 'o') &&
+                       details::standard_unsigned_integer<T>)
+      action(details::parse_number<T, 8>());
+    else if constexpr (is_one_of(Shape, 'x', 'X') &&
+                       details::standard_unsigned_integer<T>)
+      action(details::parse_number<T, 16>());
+    else if constexpr (is_one_of(Shape, 'a', 'A') &&
+                       std::is_floating_point_v<T>)
+      action(details::parse_number<T, details::chars_format::hex>());
+    else if constexpr (is_one_of(Shape, 'e', 'E') &&
+                       std::is_floating_point_v<T>)
+      action(details::parse_number<T, details::chars_format::scientific>());
+    else if constexpr (is_one_of(Shape, 'f', 'F') &&
+                       std::is_floating_point_v<T>)
+      action(details::parse_number<T, details::chars_format::fixed>());
+    else if constexpr (is_one_of(Shape, 'g', 'G') &&
+                       std::is_floating_point_v<T>)
+      action(details::parse_number<T, details::chars_format::general>());
+    else
+      static_assert(alignof(T) == 0, "No scan specification for T");
+
+    return *this;
+  }
+
   Argument &nargs(int aNumArgs) {
     if (aNumArgs < 0)
       throw std::logic_error("Number of arguments must be non-negative");
@@ -174,12 +381,13 @@ public:
   }
 
   template <typename Iterator>
-  Iterator consume(Iterator start, Iterator end, std::string usedName = {}) {
+  Iterator consume(Iterator start, Iterator end,
+                   std::string_view usedName = {}) {
     if (mIsUsed) {
       throw std::runtime_error("Duplicate argument");
     }
     mIsUsed = true;
-    mUsedName = std::move(usedName);
+    mUsedName = usedName;
     if (mNumArgs == 0) {
       mValues.emplace_back(mImplicitValue);
       return start;
@@ -244,8 +452,10 @@ public:
       } else {
         if (mValues.size() != expected && !mDefaultValue.has_value()) {
           std::stringstream stream;
-          stream << mUsedName << ": expected " << *expected << " argument(s). "
-                 << mValues.size() << " provided.";
+          if (!mUsedName.empty())
+            stream << mUsedName << ": ";
+          stream << *expected << " argument(s) expected. " << mValues.size()
+                 << " provided.";
           throw std::runtime_error(stream.str());
         }
       }
@@ -301,33 +511,179 @@ public:
   }
 
 private:
-  static bool is_integer(const std::string &aValue) {
-    if (aValue.empty() ||
-        ((!isdigit(aValue[0])) && (aValue[0] != '-') && (aValue[0] != '+')))
+  static constexpr int eof = std::char_traits<char>::eof();
+
+  static auto lookahead(std::string_view s) -> int {
+    if (s.empty())
+      return eof;
+    else
+      return static_cast<int>(static_cast<unsigned char>(s[0]));
+  }
+
+  /*
+   * decimal-literal:
+   *    '0'
+   *    nonzero-digit digit-sequence_opt
+   *    integer-part fractional-part
+   *    fractional-part
+   *    integer-part '.' exponent-part_opt
+   *    integer-part exponent-part
+   *
+   * integer-part:
+   *    digit-sequence
+   *
+   * fractional-part:
+   *    '.' post-decimal-point
+   *
+   * post-decimal-point:
+   *    digit-sequence exponent-part_opt
+   *
+   * exponent-part:
+   *    'e' post-e
+   *    'E' post-e
+   *
+   * post-e:
+   *    sign_opt digit-sequence
+   *
+   * sign: one of
+   *    '+' '-'
+   */
+  static bool is_decimal_literal(std::string_view s) {
+    auto is_digit = [](auto c) constexpr {
+      switch (c) {
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+        return true;
+      default:
+        return false;
+      }
+    };
+
+    // precondition: we have consumed or will consume at least one digit
+    auto consume_digits = [=](std::string_view s) {
+      auto it = std::find_if_not(begin(s), end(s), is_digit);
+      return s.substr(it - begin(s));
+    };
+
+    switch (lookahead(s)) {
+    case '0': {
+      s.remove_prefix(1);
+      if (s.empty())
+        return true;
+      else
+        goto integer_part;
+    }
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9': {
+      s = consume_digits(s);
+      if (s.empty())
+        return true;
+      else
+        goto integer_part_consumed;
+    }
+    case '.': {
+      s.remove_prefix(1);
+      goto post_decimal_point;
+    }
+    default:
       return false;
-    char *tPtr;
-    strtol(aValue.c_str(), &tPtr, 10);
-    return (*tPtr == 0);
+    }
+
+  integer_part:
+    s = consume_digits(s);
+  integer_part_consumed:
+    switch (lookahead(s)) {
+    case '.': {
+      s.remove_prefix(1);
+      if (is_digit(lookahead(s)))
+        goto post_decimal_point;
+      else
+        goto exponent_part_opt;
+    }
+    case 'e':
+    case 'E': {
+      s.remove_prefix(1);
+      goto post_e;
+    }
+    default:
+      return false;
+    }
+
+  post_decimal_point:
+    if (is_digit(lookahead(s))) {
+      s = consume_digits(s);
+      goto exponent_part_opt;
+    } else {
+      return false;
+    }
+
+  exponent_part_opt:
+    switch (lookahead(s)) {
+    case eof:
+      return true;
+    case 'e':
+    case 'E': {
+      s.remove_prefix(1);
+      goto post_e;
+    }
+    default:
+      return false;
+    }
+
+  post_e:
+    switch (lookahead(s)) {
+    case '-':
+    case '+':
+      s.remove_prefix(1);
+    }
+    if (is_digit(lookahead(s))) {
+      s = consume_digits(s);
+      return s.empty();
+    } else {
+      return false;
+    }
   }
 
-  static bool is_float(const std::string &aValue) {
-    std::istringstream tStream(aValue);
-    float tFloat;
-    // noskipws considers leading whitespace invalid
-    tStream >> std::noskipws >> tFloat;
-    // Check the entire string was consumed
-    // and if either failbit or badbit is set
-    return tStream.eof() && !tStream.fail();
+  static bool is_optional(std::string_view aName) {
+    return !is_positional(aName);
   }
 
-  // If an argument starts with "-" or "--", then it's optional
-  static bool is_optional(const std::string &aName) {
-    return (aName.size() > 1 && aName[0] == '-' && !is_integer(aName) &&
-            !is_float(aName));
-  }
-
-  static bool is_positional(const std::string &aName) {
-    return !is_optional(aName);
+  /*
+   * positional:
+   *    _empty_
+   *    '-'
+   *    '-' decimal-literal
+   *    !'-' anything
+   */
+  static bool is_positional(std::string_view aName) {
+    switch (lookahead(aName)) {
+    case eof:
+      return true;
+    case '-': {
+      aName.remove_prefix(1);
+      if (aName.empty())
+        return true;
+      else
+        return is_decimal_literal(aName);
+    }
+    default:
+      return true;
+    }
   }
 
   /*
@@ -347,6 +703,23 @@ private:
     throw std::logic_error("No value provided");
   }
 
+  /*
+   * Get argument value given a type.
+   * @pre The object has no default value.
+   * @returns The stored value if any, std::nullopt otherwise.
+   */
+  template <typename T> auto present() const -> std::optional<T> {
+    if (mDefaultValue.has_value())
+      throw std::logic_error("Argument with default value always presents");
+
+    if (mValues.empty())
+      return std::nullopt;
+    else if constexpr (details::is_container_v<T>)
+      return any_cast_container<T>(mValues);
+    else
+      return std::any_cast<T>(mValues.front());
+  }
+
   template <typename T>
   static auto any_cast_container(const std::vector<std::any> &aOperand) -> T {
     using ValueType = typename T::value_type;
@@ -359,7 +732,7 @@ private:
   }
 
   std::vector<std::string> mNames;
-  std::string mUsedName;
+  std::string_view mUsedName;
   std::string mHelp;
   std::any mDefaultValue;
   std::any mImplicitValue;
@@ -377,10 +750,13 @@ private:
 
 class ArgumentParser {
 public:
-  explicit ArgumentParser(std::string aProgramName = {})
-      : mProgramName(std::move(aProgramName)) {
+  explicit ArgumentParser(std::string aProgramName = {}, std::string aVersion = "1.0")
+      : mProgramName(std::move(aProgramName)), mVersion(std::move(aVersion)) {
     add_argument("-h", "--help")
-        .help("show this help message and exit")
+        .help("shows help message and exits")
+        .nargs(0);
+    add_argument("-v", "--version")
+        .help("prints version information and exits")
         .nargs(0);
   }
 
@@ -408,8 +784,9 @@ public:
   // Parameter packing
   // Call add_argument with variadic number of string arguments
   template <typename... Targs> Argument &add_argument(Targs... Fargs) {
+    using array_of_sv = std::string_view[sizeof...(Targs)];
     auto tArgument = mOptionalArguments.emplace(cend(mOptionalArguments),
-                                                std::move(Fargs)...);
+                                                array_of_sv{Fargs...});
 
     if (!tArgument->mIsOptional)
       mPositionalArguments.splice(cend(mPositionalArguments),
@@ -436,6 +813,14 @@ public:
     }
   }
 
+  void add_description(std::string aDescription) {
+    mDescription = std::move(aDescription);
+  }
+
+  void add_epilog(std::string aEpilog) {
+    mEpilog = std::move(aEpilog);
+  }
+
   /* Call parse_args_internal - which does all the work
    * Then, validate the parsed arguments
    * This variant is used mainly for testing
@@ -456,19 +841,30 @@ public:
     parse_args(arguments);
   }
 
-  /* Getter enabled for all template types other than std::vector and std::list
-   * @throws std::logic_error in case of an invalid argument name
-   * @throws std::logic_error in case of incompatible types
+  /* Getter for options with default values.
+   * @throws std::logic_error if there is no such option
+   * @throws std::logic_error if the option has no value
+   * @throws std::bad_any_cast if the option is not of type T
    */
-  template <typename T = std::string> T get(std::string_view aArgumentName) {
+  template <typename T = std::string> T get(std::string_view aArgumentName) const {
     return (*this)[aArgumentName].get<T>();
+  }
+
+  /* Getter for options without default values.
+   * @pre The option has no default value.
+   * @throws std::logic_error if there is no such option
+   * @throws std::bad_any_cast if the option is not of type T
+   */
+  template <typename T = std::string>
+  auto present(std::string_view aArgumentName) -> std::optional<T> {
+    return (*this)[aArgumentName].present<T>();
   }
 
   /* Indexing operator. Return a reference to an Argument object
    * Used in conjuction with Argument.operator== e.g., parser["foo"] == true
    * @throws std::logic_error in case of an invalid argument name
    */
-  Argument &operator[](std::string_view aArgumentName) {
+  Argument &operator[](std::string_view aArgumentName) const {
     auto tIterator = mArgumentMap.find(aArgumentName);
     if (tIterator != mArgumentMap.end()) {
       return *(tIterator->second);
@@ -489,6 +885,9 @@ public:
       }
       stream << "\n\n";
 
+      if(!parser.mDescription.empty())
+        stream << parser.mDescription << "\n\n";
+
       if (!parser.mPositionalArguments.empty())
         stream << "Positional arguments:\n";
 
@@ -505,6 +904,9 @@ public:
         stream.width(tLongestArgumentLength);
         stream << mOptionalArgument;
       }
+
+      if(!parser.mEpilog.empty())
+        stream << parser.mEpilog << "\n\n";
     }
 
     return stream;
@@ -557,8 +959,13 @@ private:
           std::cout << *this;
           std::exit(0);
         }
+        // the second optional argument is --version 
+        else if (tArgument == std::next(mOptionalArguments.begin(), 1)) {
+          std::cout << mVersion << "\n";
+          std::exit(0);
+        }
 
-        it = tArgument->consume(std::next(it), end, tCurrentArgument);
+        it = tArgument->consume(std::next(it), end, tIterator->first);
       } else if (const auto &tCompoundArgument = tCurrentArgument;
                  tCompoundArgument.size() > 1 && tCompoundArgument[0] == '-' &&
                  tCompoundArgument[1] != '-') {
@@ -568,7 +975,7 @@ private:
           auto tIterator2 = mArgumentMap.find(tHypotheticalArgument);
           if (tIterator2 != mArgumentMap.end()) {
             auto tArgument = tIterator2->second;
-            it = tArgument->consume(it, end, tHypotheticalArgument);
+            it = tArgument->consume(it, end, tIterator2->first);
           } else {
             throw std::runtime_error("Unknown argument");
           }
@@ -613,6 +1020,9 @@ private:
   }
 
   std::string mProgramName;
+  std::string mVersion;
+  std::string mDescription;
+  std::string mEpilog;
   std::list<Argument> mPositionalArguments;
   std::list<Argument> mOptionalArguments;
   std::map<std::string_view, list_iterator, std::less<>> mArgumentMap;
