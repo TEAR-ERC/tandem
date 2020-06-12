@@ -6,6 +6,8 @@
 #include "tensor/Tensor.h"
 
 #include <argparse.hpp>
+#include <cstddef>
+#include <limits>
 #include <mpi.h>
 
 #include <cmath>
@@ -19,10 +21,12 @@ using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
 using tndm::Managed;
+using tndm::Matrix;
 using tndm::Tensor;
 
 template <std::size_t D, typename Func>
-double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree) {
+double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree,
+            unsigned minQuadOrder) {
     GenMesh<D> meshGen(size);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
@@ -31,33 +35,56 @@ double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree
 
     Curvilinear<D> cl(*mesh, transform, degree);
 
-    // auto rule = createSimplexQuadratureRule<D - 1u>(degree + 1);
-    auto rule = createSimplexQuadratureRule<D>(degree + 1);
+    auto rule =
+        createSimplexQuadratureRule<D - 1u>(1 + minQuadOrder / 2); // n = ceil((minQuadOrder+1)/2)
+    // auto rule = createSimplexQuadratureRule<D>(degree + 1);
     auto& pts = rule.points();
     auto& wgts = rule.weights();
 
-    auto gradE = cl.evaluateGradientAt(pts);
-    auto J = Managed(cl.jacobianResultInfo(pts.size()));
-    auto detJ = Managed(cl.detJResultInfo(pts.size()));
+    std::vector<Managed<Matrix<double>>> E;
+    for (std::size_t f = 0; f < D + 1; ++f) {
+        E.emplace_back(cl.evaluateBasisAt(cl.facetParam(f, pts)));
+    }
+
+    std::vector<Managed<Tensor<double, 3u>>> gradE;
+    for (std::size_t f = 0; f < D + 1; ++f) {
+        gradE.emplace_back(cl.evaluateGradientAt(cl.facetParam(f, pts)));
+    }
 
     double volume = 0.0;
-    for (std::size_t eleNo = 0; eleNo < mesh->numElements(); ++eleNo) {
-        double localSum = 0.0;
+#pragma omp parallel shared(volume)
+    {
+        auto J = Managed(cl.jacobianResultInfo(pts.size()));
+        auto JinvT = Managed(cl.jacobianResultInfo(pts.size()));
+        auto detJ = Managed(cl.detJResultInfo(pts.size()));
+        auto normal = Managed(cl.normalResultInfo(rule.size()));
+        auto x = Managed(cl.mapResultInfo(rule.size()));
 
-        cl.jacobian(eleNo, gradE, J);
-        cl.detJ(eleNo, J, detJ);
-        for (std::size_t q = 0; q < rule.size(); ++q) {
-            localSum += std::fabs(detJ(q)) * wgts[q];
-        }
-        volume += localSum;
+#pragma omp for reduction(+ : volume)
+        for (std::size_t eleNo = 0; eleNo < mesh->numElements(); ++eleNo) {
+            double localSum = 0.0;
 
-        // for (std::size_t f = 0; f < D + 1; ++f) {
-        for (std::size_t q = 0; q < rule.size(); ++q) {
-            // auto xi = cl.facetParam(f, pts[q]);
-            // localSum += dot(cl.map(eleNo, xi), cl.normal(eleNo, f, xi)) * wgts[q];
+            /*cl.jacobian(eleNo, gradE, J);
+            cl.detJ(eleNo, J, detJ);
+            for (std::size_t q = 0; q < rule.size(); ++q) {
+                localSum += std::fabs(detJ(q)) * wgts[q];
+            }
+            volume += localSum;*/
+
+            for (std::size_t f = 0; f < D + 1; ++f) {
+                cl.jacobian(eleNo, gradE[f], J);
+                cl.detJ(eleNo, J, detJ);
+                cl.jacobianInvT(J, JinvT);
+                cl.map(eleNo, E[f], x);
+                cl.normal(f, detJ, JinvT, normal);
+                for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
+                    for (std::ptrdiff_t d = 0; d < x.shape(0); ++d) {
+                        localSum += x(d, q) * normal(d, q) * wgts[q];
+                    }
+                }
+            }
+            volume += localSum / D;
         }
-        //}
-        // volume += localSum / D;
     }
 
     return volume;
@@ -74,6 +101,9 @@ int main(int argc, char** argv) {
     program.add_argument("-N", "--degree")
         .help("Polynomial degree for geometry approximation")
         .default_value(1ul)
+        .action([](std::string const& value) { return std::stoul(value); });
+    program.add_argument("-Q", "--min-quadrature-order")
+        .help("Minimum quadrature order")
         .action([](std::string const& value) { return std::stoul(value); });
     program.add_argument("--csv")
         .help("Print in CSV format")
@@ -98,6 +128,10 @@ int main(int argc, char** argv) {
 
     auto D = program.get<unsigned long>("-D");
     auto N = program.get<unsigned long>("-N");
+    unsigned long minQuadOrder = 2u * N + 1u;
+    if (auto Q = program.present<unsigned long>("-Q")) {
+        minQuadOrder = *Q;
+    }
     auto csv = program.get<bool>("--csv");
     auto csvHeadless = program.get<bool>("--csv-headless");
     auto n = program.get<std::vector<unsigned long>>("n");
@@ -107,31 +141,27 @@ int main(int argc, char** argv) {
     double reference = 0.0;
     std::function<double(unsigned long)> testFun;
     if (D == 2) {
-        auto transform = [](Curvilinear<2>::vertex_t const& v) {
-            double x = 2.0 * v[0] - 1.0;
-            double y = 2.0 * v[1] - 1.0;
-            return Curvilinear<2>::vertex_t{x * sqrt(1.0 - y * y / 2.0),
-                                            y * sqrt(1.0 - x * x / 2.0)};
+        auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
+            double r = 0.5 * (v[0] + 1.0);
+            double phi = 0.5 * M_PI * v[1];
+            return {r * cos(phi), r * sin(phi)};
         };
-        reference = pi;
-        testFun = [&transform, &N](unsigned long n) {
+        reference = 3.0 * pi / 16.0;
+        testFun = [&transform, &N, &minQuadOrder](unsigned long n) {
             std::array<uint64_t, 2> size = {n, n};
-            return test(size, transform, N);
+            return test(size, transform, N, minQuadOrder);
         };
     } else if (D == 3) {
-        auto transform = [](Curvilinear<3>::vertex_t const& v) {
-            double x = 2.0 * v[0] - 1.0;
-            double y = 2.0 * v[1] - 1.0;
-            double z = 2.0 * v[2] - 1.0;
-            return Curvilinear<3>::vertex_t{
-                x * sqrt(1.0 - y * y / 2.0 - z * z / 2.0 + y * y * z * z / 3.0),
-                y * sqrt(1.0 - x * x / 2.0 - z * z / 2.0 + x * x * z * z / 3.0),
-                z * sqrt(1.0 - x * x / 2.0 - y * y / 2.0 + x * x * y * y / 3.0)};
+        auto transform = [](std::array<double, 3> const& v) -> std::array<double, 3> {
+            double r = 0.5 * (v[0] + 1.0);
+            double phi = 0.5 * M_PI * v[1];
+            double theta = M_PI * (0.5 * v[2] + 0.25);
+            return {r * sin(theta) * cos(phi), r * sin(theta) * sin(phi), r * cos(theta)};
         };
-        reference = 4.0 * pi / 3.0;
-        testFun = [&transform, &N](unsigned long n) {
+        reference = sqrt(2) * pi / 2.0 * 7.0 / 24.0;
+        testFun = [&transform, &N, &minQuadOrder](unsigned long n) {
             std::array<uint64_t, 3> size = {n, n, n};
-            return test(size, transform, N);
+            return test(size, transform, N, minQuadOrder);
         };
     } else {
         std::cerr << "Test for simplex dimension " << D << " is not implemented." << std::endl;
@@ -139,7 +169,7 @@ int main(int argc, char** argv) {
     }
 
     if (csv && !csvHeadless) {
-        std::cout << "D,degree,n,computed,error" << std::endl;
+        std::cout << "D,degree,minQuadOrder,n,computed,error" << std::endl;
     }
     std::cout << std::setprecision(16);
 
@@ -152,8 +182,8 @@ int main(int argc, char** argv) {
         if (rank == 0) {
             double error = std::fabs(reference - volume);
             if (csv || csvHeadless) {
-                std::cout << D << "," << N << "," << nn << "," << volume << "," << error
-                          << std::endl;
+                std::cout << D << "," << N << "," << minQuadOrder << "," << nn << "," << volume
+                          << "," << error << std::endl;
             } else {
                 std::cout << "n = " << nn << ":" << std::endl;
                 std::cout << "\tReference area: " << reference << std::endl;

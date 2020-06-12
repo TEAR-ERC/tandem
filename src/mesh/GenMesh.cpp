@@ -15,8 +15,13 @@ template <>
 std::array<GenMesh<2>::simplex_t, 2> GenMesh<2>::tessellate(std::array<uint64_t, 4> const& vertGIDs,
                                                             bool isOdd) {
     std::array<simplex_t, 2> result;
-    result[0] = {vertGIDs[0], vertGIDs[1], vertGIDs[2]};
-    result[1] = {vertGIDs[1], vertGIDs[3], vertGIDs[2]};
+    if (isOdd) {
+        result[0] = {vertGIDs[0b00], vertGIDs[0b01], vertGIDs[0b11]};
+        result[1] = {vertGIDs[0b00], vertGIDs[0b10], vertGIDs[0b11]};
+    } else {
+        result[0] = {vertGIDs[0b00], vertGIDs[0b01], vertGIDs[0b10]};
+        result[1] = {vertGIDs[0b01], vertGIDs[0b10], vertGIDs[0b11]};
+    }
     return result;
 }
 
@@ -25,17 +30,17 @@ std::array<GenMesh<3>::simplex_t, 5> GenMesh<3>::tessellate(std::array<uint64_t,
                                                             bool isOdd) {
     std::array<simplex_t, 5> result;
     if (isOdd) {
-        result[0] = {vertGIDs[0], vertGIDs[1], vertGIDs[2], vertGIDs[4]};
-        result[1] = {vertGIDs[1], vertGIDs[2], vertGIDs[3], vertGIDs[7]};
-        result[2] = {vertGIDs[2], vertGIDs[4], vertGIDs[6], vertGIDs[7]};
-        result[3] = {vertGIDs[1], vertGIDs[4], vertGIDs[5], vertGIDs[7]};
-        result[4] = {vertGIDs[2], vertGIDs[4], vertGIDs[1], vertGIDs[7]};
+        result[0] = {vertGIDs[0b000], vertGIDs[0b001], vertGIDs[0b010], vertGIDs[0b100]};
+        result[1] = {vertGIDs[0b001], vertGIDs[0b010], vertGIDs[0b011], vertGIDs[0b111]};
+        result[2] = {vertGIDs[0b010], vertGIDs[0b100], vertGIDs[0b110], vertGIDs[0b111]};
+        result[3] = {vertGIDs[0b001], vertGIDs[0b100], vertGIDs[0b101], vertGIDs[0b111]};
+        result[4] = {vertGIDs[0b010], vertGIDs[0b100], vertGIDs[0b001], vertGIDs[0b111]};
     } else {
-        result[0] = {vertGIDs[0], vertGIDs[2], vertGIDs[3], vertGIDs[6]};
-        result[1] = {vertGIDs[0], vertGIDs[1], vertGIDs[3], vertGIDs[5]};
-        result[2] = {vertGIDs[0], vertGIDs[4], vertGIDs[5], vertGIDs[6]};
-        result[3] = {vertGIDs[3], vertGIDs[5], vertGIDs[6], vertGIDs[7]};
-        result[4] = {vertGIDs[0], vertGIDs[3], vertGIDs[5], vertGIDs[6]};
+        result[0] = {vertGIDs[0b000], vertGIDs[0b010], vertGIDs[0b011], vertGIDs[0b110]};
+        result[1] = {vertGIDs[0b000], vertGIDs[0b001], vertGIDs[0b011], vertGIDs[0b101]};
+        result[2] = {vertGIDs[0b000], vertGIDs[0b100], vertGIDs[0b101], vertGIDs[0b110]};
+        result[3] = {vertGIDs[0b011], vertGIDs[0b101], vertGIDs[0b110], vertGIDs[0b111]};
+        result[4] = {vertGIDs[0b000], vertGIDs[0b011], vertGIDs[0b101], vertGIDs[0b110]};
     }
     return result;
 }

@@ -56,27 +56,24 @@ int main(int argc, char** argv) {
 
     std::vector<const char*> variableNames{"x", "bc"};
 
-    constexpr std::size_t D = 2;
+    /*constexpr std::size_t D = 2;
     XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
-    std::array<uint64_t, 2> N = {16, 16};
-    auto transform = [](std::array<double, 2> const& v) {
-        double x = 2.0 * v[0] - 1.0;
-        double y = 2.0 * v[1] - 1.0;
-        return std::array<double, 2>{x * sqrt(1.0 - y * y / 2.0), y * sqrt(1.0 - x * x / 2.0)};
-    };
-
-    /*constexpr std::size_t D = 3;
-    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
-    std::array<uint64_t, 3> N = {16, 16, 16};
-    auto transform = [](std::array<double, 3> const& v) {
-        double x = 2.0 * v[0] - 1.0;
-        double y = 2.0 * v[1] - 1.0;
-        double z = 2.0 * v[2] - 1.0;
-        return std::array<double, 3>{
-            x * sqrt(1.0 - y * y / 2.0 - z * z / 2.0 + y * y * z * z / 3.0),
-            y * sqrt(1.0 - x * x / 2.0 - z * z / 2.0 + x * x * z * z / 3.0),
-            z * sqrt(1.0 - x * x / 2.0 - y * y / 2.0 + x * x * y * y / 3.0)};
+    std::array<uint64_t, 2> N = {32, 32};
+    auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
+        double r = 0.5 * (v[0] + 1.0);
+        double phi = 0.5 * M_PI * v[1];
+        return {r * cos(phi), r * sin(phi)};
     };*/
+
+    constexpr std::size_t D = 3;
+    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
+    std::array<uint64_t, 3> N = {32, 32, 32};
+    auto transform = [](std::array<double, 3> const& v) -> std::array<double, 3> {
+        double r = 0.5 * (v[0] + 1.0);
+        double phi = 0.5 * M_PI * v[1];
+        double theta = M_PI * (0.5 * v[2] + 0.25);
+        return {r * sin(theta) * cos(phi), r * sin(theta) * sin(phi), r * cos(theta)};
+    };
 
     GenMesh<D> meshGen(N);
     auto globalMesh = meshGen.uniformMesh();

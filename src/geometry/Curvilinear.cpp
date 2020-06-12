@@ -5,9 +5,11 @@
 #include "tensor/EigenMap.h"
 #include "tensor/Reshape.h"
 #include "util/Combinatorics.h"
+#include "util/Enumerate.h"
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <iterator>
 #include <stdexcept>
 
@@ -89,9 +91,8 @@ Managed<Matrix<double>>
 Curvilinear<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points) {
     Managed<Matrix<double>> E(vandermondeInvT.cols(), points.size());
     for (std::size_t p = 0; p < points.size(); ++p) {
-        std::size_t bf = 0;
-        for (auto j : AllIntegerSums<D>(N)) {
-            E(bf++, p) = DubinerP(j, points[p]);
+        for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(N))) {
+            E(bf, p) = DubinerP(j, points[p]);
         }
     }
     auto Emap = EigenMap(E);
@@ -104,13 +105,11 @@ Managed<Tensor<double, 3u>>
 Curvilinear<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points) {
     Managed<Tensor<double, 3u>> gradE(vandermondeInvT.cols(), D, points.size());
     for (std::size_t p = 0; p < points.size(); ++p) {
-        std::size_t bf = 0;
-        for (auto j : AllIntegerSums<D>(N)) {
+        for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(N))) {
             auto dphi = gradDubinerP(j, points[p]);
             for (std::size_t d = 0; d < D; ++d) {
                 gradE(bf, d, p) = dphi[d];
             }
-            ++bf;
         }
     }
 
@@ -118,6 +117,7 @@ Curvilinear<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& poi
     auto matView = reshape(gradE, vandermondeInvT.cols(), D * points.size());
     auto map = EigenMap(matView);
     map = vandermondeInvT * map;
+
     return gradE;
 }
 
@@ -188,6 +188,7 @@ TensorBase<Matrix<double>> Curvilinear<D>::normalResultInfo(std::size_t numPoint
 template <std::size_t D>
 void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
                             Tensor<double, 3u> const& JinvT, Tensor<double, 2u>& result) {
+    // n_{iq} = |J|_q J^{-T}_{ijq} N_j
     for (std::ptrdiff_t i = 0; i < detJ.shape(0); ++i) {
         Eigen::Map<const Eigen::Matrix<double, D, D>> JinvTmap(&JinvT(0, 0, i));
         Eigen::Map<Eigen::Matrix<double, D, 1>> resultMap(&result(0, i));
@@ -209,6 +210,17 @@ std::array<double, D> Curvilinear<D>::facetParam(std::size_t faceNo,
         xi = xi + chi[d] * refVertices[f[d + 1]];
     }
     return xi;
+}
+
+template <std::size_t D>
+std::vector<std::array<double, D>>
+Curvilinear<D>::facetParam(std::size_t faceNo, std::vector<std::array<double, D - 1>> const& chis) {
+    std::vector<std::array<double, D>> xis;
+    xis.reserve(chis.size());
+    for (auto const& chi : chis) {
+        xis.emplace_back(facetParam(faceNo, chi));
+    }
+    return xis;
 }
 
 template class Curvilinear<2u>;

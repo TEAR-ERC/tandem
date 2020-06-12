@@ -47,6 +47,9 @@ public:
 
     std::array<double, D> facetParam(std::size_t faceNo, std::array<double, D - 1> const& chi);
 
+    std::vector<std::array<double, D>>
+    facetParam(std::size_t faceNo, std::vector<std::array<double, D - 1>> const& chis);
+
 private:
     const unsigned N;
 

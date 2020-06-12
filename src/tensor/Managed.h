@@ -28,6 +28,7 @@ public:
 
     // Declare but not define copy constructor to satisfy compiler (we use copy elision)
     Managed(Managed<Tensor> const& other);
+    Managed(Managed<Tensor>&& other) = default;
 
     template <typename OtherTensor>
     Managed(TensorBase<OtherTensor> const& info)

@@ -4,8 +4,6 @@
 #include <array>
 #include <cstddef>
 
-namespace tndm {
-
 template <typename RealT, std::size_t D>
 std::array<RealT, D> operator+(std::array<RealT, D> const& lhs, std::array<RealT, D> const& rhs) {
     std::array<RealT, D> result;
@@ -37,6 +35,8 @@ template <typename RealT, std::size_t D>
 std::array<RealT, D> operator*(std::array<RealT, D> const& lhs, RealT rhs) {
     return rhs * lhs;
 }
+
+namespace tndm {
 
 template <typename RealT, std::size_t D>
 RealT dot(std::array<RealT, D> const& lhs, std::array<RealT, D> const& rhs) {
