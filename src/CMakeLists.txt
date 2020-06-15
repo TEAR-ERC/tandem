@@ -1,13 +1,16 @@
 add_library(tandem-lib
     basis/Functions.cpp
     basis/Nodal.cpp
-    basis/Quadrature.cpp
     basis/WarpAndBlend.cpp
+    form/DG.cpp
     mesh/GenMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
+    quadrules/GaussJacobi.cpp
+    quadrules/IntervalQuadratureRule.cpp
+    quadrules/TensorProductRule.cpp
 )
 
 find_package (MPI REQUIRED)

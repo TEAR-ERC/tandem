@@ -26,6 +26,10 @@ add_executable(test-parallel parallel.cpp)
 target_link_libraries(test-parallel test-runner)
 doctest_discover_tests(test-parallel)
 
+add_executable(test-quadrules quadrules.cpp)
+target_link_libraries(test-quadrules test-runner)
+doctest_discover_tests(test-quadrules)
+
 add_executable(test-simplex simplex.cpp)
 target_link_libraries(test-simplex test-runner)
 doctest_discover_tests(test-simplex)

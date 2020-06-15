@@ -1,6 +1,6 @@
 #include "Nodal.h"
 #include "Functions.h"
-#include "Quadrature.h"
+#include "quadrules/GaussJacobi.h"
 #include "util/Combinatorics.h"
 
 #include <algorithm>

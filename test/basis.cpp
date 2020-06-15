@@ -1,13 +1,10 @@
 #include "basis/Functions.h"
 #include "basis/Nodal.h"
-#include "basis/Quadrature.h"
 #include "basis/WarpAndBlend.h"
 
 #include "doctest.h"
-#include "util/Combinatorics.h"
 
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <numeric>
@@ -185,105 +182,6 @@ TEST_CASE("Basis") {
                 }
             }
         }
-    }
-
-    SUBCASE("Gauss Jacobi vs Maple") { // Test from SeisSol
-        auto rule = GaussJacobi(5, 1, 3);
-        CHECK(rule.points()[0] == doctest::Approx(0.86698568210542769702));
-        CHECK(rule.points()[1] == doctest::Approx(0.57652877512667440772));
-        CHECK(rule.points()[2] == doctest::Approx(0.17976783188823737401));
-        CHECK(rule.points()[3] == doctest::Approx(-.25499675973326581341));
-        CHECK(rule.points()[4] == doctest::Approx(-.65399981510135937963));
-        CHECK(rule.weights()[0] == doctest::Approx(0.18915446768616357329));
-        CHECK(rule.weights()[1] == doctest::Approx(0.58714974961811369751));
-        CHECK(rule.weights()[2] == doctest::Approx(0.57657004957734461768));
-        CHECK(rule.weights()[3] == doctest::Approx(0.22255926867518051648));
-        CHECK(rule.weights()[4] == doctest::Approx(0.024566464443197594119));
-    }
-
-    SUBCASE("Triangle vs Maple") { // Test from SeisSol
-        auto rule = TriangleQuadrature(2);
-        CHECK(rule.points()[0][0] == doctest::Approx(0.64494897427831780982));
-        CHECK(rule.points()[1][0] == doctest::Approx(0.64494897427831780982));
-        CHECK(rule.points()[2][0] == doctest::Approx(0.15505102572168219018));
-        CHECK(rule.points()[3][0] == doctest::Approx(0.15505102572168219018));
-        CHECK(rule.points()[0][1] == doctest::Approx(0.28001991549907407200));
-        CHECK(rule.points()[1][1] == doctest::Approx(0.075031110222608118175));
-        CHECK(rule.points()[2][1] == doctest::Approx(0.66639024601470138669));
-        CHECK(rule.points()[3][1] == doctest::Approx(0.17855872826361642311));
-        CHECK(rule.weights()[0] == doctest::Approx(0.090979309128011415315));
-        CHECK(rule.weights()[1] == doctest::Approx(0.090979309128011415315));
-        CHECK(rule.weights()[2] == doctest::Approx(0.15902069087198858472));
-        CHECK(rule.weights()[3] == doctest::Approx(0.15902069087198858472));
-    }
-
-    SUBCASE("Triangle") {
-        auto rule = TriangleQuadrature(1);
-        auto f = [](std::array<double, 2> const& xi) { return xi[0] + xi[1]; };
-        double intf = 0.0;
-        for (std::size_t i = 0; i < rule.points().size(); ++i) {
-            intf += f(rule.points()[i]) * rule.weights()[i];
-        }
-        CHECK(intf == doctest::Approx(1.0 / 3.0));
-    }
-
-    SUBCASE("Tetrahedron") {
-        auto rule = TetrahedronQuadrature(3);
-        auto intBFPair = [&](std::size_t i, std::size_t j) {
-            double intf = 0.0;
-            for (std::size_t q = 0; q < rule.points().size(); ++q) {
-                intf += tetraBFs[i].second(rule.points()[q]) *
-                        tetraBFs[j].second(rule.points()[q]) * rule.weights()[q];
-            }
-            return intf;
-        };
-        CHECK(doctest::Approx(intBFPair(8, 9)) == 0.0);
-        CHECK(doctest::Approx(intBFPair(0, 9)) == 0.0);
-        CHECK(doctest::Approx(intBFPair(6, 3)) == 0.0);
-        CHECK(doctest::Approx(intBFPair(0, 1)) == 0.0);
-    }
-
-    auto testOrder = [](auto D) {
-        for (unsigned n = 1; n < 12; ++n) {
-            auto rule = createSimplexQuadratureRule<D()>(n);
-            auto& pts = rule.points();
-            auto& wgts = rule.weights();
-            unsigned maxDegree = 2u * n - 1u;
-            unsigned dim = pts[0].size();
-            // Test integrated all monomials x_1^{j_1} * ... * x_D^{j_D}
-            for (auto&& j : AllIntegerSums<D()>(maxDegree)) {
-                double integral = 0.0;
-                for (std::size_t q = 0; q < pts.size(); ++q) {
-                    double mono = 1.0;
-                    for (std::size_t d = 0; d < D(); ++d) {
-                        mono *= std::pow(pts[q][d], j[d]);
-                    }
-                    integral += mono * wgts[q];
-                }
-                // Solution is (at least up to D=3)
-                // j_1!*...*j_D! / (j_1 + ... + j_D + D)! =
-                //   j_1!*...*j_{D-1}! / ((j_{D-1} + 1)*...*(j_1 + ... + j_D + D))
-                std::sort(j.begin(), j.end());
-                auto jsum = std::accumulate(j.begin(), j.end(), 0u);
-                double reference = 1.0 / rangeProduct(j[D()-1u] + 1u, jsum + D());
-                for (std::size_t d = 0; d < D()-1u; ++d) {
-                   reference *= factorial(j[d]);
-                }
-                CHECK(integral == doctest::Approx(reference));
-            }
-        }
-    };
-
-    SUBCASE("Interval quadrature order test") {
-        testOrder(std::integral_constant<std::size_t, 1u>());
-    }
-
-    SUBCASE("Triangle quadrature order test") {
-        testOrder(std::integral_constant<std::size_t, 2u>());
-    }
-
-    SUBCASE("Tetrahedron quadrature order test") {
-        testOrder(std::integral_constant<std::size_t, 3u>());
     }
 }
 

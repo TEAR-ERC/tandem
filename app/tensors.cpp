@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "basis/Functions.h"
-#include "basis/Quadrature.h"
+#include "quadrules/TensorProductRule.h"
 #include "util/Combinatorics.h"
 
 #include <Eigen/Core>
@@ -14,7 +14,6 @@ using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::gradTetraDubinerP;
 using tndm::TetraDubinerP;
-using tndm::TetrahedronQuadrature;
 
 int main(int argc, char** argv) {
 
@@ -28,7 +27,7 @@ int main(int argc, char** argv) {
 
     std::cout << "Number of basis functions: " << numBF << std::endl;
 
-    auto rule = TetrahedronQuadrature(N + 1);
+    auto rule = tndm::tensorProductRule<3u>(N + 1);
 
     auto truncate = [](double x) { return (std::fabs(x) < 1e-15) ? 0.0 : x; };
 

@@ -20,8 +20,7 @@ namespace tndm {
  *
  * @tparam D simplex dimension
  */
-template<std::size_t D>
-class LocalSimplexMesh {
+template <std::size_t D> class LocalSimplexMesh {
 public:
     using storage_t = ntuple_t<LocalFaces, D + 1>;
     template <std::size_t DD>
