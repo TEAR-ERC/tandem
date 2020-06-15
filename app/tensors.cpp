@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "basis/Functions.h"
-#include "quadrules/TensorProductRule.h"
+#include "quadrules/AutoRule.h"
 #include "util/Combinatorics.h"
 
 #include <Eigen/Core>
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 
     std::cout << "Number of basis functions: " << numBF << std::endl;
 
-    auto rule = tndm::tensorProductRule<3u>(N + 1);
+    auto rule = tndm::simplexQuadratureRule<3u>(2u * N + 1u);
 
     auto truncate = [](double x) { return (std::fabs(x) < 1e-15) ? 0.0 : x; };
 

@@ -3,8 +3,9 @@
 
 namespace tndm {
 
-template <> SimplexQuadratureRule<1u> tensorProductRule<1u>(unsigned n) {
-    SimplexQuadratureRule<1u> rule(n);
+template <> SimplexQuadratureRule<1u> TensorProductRule<1u>::get(unsigned minQuadOrder) {
+    unsigned n = pointsPerDim(minQuadOrder);
+    SimplexQuadratureRule<1u> rule(n, 2 * n - 1);
 
     auto gj = GaussJacobi(n, 0, 0);
     gj.changeInterval(0.0, 1.0);
@@ -17,8 +18,9 @@ template <> SimplexQuadratureRule<1u> tensorProductRule<1u>(unsigned n) {
     return rule;
 }
 
-template <> SimplexQuadratureRule<2u> tensorProductRule<2u>(unsigned n) {
-    SimplexQuadratureRule<2u> rule(n * n);
+template <> SimplexQuadratureRule<2u> TensorProductRule<2u>::get(unsigned minQuadOrder) {
+    unsigned n = pointsPerDim(minQuadOrder);
+    SimplexQuadratureRule<2u> rule(n * n, 2 * n - 1);
 
     auto gj0 = GaussJacobi(n, 0, 0);
     auto gj1 = GaussJacobi(n, 1, 0);
@@ -39,8 +41,9 @@ template <> SimplexQuadratureRule<2u> tensorProductRule<2u>(unsigned n) {
     return rule;
 }
 
-template <> SimplexQuadratureRule<3u> tensorProductRule<3u>(unsigned n) {
-    SimplexQuadratureRule<3u> rule(n * n * n);
+template <> SimplexQuadratureRule<3u> TensorProductRule<3u>::get(unsigned minQuadOrder) {
+    unsigned n = pointsPerDim(minQuadOrder);
+    SimplexQuadratureRule<3u> rule(n * n * n, 2 * n - 1);
 
     auto gj0 = GaussJacobi(n, 0, 0);
     auto gj1 = GaussJacobi(n, 1, 0);
