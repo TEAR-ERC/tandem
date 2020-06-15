@@ -4,7 +4,7 @@
 #include <array>
 #include <vector>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 namespace tndm {
 

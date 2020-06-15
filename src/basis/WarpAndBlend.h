@@ -3,7 +3,8 @@
 
 #include "Nodal.h"
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
+#include <Eigen/QR>
 
 #include <array>
 #include <functional>

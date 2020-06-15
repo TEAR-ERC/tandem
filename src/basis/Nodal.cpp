@@ -3,6 +3,8 @@
 #include "quadrules/GaussJacobi.h"
 #include "util/Combinatorics.h"
 
+#include <Eigen/LU>
+
 #include <algorithm>
 #include <iterator>
 

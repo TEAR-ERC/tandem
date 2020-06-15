@@ -7,6 +7,8 @@
 #include "util/Combinatorics.h"
 #include "util/Enumerate.h"
 
+#include <Eigen/LU>
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>

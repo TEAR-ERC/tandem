@@ -10,7 +10,7 @@
 #include <mneme/storage.hpp>
 #include <mneme/view.hpp>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 #include <array>
 #include <functional>

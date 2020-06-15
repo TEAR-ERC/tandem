@@ -3,7 +3,7 @@
 
 #include "Vector.h"
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 #include <array>
 #include <numeric>
