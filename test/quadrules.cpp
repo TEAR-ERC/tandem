@@ -1,6 +1,7 @@
 #include "basis/Functions.h"
+#include "quadrules/AutoRule.h"
 #include "quadrules/GaussJacobi.h"
-#include "quadrules/NME2020.h"
+#include "quadrules/TabulatedRules.h"
 #include "quadrules/TensorProductRule.h"
 #include "util/Combinatorics.h"
 
@@ -43,6 +44,7 @@ TEST_CASE("Quadrature") {
     }
 
     auto testOrder = [](auto D, auto&& rule) {
+        REQUIRE(rule.size() > 0);
         auto& pts = rule.points();
         auto& wgts = rule.weights();
         REQUIRE(pts.size() == wgts.size());
@@ -89,10 +91,37 @@ TEST_CASE("Quadrature") {
         testTensorProductRule(std::integral_constant<std::size_t, 3u>());
     }
 
-    SUBCASE("Tetrahedron: NME2020") {
-        for (unsigned n = 1; n < 12; ++n) {
-            auto rule = NME2020::get(n);
+    SUBCASE("Tetrahedron: Jaskowiec and Sukumar") {
+        for (unsigned n = 1; n <= 20; ++n) {
+            auto rule = JaskowiecSukumar2020::get(n);
             testOrder(std::integral_constant<std::size_t, 3u>(), rule);
         }
+    }
+
+    SUBCASE("Triangle: Witherden and Vincent") {
+        for (unsigned n = 1; n <= 20; ++n) {
+            auto rule = WitherdenVincent2015<2u>::get(n);
+            testOrder(std::integral_constant<std::size_t, 2u>(), rule);
+        }
+    }
+
+    SUBCASE("Tetrahedron: Witherden and Vincent") {
+        for (unsigned n = 1; n <= 10; ++n) {
+            auto rule = WitherdenVincent2015<3u>::get(n);
+            testOrder(std::integral_constant<std::size_t, 3u>(), rule);
+        }
+    }
+
+    SUBCASE("Autorule") {
+        CHECK(simplexQuadratureRule<2u>(1).size() == 1);
+        CHECK(simplexQuadratureRule<2u>(3).size() == 4);
+        CHECK(simplexQuadratureRule<2u>(4).size() == 6);
+        CHECK(simplexQuadratureRule<2u>(20).size() == 79);
+        CHECK(simplexQuadratureRule<2u>(21).size() == 121);
+        CHECK(simplexQuadratureRule<3u>(1).size() == 1);
+        CHECK(simplexQuadratureRule<3u>(2).size() == 4);
+        CHECK(simplexQuadratureRule<3u>(10).size() == 74);
+        CHECK(simplexQuadratureRule<3u>(20).size() == 448);
+        CHECK(simplexQuadratureRule<3u>(21).size() == 1331);
     }
 }

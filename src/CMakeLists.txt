@@ -10,7 +10,9 @@ add_library(tandem-lib
     parallel/SortedDistribution.cpp
     quadrules/GaussJacobi.cpp
     quadrules/IntervalQuadratureRule.cpp
-    quadrules/NME2020.cpp
+    quadrules/JaskowiecSukumar2020.cpp
+    quadrules/WitherdenVincent2015_Tri.cpp
+    quadrules/WitherdenVincent2015_Tet.cpp
     quadrules/TensorProductRule.cpp
 )
 
