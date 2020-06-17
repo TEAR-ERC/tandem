@@ -3,7 +3,7 @@ add_custom_target(
     COMMAND
     ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/kernels")
 
-if(NOT CMAKE_VERSION VERSION_LESS 3.13.4)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
 else()
     find_package(PythonInterp 3 REQUIRED)
