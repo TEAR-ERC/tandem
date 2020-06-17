@@ -16,7 +16,6 @@ before_install:
 
 script:
   - mkdir build && cd build
-  - cmake -E environment
   - cmake ..
   - make -j2
   - make test
