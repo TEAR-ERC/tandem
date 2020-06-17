@@ -16,7 +16,8 @@ before_install:
 
 script:
   - mkdir build && cd build
-  - cmake .. || cat CMakeFiles/CMakeOutput.log || cat CMakeFiles/CMakeError.log
+  - cmake -E environment
+  - cmake ..
   - make -j2
   - make test
 
