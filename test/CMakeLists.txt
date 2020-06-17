@@ -1,4 +1,3 @@
-
 include(CTest)
 include(../cmake/doctest.cmake)
 
@@ -21,6 +20,10 @@ doctest_discover_tests(test-basis)
 add_executable(test-geometry geometry.cpp)
 target_link_libraries(test-geometry test-runner-mpi)
 doctest_discover_tests(test-geometry)
+
+add_executable(test-kernel dummy.cpp)
+target_link_libraries(test-kernel test-runner kernels-lib)
+doctest_discover_tests(test-kernel)
 
 add_executable(test-parallel parallel.cpp)
 target_link_libraries(test-parallel test-runner)

@@ -6,11 +6,15 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../submodules/yateto
 
 import argparse
 
-from yateto import Tensor, useArchitectureIdentifiedBy, Generator
+from yateto import useArchitectureIdentifiedBy, Generator
+from yateto.ast.visitor import PrettyPrinter
 from yateto.gemm_configuration import GeneratorCollection, Eigen
+
+import poisson
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--arch', required=True)
+cmdLineParser.add_argument('--dim', type=int, required=True)
 cmdLineParser.add_argument('--degree', type=int, required=True)
 cmdLineParser.add_argument('--quadPoints', type=int, required=True)
 cmdLineParser.add_argument('--outputDir', required=True)
@@ -20,14 +24,17 @@ arch = useArchitectureIdentifiedBy(cmdLineArgs.arch)
 
 g = Generator(arch)
 
-N = 8
-A = Tensor('A', (N, N))
-B = Tensor('B', (N, N))
-C = Tensor('C', (N, N))
-
-g.add('test', C['ij'] <= A['ik'] * B['kj'])
+poisson.add(g, cmdLineArgs.dim, cmdLineArgs.degree, cmdLineArgs.quadPoints)
 
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,
            gemm_cfg=GeneratorCollection([Eigen(arch)]),
            namespace='tndm')
+
+for kernel in g.kernels():
+    title = 'AST of {}'.format(kernel.name)
+    print(title)
+    print('='*len(title))
+    for ast in kernel.ast:
+        PrettyPrinter().visit(ast)
+    print(' ')
