@@ -6,7 +6,7 @@ add_custom_target(
 if(NOT CMAKE_VERSION VERSION_LESS 3.13.4)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
 else()
-    find_package(PythonInterp REQUIRED 3)
+    find_package(PythonInterp 3 REQUIRED)
     set(Python3_EXECUTABLE ${PYTHON_EXECUTABLE})
 endif()
 
