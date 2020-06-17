@@ -1,5 +1,8 @@
 # Apps without generated kernels
 
+add_executable(preprocess preprocess.cpp)
+target_link_libraries(preprocess PRIVATE tandem-lib)
+
 add_executable(tandem tandem.cpp)
 target_link_libraries(tandem PRIVATE tandem-lib)
 target_compile_definitions(tandem PUBLIC PARALLEL)
@@ -12,6 +15,19 @@ target_link_libraries(test-gauss PRIVATE tandem-lib)
 
 add_executable(warp-blend-opt warp-blend-opt.cpp)
 target_link_libraries(warp-blend-opt PRIVATE tandem-lib)
+
+# Preprocessing for kernel generation
+
+set(OPTIONS_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/options.json)
+
+add_custom_command(
+    COMMAND
+        preprocess -o ${OPTIONS_FILE_NAME} ${DOMAIN_DIMENSION} ${POLYNOMIAL_DEGREE}
+    DEPENDS
+        preprocess
+    OUTPUT
+        ${OPTIONS_FILE_NAME}
+)
 
 # Generate kernels
 
@@ -31,13 +47,12 @@ add_custom_command(
     COMMAND
         ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
         "--arch" "dnoarch"
-        "--dim" ${DOMAIN_DIMENSION}
-        "--degree" ${POLYNOMIAL_DEGREE}
-        "--quadPoints" 5
+        "--options" ${OPTIONS_FILE_NAME}
         "--outputDir" ${CMAKE_CURRENT_BINARY_DIR}/kernels
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
     DEPENDS
         make-kernels-directory
+        ${OPTIONS_FILE_NAME}
         kernels/generate.py
         kernels/poisson.py
     OUTPUT

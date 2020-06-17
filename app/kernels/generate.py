@@ -5,6 +5,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../submodules/yateto/'))
 
 import argparse
+import json
 
 from yateto import useArchitectureIdentifiedBy, Generator
 from yateto.ast.visitor import PrettyPrinter
@@ -14,17 +15,19 @@ import poisson
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--arch', required=True)
-cmdLineParser.add_argument('--dim', type=int, required=True)
-cmdLineParser.add_argument('--degree', type=int, required=True)
-cmdLineParser.add_argument('--quadPoints', type=int, required=True)
+cmdLineParser.add_argument('--options', required=True)
 cmdLineParser.add_argument('--outputDir', required=True)
 cmdLineArgs = cmdLineParser.parse_args()
 
 arch = useArchitectureIdentifiedBy(cmdLineArgs.arch)
-
 g = Generator(arch)
 
-poisson.add(g, cmdLineArgs.dim, cmdLineArgs.degree, cmdLineArgs.quadPoints)
+options = None
+with open(cmdLineArgs.options) as j:
+    options = json.load(j)
+
+
+poisson.add(g, options['dim'], options['numBasisFunctions'], options['numQuadPoints'])
 
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,
