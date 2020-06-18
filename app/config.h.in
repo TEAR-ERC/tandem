@@ -4,7 +4,7 @@
 #include <cstddef>
 
 static constexpr std::size_t DomainDimension = @DOMAIN_DIMENSION@;
-static constexpr std::size_t PolynomialDegree = @POLYNOMIAL_DEGREE@;
+static constexpr unsigned PolynomialDegree = @POLYNOMIAL_DEGREE@;
 static constexpr unsigned MinQuadOrder() {
     unsigned minQuadOrder = @MIN_QUADRATURE_ORDER@;
     return (minQuadOrder == 0u) ? 2u * PolynomialDegree + 1u : minQuadOrder;

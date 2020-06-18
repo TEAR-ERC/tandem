@@ -9,7 +9,7 @@
 
 template <std::size_t D>
 void preprocess(unsigned N, unsigned minQuadOrder, std::string const& outputFileName) {
-    auto fctRule = tndm::simplexQuadratureRule<D>(minQuadOrder);
+    auto fctRule = tndm::simplexQuadratureRule<D - 1u>(minQuadOrder);
     auto elRule = tndm::simplexQuadratureRule<D>(minQuadOrder);
 
     std::ofstream file;

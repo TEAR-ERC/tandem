@@ -30,12 +30,10 @@ protected:
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;
 
-    Managed<Tensor<double, 3u>> Dxi;
-
     Managed<Matrix<double>> E;
-    Managed<Tensor<double, 3u>> gradE;
-    std::vector<Managed<Matrix<double>>> fctE;
-    std::vector<Managed<Tensor<double, 3u>>> fctGradE;
+    Managed<Tensor<double, 3u>> D_xi;
+    std::vector<Managed<Matrix<double>>> e;
+    std::vector<Managed<Tensor<double, 3u>>> d_xi;
 
     struct AbsDetJ {
         using type = double;
@@ -46,17 +44,24 @@ protected:
     struct Normal {
         using type = std::array<double, D>;
     };
+    struct NormalLength {
+        using type = double;
+    };
+    struct Coords {
+        using type = std::array<double, D>;
+    };
 
     struct FacetInfo {
         std::array<std::size_t, 2> up;
         std::array<std::size_t, 2> localNo;
+        double area;
     };
     std::vector<FacetInfo> fctInfo;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, Normal> fctStore;
+    mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, Normal, NormalLength, Coords> fctStore;
     mneme::StridedView<decltype(fctStore)> fct;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT> volStore;
+    mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT, Coords> volStore;
     mneme::StridedView<decltype(volStore)> vol;
 };
 
