@@ -1,13 +1,10 @@
-add_library(tandem-lib
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+# Add element-local stuff here
+add_library(tandem-fem-lib
     basis/Functions.cpp
     basis/Nodal.cpp
     basis/WarpAndBlend.cpp
-    form/DG.cpp
-    mesh/GenMesh.cpp
-    geometry/Curvilinear.cpp
-    parallel/CommPattern.cpp
-    parallel/MetisPartitioner.cpp
-    parallel/SortedDistribution.cpp
     quadrules/GaussJacobi.cpp
     quadrules/IntervalQuadratureRule.cpp
     quadrules/JaskowiecSukumar2020.cpp
@@ -16,21 +13,34 @@ add_library(tandem-lib
     quadrules/TensorProductRule.cpp
 )
 
+target_compile_features(tandem-fem-lib PUBLIC cxx_std_17)
+target_include_directories(tandem-fem-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(tandem-fem-lib PUBLIC
+    Eigen3::Eigen
+)
+
+# Add everything else here
+add_library(tandem-lib
+    form/DG.cpp
+    mesh/GenMesh.cpp
+    geometry/Curvilinear.cpp
+    parallel/CommPattern.cpp
+    parallel/MetisPartitioner.cpp
+    parallel/SortedDistribution.cpp
+)
+
 find_package(MPI REQUIRED)
-find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
 
-target_compile_features(tandem-lib PUBLIC cxx_std_17)
-target_include_directories(tandem-lib PUBLIC .
-                                          ../external/
-                                          ../submodules/
-                                          ../submodules/mneme/include/
-                                          ${PARMETIS_INCLUDE_DIRS}
+target_include_directories(tandem-lib PUBLIC 
+    ../submodules/
+    ../submodules/mneme/include/
+    ${PARMETIS_INCLUDE_DIRS}
 )
 target_link_libraries(tandem-lib PUBLIC
+    tandem-fem-lib
     MPI::MPI_CXX
     OpenMP::OpenMP_CXX
-    Eigen3::Eigen
     ${PARMETIS_LIBRARIES}
 )

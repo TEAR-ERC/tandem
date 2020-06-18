@@ -9,7 +9,8 @@
 
 template <std::size_t D>
 void preprocess(unsigned N, unsigned minQuadOrder, std::string const& outputFileName) {
-    auto rule = tndm::simplexQuadratureRule<3u>(minQuadOrder);
+    auto fctRule = tndm::simplexQuadratureRule<D>(minQuadOrder);
+    auto elRule = tndm::simplexQuadratureRule<D>(minQuadOrder);
 
     std::ofstream file;
     file.open(outputFileName);
@@ -17,7 +18,8 @@ void preprocess(unsigned N, unsigned minQuadOrder, std::string const& outputFile
          << "  \"dim\": " << D << ",\n"
          << "  \"degree\": " << N << ",\n"
          << "  \"numBasisFunctions\": " << tndm::binom(N + D, D) << ",\n"
-         << "  \"numQuadPoints\": " << rule.size() << "\n"
+         << "  \"numFacetQuadPoints\": " << fctRule.size() << ",\n"
+         << "  \"numElementQuadPoints\": " << elRule.size() << "\n"
          << "}\n";
     file.close();
 }
@@ -26,6 +28,7 @@ int main(int argc, char** argv) {
     argparse::ArgumentParser program("preprocess");
     program.add_argument("-Q")
         .help("Minimum quadrature order")
+        .default_value(0u)
         .action([](std::string const& value) { return static_cast<unsigned>(std::stoul(value)); });
     program.add_argument("-o").help("Output file name").default_value(std::string("options.json"));
     program.add_argument("D")
@@ -46,9 +49,9 @@ int main(int argc, char** argv) {
     auto outputFileName = program.get("-o");
     auto D = program.get<unsigned>("D");
     auto N = program.get<unsigned>("N");
-    auto minQuadOrder = 2u * N + 1u;
-    if (auto Q = program.present<unsigned>("-Q")) {
-        minQuadOrder = *Q;
+    auto minQuadOrder = program.get<unsigned>("-Q");
+    if (minQuadOrder == 0u) {
+        minQuadOrder = 2u * N + 1u;
     }
 
     switch (D) {

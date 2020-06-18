@@ -1,20 +1,23 @@
 # Apps without generated kernels
 
 add_executable(preprocess preprocess.cpp)
-target_link_libraries(preprocess PRIVATE tandem-lib)
+target_include_directories(preprocess PRIVATE ../external/)
+target_link_libraries(preprocess PRIVATE tandem-fem-lib)
+
+add_executable(tensors tensors.cpp)
+target_link_libraries(tensors PRIVATE tandem-fem-lib)
+
+add_executable(warp-blend-opt warp-blend-opt.cpp)
+target_include_directories(warp-blend-opt PRIVATE ../external/)
+target_link_libraries(warp-blend-opt PRIVATE tandem-fem-lib)
 
 add_executable(tandem tandem.cpp)
 target_link_libraries(tandem PRIVATE tandem-lib)
 target_compile_definitions(tandem PUBLIC PARALLEL)
 
-add_executable(tensors tensors.cpp)
-target_link_libraries(tensors PRIVATE tandem-lib)
-
 add_executable(test-gauss test-gauss.cpp)
+target_include_directories(test-gauss PRIVATE ../external/)
 target_link_libraries(test-gauss PRIVATE tandem-lib)
-
-add_executable(warp-blend-opt warp-blend-opt.cpp)
-target_link_libraries(warp-blend-opt PRIVATE tandem-lib)
 
 # Preprocessing for kernel generation
 
@@ -22,7 +25,11 @@ set(OPTIONS_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/options.json)
 
 add_custom_command(
     COMMAND
-        preprocess -o ${OPTIONS_FILE_NAME} ${DOMAIN_DIMENSION} ${POLYNOMIAL_DEGREE}
+        preprocess
+        -Q ${MIN_QUADRATURE_ORDER}
+        -o ${OPTIONS_FILE_NAME}
+        ${DOMAIN_DIMENSION}
+        ${POLYNOMIAL_DEGREE}
     DEPENDS
         preprocess
     OUTPUT
@@ -82,3 +89,10 @@ target_include_directories(kernels-lib PUBLIC
 )
 target_link_libraries(kernels-lib PUBLIC Eigen3::Eigen)
 
+# Apps using generated kernels
+
+configure_file( config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+
+add_executable(poisson poisson.cpp)
+target_link_libraries(poisson PRIVATE tandem-lib kernels-lib)
+target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

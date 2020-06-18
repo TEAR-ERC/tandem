@@ -12,7 +12,7 @@ namespace tndm {
 /**V
  * @brief Returns n choose k.
  */
-constexpr inline unsigned binom(unsigned n, unsigned k) {
+constexpr inline std::size_t binom(unsigned n, unsigned k) {
     return (k == 0 || k == n) ? 1
                               : (k == 1 || k == n - 1) ? n : binom(n - 1, k - 1) + binom(n - 1, k);
 }

@@ -27,7 +27,11 @@ with open(cmdLineArgs.options) as j:
     options = json.load(j)
 
 
-poisson.add(g, options['dim'], options['numBasisFunctions'], options['numQuadPoints'])
+poisson.add(g,
+        options['dim'],
+        options['numBasisFunctions'],
+        options['numFacetQuadPoints'],
+        options['numElementQuadPoints'])
 
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,
