@@ -40,6 +40,7 @@ public:
 
     TensorBase<Vector<double>> detJResultInfo(std::size_t numPoints) const;
     void detJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian, Tensor<double, 1u>& result);
+    void absDetJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian, Tensor<double, 1u>& result);
 
     TensorBase<Matrix<double>> normalResultInfo(std::size_t numPoints) const;
     void normal(std::size_t faceNo, Tensor<double, 1u> const& detJ, Tensor<double, 3u> const& JinvT,

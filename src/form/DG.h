@@ -17,29 +17,33 @@ namespace tndm {
 
 template <std::size_t D> class DG {
 public:
-    DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl, unsigned minQuadOrder);
+    DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, unsigned degree, unsigned minQuadOrder);
     virtual ~DG() = default;
 
-private:
-    void facetPrecompute(LocalSimplexMesh<D> const& mesh);
-    void volumePrecompute(LocalSimplexMesh<D> const& mesh);
+    std::size_t numElements() const { return vol.size(); }
+    std::size_t numFacets() const { return fctInfo.size(); }
 
-    Curvilinear<D> const& cl;
+protected:
+    void facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
+    void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
+
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;
 
-    Managed<Matrix<double>> E;
-    Managed<Matrix<double>> gradE;
-    std::vector<Managed<Matrix<double>>> fctE;
-    std::vector<Managed<Matrix<double>>> fctGradE;
+    Managed<Tensor<double, 3u>> Dxi;
 
-    struct detJ {
+    Managed<Matrix<double>> E;
+    Managed<Tensor<double, 3u>> gradE;
+    std::vector<Managed<Matrix<double>>> fctE;
+    std::vector<Managed<Tensor<double, 3u>>> fctGradE;
+
+    struct AbsDetJ {
         using type = double;
     };
-    struct JinvT {
-        using type = std::array<double, D*D>;
+    struct JInvT {
+        using type = std::array<double, D * D>;
     };
-    struct normal {
+    struct Normal {
         using type = std::array<double, D>;
     };
 
@@ -49,10 +53,10 @@ private:
     };
     std::vector<FacetInfo> fctInfo;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, detJ, JinvT, normal> fctStore;
+    mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, Normal> fctStore;
     mneme::StridedView<decltype(fctStore)> fct;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, detJ, JinvT> volStore;
+    mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT> volStore;
     mneme::StridedView<decltype(volStore)> vol;
 };
 

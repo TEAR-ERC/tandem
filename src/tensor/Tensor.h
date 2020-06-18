@@ -77,6 +77,9 @@ protected:
     multi_index_t stride_;
 };
 
+template <typename real_t, typename T>
+Tensor(real_t*, TensorBase<T> const&) -> Tensor<real_t, detail::traits<T>::Dim>;
+
 template <typename real_t> using Vector = Tensor<real_t, 1u>;
 template <typename real_t> using Matrix = Tensor<real_t, 2u>;
 

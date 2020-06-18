@@ -1,11 +1,10 @@
 #include "Curvilinear.h"
 #include "Affine.h"
 #include "Vector.h"
-#include "basis/Functions.h"
+#include "form/RefElement.h"
 #include "tensor/EigenMap.h"
 #include "tensor/Reshape.h"
 #include "util/Combinatorics.h"
-#include "util/Enumerate.h"
 
 #include <Eigen/LU>
 
@@ -91,12 +90,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
 template <std::size_t D>
 Managed<Matrix<double>>
 Curvilinear<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points) {
-    Managed<Matrix<double>> E(vandermondeInvT.cols(), points.size());
-    for (std::size_t p = 0; p < points.size(); ++p) {
-        for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(N))) {
-            E(bf, p) = DubinerP(j, points[p]);
-        }
-    }
+    Managed<Matrix<double>> E = dubinerBasisAt(N, points);
     auto Emap = EigenMap(E);
     Emap = vandermondeInvT * Emap;
     return E;
@@ -105,15 +99,7 @@ Curvilinear<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points
 template <std::size_t D>
 Managed<Tensor<double, 3u>>
 Curvilinear<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points) {
-    Managed<Tensor<double, 3u>> gradE(vandermondeInvT.cols(), D, points.size());
-    for (std::size_t p = 0; p < points.size(); ++p) {
-        for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(N))) {
-            auto dphi = gradDubinerP(j, points[p]);
-            for (std::size_t d = 0; d < D; ++d) {
-                gradE(bf, d, p) = dphi[d];
-            }
-        }
-    }
+    Managed<Tensor<double, 3u>> gradE = dubinerBasisGradientAt(N, points);
 
     assert(vandermondeInvT.cols() == vandermondeInvT.rows());
     auto matView = reshape(gradE, vandermondeInvT.cols(), D * points.size());
@@ -179,6 +165,15 @@ void Curvilinear<D>::detJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian,
                           Tensor<double, 1u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
         result(i) = Eigen::Map<const Eigen::Matrix<double, D, D>>(&jacobian(0, 0, i)).determinant();
+    }
+}
+
+template <std::size_t D>
+void Curvilinear<D>::absDetJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian,
+                             Tensor<double, 1u>& result) {
+    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
+        result(i) = std::fabs(
+            Eigen::Map<const Eigen::Matrix<double, D, D>>(&jacobian(0, 0, i)).determinant());
     }
 }
 
