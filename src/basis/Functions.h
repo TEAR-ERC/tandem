@@ -50,9 +50,7 @@ uint64_t rangeProduct(uint64_t from, uint64_t to);
  *
  * @return n!
  */
-inline uint64_t factorial(uint64_t n) {
-    return rangeProduct(1, n);
-}
+inline uint64_t factorial(uint64_t n) { return rangeProduct(1, n); }
 
 /**
  * @brief Evaluates Jacobi polynomial P_{n}^{(a,b)}(x).
@@ -77,8 +75,8 @@ std::array<double, 5> SingularityFreeJacobiPFactors(unsigned m, unsigned a, unsi
  * @param Pm_2 JacobiP(n-2, a, b, x/y) * y^{n-2}
  *
  */
-double SingularityFreeJacobiPRecursion(unsigned m, unsigned a, unsigned b, double x, double y,
-                                       std::array<double, 5> const& c, double Pm_1, double Pm_2);
+double SingularityFreeJacobiPRecursion(double x, double y, std::array<double, 5> const& cm,
+                                       double Pm_1, double Pm_2);
 
 /**
  * @brief Computes JacobiP(n, a, b, x/y) * y^n.

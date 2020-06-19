@@ -19,6 +19,22 @@ using TetraBasisFunction = std::function<double(std::array<double, 3> const&)>;
 using GradTetraBasisFunction = std::function<std::array<double, 3>(std::array<double, 3> const&)>;
 
 TEST_CASE("Basis") {
+    const std::vector<double> testPoints1{0.0, 1.0, 0.25, 0.1, 0.2};
+    const double divisor = 2.0;
+
+    SUBCASE("Test singularity free JacobiP against JacobiP") {
+        for (unsigned n = 0; n < 5; ++n) {
+            for (unsigned a = 0; a < 10; ++a) {
+                for (unsigned b = 0; b < 4; ++b) {
+                    for (auto& point : testPoints1) {
+                        CHECK(JacobiP(n, a, b, point / divisor) * std::pow(divisor, n) ==
+                              SingularityFreeJacobiP(n, a, b, point, divisor));
+                    }
+                }
+            }
+        }
+    }
+
     std::vector<std::array<double, 2>> testPoints2{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {0.25, 0.25},
                                                    {0.1, 0.1}, {0.1, 0.2}, {0.2, 0.1}};
 
@@ -36,7 +52,16 @@ TEST_CASE("Basis") {
              return 1.0 - 2.0 * p[0] - 6.0 * p[1] + 10.0 * p[0] * p[1] + 5.0 * p[1] * p[1];
          }},
         {{0, 2},
-         [](std::array<double, 2> const& p) { return 1.0 - 8.0 * p[1] + 10.0 * p[1] * p[1]; }}};
+         [](std::array<double, 2> const& p) { return 1.0 - 8.0 * p[1] + 10.0 * p[1] * p[1]; }},
+        {{3, 0},
+         [](std::array<double, 2> const& p) {
+             return -1.0 + 12.0 * p[0] - 30.0 * p[0] * p[0] + 20.0 * p[0] * p[0] * p[0] +
+                    3.0 * p[1] - 24.0 * p[0] * p[1] + 30.0 * p[0] * p[0] * p[1] -
+                    3.0 * p[1] * p[1] + 12.0 * p[0] * p[1] * p[1] + p[1] * p[1] * p[1];
+         }},
+        {{0, 3}, [](std::array<double, 2> const& p) {
+             return -1.0 + 15.0 * p[1] - 45.0 * p[1] * p[1] + 35.0 * p[1] * p[1] * p[1];
+         }}};
 
     SUBCASE("Dubiner polynomials on triangle") {
         for (auto& t : triBFs) {
@@ -67,8 +92,12 @@ TEST_CASE("Basis") {
          [](std::array<double, 2> const& p) -> std::array<double, 2> {
              return {-2.0 + 10.0 * p[1], -6.0 + 10.0 * p[0] + 10.0 * p[1]};
          }},
-        {{0, 2}, [](std::array<double, 2> const& p) -> std::array<double, 2> {
+        {{0, 2},
+         [](std::array<double, 2> const& p) -> std::array<double, 2> {
              return {0.0, -8.0 + 20.0 * p[1]};
+         }},
+        {{0, 3}, [](std::array<double, 2> const& p) -> std::array<double, 2> {
+             return {0.0, 15.0 - 90.0 * p[1] + 105.0 * p[1] * p[1]};
          }}};
 
     SUBCASE("Dubiner polynomials gradients on triangle") {

@@ -43,9 +43,9 @@ std::array<double, 5> SingularityFreeJacobiPFactors(unsigned m, unsigned a, unsi
     return {c_1, c_2, c_3, c_4, c_5};
 }
 
-double SingularityFreeJacobiPRecursion(unsigned m, unsigned a, unsigned b, double x, double y,
-                                       std::array<double, 5> const& c, double Pm_1, double Pm_2) {
-    return (c[0] * (c[1] * y + c[2] * x) * Pm_1 - c[3] * y * y * Pm_2) / c[4];
+double SingularityFreeJacobiPRecursion(double x, double y, std::array<double, 5> const& cm,
+                                       double Pm_1, double Pm_2) {
+    return (cm[0] * (cm[1] * y + cm[2] * x) * Pm_1 - cm[3] * y * y * Pm_2) / cm[4];
 }
 
 double SingularityFreeJacobiP(unsigned n, unsigned a, unsigned b, double x, double y) {
@@ -58,8 +58,8 @@ double SingularityFreeJacobiP(unsigned n, unsigned a, unsigned b, double x, doub
     for (unsigned m = 2; m <= n; ++m) {
         Pm_2 = Pm_1;
         Pm_1 = Pm;
-        auto c = SingularityFreeJacobiPFactors(n, a, b);
-        Pm = SingularityFreeJacobiPRecursion(m, a, b, x, y, c, Pm_1, Pm_2);
+        auto c = SingularityFreeJacobiPFactors(m, a, b);
+        Pm = SingularityFreeJacobiPRecursion(x, y, c, Pm_1, Pm_2);
     }
     return Pm;
 }
@@ -81,8 +81,8 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
         ddxPm_1 = ddxPm;
         ddyPm_2 = ddyPm_1;
         ddyPm_1 = ddyPm;
-        auto c = SingularityFreeJacobiPFactors(n, a, b);
-        Pm = SingularityFreeJacobiPRecursion(m, a, b, x, y, c, Pm_1, Pm_2);
+        auto c = SingularityFreeJacobiPFactors(m, a, b);
+        Pm = SingularityFreeJacobiPRecursion(x, y, c, Pm_1, Pm_2);
         ddxPm = (c[0] * (c[2] * Pm_1 + (c[1] * y + c[2] * x) * ddxPm_1) - c[3] * y * y * ddxPm_2) /
                 c[4];
         ddyPm = (c[0] * (c[1] * Pm_1 + (c[1] * y + c[2] * x) * ddyPm_1) -
