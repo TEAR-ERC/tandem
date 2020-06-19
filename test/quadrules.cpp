@@ -48,7 +48,6 @@ TEST_CASE("Quadrature") {
         auto& pts = rule.points();
         auto& wgts = rule.weights();
         REQUIRE(pts.size() == wgts.size());
-        unsigned dim = pts[0].size();
         // Test integrated all monomials x_1^{j_1} * ... * x_D^{j_D}
         for (auto&& j : AllIntegerSums<D()>(rule.order())) {
             double integral = 0.0;

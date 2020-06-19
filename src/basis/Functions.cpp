@@ -74,7 +74,6 @@ std::array<double, 3> SingularityFreeJacobiPAndDerivatives(unsigned n, unsigned 
     double Pm = SingularityFreeJacobiP(1, a, b, x, y);
     double ddxPm = 1.0 + 0.5 * (a + b);
     double ddyPm = 0.5 * (static_cast<double>(a) - static_cast<double>(b));
-    double c_2 = static_cast<double>(a * a) - static_cast<double>(b * b);
     for (unsigned m = 2; m <= n; ++m) {
         Pm_2 = Pm_1;
         Pm_1 = Pm;

@@ -42,9 +42,11 @@ public:
             result.weights() = rule->second.second;
             Derived::transform(result);
             assert(result.points().size() == result.weights().size());
+#ifndef NDEBUG
             for (auto& wgt : result.weights()) {
                 assert(wgt > 0.0);
             }
+#endif
             return result;
         }
         return SimplexQuadratureRule<Derived::dim()>();
@@ -91,7 +93,6 @@ public:
     static void transform(SimplexQuadratureRule<D>& result) {
         for (auto& pt : result.points()) {
             for (auto& x : pt) {
-                double y = x;
                 x = 0.5 * x + 0.5;
             }
         }
