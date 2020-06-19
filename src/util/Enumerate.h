@@ -49,18 +49,20 @@ private:
     std::size_t count = std::numeric_limits<std::size_t>::max();
 };
 
-template <typename Container> class enumerate {
+template <typename Iterable> class enumerate {
 public:
-    enumerate(Container&& container, std::size_t beginCount = 0u)
-        : container(std::forward<Container>(container)), beginCount(beginCount) {}
+    enumerate(Iterable&& iterable, std::size_t beginCount = 0u)
+        : iterable(std::forward<Iterable>(iterable)), beginCount(beginCount) {}
 
-    auto begin() { return EnumerateIterator(container.begin(), beginCount); }
-    auto end() { return EnumerateIterator(container.end()); }
+    auto begin() { return EnumerateIterator(iterable.begin(), beginCount); }
+    auto end() { return EnumerateIterator(iterable.end()); }
 
 private:
-    Container&& container;
+    Iterable iterable;
     std::size_t beginCount;
 };
+
+template <typename Iterable> enumerate(Iterable&&) -> enumerate<Iterable>;
 
 } // namespace tndm
 
