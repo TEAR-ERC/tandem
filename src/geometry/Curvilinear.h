@@ -51,6 +51,8 @@ public:
     std::vector<std::array<double, D>>
     facetParam(std::size_t faceNo, std::vector<std::array<double, D - 1>> const& chis);
 
+    std::size_t numElements() { return vertices.size(); }
+
 private:
     const unsigned N;
 

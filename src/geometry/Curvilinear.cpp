@@ -117,7 +117,9 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
 template <std::size_t D>
 void Curvilinear<D>::map(std::size_t eleNo, Matrix<double> const& E, Tensor<double, 2u>& result) {
     assert(eleNo < vertices.size());
-    assert(E.shape(1) == result.shape(1));
+    assert(result.shape(0) == D);
+    assert(result.shape(1) == E.shape(1));
+    assert(E.shape(0) == vandermondeInvT.rows());
 
     auto vertexSpan = vertices[eleNo];
     assert(vertexSpan.size() == vandermondeInvT.rows());
@@ -141,8 +143,15 @@ void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
                                                                  vandermondeInvT.rows());
 
+    assert(gradE.shape(0) == vandermondeInvT.rows());
+    assert(gradE.shape(1) == D);
     auto gradEMat = reshape(gradE, vandermondeInvT.rows(), D * gradE.shape(2));
+
+    assert(result.shape(0) == D);
+    assert(result.shape(1) == D);
+    assert(result.shape(2) == gradE.shape(2));
     auto resultMat = reshape(result, D, D * gradE.shape(2));
+
     EigenMap(resultMat) = vertMap * EigenMap(gradEMat);
 }
 
