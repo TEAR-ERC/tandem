@@ -1,8 +1,9 @@
-#include "quadrules/AutoRule.h"
 #include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
+#include "mesh/LocalSimplexMesh.h"
+#include "quadrules/AutoRule.h"
 #include "tensor/Tensor.h"
 
 #include <argparse.hpp>
@@ -16,25 +17,24 @@
 #include <iostream>
 #include <vector>
 
-using tndm::simplexQuadratureRule;
 using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
+using tndm::LocalSimplexMesh;
 using tndm::Managed;
 using tndm::Matrix;
+using tndm::simplexQuadratureRule;
 using tndm::Tensor;
+using tndm::Vector;
 
-template <std::size_t D, typename Func>
-double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree,
-            unsigned minQuadOrder) {
-    GenMesh<D> meshGen(size);
-    auto globalMesh = meshGen.uniformMesh();
-    globalMesh->repartition();
+template <std::size_t... Is>
+std::array<double, sizeof...(Is)> to_array(double* ptr, std::index_sequence<Is...>) {
+    return {ptr[Is]...};
+}
 
-    auto mesh = globalMesh->getLocalMesh();
-
-    Curvilinear<D> cl(*mesh, transform, degree);
-
+template <std::size_t D, typename SurfaceFunc>
+double surfaceInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, SurfaceFunc surfaceFun,
+                  unsigned minQuadOrder) {
     auto rule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     auto& pts = rule.points();
     auto& wgts = rule.weights();
@@ -49,8 +49,8 @@ double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree
         gradE.emplace_back(cl.evaluateGradientAt(cl.facetParam(f, pts)));
     }
 
-    double volume = 0.0;
-#pragma omp parallel shared(volume)
+    double result = 0.0;
+#pragma omp parallel shared(result)
     {
         auto J = Managed(cl.jacobianResultInfo(pts.size()));
         auto JinvT = Managed(cl.jacobianResultInfo(pts.size()));
@@ -58,39 +58,84 @@ double test(std::array<uint64_t, D> const& size, Func transform, unsigned degree
         auto normal = Managed(cl.normalResultInfo(rule.size()));
         auto x1 = Managed(cl.mapResultInfo(rule.size()));
         auto x2 = Managed(cl.mapResultInfo(rule.size()));
+        auto fx = Managed<Matrix<double>>(x1.shape());
 
-#pragma omp for reduction(+ : volume)
-        for (std::size_t fNo = 0; fNo < mesh->numFacets(); ++fNo) {
-            auto elNos = mesh->template upward<D - 1u>(fNo);
+#pragma omp for reduction(+ : result)
+        for (std::size_t fNo = 0; fNo < mesh.numFacets(); ++fNo) {
+            auto elNos = mesh.template upward<D - 1u>(fNo);
             assert(elNos.size() >= 1u);
-            auto dws = mesh->template downward<D - 1u, D>(elNos[0]);
+            auto dws = mesh.template downward<D - 1u, D>(elNos[0]);
             auto localFNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fNo));
             cl.jacobian(elNos[0], gradE[localFNo], J);
             cl.detJ(elNos[0], J, detJ);
             cl.jacobianInvT(J, JinvT);
             cl.map(elNos[0], E[localFNo], x1);
             cl.normal(localFNo, detJ, JinvT, normal);
+            for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
+                auto f = surfaceFun(to_array(&x1(0, q), std::make_index_sequence<D>{}));
+                std::copy(f.begin(), f.end(), &fx(0, q));
+            }
             if (elNos.size() > 1) {
-                auto dws2 = mesh->template downward<D - 1u, D>(elNos[1]);
-                auto localFNo2 = std::distance(dws2.begin(), std::find(dws2.begin(), dws2.end(), fNo));
+                auto dws2 = mesh.template downward<D - 1u, D>(elNos[1]);
+                auto localFNo2 =
+                    std::distance(dws2.begin(), std::find(dws2.begin(), dws2.end(), fNo));
                 cl.map(elNos[1], E[localFNo2], x2);
                 for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
-                    for (std::ptrdiff_t d = 0; d < x1.shape(0); ++d) {
-                        x1(d, q) -= x2(d, q);
+                    auto f = surfaceFun(to_array(&x2(0, q), std::make_index_sequence<D>{}));
+                    for (std::size_t d = 0; d < D; ++d) {
+                        fx(d, q) -= f[d];
                     }
                 }
             }
-            double localSum = 0.0;
             for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
                 for (std::ptrdiff_t d = 0; d < x1.shape(0); ++d) {
-                    localSum += x1(d, q) * normal(d, q) * wgts[q];
+                    result += fx(d, q) * normal(d, q) * wgts[q];
                 }
             }
-            volume += localSum / D;
-        } 
+        }
     }
+    return result;
+}
 
-    return volume;
+template <std::size_t D, typename VolumeFunc>
+double volumeInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, VolumeFunc volumeFun,
+                 unsigned minQuadOrder) {
+    auto rule = simplexQuadratureRule<D>(minQuadOrder);
+    auto& pts = rule.points();
+    auto& wgts = rule.weights();
+
+    Managed<Matrix<double>> E = cl.evaluateBasisAt(pts);
+    Managed<Tensor<double, 3u>> gradE = cl.evaluateGradientAt(pts);
+
+    double result = 0.0;
+#pragma omp parallel shared(result)
+    {
+        auto J = Managed(cl.jacobianResultInfo(pts.size()));
+        auto JinvT = Managed(cl.jacobianResultInfo(pts.size()));
+        auto absDetJ = Managed(cl.detJResultInfo(pts.size()));
+        auto normal = Managed(cl.normalResultInfo(rule.size()));
+        auto x1 = Managed(cl.mapResultInfo(rule.size()));
+        auto x2 = Managed(cl.mapResultInfo(rule.size()));
+
+#pragma omp for reduction(+ : result)
+        for (std::size_t elNo = 0; elNo < mesh.numElements(); ++elNo) {
+            cl.jacobian(elNo, gradE, J);
+            cl.absDetJ(elNo, J, absDetJ);
+            cl.map(elNo, E, x1);
+            for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
+                double fx = volumeFun(to_array(&x1(0, q), std::make_index_sequence<D>{}));
+                result += fx * absDetJ(q) * wgts[q];
+            }
+        }
+    }
+    return result;
+}
+
+template <std::size_t D> auto getMesh(std::array<uint64_t, D> const& size) {
+    GenMesh<D> meshGen(size);
+    auto globalMesh = meshGen.uniformMesh();
+    globalMesh->repartition();
+    return globalMesh->getLocalMesh();
 }
 
 int main(int argc, char** argv) {
@@ -149,10 +194,24 @@ int main(int argc, char** argv) {
             double phi = 0.5 * M_PI * v[1];
             return {r * cos(phi), r * sin(phi)};
         };
-        reference = 3.0 * pi / 16.0;
-        testFun = [&transform, &N, &minQuadOrder](unsigned long n) {
+        auto surfaceFun = [](std::array<double, 2> const& x) -> std::array<double, 2> {
+            double r = sqrt(x[0] * x[0] + x[1] * x[1]);
+            double phi = atan2(x[1], x[0]);
+            double f_r = sin(r) + cos(r) / r;
+            return {f_r * cos(phi), f_r * sin(phi)};
+        };
+        auto volumeFun = [](std::array<double, 2> const& x) {
+            double r = sqrt(x[0] * x[0] + x[1] * x[1]);
+            return cos(r);
+        };
+        // int_{0}^{pi/2} int_{0.5}^{1} cos(r) r dr dphi
+        reference = pi / 2.0 * (sin(1.0) + cos(1.0) - 0.5 * sin(0.5) - cos(0.5));
+        testFun = [transform, surfaceFun, volumeFun, &N, &minQuadOrder](unsigned long n) {
             std::array<uint64_t, 2> size = {n, n};
-            return test(size, transform, N, minQuadOrder);
+            auto mesh = getMesh(size);
+            Curvilinear<2> cl(*mesh, transform, N);
+            return 0.5 * surfaceInt(*mesh, cl, surfaceFun, minQuadOrder) +
+                   0.5 * volumeInt(*mesh, cl, volumeFun, minQuadOrder);
         };
     } else if (D == 3) {
         auto transform = [](std::array<double, 3> const& v) -> std::array<double, 3> {
@@ -161,10 +220,18 @@ int main(int argc, char** argv) {
             double theta = M_PI * (0.5 * v[2] + 0.25);
             return {r * sin(theta) * cos(phi), r * sin(theta) * sin(phi), r * cos(theta)};
         };
+        auto surfaceFun = [](std::array<double, 3> const& x) -> std::array<double, 3> {
+            return x * (1.0 / 3.0);
+        };
+        auto volumeFun = [](std::array<double, 3> const&) { return 1.0; };
+        // int_{0}^{pi/2} int_{pi/4}^{3pi/4} int_{0.5}^{1} r^2 sin(theta) dr dtheta dphi
         reference = sqrt(2) * pi / 2.0 * 7.0 / 24.0;
-        testFun = [&transform, &N, &minQuadOrder](unsigned long n) {
+        testFun = [transform, surfaceFun, volumeFun, &N, &minQuadOrder](unsigned long n) {
             std::array<uint64_t, 3> size = {n, n, n};
-            return test(size, transform, N, minQuadOrder);
+            auto mesh = getMesh(size);
+            Curvilinear<3> cl(*mesh, transform, N);
+            return 0.5 * surfaceInt(*mesh, cl, surfaceFun, minQuadOrder) +
+                   0.5 * volumeInt(*mesh, cl, volumeFun, minQuadOrder);
         };
     } else {
         std::cerr << "Test for simplex dimension " << D << " is not implemented." << std::endl;
