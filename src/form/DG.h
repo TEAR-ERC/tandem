@@ -58,11 +58,11 @@ protected:
     };
     std::vector<FacetInfo> fctInfo;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, Normal, NormalLength, Coords> fctStore;
-    mneme::StridedView<decltype(fctStore)> fct;
+    using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, Normal, NormalLength, Coords>;
+    mneme::StridedView<fct_t> fct;
 
-    mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT, Coords> volStore;
-    mneme::StridedView<decltype(volStore)> vol;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT, Coords>;
+    mneme::StridedView<vol_t> vol;
 };
 
 } // namespace tndm

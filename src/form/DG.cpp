@@ -4,6 +4,8 @@
 #include "util/Combinatorics.h"
 #include "util/Enumerate.h"
 
+#include <memory>
+
 namespace tndm {
 
 template <std::size_t D>
@@ -22,11 +24,11 @@ DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, unsigned degree,
         d_xi.emplace_back(dubinerBasisGradientAt(degree, points));
     }
 
-    fctStore.resize(mesh.numFacets() * fctRule.size());
-    fct.setStorage(fctStore, 0u, mesh.numFacets(), fctRule.size());
+    fct.setStorage(std::make_shared<fct_t>(mesh.numFacets() * fctRule.size()), 0u, mesh.numFacets(),
+                   fctRule.size());
 
-    volStore.resize(mesh.numElements() * volRule.size());
-    vol.setStorage(volStore, 0u, mesh.numElements(), volRule.size());
+    vol.setStorage(std::make_shared<vol_t>(mesh.numElements() * volRule.size()), 0u,
+                   mesh.numElements(), volRule.size());
 
     facetPrecompute(mesh, cl);
     volumePrecompute(mesh, cl);

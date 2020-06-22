@@ -60,7 +60,6 @@ private:
         using type = std::array<double, D>;
     };
 
-    mneme::SingleStorage<Verts> storage;
     mneme::StridedView<mneme::SingleStorage<Verts>> vertices;
 
     std::array<Simplex<D - 1>, D + 1> f2v;

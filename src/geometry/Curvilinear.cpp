@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstddef>
 #include <iterator>
+#include <memory>
 #include <stdexcept>
 
 namespace tndm {
@@ -26,7 +27,8 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
     std::size_t vertsPerElement = refNodes.size();
     assert(binom(N + D, D) == refNodes.size());
 
-    storage.resize(mesh.numElements() * vertsPerElement);
+    auto storage =
+        std::make_shared<mneme::SingleStorage<Verts>>(mesh.numElements() * vertsPerElement);
     vertices.setStorage(storage, 0, mesh.numElements(), vertsPerElement);
 
     auto vertexData = dynamic_cast<VertexData<D> const*>(mesh.vertices().data());
@@ -44,7 +46,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
         }
         RefPlexToGeneralPlex<D> map(verts);
         for (auto& refNode : refNodes) {
-            storage[vertexNo] = transform(map(refNode));
+            (*storage)[vertexNo] = transform(map(refNode));
             ++vertexNo;
         }
     }
