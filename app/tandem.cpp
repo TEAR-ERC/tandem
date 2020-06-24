@@ -23,11 +23,6 @@ using xdmfwriter::XdmfWriter;
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    std::vector<const char*> variableNames{"x", "bc"};
-
     /*constexpr std::size_t D = 2;
     XdmfWriter<TRIANGLE> writer(rank, "testmesh", variableNames);
     std::array<uint64_t, 2> N = {32, 32};
@@ -38,7 +33,7 @@ int main(int argc, char** argv) {
     };*/
 
     constexpr std::size_t D = 3;
-    XdmfWriter<TETRAHEDRON> writer(rank, "testmesh", variableNames);
+    XdmfWriter<TETRAHEDRON, double> writer(xdmfwriter::POSIX, "testmesh");
     std::array<uint64_t, 3> N = {32, 32, 32};
     auto transform = [](std::array<double, 3> const& v) -> std::array<double, 3> {
         double r = 0.5 * (v[0] + 1.0);
@@ -72,12 +67,16 @@ int main(int argc, char** argv) {
 
     auto flatVerts = flatVertices<double, D, 3>(vertexData->getVertices(), transform);
     auto flatElems = flatElements<unsigned int, D>(*mesh);
-    writer.init(mesh->elements().size(), flatElems.data(), vertexData->getVertices().size(),
-                flatVerts.data());
+
+    std::vector<const char*> variableNames{"x", "bc"};
+    writer.init(variableNames, std::vector<char const*>{});
+    writer.setMesh(mesh->elements().size(), flatElems.data(), vertexData->getVertices().size(),
+                   flatVerts.data());
     writer.addTimeStep(0.0);
-    writer.writeData(0, data.data());
-    writer.writeData(1, bc.data());
+    writer.writeCellData(0, data.data());
+    writer.writeCellData(1, bc.data());
     writer.flush();
+    writer.close();
 
     MPI_Finalize();
 
