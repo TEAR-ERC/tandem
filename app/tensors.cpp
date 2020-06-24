@@ -1,7 +1,9 @@
 #include <iostream>
 
 #include "basis/Functions.h"
+#include "form/RefElement.h"
 #include "quadrules/AutoRule.h"
+#include "tensor/EigenMap.h"
 #include "util/Combinatorics.h"
 
 #include <Eigen/Core>
@@ -12,6 +14,7 @@ using Eigen::DiagonalMatrix;
 using Eigen::MatrixXd;
 using tndm::AllIntegerSums;
 using tndm::binom;
+using tndm::dubinerBasisAt;
 using tndm::gradTetraDubinerP;
 using tndm::TetraDubinerP;
 
@@ -31,21 +34,16 @@ int main(int argc, char** argv) {
 
     auto truncate = [](double x) { return (std::fabs(x) < 1e-15) ? 0.0 : x; };
 
-    MatrixXd phi(rule.size(), numBF);
     DiagonalMatrix<double, Eigen::Dynamic> W(rule.size());
 
-    std::size_t bf = 0;
-    for (auto j : AllIntegerSums<3>(N)) {
-        for (std::size_t i = 0; i < rule.size(); ++i) {
-            phi(i, bf) = TetraDubinerP(j, rule.points()[i]);
-        }
-        ++bf;
-    }
+    auto phi = dubinerBasisAt(N, rule.points());
+    auto phiMap = EigenMap(phi);
+
     for (std::size_t i = 0; i < rule.size(); ++i) {
         W.diagonal()(i) = rule.weights()[i];
     }
 
-    auto m = phi.transpose() * W * phi;
+    auto m = phiMap * W * phiMap.transpose();
     std::cout << "Mass matrix:" << std::endl;
     std::cout << m.unaryExpr(truncate) << std::endl;
 
@@ -53,7 +51,7 @@ int main(int argc, char** argv) {
     for (auto& matrix : dphi) {
         matrix.resize(rule.size(), numBF);
     }
-    bf = 0;
+    std::size_t bf = 0;
     for (auto j : AllIntegerSums<3>(N)) {
         for (std::size_t i = 0; i < rule.size(); ++i) {
             auto grad = gradTetraDubinerP(j, rule.points()[i]);
@@ -64,7 +62,7 @@ int main(int argc, char** argv) {
         ++bf;
     }
 
-    auto kXi = dphi[0].transpose() * W * phi;
+    auto kXi = dphi[0].transpose() * W * phiMap.transpose();
     std::cout << "dphidxi * phi:" << std::endl;
     std::cout << kXi.unaryExpr(truncate) << std::endl;
 

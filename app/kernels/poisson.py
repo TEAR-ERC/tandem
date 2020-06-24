@@ -47,8 +47,9 @@ def add(generator, dim, Nbf, nq, Nq):
 
     b = Tensor('b', (Nbf,))
     F = Tensor('F', (Nq,))
-    f = Tensor('f', (nq,))
     generator.add('rhsVolume', b['k'] <= J['q'] * W['q'] * E['kq'] * F['q'])
+
+    f = Tensor('f', (nq,))
     generator.add('rhsFacet', b['k'] <= c1[0] * w['q'] * g['eiq'] * d_xi[0]['keq'] * n['iq'] * f['q'] + \
                                         c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f['q'])
 

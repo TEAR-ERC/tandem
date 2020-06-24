@@ -58,6 +58,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             auto dws = mesh.template downward<D - 1u, D>(elNos[0]);
             auto localFctNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
+            assert(localFctNo < D + 1u);
 
             auto jInvT = Tensor(fct[fctNo].template get<JInvT>().data()->data(),
                                 cl.jacobianResultInfo(fctRule.size()));
@@ -88,9 +89,16 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);
                 auto localFNoOther = std::distance(
                     dwsOther.begin(), std::find(dwsOther.begin(), dwsOther.end(), fctNo));
+                assert(localFNoOther < D + 1u);
 
                 fctInfo[fctNo].up[1] = elNos[1];
                 fctInfo[fctNo].localNo[1] = localFNoOther;
+
+                auto jInvTOther = Tensor(fct[fctNo].template get<JInvTOther>().data()->data(),
+                                         cl.jacobianResultInfo(fctRule.size()));
+
+                cl.jacobian(elNos[1], fctGradE[localFNoOther], J);
+                cl.jacobianInvT(J, jInvTOther);
             } else {
                 fctInfo[fctNo].up[1] = elNos[0];
                 fctInfo[fctNo].localNo[1] = localFctNo;

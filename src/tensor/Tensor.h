@@ -4,6 +4,7 @@
 #include "TensorBase.h"
 
 #include <array>
+#include <cassert>
 
 namespace tndm {
 
