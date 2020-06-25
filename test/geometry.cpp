@@ -85,13 +85,13 @@ TEST_CASE("Curvilinear") {
         for (auto& [eleNo, faceNo, xi, refN] : test) {
             auto gradE = cl.evaluateGradientAt({xi});
             auto J = Managed(cl.jacobianResultInfo(1u));
-            auto JinvT = Managed(cl.jacobianResultInfo(1u));
+            auto JInv = Managed(cl.jacobianResultInfo(1u));
             auto detJ = Managed(cl.detJResultInfo(1u));
             auto n = Managed(cl.normalResultInfo(1u));
             cl.jacobian(eleNo, gradE, J);
-            cl.jacobianInvT(J, JinvT);
+            cl.jacobianInv(J, JInv);
             cl.detJ(eleNo, J, detJ);
-            cl.normal(faceNo, detJ, JinvT, n);
+            cl.normal(faceNo, detJ, JInv, n);
             for (std::size_t d = 0; d < 2; ++d) {
                 CHECK(n(d, 0) == doctest::Approx(refN[d]));
             }

@@ -36,14 +36,14 @@ public:
     TensorBase<Tensor<double, 3u>> jacobianResultInfo(std::size_t numPoints) const;
     void jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE, Tensor<double, 3u>& result);
 
-    void jacobianInvT(Tensor<double, 3u> const& jacobian, Tensor<double, 3u>& result);
+    void jacobianInv(Tensor<double, 3u> const& jacobian, Tensor<double, 3u>& result);
 
     TensorBase<Vector<double>> detJResultInfo(std::size_t numPoints) const;
     void detJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian, Tensor<double, 1u>& result);
     void absDetJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian, Tensor<double, 1u>& result);
 
     TensorBase<Matrix<double>> normalResultInfo(std::size_t numPoints) const;
-    void normal(std::size_t faceNo, Tensor<double, 1u> const& detJ, Tensor<double, 3u> const& JinvT,
+    void normal(std::size_t faceNo, Tensor<double, 1u> const& detJ, Tensor<double, 3u> const& jInv,
                 Tensor<double, 2u>& result);
 
     std::array<double, D> facetParam(std::size_t faceNo, std::array<double, D - 1> const& chi);

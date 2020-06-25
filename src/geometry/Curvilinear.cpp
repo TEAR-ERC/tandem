@@ -158,11 +158,11 @@ void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE
 }
 
 template <std::size_t D>
-void Curvilinear<D>::jacobianInvT(Tensor<double, 3u> const& jacobian, Tensor<double, 3u>& result) {
+void Curvilinear<D>::jacobianInv(Tensor<double, 3u> const& jacobian, Tensor<double, 3u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(2); ++i) {
-        Eigen::Map<const Eigen::Matrix<double, D, D>> Jmap(&jacobian(0, 0, i));
+        Eigen::Map<const Eigen::Matrix<double, D, D>> jMap(&jacobian(0, 0, i));
         Eigen::Map<Eigen::Matrix<double, D, D>> resultMap(&result(0, 0, i));
-        resultMap = Jmap.transpose().inverse();
+        resultMap = jMap.inverse();
     }
 }
 
@@ -195,12 +195,12 @@ TensorBase<Matrix<double>> Curvilinear<D>::normalResultInfo(std::size_t numPoint
 
 template <std::size_t D>
 void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
-                            Tensor<double, 3u> const& JinvT, Tensor<double, 2u>& result) {
+                            Tensor<double, 3u> const& jInv, Tensor<double, 2u>& result) {
     // n_{iq} = |J|_q J^{-T}_{ijq} N_j
     for (std::ptrdiff_t i = 0; i < detJ.shape(0); ++i) {
-        Eigen::Map<const Eigen::Matrix<double, D, D>> JinvTmap(&JinvT(0, 0, i));
+        Eigen::Map<const Eigen::Matrix<double, D, D>> jInvMap(&jInv(0, 0, i));
         Eigen::Map<Eigen::Matrix<double, D, 1>> resultMap(&result(0, i));
-        resultMap = std::fabs(detJ(i)) * JinvTmap * refNormals[faceNo];
+        resultMap = std::fabs(detJ(i)) * jInvMap.transpose() * refNormals[faceNo];
     }
 }
 
