@@ -2,21 +2,34 @@
 #define TENSOR_20200609_H
 
 #include "TensorBase.h"
+#include "util/Sequence.h"
 
 #include <array>
 #include <cassert>
+#include <type_traits>
 
 namespace tndm {
 
-template <typename RealT, std::size_t D> class Tensor : public TensorBase<Tensor<RealT, D>> {
+struct slice {};
+
+template <typename RealT, std::size_t D, bool Packed = true>
+class Tensor : public TensorBase<Tensor<RealT, D>> {
 public:
     using Base = TensorBase<Tensor<RealT, D>>;
     using typename Base::index_t;
     using typename Base::multi_index_t;
     using real_t = RealT;
 
+    template <typename T> using is_slice = std::is_same<slice, T>;
+
     Tensor(real_t* memory, multi_index_t const& shape) : Base(shape), data_(memory) {
+        static_assert(Packed);
         computeStride();
+    }
+
+    Tensor(real_t* memory, multi_index_t const& shape, multi_index_t const& stride)
+        : Base(shape), data_(memory), stride_(stride) {
+        static_assert(!Packed);
     }
 
     template <typename... Shape>
@@ -47,6 +60,17 @@ public:
     real_t* data() { return data_; }
     real_t const* data() const { return data_; }
 
+    template <typename... Entry> auto subtensor(Entry... entry) {
+        return extractSubtensor<decltype(data()), Entry...>(entry...);
+    }
+
+    template <typename... Entry> auto subtensor(Entry... entry) const {
+        return extractSubtensor<decltype(data()), Entry...>(entry...);
+    }
+
+    multi_index_t const& stride() const { return stride_; }
+    index_t stride(index_t pos) const { return stride_[pos]; }
+
 protected:
     void computeStride() {
         stride_[0] = 1;
@@ -74,6 +98,35 @@ protected:
         return addr;
     }
 
+    template <std::size_t... Is>
+    std::array<index_t, sizeof...(Is)> extractNumbers(multi_index_t const& multiIndex,
+                                                      std::index_sequence<Is...>) const {
+        return {multiIndex[Is]...};
+    }
+
+    template <typename new_real_t, typename... Entry> auto extractSubtensor(Entry... entry) const {
+        constexpr auto filtered_sequence = make_filtered_sequence<is_slice, Entry...>();
+        auto filter_entry = [](auto entry) {
+            if constexpr (is_slice<decltype(entry)>::value) {
+                return 0;
+            } else {
+                return entry;
+            }
+        };
+        auto addr = address(filter_entry(entry)...);
+        constexpr bool subPacked =
+            std::is_same_v<std::decay_t<decltype(filtered_sequence)>,
+                           std::make_index_sequence<filtered_sequence.size()>>;
+        using subtensor_t =
+            Tensor<std::remove_pointer_t<new_real_t>, filtered_sequence.size(), subPacked>;
+        if constexpr (subPacked) {
+            return subtensor_t(data_ + addr, extractNumbers(Base::shape(), filtered_sequence));
+        } else {
+            return subtensor_t(data_ + addr, extractNumbers(Base::shape(), filtered_sequence),
+                               extractNumbers(stride_, filtered_sequence));
+        }
+    }
+
     real_t* data_;
     multi_index_t stride_;
 };
@@ -86,14 +139,16 @@ template <typename real_t> using Matrix = Tensor<real_t, 2u>;
 
 namespace detail {
 
-template <typename RealT, std::size_t D> struct traits<Tensor<RealT, D>> {
+template <typename RealT, std::size_t D, bool Packd> struct traits<Tensor<RealT, D, Packd>> {
     using real_t = RealT;
     static constexpr std::size_t Dim = D;
+    static constexpr bool Packed = Packd;
 };
 
-template <typename RealT, std::size_t D> struct traits<const Tensor<RealT, D>> {
+template <typename RealT, std::size_t D, bool Packd> struct traits<const Tensor<RealT, D, Packd>> {
     using real_t = const RealT;
     static constexpr std::size_t Dim = D;
+    static constexpr bool Packed = Packd;
 };
 
 } // namespace detail

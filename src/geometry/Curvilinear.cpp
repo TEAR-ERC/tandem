@@ -160,9 +160,10 @@ void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE
 template <std::size_t D>
 void Curvilinear<D>::jacobianInv(Tensor<double, 3u> const& jacobian, Tensor<double, 3u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(2); ++i) {
-        Eigen::Map<const Eigen::Matrix<double, D, D>> jMap(&jacobian(0, 0, i));
-        Eigen::Map<Eigen::Matrix<double, D, D>> resultMap(&result(0, 0, i));
-        resultMap = jMap.inverse();
+        auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
+        auto resAtP = result.subtensor(slice{}, slice{}, i);
+        EigenMap<Matrix<double>, D, D>(resAtP) =
+            EigenMap<Matrix<const double>, D, D>(jAtP).inverse();
     }
 }
 
@@ -175,7 +176,8 @@ template <std::size_t D>
 void Curvilinear<D>::detJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian,
                           Tensor<double, 1u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
-        result(i) = Eigen::Map<const Eigen::Matrix<double, D, D>>(&jacobian(0, 0, i)).determinant();
+        auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
+        result(i) = EigenMap<Matrix<const double>, D, D>(jAtP).determinant();
     }
 }
 
@@ -183,8 +185,8 @@ template <std::size_t D>
 void Curvilinear<D>::absDetJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian,
                              Tensor<double, 1u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
-        result(i) = std::fabs(
-            Eigen::Map<const Eigen::Matrix<double, D, D>>(&jacobian(0, 0, i)).determinant());
+        auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
+        result(i) = std::fabs(EigenMap<Matrix<const double>, D, D>(jAtP).determinant());
     }
 }
 
@@ -198,9 +200,11 @@ void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
                             Tensor<double, 3u> const& jInv, Tensor<double, 2u>& result) {
     // n_{iq} = |J|_q J^{-T}_{ijq} N_j
     for (std::ptrdiff_t i = 0; i < detJ.shape(0); ++i) {
-        Eigen::Map<const Eigen::Matrix<double, D, D>> jInvMap(&jInv(0, 0, i));
-        Eigen::Map<Eigen::Matrix<double, D, 1>> resultMap(&result(0, i));
-        resultMap = std::fabs(detJ(i)) * jInvMap.transpose() * refNormals[faceNo];
+        auto jInvAtP = jInv.subtensor(slice{}, slice{}, i);
+        auto res = result.subtensor(slice{}, i);
+        EigenMap<Vector<double>, D>(res) =
+            std::fabs(detJ(i)) * EigenMap<Matrix<const double>, D, D>(jInvAtP).transpose() *
+            refNormals[faceNo];
     }
 }
 

@@ -37,6 +37,10 @@ add_executable(test-simplex simplex.cpp)
 target_link_libraries(test-simplex test-runner)
 doctest_discover_tests(test-simplex)
 
+add_executable(test-tensor tensor.cpp)
+target_link_libraries(test-tensor test-runner)
+doctest_discover_tests(test-tensor)
+
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)

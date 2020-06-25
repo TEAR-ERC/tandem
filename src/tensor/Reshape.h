@@ -9,6 +9,7 @@
 namespace tndm {
 
 template <typename TensorType, typename... Sizes> auto reshape(TensorType& tensor, Sizes... sizes) {
+    static_assert(detail::traits<TensorType>::Packed, "Only packed tensor may be reshaped.");
     assert((sizes * ...) == tensor.size());
     using new_real_t = std::remove_pointer_t<decltype(tensor.data())>;
     return Tensor<new_real_t, sizeof...(Sizes)>(
