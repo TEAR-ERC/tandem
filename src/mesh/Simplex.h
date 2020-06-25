@@ -54,7 +54,7 @@ public:
     }
 
     constexpr static auto referenceSimplexVertices() {
-        std::array<std::array<double, D>, D + 1> verts;
+        std::array<std::array<double, D>, D + 1> verts{};
         std::fill(verts[0].begin(), verts[0].end(), 0.0);
         for (std::size_t d = 1; d < D + 1; ++d) {
             std::fill(verts[d].begin(), verts[d].end(), 0.0);
