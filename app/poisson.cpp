@@ -34,7 +34,7 @@ class Poisson : DG<DomainDimension> {
 public:
     using DG<DomainDimension>::DG;
 
-    auto assemble(bool nonsense = false) {
+    auto assemble() {
         using T = Eigen::Triplet<double>;
         std::vector<T> triplets;
 
@@ -63,12 +63,6 @@ public:
                     triplets.emplace_back(T(i0 + i, j0 + j, Aview(i, j)));
                 }
             }
-        }
-        if (nonsense) {
-            Eigen::SparseMatrix<double> mat(numElements() * tensor::A::Shape[0],
-                                            numElements() * tensor::A::Shape[1]);
-            mat.setFromTriplets(triplets.begin(), triplets.end());
-            return mat;
         }
 
         double a00[tensor::a::size(0, 0)];
@@ -177,9 +171,7 @@ public:
             unsigned i0 = elNo * bview.shape(0);
             for (unsigned i = 0; i < bview.shape(0); ++i) {
                 B[i0 + i] += bview(i);
-                // std::cout << bview(i) << std::endl;
             }
-            // std::cout << std::endl;
         }
 
         double f[tensor::f::size()];
@@ -191,24 +183,7 @@ public:
                 auto coords = fct[fctNo].template get<Coords>();
                 for (unsigned q = 0; q < tensor::f::size(); ++q) {
                     f[q] = dirichletFun(coords[q]);
-                    // std::cout << coords[q][0] << " " << coords[q][1] << " " << f[q] << " " <<
-                    // fct[fctNo].template get<NormalLength>()[q] << std::endl;
-                    // std::cout << "| " << fct[fctNo].template get<Normal>()[q][0]
-                    //<< " " << fct[fctNo].template get<Normal>()[q][1] << std::endl;
-                    // for (int i = 0; i < 3; ++i) {
-                    // std::cout << "# " << e[info.localNo[0]](i,q) << " ";
-                    //}
-                    // std::cout << std::endl;
                 }
-                // std::cout << penalty / std::pow(info.area, beta0) << std::endl;
-                // std::cout << "=========" << std::endl;
-                // for (int i = 0; i < e[0].shape(0); ++i){
-                // for (int j = 0; j < e[0].shape(1); ++j) {
-                // std::cout << e[info.localNo[0]](i,j) << " ";
-                //}
-                // std::cout << std::endl;
-                //}
-                // std::cout << "---------------" << std::endl;
 
                 kernel::rhsFacet rhs;
                 rhs.c10 = epsilon;
@@ -224,12 +199,9 @@ public:
                 rhs.execute();
 
                 unsigned i0 = info.up[0] * bview.shape(0);
-                // std::cout << info.localNo[0] << std::endl;
                 for (unsigned i = 0; i < bview.shape(0); ++i) {
                     B[i0 + i] += bview(i);
-                    // std::cout << bview(i) << std::endl;
                 }
-                // std::cout << std::endl;
             }
         }
         return B;
@@ -377,10 +349,6 @@ int main(int argc, char** argv) {
         L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
 
     std::cout << "L2 error: " << error << std::endl;
-    auto A2 = poisson.assemble(true);
-    // std::cout << b << std::endl << std::endl;
-    // std::cout << A2 * b << std::endl;
-    // std::cout << (A2 * x) << std::endl;
 
     if (auto fileName = program.present("-o")) {
         std::vector<double> data(3 * mesh->numElements(), 0.0);
