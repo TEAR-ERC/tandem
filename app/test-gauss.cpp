@@ -53,7 +53,7 @@ double surfaceInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, SurfaceFu
 #pragma omp parallel shared(result)
     {
         auto J = Managed(cl.jacobianResultInfo(pts.size()));
-        auto JinvT = Managed(cl.jacobianResultInfo(pts.size()));
+        auto JInv = Managed(cl.jacobianResultInfo(pts.size()));
         auto detJ = Managed(cl.detJResultInfo(pts.size()));
         auto normal = Managed(cl.normalResultInfo(rule.size()));
         auto x1 = Managed(cl.mapResultInfo(rule.size()));
@@ -68,9 +68,9 @@ double surfaceInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, SurfaceFu
             auto localFNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fNo));
             cl.jacobian(elNos[0], gradE[localFNo], J);
             cl.detJ(elNos[0], J, detJ);
-            cl.jacobianInvT(J, JinvT);
+            cl.jacobianInv(J, JInv);
             cl.map(elNos[0], E[localFNo], x1);
-            cl.normal(localFNo, detJ, JinvT, normal);
+            cl.normal(localFNo, detJ, JInv, normal);
             for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
                 auto f = surfaceFun(to_array(&x1(0, q), std::make_index_sequence<D>{}));
                 std::copy(f.begin(), f.end(), &fx(0, q));

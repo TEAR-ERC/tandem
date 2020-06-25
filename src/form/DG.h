@@ -38,10 +38,10 @@ protected:
     struct AbsDetJ {
         using type = double;
     };
-    struct JInvT {
+    struct JInv {
         using type = std::array<double, D * D>;
     };
-    struct JInvTOther {
+    struct JInvOther {
         using type = std::array<double, D * D>;
     };
     struct Normal {
@@ -61,11 +61,11 @@ protected:
     };
     std::vector<FacetInfo> fctInfo;
 
-    using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInvT, JInvTOther, Normal,
-                                      NormalLength, Coords>;
+    using fct_t =
+        mneme::MultiStorage<mneme::DataLayout::SoA, JInv, JInvOther, Normal, NormalLength, Coords>;
     mneme::StridedView<fct_t> fct;
 
-    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInvT, Coords>;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
     mneme::StridedView<vol_t> vol;
 };
 

@@ -52,7 +52,7 @@ public:
             krnl.A = A;
             krnl.D_x = D_x;
             krnl.D_xi = D_xi.data();
-            krnl.G = vol[elNo].template get<JInvT>().data()->data();
+            krnl.G = vol[elNo].template get<JInv>().data()->data();
             krnl.J = vol[elNo].template get<AbsDetJ>().data();
             krnl.W = volRule.weights().data();
             krnl.execute();
@@ -96,7 +96,7 @@ public:
             local.d_x(0) = d_x0;
             local.d_xi(0) = d_xi[info.localNo[0]].data();
             local.e(0) = e[info.localNo[0]].data();
-            local.g = fct[fctNo].template get<JInvT>().data()->data();
+            local.g = fct[fctNo].template get<JInv>().data()->data();
             local.n = fct[fctNo].template get<Normal>().data()->data();
             local.nl = fct[fctNo].template get<NormalLength>().data();
             local.w = fctRule.weights().data();
@@ -131,8 +131,7 @@ public:
                 neighbour.d_xi(1) = d_xi[info.localNo[1]].data();
                 neighbour.e(0) = local.e(0);
                 neighbour.e(1) = e[info.localNo[1]].data();
-                neighbour.g = fct[fctNo].template get<JInvTOther>().data()->data();
-                // neighbour.g = fct[fctNo].template get<JInvT>().data()->data();
+                neighbour.g = fct[fctNo].template get<JInvOther>().data()->data();
                 neighbour.n = local.n;
                 neighbour.nl = local.nl;
                 neighbour.w = local.w;
@@ -218,7 +217,7 @@ public:
                 rhs.d_xi(0) = d_xi[info.localNo[0]].data();
                 rhs.e(0) = e[info.localNo[0]].data();
                 rhs.f = f;
-                rhs.g = fct[fctNo].template get<JInvT>().data()->data();
+                rhs.g = fct[fctNo].template get<JInv>().data()->data();
                 rhs.n = fct[fctNo].template get<Normal>().data()->data();
                 rhs.nl = fct[fctNo].template get<NormalLength>().data();
                 rhs.w = fctRule.weights().data();
@@ -308,11 +307,11 @@ int main(int argc, char** argv) {
     auto mesh = globalMesh->getLocalMesh();
 
     auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
-        // double r = 0.5 * (v[0] + 1.0);
-        // double phi = 0.5 * M_PI * v[1];
-        // return {r * cos(phi), r * sin(phi)};
+        double r = 0.5 * (v[0] + 1.0);
+        double phi = 0.5 * M_PI * v[1];
+        return {r * cos(phi), r * sin(phi)};
         // return v;
-        return {2.0 * v[0] - 1.0, 2.0 * v[1] - 1.0};
+        // return {2.0 * v[0] - 1.0, 2.0 * v[1] - 1.0};
     };
 
     Curvilinear<2u> cl(*mesh, transform, PolynomialDegree);
@@ -337,18 +336,21 @@ int main(int argc, char** argv) {
     //},
     //[](std::array<double, 2> const&) {
     // return 0.0; });
-    auto b = poisson.rhs([](std::array<double, 2> const& x) { return 0.0; },
-                         [](std::array<double, 2> const& x) { return x[0] + x[1]; });
+    // auto b = poisson.rhs([](std::array<double, 2> const& x) { return 0.0; },
+    //[](std::array<double, 2> const& x) { return x[0] + x[1]; });
     // auto b = poisson.rhs(
     //[](std::array<double, 2> const& x) {
     // return 2.0 * M_PI * M_PI * cos(M_PI * x[0]) * cos(M_PI * x[1]);
     //},
     //[](std::array<double, 2> const& x) { return cos(M_PI * x[0]) * cos(M_PI * x[1]); });
     // auto b = poisson.rhs(
-    //[](std::array<double, 2> const& x) {
-    // return (1.0 - 4.0 * x[1] * x[1]) * exp(-x[0] - x[1] * x[1]);
-    //},
-    //[](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); });
+    //[](std::array<double, 2> const& x) { return -12 * (x[0] * x[0] + x[1] * x[1]); },
+    //[](std::array<double, 2> const& x) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
+    auto b = poisson.rhs(
+        [](std::array<double, 2> const& x) {
+            return (1.0 - 4.0 * x[1] * x[1]) * exp(-x[0] - x[1] * x[1]);
+        },
+        [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); });
 
     // std::cout << A << std::endl;
 
@@ -367,11 +369,12 @@ int main(int argc, char** argv) {
     }
 
     // double error = L2error(cl, x, [&phi](double x[]) { return phi(x[0]) * phi(x[1]); });
-    double error = L2error(cl, x, [](double x[]) { return x[0] + x[1]; });
+    // double error = L2error(cl, x, [](double x[]) { return x[0] + x[1]; });
     // double error = L2error(cl, x, [](double x[]) { return cos(M_PI * x[0]) * cos(M_PI * x[1]);
     // });
-    // double error =
-    // L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
+    // double error = L2error(cl, x, [](double x[]) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
+    double error =
+        L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
 
     std::cout << "L2 error: " << error << std::endl;
     auto A2 = poisson.assemble(true);
