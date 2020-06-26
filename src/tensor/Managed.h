@@ -15,11 +15,11 @@ public:
     using typename Tensor::multi_index_t;
     using typename Tensor::real_t;
 
+    Managed() : Tensor(nullptr, multi_index_t{}) {}
     Managed(multi_index_t const& shape)
         : Tensor(nullptr, shape), managedData(std::make_unique<real_t[]>(Tensor::size())) {
         Tensor::data_ = managedData.get();
     }
-
     template <typename... Shape>
     Managed(Shape... shape)
         : Tensor(nullptr, shape...), managedData(std::make_unique<real_t[]>(Tensor::size())) {
@@ -50,6 +50,7 @@ Managed(TensorBase<T> const&)
 
 namespace detail {
 template <typename Tensor> struct traits<Managed<Tensor>> : public traits<Tensor> {};
+template <typename Tensor> struct traits<const Managed<Tensor>> : public traits<const Tensor> {};
 } // namespace detail
 
 } // namespace tndm

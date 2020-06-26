@@ -18,7 +18,10 @@ public:
     TensorBase(multi_index_t const& shape) : shape_(shape) {}
 
     template <typename... Shape>
-    TensorBase(Shape... shape) : shape_{static_cast<index_t>(shape)...} {}
+    TensorBase(Shape... shape) : shape_{static_cast<index_t>(shape)...} {
+        static_assert(sizeof...(Shape) == detail::traits<Derived>::Dim,
+                      "Number of shape arguments must match tensor order");
+    }
 
     template <typename OtherTensor>
     TensorBase(TensorBase<OtherTensor> const& info) : shape_(info.shape()) {}

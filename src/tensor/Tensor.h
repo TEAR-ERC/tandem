@@ -115,8 +115,8 @@ protected:
         };
         auto addr = address(filter_entry(entry)...);
         constexpr bool subPacked =
-            std::is_same_v<std::decay_t<decltype(filtered_sequence)>,
-                           std::make_index_sequence<filtered_sequence.size()>>;
+            Packed && std::is_same_v<std::decay_t<decltype(filtered_sequence)>,
+                                     std::make_index_sequence<filtered_sequence.size()>>;
         using subtensor_t =
             Tensor<std::remove_pointer_t<new_real_t>, filtered_sequence.size(), subPacked>;
         if constexpr (subPacked) {
