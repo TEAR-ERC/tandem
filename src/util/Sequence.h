@@ -3,13 +3,13 @@
 
 #include <utility>
 
+namespace tndm {
+
 template <class T, T... As, T... Bs>
-constexpr std::integer_sequence<T, As..., Bs...> operator+(std::integer_sequence<T, As...>,
-                                                           std::integer_sequence<T, Bs...>) {
+constexpr std::integer_sequence<T, As..., Bs...> concat(std::integer_sequence<T, As...>,
+                                                        std::integer_sequence<T, Bs...>) {
     return {};
 }
-
-namespace tndm {
 
 template <template <typename> typename Predicate, auto Start>
 constexpr auto make_filtered_sequence_with_start() {
@@ -19,16 +19,16 @@ constexpr auto make_filtered_sequence_with_start() {
 template <template <typename> typename Predicate, auto Start, typename Head, typename... Tail>
 constexpr auto make_filtered_sequence_with_start() {
     if constexpr (Predicate<Head>::value) {
-        return std::index_sequence<Start>{} +
-               make_filtered_sequence_with_start<Predicate, Start + 1, Tail...>();
+        return concat(std::index_sequence<Start>{},
+                      make_filtered_sequence_with_start<Predicate, Start + 1u, Tail...>());
     } else {
-        return make_filtered_sequence_with_start<Predicate, Start + 1, Tail...>();
+        return make_filtered_sequence_with_start<Predicate, Start + 1u, Tail...>();
     }
 }
 
 template <template <typename> typename Predicate, typename... Entry>
 constexpr auto make_filtered_sequence() {
-    return make_filtered_sequence_with_start<Predicate, 0, Entry...>();
+    return make_filtered_sequence_with_start<Predicate, 0u, Entry...>();
 }
 
 } // namespace tndm
