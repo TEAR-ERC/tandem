@@ -6,6 +6,7 @@
 #include "kernels/tensor.h"
 
 #include "form/DG.h"
+#include "form/Error.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "mesh/GenMesh.h"
@@ -214,36 +215,10 @@ private:
     double beta0 = 1.0;
 };
 
-template <std::size_t D, typename Func>
-double L2error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func reference) {
-    auto rule = simplexQuadratureRule<D>(20);
-
-    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
-    auto geoE = cl.evaluateBasisAt(rule.points());
-    auto geoD_xi = cl.evaluateGradientAt(rule.points());
-    auto J = Managed(cl.jacobianResultInfo(rule.size()));
-    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
-    auto coords = Managed(cl.mapResultInfo(rule.size()));
-
-    Eigen::VectorXd x(rule.size());
-
-    double error = 0.0;
-    for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
-        cl.jacobian(elNo, geoD_xi, J);
-        cl.absDetJ(elNo, J, absDetJ);
-        cl.map(elNo, geoE, coords);
-        // int (x - xref)^2 dV = w_q |J|_q (x_k E_{kq} - xref(x_q))^2
-        auto EM = EigenMap(E);
-        x = EM.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
-        double localError = 0;
-        for (std::size_t q = 0; q < rule.size(); ++q) {
-            double e = reference(&coords(0, q)) - x(q);
-            localError += rule.weights()[q] * absDetJ(q) * e * e;
-        }
-        error += localError;
-    }
-
-    return sqrt(error);
+auto reshapeNumericSolution(Eigen::VectorXd const& numeric) {
+    assert(numeric.rows() % tensor::b::Shape[0] == 0);
+    auto numElements = numeric.rows() / tensor::b::Shape[0];
+    return Tensor<const double, 3u>(numeric.data(), tensor::b::Shape[0], 1, numElements);
 }
 
 } // namespace tndm
@@ -346,7 +321,10 @@ int main(int argc, char** argv) {
     // });
     // double error = L2error(cl, x, [](double x[]) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
     double error =
-        L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
+        tndm::Error<2u>::L2(PolynomialDegree, cl, tndm::reshapeNumericSolution(x),
+                            tndm::LambdaSolution([](auto&& coords) -> std::array<double, 1> {
+                                return {exp(-coords(0) - coords(1) * coords(1))};
+                            }));
 
     std::cout << "L2 error: " << error << std::endl;
 

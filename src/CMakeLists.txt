@@ -22,6 +22,7 @@ target_link_libraries(tandem-fem-lib PUBLIC
 # Add everything else here
 add_library(tandem-lib
     form/DG.cpp
+    form/Error.cpp
     mesh/GenMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp
