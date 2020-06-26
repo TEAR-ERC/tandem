@@ -11,6 +11,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/MeshData.h"
 #include "tensor/EigenMap.h"
+#include "tensor/Tensor.h"
 #include "util/Stopwatch.h"
 
 #include "xdmfwriter/XdmfWriter.h"
@@ -246,6 +247,60 @@ double L2error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func referenc
     return sqrt(error);
 }
 
+
+template <std::size_t D, typename DFunc>
+double ComputeError_H1semi(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, DFunc grad_reference)
+{
+    auto rule = simplexQuadratureRule<D>(20);
+
+    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
+    auto E_xi = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
+    auto geoE = cl.evaluateBasisAt(rule.points());
+    auto geoD_xi = cl.evaluateGradientAt(rule.points());
+    auto J = Managed(cl.jacobianResultInfo(rule.size()));
+    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
+    auto coords = Managed(cl.mapResultInfo(rule.size()));
+
+    Eigen::VectorXd x(rule.size());
+
+    double error = 0.0;
+    for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
+        cl.jacobian(elNo, geoD_xi, J);
+        cl.absDetJ(elNo, J, absDetJ);
+        cl.map(elNo, geoE, coords);
+        // int |u,x - uref,x|^2 dV + int |u,y - uref,y|^2 dV = w_q |J|_q (u_k,x E_{kq} - uref,x(x_q))^2 + w_q |J|_q (u_k,y E_{kq} - uref,y(x_q))^2
+        auto EM = EigenMap(E);
+        x = EM.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+     
+	auto x_el = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+	auto nbasis = tensor::b::Shape[0];
+	std::cout << "Nb " << tensor::b::Shape[0] << std::endl;
+	for (int i=0; i<nbasis; i++) {
+		std::cout << "e " << elNo << " b_[" << i << "] = " << x_el[i] << std::endl;
+	}
+
+	//auto jq = J()[0];
+	//std::cout << J(0)  << std::endl; 
+
+	auto E_x = E_xi.subtensor(slice{}, 0, slice{});
+	auto E_y = E_xi.subtensor(slice{}, 1, slice{});
+
+	double localError = 0;
+        for (std::size_t q = 0; q < rule.size(); ++q) {
+            double gradXref[2], e;
+	     
+	    grad_reference(&coords(0, q),gradXref);
+	    e = (gradXref[0] - 0) * (gradXref[0] - 0) + (gradXref[1] - 0) * (gradXref[1] - 0);
+
+	    std::cout << "u,x " << gradXref[0] << " u,y "<< gradXref[1] << std::endl;
+            localError += rule.weights()[q] * absDetJ(q) * e;
+        }
+        error += localError;
+    }
+
+    return sqrt(error);
+}
+
 } // namespace tndm
 
 using tndm::Curvilinear;
@@ -345,10 +400,13 @@ int main(int argc, char** argv) {
     // double error = L2error(cl, x, [](double x[]) { return cos(M_PI * x[0]) * cos(M_PI * x[1]);
     // });
     // double error = L2error(cl, x, [](double x[]) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
-    double error =
+    double errorL2 =
         L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
 
-    std::cout << "L2 error: " << error << std::endl;
+    std::cout << "error(L2) " << errorL2 << std::endl;
+
+    double errorH1 = ComputeError_H1semi(cl, x, [](double x[],double gu[]) { gu[0] = -exp(-x[0] - x[1]*x[1]); gu[1] = -2.0*x[1]*exp(-x[0] - x[1]*x[1]); });
+    std::cout << "error(H1_s) " << errorH1 << std::endl;
 
     if (auto fileName = program.present("-o")) {
         std::vector<double> data(3 * mesh->numElements(), 0.0);
