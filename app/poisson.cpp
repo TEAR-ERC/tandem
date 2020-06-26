@@ -247,7 +247,61 @@ double L2error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func referenc
     return sqrt(error);
 }
 
+template <std::size_t D, typename Func>
+double H1error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func reference) {
+    auto rule = simplexQuadratureRule<D>(20);
 
+    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
+    auto E_grad = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
+    auto geoE = cl.evaluateBasisAt(rule.points());
+    auto geoD_xi = cl.evaluateGradientAt(rule.points());
+    auto J = Managed(cl.jacobianResultInfo(rule.size()));
+    auto invJ = Managed(cl.jacobianResultInfo(rule.size()));
+    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
+    auto coords = Managed(cl.mapResultInfo(rule.size()));
+
+    Eigen::VectorXd x(rule.size());
+
+    double error = 0.0;
+    for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
+        cl.jacobian(elNo, geoD_xi, J);
+	cl.jacobianInv(J, invJ);
+	cl.absDetJ(elNo, J, absDetJ);
+        cl.map(elNo, geoE, coords);
+        // int (x - xref)^2 dV = w_q |J|_q (x_k E_{kq} - xref(x_q))^2
+        auto EM = EigenMap(E);
+        x = EM.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+
+	auto x_el = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+
+	double localError = 0;
+        for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
+            double e = reference(&coords(0, q)) - x(q);
+            localError += rule.weights()[q] * absDetJ(q) * e * e;
+
+	    auto invJ_q  = invJ.subtensor(slice{}, slice{}, q);
+	    auto invJM_q = EigenMap( invJ_q  );
+
+	    auto E_grad_q  = E_grad.subtensor(slice{}, slice{}, q);
+	    auto E_grad_M_q  = EigenMap( E_grad_q );
+	
+	    auto E_grad_x_q = E_grad_M_q * invJM_q;
+
+	    Eigen::VectorXd gradx(2);
+
+	    gradx = E_grad_x_q.transpose() * x_el;
+
+
+            //std::cout << "u,x " << gradx(0) << " u,y "<< gradx(1) << std::endl;
+
+	}
+        error += localError;
+    }
+
+    return sqrt(error);
+}
+
+/*
 template <std::size_t D, typename DFunc>
 double ComputeError_H1semi(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, DFunc grad_reference)
 {
@@ -300,6 +354,7 @@ double ComputeError_H1semi(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, D
 
     return sqrt(error);
 }
+*/
 
 } // namespace tndm
 
@@ -405,8 +460,9 @@ int main(int argc, char** argv) {
 
     std::cout << "error(L2) " << errorL2 << std::endl;
 
-    double errorH1 = ComputeError_H1semi(cl, x, [](double x[],double gu[]) { gu[0] = -exp(-x[0] - x[1]*x[1]); gu[1] = -2.0*x[1]*exp(-x[0] - x[1]*x[1]); });
-    std::cout << "error(H1_s) " << errorH1 << std::endl;
+    //double errorH1 = H1error(cl, x, [](double x[],double gu[]) { gu[0] = -exp(-x[0] - x[1]*x[1]); gu[1] = -2.0*x[1]*exp(-x[0] - x[1]*x[1]); });
+    //std::cout << "error(H1_s) " << errorH1 << std::endl;
+    double errorH1 = H1error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
 
     if (auto fileName = program.present("-o")) {
         std::vector<double> data(3 * mesh->numElements(), 0.0);
