@@ -3,11 +3,11 @@
 namespace tndm {
 
 template <std::size_t D>
-double Error<D>::L2(unsigned degree, Curvilinear<D>& cl, Tensor<const double, 3u> const& numeric,
-                    SolutionInterface const& reference) {
+double Error<D>::L2(RefElement<D> const& refElement, Curvilinear<D>& cl,
+                    Tensor<const double, 3u> const& numeric, SolutionInterface const& reference) {
     auto rule = simplexQuadratureRule<D>(20);
 
-    auto E = dubinerBasisAt(degree, rule.points());
+    auto E = refElement.evaluateBasisAt(rule.points());
     Eigen::MatrixXd ET = EigenMap(E).transpose();
     Eigen::MatrixXd numAtQp(ET.rows(), numeric.shape(1));
 

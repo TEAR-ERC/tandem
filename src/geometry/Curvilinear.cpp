@@ -4,8 +4,8 @@
 #include "form/RefElement.h"
 #include "tensor/EigenMap.h"
 #include "tensor/Reshape.h"
-#include "util/Combinatorics.h"
 
+#include <Eigen/Core>
 #include <Eigen/LU>
 
 #include <algorithm>
@@ -21,11 +21,9 @@ template <std::size_t D>
 Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
                             std::function<vertex_t(vertex_t const&)> transform, unsigned degree,
                             NodesFactory<D> const& nodesFactory)
-    : N(degree) {
+    : N(degree), refElement_(degree, nodesFactory) {
     // Get vertices
-    std::vector<std::array<double, D>> refNodes = nodesFactory(degree);
-    std::size_t vertsPerElement = refNodes.size();
-    assert(binom(N + D, D) == refNodes.size());
+    std::size_t vertsPerElement = refElement_.refNodes().size();
 
     auto storage =
         std::make_shared<mneme::SingleStorage<Verts>>(mesh.numElements() * vertsPerElement);
@@ -45,18 +43,14 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
             verts[localVertexNo++] = vertexData->getVertices()[vlid];
         }
         RefPlexToGeneralPlex<D> map(verts);
-        for (auto& refNode : refNodes) {
+        for (auto& refNode : refElement_.refNodes()) {
             (*storage)[vertexNo] = transform(map(refNode));
             ++vertexNo;
         }
     }
 
-    // Compute Vandermonde matrix
     Simplex<D> refPlex = Simplex<D>::referenceSimplex();
     f2v = refPlex.downward();
-
-    vandermonde = Vandermonde(N, refNodes);
-    vandermondeInvT = vandermonde.inverse().transpose();
 
     // Compute reference normals
     std::size_t fsNo = 0;
@@ -90,28 +84,6 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
 }
 
 template <std::size_t D>
-Managed<Matrix<double>>
-Curvilinear<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points) {
-    Managed<Matrix<double>> E = dubinerBasisAt(N, points);
-    auto Emap = EigenMap(E);
-    Emap = vandermondeInvT * Emap;
-    return E;
-}
-
-template <std::size_t D>
-Managed<Tensor<double, 3u>>
-Curvilinear<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points) {
-    Managed<Tensor<double, 3u>> gradE = dubinerBasisGradientAt(N, points);
-
-    assert(vandermondeInvT.cols() == vandermondeInvT.rows());
-    auto matView = reshape(gradE, vandermondeInvT.cols(), D * points.size());
-    auto map = EigenMap(matView);
-    map = vandermondeInvT * map;
-
-    return gradE;
-}
-
-template <std::size_t D>
 TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) const {
     return TensorBase<Matrix<double>>(D, numPoints);
 }
@@ -121,12 +93,12 @@ void Curvilinear<D>::map(std::size_t eleNo, Matrix<double> const& E, Tensor<doub
     assert(eleNo < vertices.size());
     assert(result.shape(0) == D);
     assert(result.shape(1) == E.shape(1));
-    assert(E.shape(0) == vandermondeInvT.rows());
+    assert(E.shape(0) == refElement_.numberOfBasisFunctions());
 
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == vandermondeInvT.rows());
+    assert(vertexSpan.size() == refElement_.numberOfBasisFunctions());
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
-                                                                 vandermondeInvT.rows());
+                                                                 refElement_.numberOfBasisFunctions());
     EigenMap(result) = vertMap * EigenMap(E);
 }
 
@@ -141,13 +113,13 @@ void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE
     assert(eleNo < vertices.size());
 
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == vandermondeInvT.rows());
+    assert(vertexSpan.size() == refElement_.numberOfBasisFunctions());
     Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
-                                                                 vandermondeInvT.rows());
+                                                                 refElement_.numberOfBasisFunctions());
 
-    assert(gradE.shape(0) == vandermondeInvT.rows());
+    assert(gradE.shape(0) == refElement_.numberOfBasisFunctions());
     assert(gradE.shape(1) == D);
-    auto gradEMat = reshape(gradE, vandermondeInvT.rows(), D * gradE.shape(2));
+    auto gradEMat = reshape(gradE, refElement_.numberOfBasisFunctions(), D * gradE.shape(2));
 
     assert(result.shape(0) == D);
     assert(result.shape(1) == D);
@@ -235,7 +207,7 @@ Curvilinear<D>::facetParam(std::size_t faceNo, std::vector<std::array<double, D 
     return xis;
 }
 
-template class Curvilinear<2u>;
-template class Curvilinear<3u>;
+template class Curvilinear<2ul>;
+template class Curvilinear<3ul>;
 
 } // namespace tndm

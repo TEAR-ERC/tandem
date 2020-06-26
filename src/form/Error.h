@@ -61,7 +61,7 @@ public:
     /**
      * @brief Computes \sum_i ||numeric_i(x) - reference_i(x)||_2
      *
-     * @param degree Polynomial degree of numeric solution
+     * @param refElement Function space of reference element
      * @param cl Curvilinear transformation
      * @param numeric Numeric solution tensor of shape
      *                (numberOfBasisFunctions, numberOfQuantities, numberOfElements)
@@ -69,8 +69,8 @@ public:
      *
      * @return L2 error
      */
-    static double L2(unsigned degree, Curvilinear<D>& cl, Tensor<const double, 3u> const& numeric,
-                     SolutionInterface const& reference);
+    static double L2(RefElement<D> const& refElement, Curvilinear<D>& cl,
+                     Tensor<const double, 3u> const& numeric, SolutionInterface const& reference);
 };
 
 } // namespace tndm

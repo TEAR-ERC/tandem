@@ -1,6 +1,7 @@
 #ifndef DG_20200615_H
 #define DG_20200615_H
 
+#include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "quadrules/AutoRule.h"
@@ -11,21 +12,27 @@
 #include <mneme/view.hpp>
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 namespace tndm {
 
 template <std::size_t D> class DG {
 public:
-    DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, unsigned degree, unsigned minQuadOrder);
+    DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
+       std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder);
     virtual ~DG() = default;
 
     std::size_t numElements() const { return vol.size(); }
     std::size_t numFacets() const { return fctInfo.size(); }
 
+    RefElement<D> const& refElement() const { return *refElement_; }
+
 protected:
     void facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
     void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
+
+    std::unique_ptr<RefElement<D>> refElement_;
 
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;

@@ -5,6 +5,7 @@ add_library(tandem-fem-lib
     basis/Functions.cpp
     basis/Nodal.cpp
     basis/WarpAndBlend.cpp
+    form/RefElement.cpp
     quadrules/GaussJacobi.cpp
     quadrules/IntervalQuadratureRule.cpp
     quadrules/JaskowiecSukumar2020.cpp

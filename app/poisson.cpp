@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <memory>
 
 using tndm::VertexData;
 using xdmfwriter::TRIANGLE;
@@ -31,7 +32,7 @@ using xdmfwriter::XdmfWriter;
 
 namespace tndm {
 
-class Poisson : DG<DomainDimension> {
+class Poisson : public DG<DomainDimension> {
 public:
     using DG<DomainDimension>::DG;
 
@@ -274,7 +275,8 @@ int main(int argc, char** argv) {
     //};
 
     sw.start();
-    Poisson poisson(*mesh, cl, PolynomialDegree, MinQuadOrder());
+    Poisson poisson(*mesh, cl, std::make_unique<tndm::ModalRefElement<2ul>>(PolynomialDegree),
+                    MinQuadOrder());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
     auto A = poisson.assemble();
     // auto b = poisson.rhs(
@@ -321,7 +323,7 @@ int main(int argc, char** argv) {
     // });
     // double error = L2error(cl, x, [](double x[]) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
     double error =
-        tndm::Error<2u>::L2(PolynomialDegree, cl, tndm::reshapeNumericSolution(x),
+        tndm::Error<2u>::L2(poisson.refElement(), cl, tndm::reshapeNumericSolution(x),
                             tndm::LambdaSolution([](auto&& coords) -> std::array<double, 1> {
                                 return {exp(-coords(0) - coords(1) * coords(1))};
                             }));
@@ -331,7 +333,7 @@ int main(int argc, char** argv) {
     if (auto fileName = program.present("-o")) {
         std::vector<double> data(3 * mesh->numElements(), 0.0);
         auto outPoints = std::vector<std::array<double, 2u>>{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
-        auto E = tndm::dubinerBasisAt(PolynomialDegree, outPoints);
+        auto E = poisson.refElement().evaluateBasisAt(outPoints);
         auto EM = EigenMap(E);
         for (std::size_t elNo = 0; elNo < mesh->numElements(); ++elNo) {
             Eigen::VectorXd out = EM.transpose() * x.segment(elNo * tndm::tensor::b::Shape[0],

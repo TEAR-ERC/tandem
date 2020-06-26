@@ -14,8 +14,8 @@ using Eigen::DiagonalMatrix;
 using Eigen::MatrixXd;
 using tndm::AllIntegerSums;
 using tndm::binom;
-using tndm::dubinerBasisAt;
 using tndm::gradTetraDubinerP;
+using tndm::ModalRefElement;
 using tndm::TetraDubinerP;
 
 int main(int argc, char** argv) {
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
 
     DiagonalMatrix<double, Eigen::Dynamic> W(rule.size());
 
-    auto phi = dubinerBasisAt(N, rule.points());
+    auto phi = ModalRefElement<3u>(N).evaluateBasisAt(rule.points());
     auto phiMap = EigenMap(phi);
 
     for (std::size_t i = 0; i < rule.size(); ++i) {

@@ -5,23 +5,24 @@
 #include "util/Enumerate.h"
 
 #include <memory>
+#include <utility>
 
 namespace tndm {
 
 template <std::size_t D>
-DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, unsigned degree,
-          unsigned minQuadOrder)
-    : fctInfo(mesh.numFacets()) {
+DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
+          std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder)
+    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
-    E = dubinerBasisAt(degree, volRule.points());
-    D_xi = dubinerBasisGradientAt(degree, volRule.points());
+    E = refElement_->evaluateBasisAt(volRule.points());
+    D_xi = refElement_->evaluateGradientAt(volRule.points());
 
     for (std::size_t f = 0; f < D + 1u; ++f) {
         auto points = cl.facetParam(f, fctRule.points());
-        e.emplace_back(dubinerBasisAt(degree, points));
-        d_xi.emplace_back(dubinerBasisGradientAt(degree, points));
+        e.emplace_back(refElement_->evaluateBasisAt(points));
+        d_xi.emplace_back(refElement_->evaluateGradientAt(points));
     }
 
     fct.setStorage(std::make_shared<fct_t>(mesh.numFacets() * fctRule.size()), 0u, mesh.numFacets(),
