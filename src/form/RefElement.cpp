@@ -56,7 +56,8 @@ NodalRefElement<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& po
 template <std::size_t D>
 Managed<Tensor<double, 3u>>
 NodalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points) const {
-    Managed<Tensor<double, 3u>> gradE = ModalRefElement<D>(this->degree()).evaluateGradientAt(points);
+    Managed<Tensor<double, 3u>> gradE =
+        ModalRefElement<D>(this->degree()).evaluateGradientAt(points);
 
     assert(vandermondeInvT_.cols() == vandermondeInvT_.rows());
     auto matView = reshape(gradE, vandermondeInvT_.cols(), D * points.size());

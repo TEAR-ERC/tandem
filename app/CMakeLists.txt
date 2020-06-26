@@ -98,7 +98,9 @@ doctest_discover_tests(test-kernel)
 
 configure_file( config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h )
 
-add_executable(poisson poisson.cpp)
+add_executable(poisson
+    poisson/Poisson.cpp
+    poisson.cpp)
 target_link_libraries(poisson PRIVATE tandem-lib kernels-lib)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_definitions(tandem PUBLIC PARALLEL)
