@@ -247,12 +247,11 @@ double L2error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func referenc
     return sqrt(error);
 }
 
-template <std::size_t D, typename Func>
-double H1error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func reference) {
+template <std::size_t D, typename DFunc>
+double ComputeError_H1SemiNorm(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, DFunc grad_reference)
+{
     auto rule = simplexQuadratureRule<D>(20);
-
-    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
-    auto E_grad = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
+    auto E_xi = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
     auto geoE = cl.evaluateBasisAt(rule.points());
     auto geoD_xi = cl.evaluateGradientAt(rule.points());
     auto J = Managed(cl.jacobianResultInfo(rule.size()));
@@ -260,101 +259,102 @@ double H1error(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, Func referenc
     auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
     auto coords = Managed(cl.mapResultInfo(rule.size()));
 
-    Eigen::VectorXd x(rule.size());
+    Eigen::VectorXd gradu(2);
 
     double error = 0.0;
     for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
         cl.jacobian(elNo, geoD_xi, J);
-	cl.jacobianInv(J, invJ);
-	cl.absDetJ(elNo, J, absDetJ);
-        cl.map(elNo, geoE, coords);
-        // int (x - xref)^2 dV = w_q |J|_q (x_k E_{kq} - xref(x_q))^2
-        auto EM = EigenMap(E);
-        x = EM.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
-
-	auto x_el = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
-
-	double localError = 0;
-        for (std::ptrdiff_t q = 0; q < rule.size(); ++q) {
-            double e = reference(&coords(0, q)) - x(q);
-            localError += rule.weights()[q] * absDetJ(q) * e * e;
-
-	    auto invJ_q  = invJ.subtensor(slice{}, slice{}, q);
-	    auto invJM_q = EigenMap( invJ_q  );
-
-	    auto E_grad_q  = E_grad.subtensor(slice{}, slice{}, q);
-	    auto E_grad_M_q  = EigenMap( E_grad_q );
-	
-	    auto E_grad_x_q = E_grad_M_q * invJM_q;
-
-	    Eigen::VectorXd gradx(2);
-
-	    gradx = E_grad_x_q.transpose() * x_el;
-
-
-            //std::cout << "u,x " << gradx(0) << " u,y "<< gradx(1) << std::endl;
-
-	}
-        error += localError;
-    }
-
-    return sqrt(error);
-}
-
-/*
-template <std::size_t D, typename DFunc>
-double ComputeError_H1semi(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, DFunc grad_reference)
-{
-    auto rule = simplexQuadratureRule<D>(20);
-
-    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
-    auto E_xi = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
-    auto geoE = cl.evaluateBasisAt(rule.points());
-    auto geoD_xi = cl.evaluateGradientAt(rule.points());
-    auto J = Managed(cl.jacobianResultInfo(rule.size()));
-    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
-    auto coords = Managed(cl.mapResultInfo(rule.size()));
-
-    Eigen::VectorXd x(rule.size());
-
-    double error = 0.0;
-    for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
-        cl.jacobian(elNo, geoD_xi, J);
+        cl.jacobianInv(J, invJ);
         cl.absDetJ(elNo, J, absDetJ);
         cl.map(elNo, geoE, coords);
-        // int |u,x - uref,x|^2 dV + int |u,y - uref,y|^2 dV = w_q |J|_q (u_k,x E_{kq} - uref,x(x_q))^2 + w_q |J|_q (u_k,y E_{kq} - uref,y(x_q))^2
-        auto EM = EigenMap(E);
-        x = EM.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
-     
-	auto x_el = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
-	auto nbasis = tensor::b::Shape[0];
-	std::cout << "Nb " << tensor::b::Shape[0] << std::endl;
-	for (int i=0; i<nbasis; i++) {
-		std::cout << "e " << elNo << " b_[" << i << "] = " << x_el[i] << std::endl;
-	}
 
-	//auto jq = J()[0];
-	//std::cout << J(0)  << std::endl; 
+        // All element DOF for cell elNo
+        auto u_cell = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
 
-	auto E_x = E_xi.subtensor(slice{}, 0, slice{});
-	auto E_y = E_xi.subtensor(slice{}, 1, slice{});
-
-	double localError = 0;
+        // || u - u_ref||_H1s = \int |u,x - u_ref,x|^2 dV 
+        //                      + \int |u,y - u_ref,y|^2 dV 
+        double localError = 0.0;
         for (std::size_t q = 0; q < rule.size(); ++q) {
-            double gradXref[2], e;
-	     
-	    grad_reference(&coords(0, q),gradXref);
-	    e = (gradXref[0] - 0) * (gradXref[0] - 0) + (gradXref[1] - 0) * (gradXref[1] - 0);
+            double error_q, gradu_ref[2];
+            auto   invJ_q  = invJ.subtensor(slice{}, slice{}, q);
+            auto   E_xi_q  = E_xi.subtensor(slice{}, slice{}, q);
+            auto   invJ_q_M = EigenMap(invJ_q);
+	    auto   E_xi_q_M  = EigenMap(E_xi_q);
+            auto   E_grad_q = E_xi_q_M * invJ_q_M;
 
-	    std::cout << "u,x " << gradXref[0] << " u,y "<< gradXref[1] << std::endl;
-            localError += rule.weights()[q] * absDetJ(q) * e;
+            gradu = E_grad_q.transpose() * u_cell; // numerical solution at quad. point
+            grad_reference(&coords(0, q), gradu_ref); // reference solution gradient at quad. point
+            error_q = (gradu_ref[0] - gradu(0)) * (gradu_ref[0] - gradu(0)) + (gradu_ref[1] - gradu(1)) * (gradu_ref[1] - gradu(1));
+            localError += rule.weights()[q] * absDetJ(q) * error_q;
         }
         error += localError;
     }
 
     return sqrt(error);
 }
-*/
+
+template <std::size_t D, typename FuncDFunc>
+double ComputeError_H1Norm(Curvilinear<D>& cl, Eigen::VectorXd const& numeric, FuncDFunc reference)
+{
+    auto rule = simplexQuadratureRule<D>(20);
+    auto E = dubinerBasisAt(PolynomialDegree, rule.points());
+    auto E_xi = dubinerBasisGradientAt(PolynomialDegree, rule.points()); // tensor[basis][deriv][point]
+    auto geoE = cl.evaluateBasisAt(rule.points());
+    auto geoD_xi = cl.evaluateGradientAt(rule.points());
+    auto J = Managed(cl.jacobianResultInfo(rule.size()));
+    auto invJ = Managed(cl.jacobianResultInfo(rule.size()));
+    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
+    auto coords = Managed(cl.mapResultInfo(rule.size()));
+
+    Eigen::VectorXd u(rule.size());
+    Eigen::VectorXd gradu(2);
+
+    double error = 0.0;
+    for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
+        cl.jacobian(elNo, geoD_xi, J);
+        cl.jacobianInv(J, invJ);
+        cl.absDetJ(elNo, J, absDetJ);
+        cl.map(elNo, geoE, coords);
+
+	auto E_M = EigenMap(E);
+        u = E_M.transpose() * numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+
+        // All element DOF for cell elNo
+        auto u_cell = numeric.segment(elNo * tensor::b::Shape[0], tensor::b::Shape[0]);
+
+        // || u - u_ref||_H1 = \int |u - u_ref|^2 dV
+        //                     + \int |u,x - u_ref,x|^2 dV 
+        //                     + \int |u,y - u_ref,y|^2 dV 
+        //                   = || u - u_ref||_L2 + || u - u_ref||_H1s
+        double localError = 0.0;
+        for (std::size_t q = 0; q < rule.size(); ++q) {
+            double e, error_q = 0.0, ref[3];
+            auto   invJ_q  = invJ.subtensor(slice{}, slice{}, q);
+            auto   E_xi_q  = E_xi.subtensor(slice{}, slice{}, q);
+	    auto   invJ_q_M = EigenMap(invJ_q);
+            auto   E_xi_q_M  = EigenMap(E_xi_q);
+            auto   E_grad_q = E_xi_q_M * invJ_q_M;
+
+
+            reference(&coords(0, q), ref); // reference solution and reference solution gradient at quad. point
+
+            e = ref[0] - u(q);
+            error_q += e * e;
+
+            gradu = E_grad_q.transpose() * u_cell; // numerical solution at quad. point
+            e = (ref[1] - gradu(0));
+	    error_q += e * e;
+	    e = (ref[2] - gradu(1));
+	    error_q += e * e;
+
+            localError += rule.weights()[q] * absDetJ(q) * error_q;
+        }
+        error += localError;
+    }
+
+    return sqrt(error);
+}
+
 
 } // namespace tndm
 
@@ -458,11 +458,15 @@ int main(int argc, char** argv) {
     double errorL2 =
         L2error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
 
-    std::cout << "error(L2) " << errorL2 << std::endl;
+    std::cout << "error(L2)   " << errorL2 << std::endl;
 
-    //double errorH1 = H1error(cl, x, [](double x[],double gu[]) { gu[0] = -exp(-x[0] - x[1]*x[1]); gu[1] = -2.0*x[1]*exp(-x[0] - x[1]*x[1]); });
-    //std::cout << "error(H1_s) " << errorH1 << std::endl;
-    double errorH1 = H1error(cl, x, [](double coords[]) { return exp(-coords[0] - coords[1] * coords[1]); });
+    double errorH1s = ComputeError_H1SemiNorm(cl, x,
+		                              [](double x[],double gu[]) { gu[0] = -exp(-x[0] - x[1]*x[1]); gu[1] = -2.0*x[1]*exp(-x[0] - x[1]*x[1]); });
+    std::cout << "error(H1_s) " << errorH1s << std::endl;
+
+    double errorH1 = ComputeError_H1Norm(cl, x, 
+		                         [](double x[],double ru[]) { ru[0] = exp(-x[0]-x[1]*x[1]); ru[1] = -exp(-x[0]-x[1]*x[1]); ru[2] = -2.0*x[1]*exp(-x[0]-x[1]*x[1]); });
+    std::cout << "error(H1)   " << errorH1 << std::endl;
 
     if (auto fileName = program.present("-o")) {
         std::vector<double> data(3 * mesh->numElements(), 0.0);
