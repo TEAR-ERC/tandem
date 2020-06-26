@@ -77,7 +77,6 @@ add_custom_command(
 find_package(Eigen3 REQUIRED NO_MODULE)
 
 add_library(kernels-lib
-    kernels/test-kernel.cpp
     kernels/init.cpp
     kernels/kernel.cpp
     kernels/subroutine.cpp
@@ -88,6 +87,12 @@ target_include_directories(kernels-lib PUBLIC
     ../submodules/yateto/include/
 )
 target_link_libraries(kernels-lib PUBLIC Eigen3::Eigen)
+
+include(CTest)
+include(../cmake/doctest.cmake)
+add_executable(test-kernel kernels/test-kernel.cpp)
+target_link_libraries(test-kernel kernels-lib test-runner)
+doctest_discover_tests(test-kernel)
 
 # Apps using generated kernels
 
