@@ -18,8 +18,7 @@
 namespace tndm {
 
 template <std::size_t D>
-Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh,
-                            std::function<vertex_t(vertex_t const&)> transform, unsigned degree,
+Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transform, unsigned degree,
                             NodesFactory<D> const& nodesFactory)
     : N(degree), refElement_(degree, nodesFactory) {
     // Get vertices
@@ -135,7 +134,7 @@ void Curvilinear<D>::jacobianInv(Tensor<double, 3u> const& jacobian, Tensor<doub
         auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
         auto resAtP = result.subtensor(slice{}, slice{}, i);
         EigenMap<Matrix<double>, D, D>(resAtP) =
-            EigenMap<Matrix<const double>, D, D>(jAtP).inverse();
+            EigenMap<const Matrix<double>, D, D>(jAtP).inverse();
     }
 }
 
@@ -149,7 +148,7 @@ void Curvilinear<D>::detJ(std::size_t eleNo, Tensor<double, 3u> const& jacobian,
                           Tensor<double, 1u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
         auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
-        result(i) = EigenMap<Matrix<const double>, D, D>(jAtP).determinant();
+        result(i) = EigenMap<const Matrix<double>, D, D>(jAtP).determinant();
     }
 }
 
@@ -158,7 +157,7 @@ void Curvilinear<D>::absDetJ(std::size_t eleNo, Tensor<double, 3u> const& jacobi
                              Tensor<double, 1u>& result) {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
         auto jAtP = jacobian.subtensor(slice{}, slice{}, i);
-        result(i) = std::fabs(EigenMap<Matrix<const double>, D, D>(jAtP).determinant());
+        result(i) = std::fabs(EigenMap<const Matrix<double>, D, D>(jAtP).determinant());
     }
 }
 
@@ -175,7 +174,7 @@ void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
         auto jInvAtP = jInv.subtensor(slice{}, slice{}, i);
         auto res = result.subtensor(slice{}, i);
         EigenMap<Vector<double>, D>(res) =
-            std::fabs(detJ(i)) * EigenMap<Matrix<const double>, D, D>(jInvAtP).transpose() *
+            std::fabs(detJ(i)) * EigenMap<const Matrix<double>, D, D>(jInvAtP).transpose() *
             refNormals[faceNo];
     }
 }

@@ -61,11 +61,11 @@ public:
     real_t const* data() const { return data_; }
 
     template <typename... Entry> auto subtensor(Entry... entry) {
-        return extractSubtensor<decltype(data()), Entry...>(entry...);
+        return extractSubtensor<real_t, Entry...>(entry...);
     }
 
     template <typename... Entry> auto subtensor(Entry... entry) const {
-        return extractSubtensor<decltype(data()), Entry...>(entry...);
+        return extractSubtensor<real_t, Entry...>(entry...);
     }
 
     multi_index_t const& stride() const { return stride_; }

@@ -103,4 +103,4 @@ add_executable(poisson
     poisson.cpp)
 target_link_libraries(poisson PRIVATE tandem-lib kernels-lib)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(tandem PUBLIC PARALLEL)
+target_compile_definitions(poisson PUBLIC USE_MPI)

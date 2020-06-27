@@ -1,5 +1,6 @@
 #include "poisson/Poisson.h"
 #include "config.h"
+#include "poisson/Scenario.h"
 #include "writer.h"
 
 #include "form/Error.h"
@@ -8,6 +9,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/MeshData.h"
 #include "tensor/EigenMap.h"
+#include "util/Hash.h"
 #include "util/Stopwatch.h"
 
 #include "xdmfwriter/XdmfWriter.h"
@@ -16,23 +18,77 @@
 #include <argparse.hpp>
 #include <mpi.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <tuple>
 
 using tndm::Curvilinear;
+using tndm::fnv1a;
 using tndm::GenMesh;
+using tndm::operator""_fnv1a;
+using tndm::MyScenario;
 using tndm::Poisson;
+using tndm::Scenario;
+using tndm::Vector;
 using tndm::VertexData;
 using xdmfwriter::TRIANGLE;
 using xdmfwriter::XdmfWriter;
+
+std::unique_ptr<Scenario> getScenario(std::string const& name) {
+    auto partialAnnulus = [](std::array<double, 2> const& v) -> std::array<double, 2> {
+        double r = 0.5 * (v[0] + 1.0);
+        double phi = 0.5 * M_PI * v[1];
+        return {r * cos(phi), r * sin(phi)};
+    };
+    auto biunit = [](std::array<double, 2> const& v) -> std::array<double, 2> {
+        return {2.0 * v[0] - 1.0, 2.0 * v[1] - 1.0};
+    };
+    switch (tndm::fnv1a(name)) {
+    case "manufactured"_fnv1a: {
+        auto ref = [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); };
+        return std::make_unique<MyScenario>(
+            partialAnnulus,
+            [](std::array<double, 2> const& x) {
+                return (1.0 - 4.0 * x[1] * x[1]) * exp(-x[0] - x[1] * x[1]);
+            },
+            [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); },
+            [](Vector<double> const& x) -> std::array<double, 1> {
+                return {exp(-x(0) - x(1) * x(1))};
+            });
+    }
+    case "analytic"_fnv1a: {
+        auto ref = [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); };
+        return std::make_unique<MyScenario>(
+            biunit, [](std::array<double, 2> const& x) { return 0.0; },
+            [](std::array<double, 2> const& x) { return (x[0] < 0.0) ? 1.0 : 2.0; },
+            [](Vector<double> const& x) -> std::array<double, 1> {
+                return {(x(0) < 0.0) ? 1.0 : 2.0};
+            });
+    }
+    default:
+        return nullptr;
+    }
+    return nullptr;
+}
 
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     argparse::ArgumentParser program("poisson");
     program.add_argument("-o").help("Output file name");
+    program.add_argument("-s")
+        .default_value(std::string("manufactured"))
+        .help("Scenario name")
+        .action([](std::string const& value) {
+            std::string result;
+            std::transform(value.begin(), value.end(), std::back_inserter(result),
+                           [](unsigned char c) { return std::tolower(c); });
+            return result;
+        });
     program.add_argument("n")
         .help("Number of elements per dimension")
         .action([](std::string const& value) { return std::stoul(value); });
@@ -45,6 +101,12 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    auto scenario = getScenario(program.get("-s"));
+    if (!scenario) {
+        std::cerr << "Unknown scenario " << program.get("-s") << std::endl;
+        return -1;
+    }
+
     auto n = program.get<unsigned long>("n");
     std::array<uint64_t, DomainDimension> size;
     size.fill(n);
@@ -54,56 +116,19 @@ int main(int argc, char** argv) {
 
     auto mesh = globalMesh->getLocalMesh();
 
-    auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
-        double r = 0.5 * (v[0] + 1.0);
-        double phi = 0.5 * M_PI * v[1];
-        return {r * cos(phi), r * sin(phi)};
-        // return v;
-        // return {2.0 * v[0] - 1.0, 2.0 * v[1] - 1.0};
-    };
-
-    Curvilinear<2u> cl(*mesh, transform, PolynomialDegree);
-    // Curvilinear<2u> cl(*mesh, transform);
+    Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);
 
     tndm::Stopwatch sw;
-
-    // auto phi = [](double x) { return std::fabs(x) < 1.0 ? exp(-1.0 / (1.0 - x * x)) : 0.0; };
-    // auto d2phidx2 = [&phi](double x) {
-    // return std::fabs(x) < 1.0
-    //? 2.0 * phi(x) * (-1.0 + 3 * std::pow(x, 4.0)) / std::pow(1.0 - x * x, 4.0)
-    //: 0.0;
-    //};
 
     sw.start();
     Poisson poisson(*mesh, cl, std::make_unique<tndm::ModalRefElement<2ul>>(PolynomialDegree),
                     MinQuadOrder());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
+
     auto A = poisson.assemble();
-    // auto b = poisson.rhs(
-    //[&phi, &d2phidx2](std::array<double, 2> const& x) {
-    // return -(d2phidx2(x[0]) * phi(x[1]) + phi(x[0]) * d2phidx2(x[1]));
-    //},
-    //[](std::array<double, 2> const&) {
-    // return 0.0; });
-    // auto b = poisson.rhs([](std::array<double, 2> const& x) { return 0.0; },
-    //[](std::array<double, 2> const& x) { return x[0] + x[1]; });
-    // auto b = poisson.rhs(
-    //[](std::array<double, 2> const& x) {
-    // return 2.0 * M_PI * M_PI * cos(M_PI * x[0]) * cos(M_PI * x[1]);
-    //},
-    //[](std::array<double, 2> const& x) { return cos(M_PI * x[0]) * cos(M_PI * x[1]); });
-    // auto b = poisson.rhs(
-    //[](std::array<double, 2> const& x) { return -12 * (x[0] * x[0] + x[1] * x[1]); },
-    //[](std::array<double, 2> const& x) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
-    auto b = poisson.rhs(
-        [](std::array<double, 2> const& x) {
-            return (1.0 - 4.0 * x[1] * x[1]) * exp(-x[0] - x[1] * x[1]);
-        },
-        [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); });
-
-    // std::cout << A << std::endl;
-
+    auto b = poisson.rhs(scenario->force(), scenario->dirichlet());
     std::cout << "Assembled after " << sw.split() << std::endl;
+
     Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
     solver.compute(A);
     std::cout << "LU after " << sw.split() << std::endl;
@@ -118,17 +143,8 @@ int main(int argc, char** argv) {
     }
 
     auto xt = poisson.reshapeNumericSolution(x);
-
-    // double error = L2error(cl, x, [&phi](double x[]) { return phi(x[0]) * phi(x[1]); });
-    // double error = L2error(cl, x, [](double x[]) { return x[0] + x[1]; });
-    // double error = L2error(cl, x, [](double x[]) { return cos(M_PI * x[0]) * cos(M_PI * x[1]);
-    // });
-    // double error = L2error(cl, x, [](double x[]) { return pow(x[0], 4.0) + pow(x[1], 4.0); });
     double error =
-        tndm::Error<2u>::L2(poisson.refElement(), cl, xt,
-                            tndm::LambdaSolution([](auto&& coords) -> std::array<double, 1> {
-                                return {exp(-coords(0) - coords(1) * coords(1))};
-                            }));
+        tndm::Error<DomainDimension>::L2(poisson.refElement(), cl, xt, *scenario->reference());
 
     std::cout << "L2 error: " << error << std::endl;
 
@@ -161,7 +177,8 @@ int main(int argc, char** argv) {
         XdmfWriter<TRIANGLE, double> writer(xdmfwriter::POSIX, (*fileName).c_str(), false);
         // writer.init(variableNames, std::vector<const char*>{});
         writer.init(std::vector<const char*>{}, variableNames);
-        auto [cells, vertices] = duplicatedDofsMesh<unsigned int, double, 2u, 3u>(*mesh, transform);
+        auto [cells, vertices] =
+            duplicatedDofsMesh<unsigned int, double, 2u, 3u>(*mesh, scenario->transform());
         writer.setMesh(mesh->elements().size(), cells.data(), 3 * mesh->elements().size(),
                        vertices.data());
         // writer.setMesh(mesh->elements().size(), flatElems.data(),

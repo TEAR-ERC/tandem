@@ -19,11 +19,12 @@ namespace tndm {
 template <std::size_t D> class Curvilinear {
 public:
     using vertex_t = std::array<double, D>;
+    using transform_t = std::function<vertex_t(vertex_t const&)>;
 
     Curvilinear(
         LocalSimplexMesh<D> const& mesh,
-        std::function<vertex_t(vertex_t const&)> transform = [](vertex_t const& v) { return v; },
-        unsigned degree = 1, NodesFactory<D> const& nodesFactory = WarpAndBlendFactory<D>());
+        transform_t transform = [](vertex_t const& v) { return v; }, unsigned degree = 1,
+        NodesFactory<D> const& nodesFactory = WarpAndBlendFactory<D>());
 
     auto evaluateBasisAt(std::vector<std::array<double, D>> const& points) const {
         return refElement_.evaluateBasisAt(points);
