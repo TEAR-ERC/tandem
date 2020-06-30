@@ -1,5 +1,7 @@
 #include "Poisson.h"
 
+#include "config.h"
+#include "form/FiniteElementFunction.h"
 #include "kernels/init.h"
 #include "kernels/kernel.h"
 #include "kernels/tensor.h"
@@ -178,9 +180,11 @@ Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
     return B;
 }
 
-Tensor<const double, 3u> Poisson::reshapeNumericSolution(Eigen::VectorXd const& numeric) {
+FiniteElementFunction<DomainDimension>
+Poisson::finiteElementFunction(Eigen::VectorXd const& numeric) const {
     assert(numeric.rows() == numElements() * tensor::b::Shape[0]);
-    return Tensor<const double, 3u>(numeric.data(), tensor::b::Shape[0], 1, numElements());
+    return FiniteElementFunction<DomainDimension>(refElement_->clone(), numeric.data(),
+                                                  tensor::b::Shape[0], 1, numElements());
 }
 
 } // namespace tndm

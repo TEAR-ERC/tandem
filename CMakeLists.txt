@@ -9,6 +9,7 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 
 add_subdirectory(app)
+add_subdirectory(external)
 add_subdirectory(src)
 
 enable_testing()

@@ -2,9 +2,11 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 
 # Add element-local stuff here
 add_library(tandem-fem-lib
+    basis/Equidistant.cpp
     basis/Functions.cpp
     basis/Nodal.cpp
     basis/WarpAndBlend.cpp
+    form/FiniteElementFunction.cpp
     form/RefElement.cpp
     quadrules/GaussJacobi.cpp
     quadrules/IntervalQuadratureRule.cpp
@@ -24,6 +26,7 @@ target_link_libraries(tandem-fem-lib PUBLIC
 add_library(tandem-lib
     form/DG.cpp
     form/Error.cpp
+    io/VTUWriter.cpp
     mesh/GenMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp
@@ -45,4 +48,5 @@ target_link_libraries(tandem-lib PUBLIC
     MPI::MPI_CXX
     OpenMP::OpenMP_CXX
     ${PARMETIS_LIBRARIES}
+    tinyxml2
 )

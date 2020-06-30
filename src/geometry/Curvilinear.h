@@ -55,6 +55,7 @@ public:
     facetParam(std::size_t faceNo, std::vector<std::array<double, D - 1>> const& chis);
 
     std::size_t numElements() { return vertices.size(); }
+    NodalRefElement<D> const& refElement() const { return refElement_; }
 
 private:
     const unsigned N;

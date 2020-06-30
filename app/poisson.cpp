@@ -1,18 +1,16 @@
 #include "poisson/Poisson.h"
 #include "config.h"
 #include "poisson/Scenario.h"
-#include "writer.h"
 
 #include "form/Error.h"
-#include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
+#include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
 #include "mesh/MeshData.h"
-#include "tensor/EigenMap.h"
+#include "tensor/Tensor.h"
 #include "util/Hash.h"
 #include "util/Stopwatch.h"
 
-#include "xdmfwriter/XdmfWriter.h"
 #include <Eigen/Core>
 #include <Eigen/SparseLU>
 #include <argparse.hpp>
@@ -35,8 +33,7 @@ using tndm::Poisson;
 using tndm::Scenario;
 using tndm::Vector;
 using tndm::VertexData;
-using xdmfwriter::TRIANGLE;
-using xdmfwriter::XdmfWriter;
+using tndm::VTUWriter;
 
 std::unique_ptr<Scenario> getScenario(std::string const& name) {
     auto partialAnnulus = [](std::array<double, 2> const& v) -> std::array<double, 2> {
@@ -49,7 +46,6 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
     };
     switch (tndm::fnv1a(name)) {
     case "manufactured"_fnv1a: {
-        auto ref = [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); };
         return std::make_unique<MyScenario>(
             partialAnnulus,
             [](std::array<double, 2> const& x) {
@@ -58,6 +54,19 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
             [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); },
             [](Vector<double> const& x) -> std::array<double, 1> {
                 return {exp(-x(0) - x(1) * x(1))};
+            });
+    }
+    case "cosine"_fnv1a: {
+        double f = 10.0;
+        auto ref1D = [f](double x) { return cos(f * M_PI * x); };
+        return std::make_unique<MyScenario>(
+            partialAnnulus,
+            [f, ref1D](std::array<double, 2> const& x) {
+                return 2.0 * f * f * M_PI * M_PI * ref1D(x[0]) * ref1D(x[1]);
+            },
+            [ref1D](std::array<double, 2> const& x) { return ref1D(x[0]) * ref1D(x[1]); },
+            [ref1D](Vector<double> const& x) -> std::array<double, 1> {
+                return {ref1D(x(0)) * ref1D(x(1))};
             });
     }
     case "analytic"_fnv1a: {
@@ -142,52 +151,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    auto xt = poisson.reshapeNumericSolution(x);
-    double error =
-        tndm::Error<DomainDimension>::L2(poisson.refElement(), cl, xt, *scenario->reference());
-
+    auto numeric = poisson.finiteElementFunction(x);
+    double error = tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference());
     std::cout << "L2 error: " << error << std::endl;
 
     if (auto fileName = program.present("-o")) {
-        std::vector<double> data(3 * mesh->numElements(), 0.0);
-        auto outPoints = std::vector<std::array<double, 2u>>{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
-        auto E = poisson.refElement().evaluateBasisAt(outPoints);
-        auto EM = EigenMap(E);
-        for (std::size_t elNo = 0; elNo < mesh->numElements(); ++elNo) {
-            auto xtAtEl = xt.subtensor(tndm::slice{}, 0, elNo);
-            Eigen::VectorXd out = EM.transpose() * EigenMap(xtAtEl);
-            // Write nodes
-            for (std::ptrdiff_t i = 0; i < 3; ++i) {
-                data[3 * elNo + i] = out(i);
-            }
-            // data[elNo] = x(elNo * tndm::tensor::A::Shape[0]);
-        }
-
-        auto vertexData = dynamic_cast<VertexData<2u> const*>(mesh->vertices().data());
-        if (!vertexData) {
-            return 1;
-        }
-
-        // auto flatVerts = flatVertices<double, 2u, 3>(vertexData->getVertices(), transform);
-        // auto flatElems = flatElements<unsigned int, 2u>(*mesh);
-
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        std::vector<const char*> variableNames{"x"};
-        XdmfWriter<TRIANGLE, double> writer(xdmfwriter::POSIX, (*fileName).c_str(), false);
-        // writer.init(variableNames, std::vector<const char*>{});
-        writer.init(std::vector<const char*>{}, variableNames);
-        auto [cells, vertices] =
-            duplicatedDofsMesh<unsigned int, double, 2u, 3u>(*mesh, scenario->transform());
-        writer.setMesh(mesh->elements().size(), cells.data(), 3 * mesh->elements().size(),
-                       vertices.data());
-        // writer.setMesh(mesh->elements().size(), flatElems.data(),
-        // vertexData->getVertices().size(), flatVerts.data());
-        writer.addTimeStep(0.0);
-        // writer.writeCellData(0, data.data());
-        writer.writeVertexData(0, data.data());
-        writer.flush();
-        writer.close();
+        VTUWriter<2u> writer(2);
+        writer.addMesh(cl);
+        writer.addData("u", numeric);
+        writer.write(*fileName);
     }
 
     MPI_Finalize();

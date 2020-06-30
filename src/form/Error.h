@@ -1,6 +1,7 @@
 #ifndef ERROR_20200625_H
 #define ERROR_20200625_H
 
+#include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "quadrules/AutoRule.h"
@@ -17,7 +18,7 @@ class SolutionInterface {
 public:
     virtual ~SolutionInterface() {}
 
-    virtual std::size_t numberOfQuantities() const = 0;
+    virtual std::size_t numQuantities() const = 0;
     /**
      * @brief Evaluate solution at quadrature points.
      *
@@ -37,7 +38,7 @@ template <typename Func> class LambdaSolution : public SolutionInterface {
 public:
     LambdaSolution(Func referenceFun) : func_(std::move(referenceFun)) {}
 
-    std::size_t numberOfQuantities() const override {
+    std::size_t numQuantities() const override {
         // Figure out the size of the array returned by func_
         return std::tuple_size_v<decltype(func_(std::declval<Vector<double> const&>()))>;
     }
@@ -61,16 +62,14 @@ public:
     /**
      * @brief Computes \sum_i ||numeric_i(x) - reference_i(x)||_2
      *
-     * @param refElement Function space of reference element
      * @param cl Curvilinear transformation
-     * @param numeric Numeric solution tensor of shape
-     *                (numberOfBasisFunctions, numberOfQuantities, numberOfElements)
+     * @param numeric Finite element function
      * @param reference Reference solution
      *
      * @return L2 error
      */
-    static double L2(RefElement<D> const& refElement, Curvilinear<D>& cl,
-                     Tensor<const double, 3u> const& numeric, SolutionInterface const& reference);
+    static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+                     SolutionInterface const& reference);
 };
 
 } // namespace tndm

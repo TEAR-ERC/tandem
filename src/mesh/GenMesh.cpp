@@ -77,7 +77,7 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
     }
 
     // elements live on grid with size N_1 x ... x N_d
-    unsigned numElemsGlobal = 1u;
+    uint64_t numElemsGlobal = 1u;
     for (auto& n : N) {
         numElemsGlobal *= n;
     }

@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "form/DG.h"
+#include "form/FiniteElementFunction.h"
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
@@ -21,7 +22,8 @@ public:
 
     Eigen::VectorXd rhs(functional_t forceFun, functional_t dirichletFun);
 
-    Tensor<const double, 3u> reshapeNumericSolution(Eigen::VectorXd const& numeric);
+    FiniteElementFunction<DomainDimension>
+    finiteElementFunction(Eigen::VectorXd const& numeric) const;
 
 private:
     double epsilon = -1.0;
