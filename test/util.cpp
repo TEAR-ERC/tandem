@@ -62,6 +62,15 @@ TEST_CASE("Combinatorics") {
         CHECK(it == sums.end());
     }
 
+    SUBCASE("all integer sums (equal): 1 operand") {
+        int N = 6;
+        AllIntegerSums<1, false> sums(N);
+        auto it = sums.begin();
+        CHECK((*it)[0] == N);
+        ++it;
+        CHECK(it == sums.end());
+    }
+
     SUBCASE("all integer sums: 2 operands") {
         int N = 7;
         AllIntegerSums<2> sums(N);
@@ -72,6 +81,18 @@ TEST_CASE("Combinatorics") {
                 CHECK((*it)[1] == j);
                 ++it;
             }
+        }
+        CHECK(it == sums.end());
+    }
+
+    SUBCASE("all integer sums (equal): 2 operands") {
+        int N = 7;
+        AllIntegerSums<2, false> sums(N);
+        auto it = sums.begin();
+        for (unsigned j = 0; j <= N; ++j) {
+            CHECK((*it)[0] == N - j);
+            CHECK((*it)[1] == j);
+            ++it;
         }
         CHECK(it == sums.end());
     }
@@ -88,6 +109,21 @@ TEST_CASE("Combinatorics") {
                     CHECK((*it)[2] == k);
                     ++it;
                 }
+            }
+        }
+        CHECK(it == sums.end());
+    }
+
+    SUBCASE("all integer sums (equal): 3 operands") {
+        int N = 5;
+        AllIntegerSums<3, false> sums(N);
+        auto it = sums.begin();
+        for (unsigned j = 0; j <= N; ++j) {
+            for (unsigned k = 0; k <= j; ++k) {
+                CHECK((*it)[0] == N - j);
+                CHECK((*it)[1] == j - k);
+                CHECK((*it)[2] == k);
+                ++it;
             }
         }
         CHECK(it == sums.end());

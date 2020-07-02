@@ -42,13 +42,21 @@ private:
     unsigned n;
 };
 
-template <unsigned D> class AllIntegerSumsIterator {
+template <unsigned D, bool EnableLess> class AllIntegerSumsIterator {
 public:
+    static_assert(D > 0);
+
     using iterator_category = std::forward_iterator_tag;
     using value_type = std::array<unsigned, D>;
     using reference = value_type&;
+    using marker_type = std::array<unsigned, D>;
 
-    AllIntegerSumsIterator(unsigned f) { std::fill(markers.begin(), markers.end(), f); }
+    AllIntegerSumsIterator(unsigned f, unsigned maxSum) {
+        std::fill(markers.begin(), markers.end(), f);
+        if (!EnableLess) {
+            markers.back() = maxSum;
+        }
+    }
 
     bool operator!=(AllIntegerSumsIterator const& other) const { return markers != other.markers; }
     bool operator==(AllIntegerSumsIterator const& other) const { return markers == other.markers; }
@@ -63,7 +71,7 @@ public:
         return *this;
     }
     auto operator++(int) {
-        AllIntegerSumsIterator copy(markers);
+        AllIntegerSumsIterator copy(*this);
         ++(*this);
         return copy;
     }
@@ -75,7 +83,7 @@ public:
     }
 
 private:
-    std::array<unsigned, D> markers;
+    marker_type markers;
 };
 
 /**
@@ -85,13 +93,17 @@ private:
  *
  * x_1 + ... + x_D <= maxSum
  *
+ * if EnableLess is false, then
+ *
+ * x_1 + ... + x_D = maxSum
+ *
  */
-template <unsigned D> class AllIntegerSums {
+template <unsigned D, bool EnableLess = true> class AllIntegerSums {
 public:
     AllIntegerSums(unsigned maxSum) : maxSum(maxSum) {}
 
-    AllIntegerSumsIterator<D> begin() { return AllIntegerSumsIterator<D>(0); }
-    AllIntegerSumsIterator<D> end() { return ++AllIntegerSumsIterator<D>(maxSum); }
+    auto begin() { return AllIntegerSumsIterator<D, EnableLess>(0, maxSum); }
+    auto end() { return ++AllIntegerSumsIterator<D, EnableLess>(maxSum, maxSum); }
 
 private:
     unsigned maxSum;

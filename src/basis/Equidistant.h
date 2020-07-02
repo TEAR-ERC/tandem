@@ -3,6 +3,8 @@
 
 #include "Nodal.h"
 
+#include <array>
+
 namespace tndm {
 
 /**
@@ -11,6 +13,20 @@ namespace tndm {
 template <std::size_t D> class EquidistantNodesFactory : public NodesFactory<D> {
 public:
     std::vector<std::array<double, D>> operator()(unsigned degree) const override;
+
+private:
+    template <std::size_t DD>
+    std::array<std::array<double, D>, DD + 1>
+    shrinkAndShift(double factor, std::array<std::array<double, D>, DD + 1> const& verts) const;
+
+    void edge(int n, std::array<std::array<double, D>, 2> const& verts,
+              std::vector<std::array<double, D>>& result) const;
+
+    void triangle(int n, std::array<std::array<double, D>, 3>&& verts,
+                  std::vector<std::array<double, D>>& result) const;
+
+    void tet(int n, std::array<std::array<double, D>, 4>&& verts,
+             std::vector<std::array<double, D>>& result) const;
 };
 
 } // namespace tndm

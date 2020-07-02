@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
     std::cout << "L2 error: " << error << std::endl;
 
     if (auto fileName = program.present("-o")) {
-        VTUWriter<2u> writer(2);
+        VTUWriter<2u> writer(PolynomialDegree);
         writer.addMesh(cl);
         writer.addData("u", numeric);
         writer.write(*fileName);
