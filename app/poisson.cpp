@@ -157,8 +157,8 @@ int main(int argc, char** argv) {
 
     if (auto fileName = program.present("-o")) {
         VTUWriter<2u> writer(PolynomialDegree);
-        writer.addMesh(cl);
-        writer.addData("u", numeric);
+        auto piece = writer.addPiece(cl);
+        piece.addPointData("u", numeric);
         writer.write(*fileName);
     }
 

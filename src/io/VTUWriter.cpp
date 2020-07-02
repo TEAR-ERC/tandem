@@ -34,7 +34,7 @@ template <std::size_t D> int32_t VTUWriter<D>::VTKType(bool linear) {
     return 0; // VTK_EMPTY_CELL
 };
 
-template <std::size_t D> void VTUWriter<D>::addMesh(Curvilinear<D>& cl) {
+template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl) {
     auto pointsPerElement = refNodes_.size();
 
     auto piece = doc_.RootElement()->InsertNewChildElement("Piece");
@@ -68,36 +68,36 @@ template <std::size_t D> void VTUWriter<D>::addMesh(Curvilinear<D>& cl) {
         auto types = std::vector<int32_t>(cl.numElements(), vtkType);
         addDataArray(cells, "types", 1, 1, types);
     }
+
+    return VTUPiece<D>(piece, *this);
 }
 
 template <std::size_t D>
-void VTUWriter<D>::addData(std::string const& name, FiniteElementFunction<D> const& function) {
-    auto pointsPerElement = refNodes_.size();
+void VTUPiece<D>::addPointData(std::string const& name, FiniteElementFunction<D> const& function) {
+    auto pointsPerElement = writer_.refNodes().size();
 
     // TODO: add support for more than one quantity
     assert(function.numQuantities() == 1);
 
-    XMLElement* piece = doc_.RootElement()->LastChildElement("Piece");
-    assert(piece != nullptr);
-    XMLElement* pdata = piece->LastChildElement("PointData");
+    XMLElement* pdata = piece_->LastChildElement("PointData");
     if (!pdata) {
-        pdata = piece->InsertNewChildElement("PointData");
+        pdata = piece_->InsertNewChildElement("PointData");
     }
 
-    auto E = function.evaluationMatrix(refNodes_);
+    auto E = function.evaluationMatrix(writer_.refNodes());
     auto data = std::vector<double>(function.numElements() * pointsPerElement);
     for (std::size_t elNo = 0; elNo < function.numElements(); ++elNo) {
         auto result = Matrix<double>(&data[elNo * pointsPerElement], pointsPerElement, 1);
         function.map(elNo, E, result);
     }
-    addDataArray(pdata, name, 1, 1, data);
+    writer_.addDataArray(pdata, name, 1, 1, data);
 }
 
 template <std::size_t D>
 template <typename T>
 XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& name,
                                        std::size_t inComponents, std::size_t outComponents,
-                                       std::vector<T> const& data) {
+                                       T const* data, std::size_t dataSize) {
     auto da = parent->InsertNewChildElement("DataArray");
     auto dataType = DataType(T{});
     da->SetAttribute("type", dataType.vtkIdentifier().c_str());
@@ -108,8 +108,8 @@ XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& na
     auto offset = appended_.size();
     da->SetAttribute("offset", offset);
 
-    assert(data.size() % inComponents == 0);
-    auto num = data.size() / inComponents;
+    assert(dataSize % inComponents == 0);
+    auto num = dataSize / inComponents;
     header_t size = num * outComponents * sizeof(T);
 
     appended_.resize(appended_.size() + sizeof(size) + size);
@@ -117,7 +117,7 @@ XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& na
     memcpy(app, &size, sizeof(size));
     app += sizeof(size);
     if (inComponents == outComponents) {
-        memcpy(app, data.data(), data.size() * sizeof(T));
+        memcpy(app, data, dataSize * sizeof(T));
     } else if (outComponents > inComponents) {
         for (std::size_t i = 0; i < num; ++i) {
             memcpy(app, &data[i * inComponents], inComponents * sizeof(T));
@@ -166,7 +166,9 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     return true;
 }
 
-template class VTUWriter<2ul>;
-template class VTUWriter<3ul>;
+template class VTUPiece<2u>;
+template class VTUPiece<3u>;
+template class VTUWriter<2u>;
+template class VTUWriter<3u>;
 
 } // namespace tndm
