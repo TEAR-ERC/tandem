@@ -96,6 +96,21 @@ private:
     tinyxml2::XMLElement* piece_;
 };
 
+class ParallelVTUVisitor : public tinyxml2::XMLVisitor {
+public:
+    ParallelVTUVisitor() : subtree_(&pdoc_) {}
+
+    bool VisitEnter(tinyxml2::XMLElement const& element,
+                    tinyxml2::XMLAttribute const* attribute) override;
+    bool VisitExit(tinyxml2::XMLElement const& element) override;
+
+    auto& parallelXML() { return pdoc_; }
+
+private:
+    tinyxml2::XMLDocument pdoc_;
+    tinyxml2::XMLNode* subtree_;
+};
+
 } // namespace tndm
 
 #endif // VTUWRITER_20200629_H

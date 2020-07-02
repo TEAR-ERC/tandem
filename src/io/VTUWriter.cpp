@@ -14,6 +14,7 @@
 #include <iostream>
 #include <sstream>
 
+using tinyxml2::XMLAttribute;
 using tinyxml2::XMLDocument;
 using tinyxml2::XMLElement;
 using tinyxml2::XMLPrinter;
@@ -131,7 +132,8 @@ XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& na
         auto destLen = compressBound(size);
         appended_.resize(offset + sizeof(header) + destLen);
         unsigned char* app = appended_.data() + offset;
-        compress(app + sizeof(header), &destLen, reinterpret_cast<unsigned char const*>(data), size);
+        compress(app + sizeof(header), &destLen, reinterpret_cast<unsigned char const*>(data),
+                 size);
         header.compressedBlocksizes = destLen;
         memcpy(app, &header, sizeof(header));
         appended_.resize(offset + sizeof(header) + destLen);
@@ -148,31 +150,38 @@ XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& na
 template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    std::stringstream nameS;
-    nameS << baseName << "-" << rank << ".vtu";
-    std::string fileName = nameS.str();
+    auto formatName = [&baseName](int rk) {
+        std::stringstream nameS;
+        nameS << baseName << "-" << rk << ".vtu";
+        return nameS.str();
+    };
 
+    std::string fileName = formatName(rank);
     FILE* fp = std::fopen(fileName.c_str(), "w");
     if (!fp) {
         std::perror("Could not open file for writing");
         return false;
     }
 
+    auto const beginVTU = [&](XMLPrinter& printer, std::string const& type) {
+        printer.PushHeader(false, true);
+        printer.OpenElement("VTKFile");
+        printer.PushAttribute("type", type.c_str());
+        printer.PushAttribute("version", "1.0");
+        auto headerType = DataType(header_t{});
+        printer.PushAttribute("header_type", headerType.vtkIdentifier().c_str());
+        if (isBigEndian()) {
+            printer.PushAttribute("byte_order", "BigEndian");
+        } else {
+            printer.PushAttribute("byte_order", "LittleEndian");
+        }
+        if (zlibCompress_) {
+            printer.PushAttribute("compressor", "vtkZLibDataCompressor");
+        }
+    };
+
     XMLPrinter printer(fp);
-    printer.PushHeader(false, true);
-    printer.OpenElement("VTKFile");
-    printer.PushAttribute("type", "UnstructuredGrid");
-    printer.PushAttribute("version", "1.0");
-    auto headerType = DataType(header_t{});
-    printer.PushAttribute("header_type", headerType.vtkIdentifier().c_str());
-    if (isBigEndian()) {
-        printer.PushAttribute("byte_order", "BigEndian");
-    } else {
-        printer.PushAttribute("byte_order", "LittleEndian");
-    }
-    if (zlibCompress_) {
-        printer.PushAttribute("compressor", "vtkZLibDataCompressor");
-    }
+    beginVTU(printer, "UnstructuredGrid");
     doc_.Print(&printer);
     printer.OpenElement("AppendedData");
     printer.PushAttribute("encoding", "raw");
@@ -181,6 +190,56 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     std::fputs("\n    </AppendedData>\n</VTKFile>\n", fp);
     std::fclose(fp);
 
+    if (rank == 0) {
+        std::string pvtuName = baseName + ".pvtu";
+        fp = std::fopen(pvtuName.c_str(), "w");
+        if (!fp) {
+            std::perror("Could not open file for writing");
+            return false;
+        }
+        XMLPrinter printer(fp);
+        beginVTU(printer, "PUnstructuredGrid");
+        ParallelVTUVisitor pvtu;
+        doc_.Accept(&pvtu);
+        auto& pdoc = pvtu.parallelXML();
+        auto grid = pdoc.FirstChildElement("PUnstructuredGrid");
+        if (grid) {
+            grid->SetAttribute("GhostLevel", 0);
+            int commSize;
+            MPI_Comm_size(MPI_COMM_WORLD, &commSize);
+            for (int rk = 0; rk < commSize; ++rk) {
+                auto piece = grid->InsertNewChildElement("Piece");
+                piece->SetAttribute("Source", formatName(rk).c_str());
+            }
+        }
+        pdoc.Print(&printer);
+        printer.CloseElement(); // VTKFile
+        std::fclose(fp);
+    }
+
+    return true;
+}
+
+bool ParallelVTUVisitor::VisitEnter(XMLElement const& element, XMLAttribute const* attribute) {
+    if (strcmp(element.Name(), "Piece") != 0) {
+        auto newName = "P" + std::string(element.Name());
+        auto clone = pdoc_.NewElement(newName.c_str());
+        while (attribute) {
+            if (strcmp(attribute->Name(), "format") != 0 &&
+                strcmp(attribute->Name(), "offset") != 0) {
+                clone->SetAttribute(attribute->Name(), attribute->Value());
+            }
+            attribute = attribute->Next();
+        }
+        subtree_ = subtree_->InsertEndChild(clone);
+    }
+    return true;
+}
+
+bool ParallelVTUVisitor::VisitExit(tinyxml2::XMLElement const& element) {
+    if (strcmp(element.Name(), "Piece") != 0) {
+        subtree_ = subtree_->Parent();
+    }
     return true;
 }
 
