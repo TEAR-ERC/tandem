@@ -92,12 +92,12 @@ void Curvilinear<D>::map(std::size_t eleNo, Matrix<double> const& E, Tensor<doub
     assert(eleNo < vertices.size());
     assert(result.shape(0) == D);
     assert(result.shape(1) == E.shape(1));
-    assert(E.shape(0) == refElement_.numberOfBasisFunctions());
+    assert(E.shape(0) == refElement_.numBasisFunctions());
 
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == refElement_.numberOfBasisFunctions());
-    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(
-        vertexSpan.data()->data(), D, refElement_.numberOfBasisFunctions());
+    assert(vertexSpan.size() == refElement_.numBasisFunctions());
+    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
+                                                                 refElement_.numBasisFunctions());
     EigenMap(result) = vertMap * EigenMap(E);
 }
 
@@ -112,13 +112,13 @@ void Curvilinear<D>::jacobian(std::size_t eleNo, Tensor<double, 3u> const& gradE
     assert(eleNo < vertices.size());
 
     auto vertexSpan = vertices[eleNo];
-    assert(vertexSpan.size() == refElement_.numberOfBasisFunctions());
-    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(
-        vertexSpan.data()->data(), D, refElement_.numberOfBasisFunctions());
+    assert(vertexSpan.size() == refElement_.numBasisFunctions());
+    Eigen::Map<Eigen::Matrix<double, D, Eigen::Dynamic>> vertMap(vertexSpan.data()->data(), D,
+                                                                 refElement_.numBasisFunctions());
 
-    assert(gradE.shape(0) == refElement_.numberOfBasisFunctions());
+    assert(gradE.shape(0) == refElement_.numBasisFunctions());
     assert(gradE.shape(1) == D);
-    auto gradEMat = reshape(gradE, refElement_.numberOfBasisFunctions(), D * gradE.shape(2));
+    auto gradEMat = reshape(gradE, refElement_.numBasisFunctions(), D * gradE.shape(2));
 
     assert(result.shape(0) == D);
     assert(result.shape(1) == D);

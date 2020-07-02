@@ -1,12 +1,49 @@
 #include "Poisson.h"
 
+#include "basis/WarpAndBlend.h"
 #include "config.h"
 #include "form/FiniteElementFunction.h"
+#include "form/RefElement.h"
 #include "kernels/init.h"
 #include "kernels/kernel.h"
 #include "kernels/tensor.h"
 
 namespace tndm {
+
+Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
+                 std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
+                 functional_t kFun)
+    : DG(mesh, cl, std::move(refElement), minQuadOrder) {
+
+    NodalRefElement nodalRefElement(PolynomialDegree, WarpAndBlendFactory<DomainDimension>());
+    userVol.setStorage(
+        std::make_shared<user_vol_t>(numElements() * nodalRefElement.numBasisFunctions()), 0u,
+        numElements(), nodalRefElement.numBasisFunctions());
+
+    auto geoE = cl.evaluateBasisAt(nodalRefElement.refNodes());
+#pragma omp parallel
+    {
+        auto coords = Managed(cl.mapResultInfo(nodalRefElement.numBasisFunctions()));
+#pragma omp for
+        for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
+            auto K = Vector<double>(userVol[elNo].data(), nodalRefElement.numBasisFunctions());
+            cl.map(elNo, geoE, coords);
+            std::array<double, DomainDimension> x;
+            for (unsigned m = 0; m < tensor::K::size(); ++m) {
+                for (unsigned d = 0; d < DomainDimension; ++d) {
+                    x[d] = coords(d, m);
+                }
+                K(m) = kFun(x);
+            }
+        }
+    }
+
+    Em = nodalRefElement.evaluateBasisAt(volRule.points(), {1, 0});
+    for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
+        auto points = cl.facetParam(f, fctRule.points());
+        em.emplace_back(nodalRefElement.evaluateBasisAt(points, {1, 0}));
+    }
+}
 
 Eigen::SparseMatrix<double> Poisson::assemble() {
     using T = Eigen::Triplet<double>;
@@ -22,11 +59,14 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
     assert(D_xi.shape(2) == tensor::D_xi::Shape[2]);
 
     for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
+
         kernel::assembleVolume krnl;
         krnl.A = A;
         krnl.D_x = D_x;
         krnl.D_xi = D_xi.data();
         krnl.G = vol[elNo].template get<JInv>().data()->data();
+        krnl.K = userVol[elNo].data();
+        krnl.Em = Em.data();
         krnl.J = vol[elNo].template get<AbsDetJ>().data();
         krnl.W = volRule.weights().data();
         krnl.execute();
@@ -64,7 +104,9 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
         local.d_x(0) = d_x0;
         local.d_xi(0) = d_xi[info.localNo[0]].data();
         local.e(0) = e[info.localNo[0]].data();
+        local.em(0) = em[info.localNo[0]].data();
         local.g = fct[fctNo].template get<JInv>().data()->data();
+        local.K = userVol[info.up[0]].data();
         local.n = fct[fctNo].template get<Normal>().data()->data();
         local.nl = fct[fctNo].template get<NormalLength>().data();
         local.w = fctRule.weights().data();
@@ -98,8 +140,11 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
             neighbour.d_x(1) = d_x1;
             neighbour.d_xi(1) = d_xi[info.localNo[1]].data();
             neighbour.e(0) = local.e(0);
+            neighbour.em(0) = local.em(0);
             neighbour.e(1) = e[info.localNo[1]].data();
+            neighbour.em(1) = em[info.localNo[1]].data();
             neighbour.g = fct[fctNo].template get<JInvOther>().data()->data();
+            neighbour.K = userVol[info.up[1]].data();
             neighbour.n = local.n;
             neighbour.nl = local.nl;
             neighbour.w = local.w;
@@ -164,8 +209,10 @@ Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
             rhs.b = b;
             rhs.d_xi(0) = d_xi[info.localNo[0]].data();
             rhs.e(0) = e[info.localNo[0]].data();
+            rhs.em(0) = em[info.localNo[0]].data();
             rhs.f = f;
             rhs.g = fct[fctNo].template get<JInv>().data()->data();
+            rhs.K = userVol[info.up[0]].data();
             rhs.n = fct[fctNo].template get<Normal>().data()->data();
             rhs.nl = fct[fctNo].template get<NormalLength>().data();
             rhs.w = fctRule.weights().data();

@@ -16,16 +16,27 @@ class Poisson : public DG<DomainDimension> {
 public:
     using functional_t = std::function<double(std::array<double, DomainDimension> const&)>;
 
-    using DG<DomainDimension>::DG;
+    Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
+            std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
+            functional_t kFun);
 
     Eigen::SparseMatrix<double> assemble();
-
     Eigen::VectorXd rhs(functional_t forceFun, functional_t dirichletFun);
 
     FiniteElementFunction<DomainDimension>
     finiteElementFunction(Eigen::VectorXd const& numeric) const;
 
 private:
+    struct K {
+        using type = double;
+    };
+
+    using user_vol_t = mneme::SingleStorage<K>;
+    mneme::StridedView<user_vol_t> userVol;
+
+    Managed<Matrix<double>> Em;
+    std::vector<Managed<Matrix<double>>> em;
+
     double penalty(FacetInfo const& info) const {
         double penaltyScale =
             (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;

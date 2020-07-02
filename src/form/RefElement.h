@@ -60,7 +60,7 @@ public:
                        std::array<unsigned, 3> const& permutation) const = 0;
 
     unsigned degree() const { return degree_; }
-    std::size_t numberOfBasisFunctions() const { return binom(degree_ + D, D); }
+    std::size_t numBasisFunctions() const { return binom(degree_ + D, D); }
 
 private:
     unsigned degree_;

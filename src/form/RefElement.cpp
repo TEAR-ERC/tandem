@@ -16,7 +16,7 @@ ModalRefElement<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& po
                                     std::array<unsigned, 2> const& permutation) const {
     using index_t = Matrix<double>::index_t;
     auto shape =
-        permute(permutation, make_index<index_t>(this->numberOfBasisFunctions(), points.size()));
+        permute(permutation, make_index<index_t>(this->numBasisFunctions(), points.size()));
     Managed<Matrix<double>> E(shape);
     for (std::size_t p = 0; p < points.size(); ++p) {
         for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(this->degree()))) {
@@ -33,7 +33,7 @@ ModalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const&
                                        std::array<unsigned, 3> const& permutation) const {
     using index_t = Matrix<double>::index_t;
     auto shape =
-        permute(permutation, make_index<index_t>(this->numberOfBasisFunctions(), D, points.size()));
+        permute(permutation, make_index<index_t>(this->numBasisFunctions(), D, points.size()));
     Managed<Tensor<double, 3u>> grad(shape);
     for (std::size_t p = 0; p < points.size(); ++p) {
         for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(this->degree()))) {
@@ -50,7 +50,7 @@ ModalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const&
 template <std::size_t D>
 NodalRefElement<D>::NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory)
     : RefElement<D>(degree), refNodes_(nodesFactory(degree)) {
-    assert(this->numberOfBasisFunctions() == refNodes_.size());
+    assert(this->numBasisFunctions() == refNodes_.size());
     auto vandermonde = Vandermonde(this->degree(), refNodes_);
     vandermondeInv_ = vandermonde.inverse();
 }
@@ -64,7 +64,7 @@ NodalRefElement<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& po
     auto Emap = EigenMap(E);
     if (permutation[0] == 0 && permutation[1] == 1) {
         Emap = vandermondeInv_.transpose() * Emap;
-    } else if (permutation[0] == 1 && permutation[0] == 0) {
+    } else if (permutation[0] == 1 && permutation[1] == 0) {
         Emap = Emap * vandermondeInv_;
     } else {
         assert(false);

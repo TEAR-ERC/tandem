@@ -56,6 +56,20 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
                 return {exp(-x(0) - x(1) * x(1))};
             });
     }
+    case "manufactured_variable"_fnv1a: {
+        return std::make_unique<MyScenario>(
+            partialAnnulus,
+            [](std::array<double, 2> const& x) {
+                return (1.0 + 3.0 * x[1] - 4.0 * x[1] * x[1] * x[1] + x[0] -
+                        4.0 * x[0] * x[1] * x[1]) *
+                       exp(-x[0] - x[1] * x[1]);
+            },
+            [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); },
+            [](Vector<double> const& x) -> std::array<double, 1> {
+                return {exp(-x(0) - x(1) * x(1))};
+            },
+            [](std::array<double, 2> const& x) { return x[0] + x[1]; });
+    }
     case "cosine"_fnv1a: {
         double f = 10.0;
         auto ref1D = [f](double x) { return cos(f * M_PI * x); };
@@ -69,14 +83,33 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
                 return {ref1D(x(0)) * ref1D(x(1))};
             });
     }
-    case "analytic"_fnv1a: {
-        auto ref = [](std::array<double, 2> const& x) { return exp(-x[0] - x[1] * x[1]); };
+    case "singular"_fnv1a: {
+        auto sol = [](std::array<double, 2> const& x) {
+            double r = hypot(x[0], x[1]);
+            double phi = atan2(x[1], x[0]);
+            if (phi < 0) {
+                phi += 2.0 * M_PI;
+            }
+            double const delta = 0.5354409456;
+            std::array<double, 4> const a{0.4472135955, -0.7453559925, -0.9441175905, -2.401702643};
+            std::array<double, 4> const b{1.0, 2.333333333, 0.55555555555, -0.4814814814};
+            int dNo = 0;
+            if (x[0] < 0 && x[1] > 0) {
+                dNo = 1;
+            } else if (x[0] < 0 && x[1] < 0) {
+                dNo = 2;
+            } else if (x[0] > 0 && x[1] < 0) {
+                dNo = 3;
+            }
+            return std::pow(r, delta) * (a[dNo] * sin(delta * phi) + b[dNo] * cos(delta * phi));
+        };
         return std::make_unique<MyScenario>(
             biunit, [](std::array<double, 2> const& x) { return 0.0; },
-            [](std::array<double, 2> const& x) { return (x[0] < 0.0) ? 1.0 : 2.0; },
-            [](Vector<double> const& x) -> std::array<double, 1> {
-                return {(x(0) < 0.0) ? 1.0 : 2.0};
-            });
+            [sol](std::array<double, 2> const& x) { return sol(x); },
+            [sol](Vector<double> const& x) -> std::array<double, 1> {
+                return {sol({x(0), x(1)})};
+            },
+            [](std::array<double, 2> const& x) { return (x[0] * x[1] >= 0) ? 5.0 : 1.0; });
     }
     default:
         return nullptr;
@@ -131,7 +164,7 @@ int main(int argc, char** argv) {
 
     sw.start();
     Poisson poisson(*mesh, cl, std::make_unique<tndm::ModalRefElement<2ul>>(PolynomialDegree),
-                    MinQuadOrder());
+                    MinQuadOrder(), scenario->K());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
     auto A = poisson.assemble();
