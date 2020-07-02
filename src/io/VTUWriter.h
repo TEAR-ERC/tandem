@@ -24,7 +24,8 @@ public:
 
     static int32_t VTKType(bool linear);
 
-    VTUWriter(unsigned degree = 1u) : refNodes_(EquidistantNodesFactory<D>()(degree)) {
+    VTUWriter(unsigned degree = 1u, bool zlibCompress = true)
+        : refNodes_(EquidistantNodesFactory<D>()(degree)), zlibCompress_(zlibCompress) {
         auto grid = doc_.NewElement("UnstructuredGrid");
         doc_.InsertFirstChild(grid);
     }
@@ -47,17 +48,17 @@ private:
 
     template <typename T>
     tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
-                                       std::size_t inComponents, std::size_t outComponents,
-                                       T const* data, std::size_t dataSize);
+                                       std::size_t numComponents, T const* data,
+                                       std::size_t dataSize);
 
     template <typename T>
     tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
-                                       std::size_t inComponents, std::size_t outComponents,
-                                       std::vector<T> const& data) {
-        return addDataArray(parent, name, inComponents, outComponents, data.data(), data.size());
+                                       std::size_t numComponents, std::vector<T> const& data) {
+        return addDataArray(parent, name, numComponents, data.data(), data.size());
     }
 
     std::vector<std::array<double, D>> refNodes_;
+    bool zlibCompress_;
     std::vector<unsigned char> appended_;
     tinyxml2::XMLDocument doc_;
 };
@@ -81,7 +82,7 @@ public:
         if (!cdata) {
             cdata = piece_->InsertNewChildElement("CellData");
         }
-        writer_.template addDataArray<T>(cdata, name, 1, 1, data, numElements);
+        writer_.template addDataArray<T>(cdata, name, 1, data, numElements);
     }
     /**
      * @brief Wrapper for addCellData(std::string const&, double const*, std::size_t)

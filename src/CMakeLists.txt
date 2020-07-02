@@ -37,6 +37,7 @@ add_library(tandem-lib
 find_package(MPI REQUIRED)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(ZLIB REQUIRED)
 
 target_include_directories(tandem-lib PUBLIC 
     ../submodules/
@@ -49,4 +50,5 @@ target_link_libraries(tandem-lib PUBLIC
     OpenMP::OpenMP_CXX
     ${PARMETIS_LIBRARIES}
     tinyxml2
+    ZLIB::ZLIB
 )
