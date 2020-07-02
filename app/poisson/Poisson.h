@@ -26,10 +26,13 @@ public:
     finiteElementFunction(Eigen::VectorXd const& numeric) const;
 
 private:
+    double penalty(FacetInfo const& info) const {
+        double penaltyScale =
+            (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
+        return penaltyScale * std::max(penalty_[info.up[0]], penalty_[info.up[1]]);
+    }
+
     double epsilon = -1.0;
-    double penalty = (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) /
-                     DomainDimension * 6.8284271247461900976;
-    double beta0 = 1.0;
 };
 
 } // namespace tndm

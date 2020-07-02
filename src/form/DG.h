@@ -67,6 +67,7 @@ protected:
         double area;
     };
     std::vector<FacetInfo> fctInfo;
+    std::vector<double> penalty_;
 
     using fct_t =
         mneme::MultiStorage<mneme::DataLayout::SoA, JInv, JInvOther, Normal, NormalLength, Coords>;

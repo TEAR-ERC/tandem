@@ -59,7 +59,7 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
         double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
         local.c00 = -half;
         local.c10 = epsilon * half;
-        local.c20 = penalty / std::pow(info.area, beta0);
+        local.c20 = penalty(info);
         local.a(0, 0) = a00;
         local.d_x(0) = d_x0;
         local.d_xi(0) = d_xi[info.localNo[0]].data();
@@ -160,7 +160,7 @@ Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
 
             kernel::rhsFacet rhs;
             rhs.c10 = epsilon;
-            rhs.c20 = penalty / std::pow(info.area, beta0);
+            rhs.c20 = penalty(info);
             rhs.b = b;
             rhs.d_xi(0) = d_xi[info.localNo[0]].data();
             rhs.e(0) = e[info.localNo[0]].data();

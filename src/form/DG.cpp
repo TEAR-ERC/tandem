@@ -12,7 +12,7 @@ namespace tndm {
 template <std::size_t D>
 DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
           std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder)
-    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()) {
+    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()), penalty_(mesh.numElements()) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -129,6 +129,22 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
             cl.absDetJ(elNo, J, absDetJ);
             cl.jacobianInv(J, jInv);
             cl.map(elNo, geoE, coords);
+
+            // Compute shape measure for interior penalty method
+            // See Shahbazi, "An explicit expression for the penalty parameter of the
+            //                interior penalty method"
+            double volume = 0.0;
+            for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
+                volume += volRule.weights()[i] * absDetJ(i);
+            }
+            auto dws = mesh.template downward<D - 1u, D>(elNo);
+            double penalty = 0.0;
+            for (auto&& fctNo : dws) {
+                auto& info = fctInfo[fctNo];
+                double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
+                penalty += fctInfo[fctNo].area * half;
+            }
+            penalty_[elNo] = penalty / volume;
         }
     }
 }
