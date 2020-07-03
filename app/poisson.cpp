@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
         VTUWriter<2u> writer(PolynomialDegree);
         auto piece = writer.addPiece(cl);
         piece.addPointData("u", numeric);
+        piece.addPointData("K", poisson.discreteK());
         writer.write(*fileName);
     }
 

@@ -17,6 +17,10 @@ add_executable(test-basis basis.cpp)
 target_link_libraries(test-basis test-runner)
 doctest_discover_tests(test-basis)
 
+add_executable(test-form form.cpp)
+target_link_libraries(test-form test-runner)
+doctest_discover_tests(test-form)
+
 add_executable(test-geometry geometry.cpp)
 target_link_libraries(test-geometry test-runner-mpi)
 doctest_discover_tests(test-geometry)

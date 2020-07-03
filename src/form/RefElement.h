@@ -24,6 +24,13 @@ public:
     RefElement(unsigned degree) : degree_(degree) {}
     virtual ~RefElement() {}
     virtual std::unique_ptr<RefElement<D>> clone() const = 0;
+
+    /**
+     * @brief Computes int phi_i phi_j dV
+     */
+    virtual Managed<Matrix<double>> massMatrix() const = 0;
+    virtual Managed<Matrix<double>> inverseMassMatrix() const = 0;
+
     /**
      * @brief Evaluate basis functions at points
      *
@@ -76,6 +83,9 @@ public:
         return std::make_unique<ModalRefElement<D>>(*this);
     }
 
+    Managed<Matrix<double>> massMatrix() const override;
+    Managed<Matrix<double>> inverseMassMatrix() const override;
+
     Managed<Matrix<double>>
     evaluateBasisAt(std::vector<std::array<double, D>> const& points,
                     std::array<unsigned, 2> const& permutation) const override;
@@ -95,6 +105,9 @@ public:
         return std::make_unique<NodalRefElement<D>>(*this);
     }
 
+    Managed<Matrix<double>> massMatrix() const override;
+    Managed<Matrix<double>> inverseMassMatrix() const override;
+
     Managed<Matrix<double>>
     evaluateBasisAt(std::vector<std::array<double, D>> const& points,
                     std::array<unsigned, 2> const& permutation) const override;
@@ -107,7 +120,7 @@ public:
 
 private:
     std::vector<std::array<double, D>> refNodes_;
-    Eigen::MatrixXd vandermondeInv_;
+    Eigen::MatrixXd vandermonde_, vandermondeInv_;
 };
 
 } // namespace tndm

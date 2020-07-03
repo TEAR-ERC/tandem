@@ -1,14 +1,44 @@
 #include "RefElement.h"
 #include "basis/Functions.h"
+#include "quadrules/AutoRule.h"
 #include "tensor/EigenMap.h"
 #include "tensor/Reshape.h"
 #include "util/Combinatorics.h"
 #include "util/Enumerate.h"
 #include "util/MultiIndex.h"
 
+#include <Eigen/Core>
 #include <Eigen/LU>
 
 namespace tndm {
+
+template <std::size_t D> Managed<Matrix<double>> ModalRefElement<D>::massMatrix() const {
+    auto rule = simplexQuadratureRule<D>(2 * this->degree());
+    auto nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> M(nbf, nbf);
+    auto E = evaluateBasisAt(rule.points(), {0, 1});
+    for (std::ptrdiff_t i = 0; i < M.shape(0); ++i) {
+        for (std::ptrdiff_t j = 0; j < M.shape(1); ++j) {
+            M(i, j) = 0.0;
+            // The basis is orthogonal, therefore we only need to compute the diagonal
+            if (i == j) {
+                for (std::size_t q = 0; q < rule.size(); ++q) {
+                    M(i, j) += rule.weights()[q] * E(i, q) * E(j, q);
+                }
+            }
+        }
+    }
+
+    return M;
+}
+
+template <std::size_t D> Managed<Matrix<double>> ModalRefElement<D>::inverseMassMatrix() const {
+    auto Minv = massMatrix();
+    for (std::ptrdiff_t i = 0; i < Minv.shape(0); ++i) {
+        Minv(i, i) = 1.0 / Minv(i, i);
+    }
+    return Minv;
+}
 
 template <std::size_t D>
 Managed<Matrix<double>>
@@ -51,8 +81,28 @@ template <std::size_t D>
 NodalRefElement<D>::NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory)
     : RefElement<D>(degree), refNodes_(nodesFactory(degree)) {
     assert(this->numBasisFunctions() == refNodes_.size());
-    auto vandermonde = Vandermonde(this->degree(), refNodes_);
-    vandermondeInv_ = vandermonde.inverse();
+    vandermonde_ = Vandermonde(this->degree(), refNodes_);
+    vandermondeInv_ = vandermonde_.inverse();
+}
+
+template <std::size_t D> Managed<Matrix<double>> NodalRefElement<D>::massMatrix() const {
+    auto nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> M(nbf, nbf);
+
+    Managed<Matrix<double>> modalM = ModalRefElement<D>(this->degree()).massMatrix();
+    EigenMap(M) = vandermondeInv_.transpose() * EigenMap(modalM) * vandermondeInv_;
+
+    return M;
+}
+
+template <std::size_t D> Managed<Matrix<double>> NodalRefElement<D>::inverseMassMatrix() const {
+    auto nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> Minv(nbf, nbf);
+
+    Managed<Matrix<double>> modalMinv = ModalRefElement<D>(this->degree()).inverseMassMatrix();
+    EigenMap(Minv) = vandermonde_ * EigenMap(modalMinv) * vandermonde_.transpose();
+
+    return Minv;
 }
 
 template <std::size_t D>

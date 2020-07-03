@@ -4,6 +4,7 @@
 #include "config.h"
 #include "form/DG.h"
 #include "form/FiniteElementFunction.h"
+#include "form/RefElement.h"
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
@@ -26,6 +27,12 @@ public:
     FiniteElementFunction<DomainDimension>
     finiteElementFunction(Eigen::VectorXd const& numeric) const;
 
+    FiniteElementFunction<DomainDimension> discreteK() const {
+        return FiniteElementFunction<DomainDimension>(nodalRefElement_.clone(), userVol[0].data(),
+                                                      nodalRefElement_.numBasisFunctions(), 1,
+                                                      numElements());
+    }
+
 private:
     struct K {
         using type = double;
@@ -37,10 +44,18 @@ private:
     Managed<Matrix<double>> Em;
     std::vector<Managed<Matrix<double>>> em;
 
+    NodalRefElement<DomainDimension> nodalRefElement_;
+
     double penalty(FacetInfo const& info) const {
+        auto Kmax = [&](std::size_t elNo) {
+            auto nbf = nodalRefElement_.numBasisFunctions();
+            auto K = userVol[elNo].data();
+            return *std::max_element(K, K + nbf);
+        };
         double penaltyScale =
             (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
-        return penaltyScale * std::max(penalty_[info.up[0]], penalty_[info.up[1]]);
+        return penaltyScale * std::max(penalty_[info.up[0]], penalty_[info.up[1]]) *
+               std::max(Kmax(info.up[0]), Kmax(info.up[1]));
     }
 
     double epsilon = -1.0;

@@ -7,41 +7,45 @@
 #include "kernels/init.h"
 #include "kernels/kernel.h"
 #include "kernels/tensor.h"
+#include "tensor/EigenMap.h"
+
+#include <Eigen/Core>
+#include <limits>
 
 namespace tndm {
 
 Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
                  std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                  functional_t kFun)
-    : DG(mesh, cl, std::move(refElement), minQuadOrder) {
+    : DG(mesh, cl, std::move(refElement), minQuadOrder),
+      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
 
-    NodalRefElement nodalRefElement(PolynomialDegree, WarpAndBlendFactory<DomainDimension>());
     userVol.setStorage(
-        std::make_shared<user_vol_t>(numElements() * nodalRefElement.numBasisFunctions()), 0u,
-        numElements(), nodalRefElement.numBasisFunctions());
+        std::make_shared<user_vol_t>(numElements() * nodalRefElement_.numBasisFunctions()), 0u,
+        numElements(), nodalRefElement_.numBasisFunctions());
 
-    auto geoE = cl.evaluateBasisAt(nodalRefElement.refNodes());
+    auto Minv = nodalRefElement_.inverseMassMatrix();
+    auto E = nodalRefElement_.evaluateBasisAt(volRule.points());
+    Eigen::MatrixXd P = EigenMap(Minv) * EigenMap(E);
 #pragma omp parallel
     {
-        auto coords = Managed(cl.mapResultInfo(nodalRefElement.numBasisFunctions()));
+        auto rhs = Eigen::VectorXd(volRule.size());
 #pragma omp for
         for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
-            auto K = Vector<double>(userVol[elNo].data(), nodalRefElement.numBasisFunctions());
-            cl.map(elNo, geoE, coords);
-            std::array<double, DomainDimension> x;
-            for (unsigned m = 0; m < tensor::K::size(); ++m) {
-                for (unsigned d = 0; d < DomainDimension; ++d) {
-                    x[d] = coords(d, m);
-                }
-                K(m) = kFun(x);
+            auto K = Vector<double>(userVol[elNo].data(), nodalRefElement_.numBasisFunctions());
+
+            auto coords = vol[elNo].get<Coords>();
+            for (std::size_t q = 0; q < volRule.size(); ++q) {
+                rhs(q) = kFun(coords[q]) * volRule.weights()[q];
             }
+            EigenMap(K) = P * rhs;
         }
     }
 
-    Em = nodalRefElement.evaluateBasisAt(volRule.points(), {1, 0});
+    Em = nodalRefElement_.evaluateBasisAt(volRule.points(), {1, 0});
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto points = cl.facetParam(f, fctRule.points());
-        em.emplace_back(nodalRefElement.evaluateBasisAt(points, {1, 0}));
+        em.emplace_back(nodalRefElement_.evaluateBasisAt(points, {1, 0}));
     }
 }
 
