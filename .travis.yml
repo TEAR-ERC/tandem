@@ -17,7 +17,7 @@ before_install:
 install:
     - wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.13.3.tar.gz
     - tar -xvf petsc-lite-3.13.3.tar.gz
-    - cd petsc-3.13.3 && ./configure --with-fortran-bindings=0 --with-debugging=0 CC=mpicc CXX=mpicxx F90=mpif90 --prefix=/usr/local/ && make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j2 && sudo make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
+    - cd petsc-3.13.3 && ./configure --with-fortran-bindings=0 --with-debugging=0 CC=mpicc CXX=mpicxx --prefix=/usr/local/ && make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j2 && sudo make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
 
 script:
   - mkdir build && cd build
