@@ -15,6 +15,7 @@
 #include <Eigen/SparseLU>
 #include <argparse.hpp>
 #include <mpi.h>
+#include <petscksp.h>
 
 #include <algorithm>
 #include <cassert>
@@ -22,6 +23,9 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
+#include <petscsys.h>
+#include <petscvec.h>
+#include <petscviewer.h>
 #include <tuple>
 
 using tndm::Curvilinear;
@@ -118,9 +122,20 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
 }
 
 int main(int argc, char** argv) {
-    MPI_Init(&argc, &argv);
+    int pArgc = 0;
+    char** pArgv = nullptr;
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "--petsc") == 0) {
+            pArgc = argc - i;
+            pArgv = argv + i;
+            argc = i;
+            break;
+        }
+    }
+    PetscInitialize(&pArgc, &pArgv, nullptr, nullptr);
 
     argparse::ArgumentParser program("poisson");
+    program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("-o").help("Output file name");
     program.add_argument("-s")
         .default_value(std::string("manufactured"))
@@ -167,22 +182,32 @@ int main(int argc, char** argv) {
                     MinQuadOrder(), scenario->K());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
-    auto A = poisson.assemble();
-    auto b = poisson.rhs(scenario->force(), scenario->dirichlet());
+    Mat A = poisson.assemble();
+    Vec b = poisson.rhs(scenario->force(), scenario->dirichlet());
     std::cout << "Assembled after " << sw.split() << std::endl;
 
-    Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-    solver.compute(A);
-    std::cout << "LU after " << sw.split() << std::endl;
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "LU of A failed" << std::endl;
-        return -1;
-    }
-    Eigen::VectorXd x = solver.solve(b);
-    if (solver.info() != Eigen::Success) {
-        std::cerr << "Could not solve Ax=b" << std::endl;
-        return -1;
-    }
+    KSP ksp;
+    Vec x;
+    VecDuplicate(b, &x);
+
+    KSPCreate(PETSC_COMM_WORLD, &ksp);
+    KSPSetType(ksp, KSPCG);
+    KSPSetOperators(ksp, A, A);
+    KSPSetTolerances(ksp, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT);
+    KSPSetFromOptions(ksp);
+
+    KSPSolve(ksp, b, x);
+    std::cout << "Solved after " << sw.split() << std::endl;
+    PetscReal rnorm;
+    PetscInt its;
+    KSPGetResidualNorm(ksp, &rnorm);
+    KSPGetIterationNumber(ksp, &its);
+    std::cout << "Residual norm: " << rnorm << std::endl;
+    std::cout << "Iterations: " << its << std::endl;
+
+    KSPDestroy(&ksp);
+    MatDestroy(&A);
+    VecDestroy(&b);
 
     auto numeric = poisson.finiteElementFunction(x);
     double error = tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference());
@@ -196,7 +221,9 @@ int main(int argc, char** argv) {
         writer.write(*fileName);
     }
 
-    MPI_Finalize();
+    VecDestroy(&x);
+
+    PetscFinalize();
 
     return 0;
 }

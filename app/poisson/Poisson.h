@@ -8,6 +8,8 @@
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
+#include <petscmat.h>
+#include <petscvec.h>
 
 #include <functional>
 
@@ -21,11 +23,10 @@ public:
             std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
             functional_t kFun);
 
-    Eigen::SparseMatrix<double> assemble();
-    Eigen::VectorXd rhs(functional_t forceFun, functional_t dirichletFun);
+    Mat assemble();
+    Vec rhs(functional_t forceFun, functional_t dirichletFun);
 
-    FiniteElementFunction<DomainDimension>
-    finiteElementFunction(Eigen::VectorXd const& numeric) const;
+    FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
     FiniteElementFunction<DomainDimension> discreteK() const {
         return FiniteElementFunction<DomainDimension>(nodalRefElement_.clone(), userVol[0].data(),

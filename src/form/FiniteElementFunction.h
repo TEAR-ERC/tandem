@@ -6,6 +6,7 @@
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <utility>
@@ -18,7 +19,9 @@ public:
                           std::size_t numberOfBasisFunctions, std::size_t numberOfQuantities,
                           std::size_t numberOfElements)
         : refElement_(std::move(refElement)),
-          data_(data, numberOfBasisFunctions, numberOfQuantities, numberOfElements) {}
+          data_(numberOfBasisFunctions, numberOfQuantities, numberOfElements) {
+        std::copy(data, data + data_.size(), data_.data());
+    }
 
     Managed<Matrix<double>>
     evaluationMatrix(std::vector<std::array<double, D>> const& points) const;
@@ -33,7 +36,7 @@ public:
 
 private:
     std::unique_ptr<RefElement<D>> refElement_;
-    Tensor<const double, 3u> data_;
+    Managed<Tensor<double, 3u>> data_;
 };
 
 } // namespace tndm

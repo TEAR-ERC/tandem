@@ -7,10 +7,15 @@
 #include "kernels/init.h"
 #include "kernels/kernel.h"
 #include "kernels/tensor.h"
+#include "parallel/MPITraits.h"
 #include "tensor/EigenMap.h"
 
 #include <Eigen/Core>
 #include <limits>
+#include <petscmat.h>
+#include <petscsys.h>
+#include <petscsystypes.h>
+#include <petscvec.h>
 
 namespace tndm {
 
@@ -49,9 +54,14 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
     }
 }
 
-Eigen::SparseMatrix<double> Poisson::assemble() {
-    using T = Eigen::Triplet<double>;
-    std::vector<T> triplets;
+Mat Poisson::assemble() {
+    Mat mat;
+    PetscInt blockSize = tensor::A::Shape[0];
+    PetscInt localRows = numElements() * tensor::A::Shape[0];
+    PetscInt localCols = numElements() * tensor::A::Shape[1];
+    MatCreateBAIJ(PETSC_COMM_WORLD, blockSize, localRows, localCols, PETSC_DETERMINE,
+                  PETSC_DETERMINE, 5, nullptr, 5, nullptr, &mat);
+    MatSetOption(mat, MAT_ROW_ORIENTED, PETSC_FALSE);
 
     double D_x[tensor::D_x::size()];
     double A[tensor::A::size()];
@@ -63,7 +73,6 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
     assert(D_xi.shape(2) == tensor::D_xi::Shape[2]);
 
     for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
-
         kernel::assembleVolume krnl;
         krnl.A = A;
         krnl.D_x = D_x;
@@ -74,13 +83,9 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
         krnl.J = vol[elNo].template get<AbsDetJ>().data();
         krnl.W = volRule.weights().data();
         krnl.execute();
-        unsigned i0 = elNo * tensor::A::Shape[0];
-        unsigned j0 = elNo * tensor::A::Shape[1];
-        for (unsigned i = 0; i < tensor::A::Shape[0]; ++i) {
-            for (unsigned j = 0; j < tensor::A::Shape[1]; ++j) {
-                triplets.emplace_back(T(i0 + i, j0 + j, Aview(i, j)));
-            }
-        }
+        PetscInt ib = elNo;
+        PetscInt jb = elNo;
+        MatSetValuesBlocked(mat, 1, &ib, 1, &jb, A, ADD_VALUES);
     }
 
     double a00[tensor::a::size(0, 0)];
@@ -116,15 +121,10 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
         local.w = fctRule.weights().data();
         local.execute();
 
-        auto push = [&info, &triplets](auto x, auto y, double* a) {
-            auto aview = init::a::view<x(), y()>::create(a);
-            unsigned i0 = info.up[x()] * aview.shape(0);
-            unsigned j0 = info.up[y()] * aview.shape(1);
-            for (unsigned i = 0; i < aview.shape(0); ++i) {
-                for (unsigned j = 0; j < aview.shape(1); ++j) {
-                    triplets.emplace_back(T(i0 + i, j0 + j, aview(i, j)));
-                }
-            }
+        auto push = [&info, &mat](auto x, auto y, double* a) {
+            PetscInt ib = info.up[x()];
+            PetscInt jb = info.up[y()];
+            MatSetValuesBlocked(mat, 1, &ib, 1, &jb, a, ADD_VALUES);
         };
 
         push(std::integral_constant<int, 0>(), std::integral_constant<int, 0>(), a00);
@@ -160,17 +160,19 @@ Eigen::SparseMatrix<double> Poisson::assemble() {
         }
     }
 
-    Eigen::SparseMatrix<double> mat(numElements() * tensor::A::Shape[0],
-                                    numElements() * tensor::A::Shape[1]);
-    mat.setFromTriplets(triplets.begin(), triplets.end());
+    MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY);
+    MatSetOption(mat, MAT_SYMMETRIC, PETSC_TRUE);
     return mat;
 }
 
-Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
-    Eigen::VectorXd B = Eigen::VectorXd::Zero(numElements() * tensor::A::Shape[0]);
+Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
+    Vec B;
+    PetscInt localRows = numElements() * tensor::A::Shape[0];
+    VecCreateMPI(PETSC_COMM_WORLD, localRows, PETSC_DETERMINE, &B);
+    VecSetBlockSize(B, tensor::b::Shape[0]);
 
     double b[tensor::b::size()];
-    auto bview = init::b::view::create(b);
 
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
@@ -190,10 +192,8 @@ Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
         rhs.b = b;
         rhs.execute();
 
-        unsigned i0 = elNo * bview.shape(0);
-        for (unsigned i = 0; i < bview.shape(0); ++i) {
-            B[i0 + i] += bview(i);
-        }
+        PetscInt ib = elNo;
+        VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
     }
 
     double f[tensor::f::size()];
@@ -222,20 +222,22 @@ Eigen::VectorXd Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
             rhs.w = fctRule.weights().data();
             rhs.execute();
 
-            unsigned i0 = info.up[0] * bview.shape(0);
-            for (unsigned i = 0; i < bview.shape(0); ++i) {
-                B[i0 + i] += bview(i);
-            }
+            PetscInt ib = info.up[0];
+            VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
         }
     }
+    VecAssemblyBegin(B);
+    VecAssemblyEnd(B);
     return B;
 }
 
-FiniteElementFunction<DomainDimension>
-Poisson::finiteElementFunction(Eigen::VectorXd const& numeric) const {
-    assert(numeric.rows() == numElements() * tensor::b::Shape[0]);
-    return FiniteElementFunction<DomainDimension>(refElement_->clone(), numeric.data(),
-                                                  tensor::b::Shape[0], 1, numElements());
+FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) const {
+    // assert(numeric.rows() == numElements() * tensor::b::Shape[0]);
+    PetscScalar const* values;
+    VecGetArrayRead(x, &values);
+    return FiniteElementFunction<DomainDimension>(refElement_->clone(), values, tensor::b::Shape[0],
+                                                  1, numElements());
+    VecRestoreArrayRead(x, &values);
 }
 
 } // namespace tndm
