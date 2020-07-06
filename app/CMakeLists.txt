@@ -96,11 +96,14 @@ doctest_discover_tests(test-kernel)
 
 # Apps using generated kernels
 
-configure_file( config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
+
+configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 add_executable(poisson
     poisson/Poisson.cpp
     poisson.cpp)
-target_link_libraries(poisson PRIVATE tandem-lib kernels-lib)
+target_link_libraries(poisson PRIVATE tandem-lib kernels-lib PkgConfig::PETSC)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(poisson PUBLIC USE_MPI)
+target_compile_definitions(poisson PRIVATE USE_MPI)
