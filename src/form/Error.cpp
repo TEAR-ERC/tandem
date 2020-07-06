@@ -5,7 +5,7 @@ namespace tndm {
 
 template <std::size_t D>
 double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
-                    SolutionInterface const& reference) {
+                    SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
     auto rule = simplexQuadratureRule<D>(20);
 
     auto evalMatrix = numeric.evaluationMatrix(rule.points());
@@ -37,7 +37,10 @@ double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
         error += localError;
     }
 
-    return sqrt(error);
+    double globalError;
+    MPI_Reduce(&error, &globalError, 1, mpi_type_t<double>(), MPI_SUM, targetRank, comm);
+
+    return sqrt(globalError);
 }
 
 template class Error<2u>;

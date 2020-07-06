@@ -11,11 +11,12 @@
 #include "util/Hash.h"
 #include "util/Stopwatch.h"
 
-#include <Eigen/Core>
-#include <Eigen/SparseLU>
 #include <argparse.hpp>
 #include <mpi.h>
 #include <petscksp.h>
+#include <petscsys.h>
+#include <petscvec.h>
+#include <petscviewer.h>
 
 #include <algorithm>
 #include <cassert>
@@ -23,9 +24,6 @@
 #include <cmath>
 #include <iostream>
 #include <memory>
-#include <petscsys.h>
-#include <petscvec.h>
-#include <petscviewer.h>
 #include <tuple>
 
 using tndm::Curvilinear;
@@ -164,6 +162,16 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    int rank, procs;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+    MPI_Comm_size(PETSC_COMM_WORLD, &procs);
+
+    if (procs > 0) {
+        std::cerr << "(TODO) Warning: Penalty is not synced on ghost layer (yet). Parallel error "
+                     "differs from serial error."
+                  << std::endl;
+    }
+
     auto n = program.get<unsigned long>("n");
     std::array<uint64_t, DomainDimension> size;
     size.fill(n);
@@ -202,16 +210,22 @@ int main(int argc, char** argv) {
     PetscInt its;
     KSPGetResidualNorm(ksp, &rnorm);
     KSPGetIterationNumber(ksp, &its);
-    std::cout << "Residual norm: " << rnorm << std::endl;
-    std::cout << "Iterations: " << its << std::endl;
+    if (rank == 0) {
+        std::cout << "Residual norm: " << rnorm << std::endl;
+        std::cout << "Iterations: " << its << std::endl;
+    }
 
     KSPDestroy(&ksp);
     MatDestroy(&A);
     VecDestroy(&b);
 
     auto numeric = poisson.finiteElementFunction(x);
-    double error = tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference());
-    std::cout << "L2 error: " << error << std::endl;
+    double error =
+        tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference(), 0, PETSC_COMM_WORLD);
+
+    if (rank == 0) {
+        std::cout << "L2 error: " << error << std::endl;
+    }
 
     if (auto fileName = program.present("-o")) {
         VTUWriter<2u> writer(PolynomialDegree);

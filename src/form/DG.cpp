@@ -12,7 +12,7 @@ namespace tndm {
 template <std::size_t D>
 DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
           std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder)
-    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()), penalty_(mesh.numElements()) {
+    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()), volInfo(mesh.numElements()) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -83,6 +83,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
             }
 
             fctInfo[fctNo].up[0] = elNos[0];
+            fctInfo[fctNo].g_up[0] = mesh.elements().l2cg(elNos[0]);
             fctInfo[fctNo].localNo[0] = localFctNo;
             fctInfo[fctNo].area = area;
 
@@ -93,6 +94,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 assert(localFNoOther < D + 1u);
 
                 fctInfo[fctNo].up[1] = elNos[1];
+                fctInfo[fctNo].g_up[1] = mesh.elements().l2cg(elNos[1]);
                 fctInfo[fctNo].localNo[1] = localFNoOther;
 
                 auto jInvOther = Tensor(fct[fctNo].template get<JInvOther>().data()->data(),
@@ -101,8 +103,9 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 cl.jacobian(elNos[1], fctGradE[localFNoOther], J);
                 cl.jacobianInv(J, jInvOther);
             } else {
-                fctInfo[fctNo].up[1] = elNos[0];
-                fctInfo[fctNo].localNo[1] = localFctNo;
+                fctInfo[fctNo].up[1] = fctInfo[fctNo].up[0];
+                fctInfo[fctNo].g_up[1] = fctInfo[fctNo].g_up[0];
+                fctInfo[fctNo].localNo[1] = fctInfo[fctNo].localNo[0];
             }
         }
     }
@@ -130,6 +133,8 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
             cl.jacobianInv(J, jInv);
             cl.map(elNo, geoE, coords);
 
+            volInfo[elNo].cGID = mesh.elements().l2cg(elNo);
+
             // Compute shape measure for interior penalty method
             // See Shahbazi, "An explicit expression for the penalty parameter of the
             //                interior penalty method"
@@ -144,7 +149,7 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
                 double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
                 penalty += fctInfo[fctNo].area * half;
             }
-            penalty_[elNo] = penalty / volume;
+            volInfo[elNo].penalty = penalty / volume;
         }
     }
 }

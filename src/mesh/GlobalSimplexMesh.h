@@ -73,8 +73,7 @@ public:
      *
      * @return Returns mesh in distributed CSR format as required by ParMETIS.
      */
-    template<typename OutIntT>
-    DistributedCSR<OutIntT> distributedCSR() const {
+    template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR() const {
         DistributedCSR<OutIntT> csr;
 
         auto elmdist = makeSortedDistribution(numElements());
@@ -82,8 +81,8 @@ public:
         std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
 
         auto numElems = numElements();
-        csr.rowPtr.resize(numElems+1);
-        csr.colInd.resize(numElems*(D+1));
+        csr.rowPtr.resize(numElems + 1);
+        csr.colInd.resize(numElems * (D + 1));
 
         OutIntT ind = 0;
         OutIntT ptr = 0;
@@ -188,8 +187,17 @@ private:
     }
 
     template <std::size_t... Is> auto getAllLocalFaces(std::index_sequence<Is...>) const {
+        // Element contiguous GIDs only need prefix sum
+        std::size_t ownedSize = numElements();
+        std::size_t gidOffset;
+        MPI_Scan(&ownedSize, &gidOffset, 1, mpi_type_t<std::size_t>(), MPI_SUM, comm);
+        gidOffset -= ownedSize;
+        std::vector<std::size_t> cGIDs(numElements());
+        std::iota(cGIDs.begin(), cGIDs.end(), gidOffset);
+
         std::vector<Simplex<D>> elemsCopy(elems);
-        return std::make_tuple(getFaces<Is>()..., LocalFaces<D>(std::move(elemsCopy)));
+        return std::make_tuple(getFaces<Is>()...,
+                               LocalFaces<D>(std::move(elemsCopy), std::move(cGIDs)));
     }
 
     template <std::size_t DD> auto getPlex2Rank() const {
@@ -247,7 +255,7 @@ private:
         auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
         a2a.swap();
 
-        auto lf = LocalFaces<DD>(std::move(faces));
+        auto lf = LocalFaces<DD>(std::move(faces), getContiguousGIDs(requestedFaces, a2a));
         if constexpr (DD == 0) {
             if (vertexData) {
                 std::vector<std::size_t> lids;
@@ -278,6 +286,43 @@ private:
 
         getSharedRanks(lf, requestedFaces, a2a);
         return lf;
+    }
+
+    template <std::size_t DD>
+    std::vector<std::size_t> getContiguousGIDs(std::vector<Simplex<DD>> const& requestedFaces,
+                                               AllToAllV const& a2a) const {
+        std::vector<std::size_t> cGIDs;
+        cGIDs.reserve(requestedFaces.size());
+        if constexpr (DD == 0) {
+            for (auto& face : requestedFaces) {
+                cGIDs.emplace_back(face[0]);
+            }
+        } else {
+            int rank;
+            MPI_Comm_rank(comm, &rank);
+
+            std::map<Simplex<DD>, std::size_t> ownedFacesToCGID;
+            for (auto& face : requestedFaces) {
+                ownedFacesToCGID[face] = -1;
+            }
+
+            std::size_t ownedSize = ownedFacesToCGID.size();
+            std::size_t gidOffset;
+            MPI_Scan(&ownedSize, &gidOffset, 1, mpi_type_t<std::size_t>(), MPI_SUM, comm);
+            gidOffset -= ownedSize;
+
+            std::size_t cGID = gidOffset;
+            for (auto& faceToGID : ownedFacesToCGID) {
+                faceToGID.second = cGID++;
+            }
+
+            for (auto& face : requestedFaces) {
+                cGIDs.emplace_back(ownedFacesToCGID[face]);
+            }
+        }
+        assert(requestedFaces.size() == cGIDs.size());
+
+        return a2a.exchange(cGIDs);
     }
 
     template <std::size_t DD>
@@ -331,7 +376,6 @@ private:
     std::vector<std::size_t> vtxdist;
     ntuple_t<global_mesh_ptr, D> boundaryMeshes;
 };
-}
-
+} // namespace tndm
 
 #endif // GLOBALSIMPLEXMESH_H

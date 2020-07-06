@@ -63,11 +63,17 @@ protected:
 
     struct FacetInfo {
         std::array<std::size_t, 2> up;
+        std::array<std::size_t, 2> g_up;
         std::array<std::size_t, 2> localNo;
         double area;
     };
     std::vector<FacetInfo> fctInfo;
-    std::vector<double> penalty_;
+
+    struct VolInfo {
+        std::size_t cGID;
+        double penalty;
+    };
+    std::vector<VolInfo> volInfo;
 
     using fct_t =
         mneme::MultiStorage<mneme::DataLayout::SoA, JInv, JInvOther, Normal, NormalLength, Coords>;

@@ -10,7 +10,6 @@
 #include "parallel/MPITraits.h"
 #include "tensor/EigenMap.h"
 
-#include <Eigen/Core>
 #include <limits>
 #include <petscmat.h>
 #include <petscsys.h>
@@ -83,8 +82,8 @@ Mat Poisson::assemble() {
         krnl.J = vol[elNo].template get<AbsDetJ>().data();
         krnl.W = volRule.weights().data();
         krnl.execute();
-        PetscInt ib = elNo;
-        PetscInt jb = elNo;
+        PetscInt ib = volInfo[elNo].cGID;
+        PetscInt jb = volInfo[elNo].cGID;
         MatSetValuesBlocked(mat, 1, &ib, 1, &jb, A, ADD_VALUES);
     }
 
@@ -122,8 +121,8 @@ Mat Poisson::assemble() {
         local.execute();
 
         auto push = [&info, &mat](auto x, auto y, double* a) {
-            PetscInt ib = info.up[x()];
-            PetscInt jb = info.up[y()];
+            PetscInt ib = info.g_up[x()];
+            PetscInt jb = info.g_up[y()];
             MatSetValuesBlocked(mat, 1, &ib, 1, &jb, a, ADD_VALUES);
         };
 
@@ -192,7 +191,7 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
         rhs.b = b;
         rhs.execute();
 
-        PetscInt ib = elNo;
+        PetscInt ib = volInfo[elNo].cGID;
         VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
     }
 
@@ -222,7 +221,7 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
             rhs.w = fctRule.weights().data();
             rhs.execute();
 
-            PetscInt ib = info.up[0];
+            PetscInt ib = info.g_up[0];
             VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
         }
     }

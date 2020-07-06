@@ -6,8 +6,6 @@
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
 
-#include <Eigen/Core>
-#include <Eigen/SparseCore>
 #include <petscmat.h>
 #include <petscvec.h>
 
@@ -55,7 +53,7 @@ private:
         };
         double penaltyScale =
             (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
-        return penaltyScale * std::max(penalty_[info.up[0]], penalty_[info.up[1]]) *
+        return penaltyScale * std::max(volInfo[info.up[0]].penalty, volInfo[info.up[1]].penalty) *
                std::max(Kmax(info.up[0]), Kmax(info.up[1]));
     }
 

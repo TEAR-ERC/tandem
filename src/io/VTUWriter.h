@@ -7,6 +7,7 @@
 #include "geometry/Curvilinear.h"
 #include "tensor/Tensor.h"
 
+#include <mpi.h>
 #include <tinyxml2.h>
 
 #include <cstdint>
@@ -24,8 +25,9 @@ public:
 
     static int32_t VTKType(bool linear);
 
-    VTUWriter(unsigned degree = 1u, bool zlibCompress = true)
-        : refNodes_(EquidistantNodesFactory<D>()(degree)), zlibCompress_(zlibCompress) {
+    VTUWriter(unsigned degree = 1u, bool zlibCompress = true, MPI_Comm comm = MPI_COMM_WORLD)
+        : refNodes_(EquidistantNodesFactory<D>()(degree)), zlibCompress_(zlibCompress),
+          comm_(comm) {
         auto grid = doc_.NewElement("UnstructuredGrid");
         doc_.InsertFirstChild(grid);
     }
@@ -59,6 +61,7 @@ private:
 
     std::vector<std::array<double, D>> refNodes_;
     bool zlibCompress_;
+    MPI_Comm comm_;
     std::vector<unsigned char> appended_;
     tinyxml2::XMLDocument doc_;
 };

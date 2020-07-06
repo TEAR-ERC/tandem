@@ -77,11 +77,16 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl) 
         addDataArray(cells, "offsets", 1, offsets);
 
         auto vtkType = VTKType(refNodes_.size() == (D + 1ul));
-        auto types = std::vector<int32_t>(cl.numElements(), vtkType);
+        auto types = std::vector<uint8_t>(cl.numElements(), vtkType);
         addDataArray(cells, "types", 1, types);
     }
 
-    return VTUPiece<D>(piece, *this);
+    auto vtupiece = VTUPiece<D>(piece, *this);
+    int rank;
+    MPI_Comm_rank(comm_, &rank);
+    auto partition = std::vector<int32_t>(cl.numElements(), rank);
+    vtupiece.addCellData("partition", partition);
+    return vtupiece;
 }
 
 template <std::size_t D>
@@ -149,7 +154,7 @@ XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& na
 
 template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_rank(comm_, &rank);
     auto formatName = [&baseName](int rk) {
         std::stringstream nameS;
         nameS << baseName << "-" << rk << ".vtu";
@@ -206,7 +211,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
         if (grid) {
             grid->SetAttribute("GhostLevel", 0);
             int commSize;
-            MPI_Comm_size(MPI_COMM_WORLD, &commSize);
+            MPI_Comm_size(comm_, &commSize);
             for (int rk = 0; rk < commSize; ++rk) {
                 auto piece = grid->InsertNewChildElement("Piece");
                 piece->SetAttribute("Source", formatName(rk).c_str());

@@ -69,7 +69,8 @@ public:
      * @return L2 error
      */
     static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
-                     SolutionInterface const& reference);
+                     SolutionInterface const& reference, int targetRank = 0,
+                     MPI_Comm = MPI_COMM_WORLD);
 };
 
 } // namespace tndm
