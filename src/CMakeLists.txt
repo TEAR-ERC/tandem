@@ -42,13 +42,12 @@ find_package(ZLIB REQUIRED)
 target_include_directories(tandem-lib PUBLIC 
     ../submodules/
     ../submodules/mneme/include/
-    ${PARMETIS_INCLUDE_DIRS}
 )
 target_link_libraries(tandem-lib PUBLIC
     tandem-fem-lib
     MPI::MPI_CXX
     OpenMP::OpenMP_CXX
-    ${PARMETIS_LIBRARIES}
+    PARMETIS::PARMETIS
     tinyxml2
     ZLIB::ZLIB
 )
