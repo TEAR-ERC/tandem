@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    if (procs > 0) {
+    if (procs > 1) {
         std::cerr << "(TODO) Warning: Penalty is not synced on ghost layer (yet). Parallel error "
                      "differs from serial error."
                   << std::endl;

@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <set>
@@ -77,7 +78,7 @@ public:
         DistributedCSR<OutIntT> csr;
 
         auto elmdist = makeSortedDistribution(numElements());
-        csr.dist.reserve(elmdist.size());
+        csr.dist.resize(elmdist.size());
         std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
 
         auto numElems = numElements();
