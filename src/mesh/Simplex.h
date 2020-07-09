@@ -62,6 +62,13 @@ public:
         }
         return verts;
     }
+
+    constexpr static auto invalidSimplex() {
+        Simplex<D> plex;
+        std::fill(plex.begin(), plex.end(),
+                  std::numeric_limits<typename SimplexBase<D>::base_t::value_type>::max());
+        return plex;
+    }
 };
 
 template <> class Simplex<0> : public SimplexBase<0> {};
