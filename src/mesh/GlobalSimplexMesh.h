@@ -207,34 +207,28 @@ private:
 
     std::vector<Simplex<D>> getGhostElements(std::vector<Simplex<D>> elems,
                                              unsigned overlap) const {
-        int procs;
-        MPI_Comm_size(comm, &procs);
-
-        bool hasDomainBoundaryFaces = false;
-        std::unordered_set<Simplex<D - 1u>, SimplexHash<D - 1u>> domainBoundaryFaces;
-
-        for (unsigned ol = 1; ol <= overlap; ++ol) {
-            auto up = getBoundaryFaces(elems);
-            if (hasDomainBoundaryFaces) {
-                for (auto& face : domainBoundaryFaces) {
-                    up.erase(face);
-                }
-            } else {
-                domainBoundaryFaces = deleteDomainBoundaryFaces(up);
-            }
-        int rank;
-        MPI_Comm_rank(comm, &rank);
-        std::cout << ol << " " << rank << " | ";
-        for (auto&& u : up) {
-            for (auto&& y : u.first) {
-                std::cout << y << " ";
-            }
-            std::cout << " :: ";
+        if (overlap == 0) {
+            return elems;
         }
-        std::cout << std::endl;
 
+        int rank, procs;
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &procs);
+        mpi_array_type<uint64_t> mpi_facet_t(D);
+        mpi_array_type<uint64_t> mpi_elem_t(D + 1u);
+        auto plex2rank = getPlex2Rank<D - 1u>();
+        auto myComm = comm;
+
+        auto const makeDistributedUpwardMap = [&procs, &myComm, &mpi_facet_t, &mpi_elem_t,
+                                               &plex2rank](auto&& elems) {
+            std::unordered_multimap<Simplex<D - 1u>, Simplex<D>, SimplexHash<D - 1u>> up;
+            for (auto&& elem : elems) {
+                auto downward = elem.template downward<D - 1u>();
+                for (auto& s : downward) {
+                    up.emplace(s, elem);
+                }
+            }
             std::vector<int> counts(procs, 0);
-            auto plex2rank = getPlex2Rank<D - 1u>();
             for (auto&& u : up) {
                 ++counts[plex2rank(u.first)];
             }
@@ -242,41 +236,94 @@ private:
             offsets[0] = 0;
             std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
 
-            std::vector<Simplex<D - 1u>> boundaryFaces(offsets.back());
-            std::vector<Simplex<D>> boundaryElems(offsets.back());
+            std::vector<Simplex<D - 1u>> upFaces(offsets.back());
+            std::vector<Simplex<D>> upElems(offsets.back());
             for (auto&& u : up) {
                 auto rank = plex2rank(u.first);
-                boundaryFaces[offsets[rank]] = u.first;
-                boundaryElems[offsets[rank]] = elems[u.second];
+                upFaces[offsets[rank]] = u.first;
+                upElems[offsets[rank]] = u.second;
                 ++offsets[rank];
             }
 
-            // Exchange boundary faces and elements
-            AllToAllV a2a(counts, comm);
-            mpi_array_type<uint64_t> mpi_facet_t(D);
-            mpi_array_type<uint64_t> mpi_elem_t(D + 1u);
-            auto requestedBoundaryFaces = a2a.exchange(boundaryFaces, mpi_facet_t.get());
-            auto requestedBoundaryElems = a2a.exchange(boundaryElems, mpi_elem_t.get());
-            a2a.swap();
+            AllToAllV a2a(std::move(counts), myComm);
+            auto receivedUpFaces = a2a.exchange(upFaces, mpi_facet_t.get());
+            auto receivedUpElems = a2a.exchange(upElems, mpi_elem_t.get());
 
-            std::unordered_multimap<Simplex<D - 1u>, Simplex<D>, SimplexHash<D - 1u>> requestedUp;
-            for (std::size_t i = 0; i < requestedBoundaryFaces.size(); ++i) {
-                requestedUp.emplace(requestedBoundaryFaces[i], requestedBoundaryElems[i]);
+            std::unordered_multimap<Simplex<D - 1u>, std::pair<int, Simplex<D>>,
+                                    SimplexHash<D - 1u>>
+                distUp;
+            for (auto [p, i] : a2a.getRDispls()) {
+                distUp.emplace(receivedUpFaces[i], std::make_pair(p, receivedUpElems[i]));
             }
+            return distUp;
+        };
 
-            for (std::size_t i = 0; i < requestedBoundaryElems.size(); ++i) {
-                auto range = requestedUp.equal_range(requestedBoundaryFaces[i]);
-                while (range.first != range.second &&
-                       range.first->second == requestedBoundaryElems[i]) {
-                    ++range.first;
+        auto distUp = makeDistributedUpwardMap(elems);
+
+        for (int level = 0; level < static_cast<int>(overlap); ++level) {
+            auto up = getBoundaryFaces(elems);
+
+            auto const getRequestedFacesAndMissingVertices = [&procs, &myComm, &mpi_facet_t,
+                                                              &plex2rank](auto&& elems, auto&& up) {
+                std::vector<int> counts(procs, 0);
+                for (auto&& u : up) {
+                    ++counts[plex2rank(u.first)];
                 }
-                assert(range.first != range.second);
-                requestedBoundaryElems[i] = range.first->second;
+                std::vector<std::ptrdiff_t> offsets(procs + 1);
+                offsets[0] = 0;
+                std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
+
+                std::vector<Simplex<D - 1u>> boundaryFaces(offsets.back());
+                std::vector<uint64_t> missingVertex(offsets.back());
+                for (auto&& u : up) {
+                    // Find missing vertex i.e. elem \ facet
+                    auto& elem = elems[u.second];
+                    auto f = u.first.begin();
+                    auto e = elem.begin();
+                    while (e != elem.end() && f != u.first.end() && *e == *f) {
+                        ++f;
+                        ++e;
+                    }
+                    assert(e != elem.end());
+
+                    auto rank = plex2rank(u.first);
+                    boundaryFaces[offsets[rank]] = u.first;
+                    missingVertex[offsets[rank]] = *e;
+                    ++offsets[rank];
+                }
+
+                AllToAllV a2a(std::move(counts), myComm);
+                auto requestedBoundaryFaces = a2a.exchange(boundaryFaces, mpi_facet_t.get());
+                auto requestedMissingVertices = a2a.exchange(missingVertex);
+                return std::make_tuple(requestedBoundaryFaces, requestedMissingVertices, a2a);
+            };
+
+            auto [requestedBoundaryFaces, requestedMissingVertices, a2a] =
+                getRequestedFacesAndMissingVertices(elems, up);
+
+            std::vector<Simplex<D>> requestedBoundaryElems(requestedBoundaryFaces.size());
+            for (auto [p, i] : a2a.getRDispls()) {
+                auto [it, end] = distUp.equal_range(requestedBoundaryFaces[i]);
+                while (it != end &&
+                       std::find(it->second.second.begin(), it->second.second.end(),
+                                 requestedMissingVertices[i]) != it->second.second.end()) {
+                    ++it;
+                }
+                // Neighbour could not be found (i.e. domain boundary)
+                if (it == end) {
+                    requestedBoundaryElems[i] = Simplex<D>::invalidSimplex();
+                } else {
+                    requestedBoundaryElems[i] = it->second.second;
+                }
             }
-            boundaryElems = a2a.exchange(requestedBoundaryElems, mpi_elem_t.get());
+            a2a.swap();
+            auto boundaryElems = a2a.exchange(requestedBoundaryElems, mpi_elem_t.get());
 
             // Remove duplicates
             std::sort(boundaryElems.begin(), boundaryElems.end());
+            boundaryElems.erase(
+                std::find(boundaryElems.begin(), boundaryElems.end(), Simplex<D>::invalidSimplex()),
+                boundaryElems.end());
             boundaryElems.erase(std::unique(boundaryElems.begin(), boundaryElems.end()),
                                 boundaryElems.end());
 
@@ -308,77 +355,8 @@ private:
                 }
             }
         };
-        //int rank;
-        //MPI_Comm_rank(comm, &rank);
-        //std::cout << rank << " | ";
-        //for (auto&& u : up) {
-            //for (auto&& y : u.first) {
-                //std::cout << y << " ";
-            //}
-            //std::cout << " :: ";
-        //}
-        //std::cout << std::endl;
         deleteInternalFaces(up);
-        //std::cout << rank << " | ";
-        //for (auto&& u : up) {
-            //for (auto&& y : u.first) {
-                //std::cout << y << " ";
-            //}
-            //std::cout << " || ";
-        //}
-        //std::cout << std::endl;
         return up;
-    }
-
-    auto deleteDomainBoundaryFaces(
-        std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>>& up) const {
-        int procs;
-        MPI_Comm_size(comm, &procs);
-        auto myComm = comm;
-        auto plex2rank = getPlex2Rank<D - 1u>();
-        auto const figureOutWhichFacesAppearTwiceInDistributedMemory = [&procs, &myComm,
-                                                                        &plex2rank](auto& up) {
-            std::vector<int> counts(procs, 0);
-            for (auto&& u : up) {
-                ++counts[plex2rank(u.first)];
-            }
-            // Send domain and partition boundary faces to face owner
-            std::vector<std::ptrdiff_t> offsets(procs + 1);
-            offsets[0] = 0;
-            std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
-            auto faces = std::vector<Simplex<D - 1u>>(offsets.back());
-            for (auto&& u : up) {
-                auto rank = plex2rank(u.first);
-                faces[offsets[rank]++] = u.first;
-            }
-            AllToAllV a2a(counts, myComm);
-            mpi_array_type<uint64_t> mpi_plex_t(D);
-            auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
-            auto requestedFacesAsMultiset =
-                std::unordered_multiset<Simplex<D - 1u>, SimplexHash<D - 1u>>(
-                    requestedFaces.begin(), requestedFaces.end());
-            auto requestedFaceCount = std::vector<std::size_t>(requestedFaces.size());
-            for (std::size_t fNo = 0; fNo < requestedFaces.size(); ++fNo) {
-                requestedFaceCount[fNo] = requestedFacesAsMultiset.count(requestedFaces[fNo]);
-            }
-            a2a.swap();
-            auto faceCount = a2a.exchange(requestedFaceCount);
-            return std::make_pair(faces, faceCount);
-        };
-
-        auto [faces, faceCount] = figureOutWhichFacesAppearTwiceInDistributedMemory(up);
-
-        std::unordered_set<Simplex<D - 1u>, SimplexHash<D - 1u>> domainBoundaryFaces;
-        assert(faceCount.size() == faces.size());
-        for (std::size_t fNo = 0; fNo < faceCount.size(); ++fNo) {
-            assert(1 <= faceCount[fNo] && faceCount[fNo] <= 2);
-            if (faceCount[fNo] == 1) {
-                assert(up.find(faces[fNo]) != up.end());
-                up.erase(faces[fNo]);
-                domainBoundaryFaces.insert(faces[fNo]);
-            }
-        }
-        return domainBoundaryFaces;
     }
 
     template <std::size_t DD> auto getPlex2Rank() const {
