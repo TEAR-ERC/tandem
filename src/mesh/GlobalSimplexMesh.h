@@ -11,6 +11,7 @@
 #include "parallel/MPITraits.h"
 #include "parallel/MetisPartitioner.h"
 #include "parallel/SortedDistribution.h"
+#include "util/Algorithm.h"
 #include "util/Utility.h"
 
 #include <mpi.h>
@@ -191,24 +192,25 @@ private:
 
     template <std::size_t... Is>
     auto getAllLocalFaces(unsigned overlap, std::index_sequence<Is...>) const {
-        auto elemsCopy = getGhostElements(elems_, overlap);
-        // Element contiguous GIDs only need prefix sum
-        std::size_t ownedSize = numElements();
-        std::size_t gidOffset;
-        MPI_Scan(&ownedSize, &gidOffset, 1, mpi_type_t<std::size_t>(), MPI_SUM, comm);
-        gidOffset -= ownedSize;
-        std::vector<std::size_t> cGIDs(numElements());
-        std::iota(cGIDs.begin(), cGIDs.end(), gidOffset);
-
-        auto localFaces = std::make_tuple(getFaces<Is>(elemsCopy)...);
-        return std::tuple_cat(std::move(localFaces), std::make_tuple(LocalFaces<D>(
-                                                         std::move(elemsCopy), std::move(cGIDs))));
+        auto localElems = getGhostElements(elems_, overlap);
+        return std::make_tuple(getFaces<Is>(localElems.faces())..., std::move(localElems));
     }
 
-    std::vector<Simplex<D>> getGhostElements(std::vector<Simplex<D>> elems,
-                                             unsigned overlap) const {
+    LocalFaces<D> getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap) const {
+        auto myComm = comm;
+        auto const getElementContiguousGIDs = [&myComm](std::size_t numElems) {
+            std::size_t ownedSize = numElems;
+            std::size_t gidOffset;
+            MPI_Scan(&ownedSize, &gidOffset, 1, mpi_type_t<std::size_t>(), MPI_SUM, myComm);
+            gidOffset -= ownedSize;
+            std::vector<std::size_t> cGIDs(numElems);
+            std::iota(cGIDs.begin(), cGIDs.end(), gidOffset);
+            return cGIDs;
+        };
+        auto cGIDs = getElementContiguousGIDs(numElements());
+
         if (overlap == 0) {
-            return elems;
+            return LocalFaces<D>(std::move(elems), std::move(cGIDs));
         }
 
         int rank, procs;
@@ -217,15 +219,15 @@ private:
         mpi_array_type<uint64_t> mpi_facet_t(D);
         mpi_array_type<uint64_t> mpi_elem_t(D + 1u);
         auto plex2rank = getPlex2Rank<D - 1u>();
-        auto myComm = comm;
 
         auto const makeDistributedUpwardMap = [&procs, &myComm, &mpi_facet_t, &mpi_elem_t,
-                                               &plex2rank](auto&& elems) {
-            std::unordered_multimap<Simplex<D - 1u>, Simplex<D>, SimplexHash<D - 1u>> up;
-            for (auto&& elem : elems) {
-                auto downward = elem.template downward<D - 1u>();
+                                               &plex2rank](auto&& elems,
+                                                           std::vector<std::size_t> const& cGIDs) {
+            std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>> up;
+            for (std::size_t elNo = 0; elNo < elems.size(); ++elNo) {
+                auto downward = elems[elNo].template downward<D - 1u>();
                 for (auto& s : downward) {
-                    up.emplace(s, elem);
+                    up.emplace(s, elNo);
                 }
             }
             std::vector<int> counts(procs, 0);
@@ -238,27 +240,31 @@ private:
 
             std::vector<Simplex<D - 1u>> upFaces(offsets.back());
             std::vector<Simplex<D>> upElems(offsets.back());
+            std::vector<std::size_t> upCGIDs(offsets.back());
             for (auto&& u : up) {
                 auto rank = plex2rank(u.first);
                 upFaces[offsets[rank]] = u.first;
-                upElems[offsets[rank]] = u.second;
+                upElems[offsets[rank]] = elems[u.second];
+                upCGIDs[offsets[rank]] = cGIDs[u.second];
                 ++offsets[rank];
             }
 
             AllToAllV a2a(std::move(counts), myComm);
             auto receivedUpFaces = a2a.exchange(upFaces, mpi_facet_t.get());
             auto receivedUpElems = a2a.exchange(upElems, mpi_elem_t.get());
+            auto receivedUpCGIDs = a2a.exchange(upCGIDs);
 
-            std::unordered_multimap<Simplex<D - 1u>, std::pair<int, Simplex<D>>,
+            std::unordered_multimap<Simplex<D - 1u>, std::pair<std::size_t, Simplex<D>>,
                                     SimplexHash<D - 1u>>
                 distUp;
-            for (auto [p, i] : a2a.getRDispls()) {
-                distUp.emplace(receivedUpFaces[i], std::make_pair(p, receivedUpElems[i]));
+            for (std::size_t i = 0; i < receivedUpFaces.size(); ++i) {
+                distUp.emplace(receivedUpFaces[i],
+                               std::make_pair(receivedUpCGIDs[i], receivedUpElems[i]));
             }
             return distUp;
         };
 
-        auto distUp = makeDistributedUpwardMap(elems);
+        auto distUp = makeDistributedUpwardMap(elems, cGIDs);
 
         for (int level = 0; level < static_cast<int>(overlap); ++level) {
             auto up = getBoundaryFaces(elems);
@@ -302,7 +308,8 @@ private:
                 getRequestedFacesAndMissingVertices(elems, up);
 
             std::vector<Simplex<D>> requestedBoundaryElems(requestedBoundaryFaces.size());
-            for (auto [p, i] : a2a.getRDispls()) {
+            std::vector<std::size_t> requestedCGIDs(requestedBoundaryFaces.size());
+            for (std::size_t i = 0; i < requestedBoundaryFaces.size(); ++i) {
                 auto [it, end] = distUp.equal_range(requestedBoundaryFaces[i]);
                 while (it != end &&
                        std::find(it->second.second.begin(), it->second.second.end(),
@@ -311,26 +318,45 @@ private:
                 }
                 // Neighbour could not be found (i.e. domain boundary)
                 if (it == end) {
+                    requestedCGIDs[i] = std::numeric_limits<std::size_t>::max();
                     requestedBoundaryElems[i] = Simplex<D>::invalidSimplex();
                 } else {
+                    requestedCGIDs[i] = it->second.first;
                     requestedBoundaryElems[i] = it->second.second;
                 }
             }
             a2a.swap();
             auto boundaryElems = a2a.exchange(requestedBoundaryElems, mpi_elem_t.get());
+            auto boundaryCGIDs = a2a.exchange(requestedCGIDs);
 
             // Remove duplicates
-            std::sort(boundaryElems.begin(), boundaryElems.end());
-            boundaryElems.erase(
-                std::find(boundaryElems.begin(), boundaryElems.end(), Simplex<D>::invalidSimplex()),
-                boundaryElems.end());
+            std::vector<std::size_t> enumeration(boundaryElems.size());
+            std::iota(enumeration.begin(), enumeration.end(), std::size_t(0));
+            std::sort(enumeration.begin(), enumeration.end(),
+                      [&boundaryElems](std::size_t a, std::size_t b) {
+                          return boundaryElems[a] < boundaryElems[b];
+                      });
+            apply_permutation(boundaryElems, enumeration);
+            apply_permutation(boundaryCGIDs, enumeration);
+            auto firstInvalid =
+                std::find(boundaryElems.begin(), boundaryElems.end(), Simplex<D>::invalidSimplex());
+            boundaryElems.erase(firstInvalid, boundaryElems.end());
+            boundaryCGIDs.erase(boundaryCGIDs.begin() +
+                                    std::distance(boundaryElems.begin(), firstInvalid),
+                                boundaryCGIDs.end());
             boundaryElems.erase(std::unique(boundaryElems.begin(), boundaryElems.end()),
                                 boundaryElems.end());
+            boundaryCGIDs.erase(std::unique(boundaryCGIDs.begin(), boundaryCGIDs.end()),
+                                boundaryCGIDs.end());
+
+            assert(boundaryElems.size() == boundaryCGIDs.size());
 
             elems.reserve(elems.size() + boundaryElems.size());
             elems.insert(elems.end(), boundaryElems.begin(), boundaryElems.end());
+            cGIDs.reserve(cGIDs.size() + boundaryCGIDs.size());
+            cGIDs.insert(cGIDs.end(), boundaryCGIDs.begin(), boundaryCGIDs.end());
         }
-        return elems;
+        return LocalFaces<D>(std::move(elems), std::move(cGIDs));
     }
 
     auto getBoundaryFaces(std::vector<Simplex<D>> const& elems) const {

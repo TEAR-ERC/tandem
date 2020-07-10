@@ -40,7 +40,9 @@ public:
         assert(lid < l2cg_.size());
         return l2cg_[lid];
     }
+    auto const& continuousGIDs() const { return l2cg_; }
 
+    auto const& faces() const { return faces_; }
     auto begin() const { return faces_.cbegin(); }
     auto end() const { return faces_.cend(); }
 

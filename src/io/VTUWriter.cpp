@@ -1,12 +1,9 @@
 #include "VTUWriter.h"
-#include "DataType.h"
 #include "Endianness.h"
 
 #include <functional>
 #include <mpi.h>
 #include <numeric>
-#include <tinyxml2.h>
-#include <zlib.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -108,48 +105,6 @@ void VTUPiece<D>::addPointData(std::string const& name, FiniteElementFunction<D>
         function.map(elNo, E, result);
     }
     writer_.addDataArray(pdata, name, 1, data);
-}
-
-template <std::size_t D>
-template <typename T>
-XMLElement* VTUWriter<D>::addDataArray(XMLElement* parent, std::string const& name,
-                                       std::size_t numComponents, T const* data,
-                                       std::size_t dataSize) {
-    auto da = parent->InsertNewChildElement("DataArray");
-    auto dataType = DataType(T{});
-    da->SetAttribute("type", dataType.vtkIdentifier().c_str());
-    da->SetAttribute("Name", name.c_str());
-    da->SetAttribute("NumberOfComponents", numComponents);
-    da->SetAttribute("format", "appended");
-
-    auto offset = appended_.size();
-    da->SetAttribute("offset", offset);
-
-    header_t size = dataSize * sizeof(T);
-
-    if (zlibCompress_) {
-        struct {
-            header_t blocks;
-            header_t blockSize;
-            header_t lastBlockSize;
-            header_t compressedBlocksizes;
-        } header{1, size, size, 0};
-        auto destLen = compressBound(size);
-        appended_.resize(offset + sizeof(header) + destLen);
-        unsigned char* app = appended_.data() + offset;
-        compress(app + sizeof(header), &destLen, reinterpret_cast<unsigned char const*>(data),
-                 size);
-        header.compressedBlocksizes = destLen;
-        memcpy(app, &header, sizeof(header));
-        appended_.resize(offset + sizeof(header) + destLen);
-    } else {
-        appended_.resize(appended_.size() + sizeof(size) + size);
-        unsigned char* app = appended_.data() + offset;
-        memcpy(app, &size, sizeof(size));
-        app += sizeof(size);
-        memcpy(app, data, size);
-    }
-    return da;
 }
 
 template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
