@@ -47,8 +47,8 @@ std::array<GenMesh<3>::simplex_t, 5> GenMesh<3>::tessellate(std::array<uint64_t,
 
 template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() {
     int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(comm_, &rank);
+    MPI_Comm_size(comm_, &size);
 
     std::size_t numVertsGlobal = 1u;
     for (auto& np1 : Np1) {
@@ -114,7 +114,8 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
     }
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
-    auto mesh = std::make_unique<mesh_t>(std::move(elements), std::move(vertexData));
+    auto mesh =
+        std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr, comm_);
     auto boundaryMesh = extractBoundaryMesh(*mesh);
     mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
     return mesh;
@@ -142,7 +143,7 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) {
     }
     auto boundaryData = std::make_unique<boundary_data_t>(std::move(boundaryConditions));
     return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
-                                             std::move(boundaryData));
+                                             std::move(boundaryData), comm_);
 }
 
 template class GenMesh<2u>;

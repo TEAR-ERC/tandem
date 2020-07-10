@@ -5,7 +5,7 @@ namespace tndm {
 
 template <std::size_t D> void GlobalSimplexMesh<D>::repartition() {
     auto distCSR = distributedCSR<idx_t>();
-    auto partition = MetisPartitioner::partition(distCSR, D);
+    auto partition = MetisPartitioner::partition(distCSR, D, 1.05, comm);
 
     doPartition(partition);
     isPartitionedByHash = false;
