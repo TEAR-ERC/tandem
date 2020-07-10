@@ -78,7 +78,7 @@ public:
     template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR() const {
         DistributedCSR<OutIntT> csr;
 
-        auto elmdist = makeSortedDistribution(numElements());
+        auto elmdist = makeSortedDistribution(numElements(), comm);
         csr.dist.resize(elmdist.size());
         std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
 

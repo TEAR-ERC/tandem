@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
     auto n = program.get<unsigned long>("n");
     std::array<uint64_t, DomainDimension> size;
     size.fill(n);
-    GenMesh meshGen(size);
+    GenMesh meshGen(size, PETSC_COMM_WORLD);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
     }
 
     if (auto fileName = program.present("-o")) {
-        VTUWriter<2u> writer(PolynomialDegree);
+        VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto piece = writer.addPiece(cl);
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());

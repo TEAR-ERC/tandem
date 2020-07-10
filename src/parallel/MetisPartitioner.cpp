@@ -1,18 +1,14 @@
 #include "MetisPartitioner.h"
-#include <mpi.h>
 
 namespace tndm {
 
-std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr,
-                                               idx_t ncommonnodes,
-                                               real_t imbalanceTol) {
-    MPI_Comm comm = MPI_COMM_WORLD;
-
+std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr, idx_t ncommonnodes,
+                                               real_t imbalanceTol, MPI_Comm comm) {
     int rank, procs;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &procs);
 
-    std::vector<idx_t> partition(csr.dist[rank+1]-csr.dist[rank]);
+    std::vector<idx_t> partition(csr.dist[rank + 1] - csr.dist[rank]);
 
     idx_t* elmdist = csr.dist.data();
     idx_t* eptr = csr.rowPtr.data();
@@ -35,4 +31,4 @@ std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr,
     return partition;
 }
 
-}
+} // namespace tndm

@@ -60,7 +60,7 @@ public:
      *
      * @param N array of (cuboid) elements in dimension d
      */
-    GenMesh(std::array<uint64_t, D> const& N) : N(N) {
+    GenMesh(std::array<uint64_t, D> const& N, MPI_Comm comm = MPI_COMM_WORLD) : N(N), comm_(comm) {
         // vertices live on grid with size (N_1+1) x ... x (N_d+1)
         for (std::size_t d = 0; d < D; ++d) {
             Np1[d] = N[d] + 1;
@@ -80,6 +80,7 @@ public:
 
 private:
     std::array<uint64_t, D> N;
+    MPI_Comm comm_;
     std::array<uint64_t, D> Np1;
 };
 

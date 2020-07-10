@@ -18,11 +18,11 @@ namespace tndm {
                      from + perRank + (rank < extras ? 1 : 0));
     }
 
-    template<typename IntT>
-    auto distribute(Range<IntT> const& range) {
+    template <typename IntT>
+    auto distribute(Range<IntT> const& range, MPI_Comm comm = MPI_COMM_WORLD) {
         int rank, size;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        MPI_Comm_size(MPI_COMM_WORLD, &size);
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &size);
 
         return distribute<IntT>(range, rank, size);
     }
