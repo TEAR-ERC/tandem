@@ -28,6 +28,7 @@ add_library(tandem-lib
     form/Error.cpp
     io/VTUWriter.cpp
     mesh/GenMesh.cpp
+    mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
