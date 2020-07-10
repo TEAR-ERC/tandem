@@ -1,10 +1,10 @@
-#ifndef SORTEDDISTRIBUTION_H
-#define SORTEDDISTRIBUTION_H
+#ifndef SORTEDDISTRIBUTION_20200710_H
+#define SORTEDDISTRIBUTION_20200710_H
 
 #include <cassert>
 #include <cstddef>
-#include <vector>
 #include <mpi.h>
+#include <vector>
 
 namespace tndm {
 
@@ -12,7 +12,8 @@ std::vector<std::size_t> makeSortedDistribution(std::size_t num, MPI_Comm comm =
 
 class SortedDistributionToRank {
 public:
-    SortedDistributionToRank(std::vector<std::size_t> const& dist) : dist(dist), guessSize(dist.back() / (dist.size()-1)) {}
+    SortedDistributionToRank(std::vector<std::size_t> const& dist)
+        : dist(dist), guessSize(dist.back() / (dist.size() - 1)) {}
 
     int operator()(std::size_t id) const;
 
@@ -21,7 +22,6 @@ private:
     std::size_t guessSize;
 };
 
-}
+} // namespace tndm
 
-
-#endif // SORTEDDISTRIBUTION_H
+#endif // SORTEDDISTRIBUTION_20200710_H
