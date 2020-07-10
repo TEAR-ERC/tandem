@@ -3,6 +3,7 @@
 
 #include "MeshData.h"
 #include "Simplex.h"
+#include "util/Range.h"
 
 #include "mneme/displacements.hpp"
 #include "mneme/span.hpp"
@@ -25,8 +26,9 @@ public:
     using l2cg_t = std::vector<std::size_t>;
 
     LocalFaces() {}
-    LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<std::size_t>&& contiguousGIDs)
-        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)) {
+    LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<std::size_t>&& contiguousGIDs,
+               Displacements<std::size_t>&& owners)
+        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), owners_(std::move(owners)) {
         makeG2LMap();
     }
 
@@ -57,6 +59,14 @@ public:
         return span(&sharedRanks_[from], sharedRanksDispls_.count(lid));
     }
 
+    /**
+     * @brief Returns interval [start, stop) of local ids owned by rank
+     */
+    auto lidRangeOwnedBy(int rank) const {
+        assert(rank < owners_.size());
+        return Range(owners_[rank], owners_[rank + 1]);
+    }
+
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
 
@@ -72,6 +82,7 @@ private:
     std::vector<Simplex<D>> faces_;
     l2cg_t l2cg_;
     g2l_t g2l_;
+    Displacements<std::size_t> owners_;
     std::vector<int> sharedRanks_;
     Displacements<int> sharedRanksDispls_;
     std::unique_ptr<MeshData> meshData_;

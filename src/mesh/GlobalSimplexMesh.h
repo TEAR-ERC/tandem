@@ -56,7 +56,7 @@ public:
         : elems_(std::move(elements)), vertexData(std::move(vertexDat)),
           elementData(std::move(elementDat)), comm(comm), isPartitionedByHash(false) {
         if (vertexData) {
-            vtxdist = makeSortedDistribution(vertexData->size());
+            vtxdist = makeSortedDistribution(vertexData->size(), comm);
         }
     }
 
@@ -141,10 +141,12 @@ private:
     template <std::size_t... Is>
     auto getAllLocalFaces(unsigned overlap, std::index_sequence<Is...>) const {
         auto localElems = getGhostElements(elems_, overlap);
+        setSharedRanksAndElementData(localElems);
         return std::make_tuple(getFaces<Is>(localElems.faces())..., std::move(localElems));
     }
 
     LocalFaces<D> getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap) const;
+    void setSharedRanksAndElementData(LocalFaces<D>& elems) const;
 
     auto getBoundaryFaces(std::vector<Simplex<D>> const& elems) const {
         // Construct upward map from faces to local element ids
@@ -215,6 +217,8 @@ private:
             total += size;
         }
 
+        auto owners = Displacements<std::size_t>(counts);
+
         std::vector<Simplex<DD>> faces;
         faces.reserve(total);
         for (auto& perRank : requiredFaces) {
@@ -227,7 +231,8 @@ private:
         auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
         a2a.swap();
 
-        auto lf = LocalFaces<DD>(std::move(faces), getContiguousGIDs(requestedFaces, a2a));
+        auto lf = LocalFaces<DD>(std::move(faces), getContiguousGIDs(requestedFaces, a2a),
+                                 std::move(owners));
         if constexpr (DD == 0) {
             if (vertexData) {
                 std::vector<std::size_t> lids;
