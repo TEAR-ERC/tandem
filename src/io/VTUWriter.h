@@ -1,6 +1,7 @@
 #ifndef VTUWRITER_20200629_H
 #define VTUWRITER_20200629_H
 
+#include "DataType.h"
 #include "basis/Equidistant.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
@@ -9,6 +10,7 @@
 
 #include <mpi.h>
 #include <tinyxml2.h>
+#include <zlib.h>
 
 #include <cstdint>
 #include <string>
@@ -51,7 +53,43 @@ private:
     template <typename T>
     tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
                                        std::size_t numComponents, T const* data,
-                                       std::size_t dataSize);
+                                       std::size_t dataSize) {
+        auto da = parent->InsertNewChildElement("DataArray");
+        auto dataType = DataType(T{});
+        da->SetAttribute("type", dataType.vtkIdentifier().c_str());
+        da->SetAttribute("Name", name.c_str());
+        da->SetAttribute("NumberOfComponents", numComponents);
+        da->SetAttribute("format", "appended");
+
+        auto offset = appended_.size();
+        da->SetAttribute("offset", offset);
+
+        header_t size = dataSize * sizeof(T);
+
+        if (zlibCompress_) {
+            struct {
+                header_t blocks;
+                header_t blockSize;
+                header_t lastBlockSize;
+                header_t compressedBlocksizes;
+            } header{1, size, size, 0};
+            auto destLen = compressBound(size);
+            appended_.resize(offset + sizeof(header) + destLen);
+            unsigned char* app = appended_.data() + offset;
+            compress(app + sizeof(header), &destLen, reinterpret_cast<unsigned char const*>(data),
+                     size);
+            header.compressedBlocksizes = destLen;
+            memcpy(app, &header, sizeof(header));
+            appended_.resize(offset + sizeof(header) + destLen);
+        } else {
+            appended_.resize(appended_.size() + sizeof(size) + size);
+            unsigned char* app = appended_.data() + offset;
+            memcpy(app, &size, sizeof(size));
+            app += sizeof(size);
+            memcpy(app, data, size);
+        }
+        return da;
+    }
 
     template <typename T>
     tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
