@@ -76,7 +76,8 @@ LocalFaces<D> GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> ele
     if (overlap == 0) {
         auto ownerRanksCount = std::vector<std::size_t>(procs, 0);
         ownerRanksCount[rank] = elems.size();
-        return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount));
+        return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount),
+                             rank);
     }
 
     mpi_array_type<uint64_t> mpi_facet_t(D);
@@ -230,7 +231,7 @@ LocalFaces<D> GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> ele
     for (auto& c : cGIDs) {
         ++ownerRanksCount[elem2rank(c)];
     }
-    return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount));
+    return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount), rank);
 }
 
 template <std::size_t D>

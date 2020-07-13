@@ -3,6 +3,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/MeshData.h"
+#include "util/Range.h"
 
 #include <mpi.h>
 #include <parmetis.h>
@@ -14,6 +15,7 @@ using tndm::BoundaryData;
 using tndm::Curvilinear;
 using tndm::GenMesh;
 using tndm::LocalSimplexMesh;
+using tndm::Range;
 using tndm::VertexData;
 using tndm::VTUWriter;
 
@@ -59,7 +61,7 @@ int main(int argc, char** argv) {
     }
 
     VTUWriter<D> writer(degree);
-    auto piece = writer.addPiece(cl);
+    auto piece = writer.addPiece(cl, Range(cl.numElements()));
     piece.addCellData("BC", bc);
     writer.write("testmesh");
 

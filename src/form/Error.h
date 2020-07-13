@@ -8,6 +8,7 @@
 #include "tensor/EigenMap.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
+#include "util/Range.h"
 
 #include <array>
 #include <utility>
@@ -68,9 +69,9 @@ public:
      *
      * @return L2 error
      */
-    static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
-                     SolutionInterface const& reference, int targetRank = 0,
-                     MPI_Comm = MPI_COMM_WORLD);
+    static double L2(Curvilinear<D>& cl, Range<std::size_t> elementRange,
+                     FiniteElementFunction<D> const& numeric, SolutionInterface const& reference,
+                     int targetRank = 0, MPI_Comm = MPI_COMM_WORLD);
 };
 
 } // namespace tndm

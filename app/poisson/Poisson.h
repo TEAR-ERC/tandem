@@ -27,9 +27,9 @@ public:
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
     FiniteElementFunction<DomainDimension> discreteK() const {
-        return FiniteElementFunction<DomainDimension>(nodalRefElement_.clone(), userVol[0].data(),
-                                                      nodalRefElement_.numBasisFunctions(), 1,
-                                                      numElements());
+        return FiniteElementFunction<DomainDimension>(
+            nodalRefElement_.clone(), userVol[owned_.from].data(),
+            nodalRefElement_.numBasisFunctions(), 1, owned_.size());
     }
 
 private:

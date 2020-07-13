@@ -12,7 +12,8 @@ namespace tndm {
 template <std::size_t D>
 DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
           std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder)
-    : refElement_(std::move(refElement)), fctInfo(mesh.numFacets()), volInfo(mesh.numElements()) {
+    : refElement_(std::move(refElement)), owned_(mesh.elements().lidRangeOwnedByMe()),
+      fctInfo(mesh.numFacets()), volInfo(mesh.numElements()) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -86,6 +87,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
             fctInfo[fctNo].g_up[0] = mesh.elements().l2cg(elNos[0]);
             fctInfo[fctNo].localNo[0] = localFctNo;
             fctInfo[fctNo].area = area;
+            fctInfo[fctNo].inside[0] = owned_.isElement(elNos[0]);
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);
@@ -96,6 +98,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 fctInfo[fctNo].up[1] = elNos[1];
                 fctInfo[fctNo].g_up[1] = mesh.elements().l2cg(elNos[1]);
                 fctInfo[fctNo].localNo[1] = localFNoOther;
+                fctInfo[fctNo].inside[1] = owned_.isElement(elNos[1]);
 
                 auto jInvOther = Tensor(fct[fctNo].template get<JInvOther>().data()->data(),
                                         cl.jacobianResultInfo(fctRule.size()));
@@ -106,6 +109,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 fctInfo[fctNo].up[1] = fctInfo[fctNo].up[0];
                 fctInfo[fctNo].g_up[1] = fctInfo[fctNo].g_up[0];
                 fctInfo[fctNo].localNo[1] = fctInfo[fctNo].localNo[0];
+                fctInfo[fctNo].inside[1] = fctInfo[fctNo].inside[0];
             }
         }
     }

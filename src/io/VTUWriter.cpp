@@ -33,18 +33,21 @@ template <std::size_t D> int32_t VTUWriter<D>::VTKType(bool linear) {
     return 0; // VTK_EMPTY_CELL
 };
 
-template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl) {
+template <std::size_t D>
+VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl, Range<std::size_t> elementRange) {
+    assert(elementRange.from <= cl.numElements() && elementRange.to <= cl.numElements());
+
     auto pointsPerElement = refNodes_.size();
 
     auto piece = doc_.RootElement()->InsertNewChildElement("Piece");
-    piece->SetAttribute("NumberOfPoints", pointsPerElement * cl.numElements());
-    piece->SetAttribute("NumberOfCells", cl.numElements());
+    piece->SetAttribute("NumberOfPoints", pointsPerElement * elementRange.size());
+    piece->SetAttribute("NumberOfCells", elementRange.size());
     {
         auto points = piece->InsertNewChildElement("Points");
         auto E = cl.evaluateBasisAt(refNodes_);
-        auto vertices = std::vector<double>(cl.numElements() * pointsPerElement * PointDim);
-        for (std::size_t elNo = 0; elNo < cl.numElements(); ++elNo) {
-            auto firstVertex = &vertices[elNo * pointsPerElement * PointDim];
+        auto vertices = std::vector<double>(elementRange.size() * pointsPerElement * PointDim);
+        for (std::size_t elNo = elementRange.from; elNo < elementRange.to; ++elNo) {
+            auto firstVertex = &vertices[(elNo - elementRange.from) * pointsPerElement * PointDim];
             auto result = Matrix<double>(firstVertex, D, pointsPerElement);
             cl.map(elNo, E, result);
             // Points must be 3d in VTK. Therefore, we set z = 0 for D = 2.
@@ -64,24 +67,24 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl) 
 
     auto cells = piece->InsertNewChildElement("Cells");
     {
-        auto connectivity = std::vector<int32_t>(cl.numElements() * pointsPerElement);
+        auto connectivity = std::vector<int32_t>(elementRange.size() * pointsPerElement);
         std::iota(connectivity.begin(), connectivity.end(), 0);
         addDataArray(cells, "connectivity", 1, connectivity);
 
-        auto offsets = std::vector<int32_t>(cl.numElements());
+        auto offsets = std::vector<int32_t>(elementRange.size());
         std::generate(offsets.begin(), offsets.end(),
                       [&pointsPerElement, n = 1]() mutable { return pointsPerElement * n++; });
         addDataArray(cells, "offsets", 1, offsets);
 
         auto vtkType = VTKType(refNodes_.size() == (D + 1ul));
-        auto types = std::vector<uint8_t>(cl.numElements(), vtkType);
+        auto types = std::vector<uint8_t>(elementRange.size(), vtkType);
         addDataArray(cells, "types", 1, types);
     }
 
     auto vtupiece = VTUPiece<D>(piece, *this);
     int rank;
     MPI_Comm_rank(comm_, &rank);
-    auto partition = std::vector<int32_t>(cl.numElements(), rank);
+    auto partition = std::vector<int32_t>(elementRange.size(), rank);
     vtupiece.addCellData("partition", partition);
     return vtupiece;
 }
