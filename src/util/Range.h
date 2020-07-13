@@ -16,6 +16,7 @@ template <typename IntT> struct Range {
     IntT length() const noexcept { return size(); }
     RangeIterator<IntT> begin() { return RangeIterator(from); }
     RangeIterator<IntT> end() { return RangeIterator(to); }
+    IntT isElement(IntT number) const noexcept { return from <= number && number < to; }
 
     IntT from;
     IntT to;

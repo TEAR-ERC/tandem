@@ -7,6 +7,7 @@
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "tensor/Tensor.h"
+#include "util/Range.h"
 
 #include <mpi.h>
 #include <tinyxml2.h>
@@ -34,7 +35,7 @@ public:
         doc_.InsertFirstChild(grid);
     }
 
-    VTUPiece<D> addPiece(Curvilinear<D>& cl);
+    VTUPiece<D> addPiece(Curvilinear<D>& cl, Range<std::size_t> elementRange);
 
     /**
      * @brief Write VTU to disk.

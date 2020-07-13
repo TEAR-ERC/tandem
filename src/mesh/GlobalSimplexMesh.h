@@ -199,7 +199,8 @@ private:
     template <std::size_t DD> auto getFaces(std::vector<Simplex<D>> const& elems) const {
         auto plex2rank = getPlex2Rank<DD>();
 
-        int procs;
+        int rank, procs;
+        MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &procs);
 
         std::vector<std::set<Simplex<DD>>> requiredFaces(procs);
@@ -232,7 +233,7 @@ private:
         a2a.swap();
 
         auto lf = LocalFaces<DD>(std::move(faces), getContiguousGIDs(requestedFaces, a2a),
-                                 std::move(owners));
+                                 std::move(owners), rank);
         if constexpr (DD == 0) {
             if (vertexData) {
                 std::vector<std::size_t> lids;

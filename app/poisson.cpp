@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
-    auto mesh = globalMesh->getLocalMesh();
+    auto mesh = globalMesh->getLocalMesh(1);
 
     Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);
 
@@ -220,8 +220,8 @@ int main(int argc, char** argv) {
     VecDestroy(&b);
 
     auto numeric = poisson.finiteElementFunction(x);
-    double error =
-        tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference(), 0, PETSC_COMM_WORLD);
+    double error = tndm::Error<DomainDimension>::L2(cl, poisson.owned(), numeric,
+                                                    *scenario->reference(), 0, PETSC_COMM_WORLD);
 
     if (rank == 0) {
         std::cout << "L2 error: " << error << std::endl;
@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
 
     if (auto fileName = program.present("-o")) {
         VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto piece = writer.addPiece(cl);
+        auto piece = writer.addPiece(cl, poisson.owned());
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());
         writer.write(*fileName);

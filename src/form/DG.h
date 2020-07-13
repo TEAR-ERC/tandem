@@ -26,6 +26,8 @@ public:
     std::size_t numElements() const { return vol.size(); }
     std::size_t numFacets() const { return fctInfo.size(); }
 
+    Range<std::size_t> owned() const { return owned_; }
+
     RefElement<D> const& refElement() const { return *refElement_; }
 
 protected:
@@ -33,6 +35,7 @@ protected:
     void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
 
     std::unique_ptr<RefElement<D>> refElement_;
+    Range<std::size_t> owned_;
 
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;
@@ -62,6 +65,7 @@ protected:
     };
 
     struct FacetInfo {
+        std::array<bool, 2> inside;
         std::array<std::size_t, 2> up;
         std::array<std::size_t, 2> g_up;
         std::array<std::size_t, 2> localNo;

@@ -27,8 +27,9 @@ public:
 
     LocalFaces() {}
     LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<std::size_t>&& contiguousGIDs,
-               Displacements<std::size_t>&& owners)
-        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), owners_(std::move(owners)) {
+               Displacements<std::size_t>&& owners, int myRank)
+        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), owners_(std::move(owners)),
+          rank_(myRank) {
         makeG2LMap();
     }
 
@@ -67,6 +68,10 @@ public:
         return Range(owners_[rank], owners_[rank + 1]);
     }
 
+    auto lidRangeOwnedByMe() const {
+        return lidRangeOwnedBy(rank_);
+    }
+
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
 
@@ -83,6 +88,7 @@ private:
     l2cg_t l2cg_;
     g2l_t g2l_;
     Displacements<std::size_t> owners_;
+    int rank_;
     std::vector<int> sharedRanks_;
     Displacements<int> sharedRanksDispls_;
     std::unique_ptr<MeshData> meshData_;

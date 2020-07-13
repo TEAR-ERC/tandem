@@ -56,8 +56,8 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
 Mat Poisson::assemble() {
     Mat mat;
     PetscInt blockSize = tensor::A::Shape[0];
-    PetscInt localRows = numElements() * tensor::A::Shape[0];
-    PetscInt localCols = numElements() * tensor::A::Shape[1];
+    PetscInt localRows = owned_.size() * tensor::A::Shape[0];
+    PetscInt localCols = owned_.size() * tensor::A::Shape[1];
     MatCreateBAIJ(PETSC_COMM_WORLD, blockSize, localRows, localCols, PETSC_DETERMINE,
                   PETSC_DETERMINE, 5, nullptr, 5, nullptr, &mat);
     MatSetOption(mat, MAT_ROW_ORIENTED, PETSC_FALSE);
@@ -71,7 +71,7 @@ Mat Poisson::assemble() {
     assert(D_xi.shape(1) == tensor::D_xi::Shape[1]);
     assert(D_xi.shape(2) == tensor::D_xi::Shape[2]);
 
-    for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
+    for (std::size_t elNo = owned_.from; elNo < owned_.to; ++elNo) {
         kernel::assembleVolume krnl;
         krnl.A = A;
         krnl.D_x = D_x;
@@ -103,6 +103,9 @@ Mat Poisson::assemble() {
 
     for (std::size_t fctNo = 0; fctNo < numFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
+        if (!info.inside[0] && !info.inside[1]) {
+            continue;
+        }
         kernel::assembleFacetLocal local;
         double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
         local.c00 = -half;
@@ -126,7 +129,9 @@ Mat Poisson::assemble() {
             MatSetValuesBlocked(mat, 1, &ib, 1, &jb, a, ADD_VALUES);
         };
 
-        push(std::integral_constant<int, 0>(), std::integral_constant<int, 0>(), a00);
+        if (info.inside[0]) {
+            push(std::integral_constant<int, 0>(), std::integral_constant<int, 0>(), a00);
+        }
 
         if (info.up[0] != info.up[1]) {
             kernel::assembleFacetNeighbour neighbour;
@@ -153,9 +158,13 @@ Mat Poisson::assemble() {
             neighbour.w = local.w;
             neighbour.execute();
 
-            push(std::integral_constant<int, 0>(), std::integral_constant<int, 1>(), a01);
-            push(std::integral_constant<int, 1>(), std::integral_constant<int, 0>(), a10);
-            push(std::integral_constant<int, 1>(), std::integral_constant<int, 1>(), a11);
+            if (info.inside[0]) {
+                push(std::integral_constant<int, 0>(), std::integral_constant<int, 1>(), a01);
+            }
+            if (info.inside[1]) {
+                push(std::integral_constant<int, 1>(), std::integral_constant<int, 0>(), a10);
+                push(std::integral_constant<int, 1>(), std::integral_constant<int, 1>(), a11);
+            }
         }
     }
 
@@ -167,7 +176,7 @@ Mat Poisson::assemble() {
 
 Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
     Vec B;
-    PetscInt localRows = numElements() * tensor::A::Shape[0];
+    PetscInt localRows = owned_.size() * tensor::A::Shape[0];
     VecCreateMPI(PETSC_COMM_WORLD, localRows, PETSC_DETERMINE, &B);
     VecSetBlockSize(B, tensor::b::Shape[0]);
 
@@ -177,7 +186,7 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
 
     double F[tensor::F::size()];
     assert(tensor::F::size() == volRule.size());
-    for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
+    for (std::size_t elNo = owned_.from; elNo < owned_.to; ++elNo) {
         auto coords = vol[elNo].template get<Coords>();
         for (unsigned q = 0; q < tensor::F::size(); ++q) {
             F[q] = forceFun(coords[q]);
@@ -200,6 +209,9 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
 
     for (std::size_t fctNo = 0; fctNo < numFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
+        if (!info.inside[0]) {
+            continue;
+        }
         if (info.up[0] == info.up[1]) {
             auto coords = fct[fctNo].template get<Coords>();
             for (unsigned q = 0; q < tensor::f::size(); ++q) {
@@ -235,7 +247,7 @@ FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) con
     PetscScalar const* values;
     VecGetArrayRead(x, &values);
     return FiniteElementFunction<DomainDimension>(refElement_->clone(), values, tensor::b::Shape[0],
-                                                  1, numElements());
+                                                  1, owned_.size());
     VecRestoreArrayRead(x, &values);
 }
 
