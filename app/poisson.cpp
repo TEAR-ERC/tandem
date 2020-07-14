@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
-    auto mesh = globalMesh->getLocalMesh(1);
+    auto mesh = globalMesh->getLocalMesh(2);
 
     Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);
 
@@ -197,6 +197,14 @@ int main(int argc, char** argv) {
     KSP ksp;
     Vec x;
     VecDuplicate(b, &x);
+
+    Vec y;
+    VecDuplicate(b, &y);
+    VecSet(x, 1.0);
+    MatMult(A, x, y);
+    PetscReal l2norm;
+    VecNorm(y, NORM_2, &l2norm);
+    std::cout << "A*1 norm: " << l2norm << std::endl;
 
     KSPCreate(PETSC_COMM_WORLD, &ksp);
     KSPSetType(ksp, KSPCG);
@@ -220,8 +228,8 @@ int main(int argc, char** argv) {
     VecDestroy(&b);
 
     auto numeric = poisson.finiteElementFunction(x);
-    double error = tndm::Error<DomainDimension>::L2(cl, poisson.owned(), numeric,
-                                                    *scenario->reference(), 0, PETSC_COMM_WORLD);
+    double error =
+        tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference(), 0, PETSC_COMM_WORLD);
 
     if (rank == 0) {
         std::cout << "L2 error: " << error << std::endl;
@@ -229,7 +237,7 @@ int main(int argc, char** argv) {
 
     if (auto fileName = program.present("-o")) {
         VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto piece = writer.addPiece(cl, poisson.owned());
+        auto piece = writer.addPiece(cl, poisson.numLocalElements());
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());
         writer.write(*fileName);
