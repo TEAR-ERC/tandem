@@ -6,6 +6,7 @@
 #include "MeshData.h"
 #include "Simplex.h"
 
+#include "mneme/displacements.hpp"
 #include "parallel/CommPattern.h"
 #include "parallel/DistributedCSR.h"
 #include "parallel/MPITraits.h"
@@ -142,7 +143,6 @@ private:
     auto getAllLocalFaces(unsigned overlap, std::index_sequence<Is...>) const {
         auto elemDist = makeSortedDistribution(elems_.size(), comm);
         auto localElems = getGhostElements(elems_, overlap, elemDist);
-        setSharedRanksAndElementData(localElems, elemDist);
         return std::make_tuple(getFaces<Is>(localElems.faces(), localElems.localSize())...,
                                std::move(localElems));
     }
@@ -244,18 +244,8 @@ private:
         auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
         a2a.swap();
 
-        // Sort faces
-        std::vector<std::size_t> permutation(faces.size());
-        std::iota(permutation.begin(), permutation.end(), std::size_t(0));
-        std::sort(permutation.begin(), permutation.end(),
-                  [&faces, &faceOrder](std::size_t a, std::size_t b) {
-                      return faceOrder[faces[a]] < faceOrder[faces[b]];
-                  });
-        apply_permutation(faces, permutation);
-
         // Create local faces
         auto contiguousGIDs = getContiguousGIDs(requestedFaces, a2a);
-        apply_permutation(contiguousGIDs, permutation);
         auto lf = LocalFaces<DD>(std::move(faces), std::move(contiguousGIDs), localSize);
 
         if constexpr (DD == 0) {
@@ -266,7 +256,6 @@ private:
                     lids.emplace_back(getVertexLID(face));
                 }
                 auto meshData = vertexData->redistributed(lids, a2a);
-                meshData->permute(permutation);
                 lf.setMeshData(std::move(meshData));
             }
         } else if constexpr (0 < DD && DD < D) {
@@ -285,25 +274,22 @@ private:
                     }
                 }
                 auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
-                meshData->permute(permutation);
                 lf.setMeshData(std::move(meshData));
             }
         }
 
         auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedFaces, a2a);
-        // Permute shared ranks
-        assert(permutation.size() == sharedRanksDispls.size());
-        std::vector<int> sharedRanksPermuted, sharedRanksCount;
-        sharedRanksPermuted.reserve(sharedRanks.size());
-        sharedRanksCount.reserve(sharedRanksDispls.size());
-        for (auto&& p : permutation) {
-            auto count = sharedRanksDispls.count(p);
-            sharedRanksCount.push_back(count);
-            for (int i = sharedRanksDispls[p], end = sharedRanksDispls[p] + count; i < end; ++i) {
-                sharedRanksPermuted.push_back(sharedRanks[i]);
-            }
-        }
-        lf.setSharedRanks(std::move(sharedRanksPermuted), Displacements(sharedRanksCount));
+        lf.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
+
+        // Sort faces
+        std::vector<std::size_t> permutation(lf.faces().size());
+        std::iota(permutation.begin(), permutation.end(), std::size_t(0));
+        std::sort(permutation.begin(), permutation.end(),
+                  [&lf, &faceOrder](std::size_t a, std::size_t b) {
+                      return faceOrder[lf.faces()[a]] < faceOrder[lf.faces()[b]];
+                  });
+        lf.permute(permutation);
+
         return lf;
     }
 
