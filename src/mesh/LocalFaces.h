@@ -52,7 +52,7 @@ public:
         assert(lid < l2cg_.size());
         return l2cg_[lid];
     }
-    auto const& continuousGIDs() const { return l2cg_; }
+    auto const& contiguousGIDs() const { return l2cg_; }
 
     auto const& faces() const { return faces_; }
     auto begin() const { return faces_.cbegin(); }
@@ -72,7 +72,35 @@ public:
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
 
+    void permute(std::vector<std::size_t> const& permutation) {
+        assert(permutation.size() == faces_.size());
+        apply_permutation(faces_, permutation);
+        apply_permutation(l2cg_, permutation);
+        if (meshData_) {
+            meshData_->permute(permutation);
+        }
+        permuteSharedRanks(permutation);
+        makeG2LMap();
+    }
+
 private:
+    void permuteSharedRanks(std::vector<std::size_t> const& permutation) {
+        // Permute shared ranks
+        assert(permutation.size() == sharedRanksDispls_.size());
+        std::vector<int> sharedRanksPermuted, sharedRanksCount;
+        sharedRanksPermuted.reserve(sharedRanks_.size());
+        sharedRanksCount.reserve(sharedRanksDispls_.size());
+        for (auto&& p : permutation) {
+            auto count = sharedRanksDispls_.count(p);
+            sharedRanksCount.push_back(count);
+            for (int i = sharedRanksDispls_[p], end = sharedRanksDispls_[p] + count; i < end; ++i) {
+                sharedRanksPermuted.push_back(sharedRanks_[i]);
+            }
+        }
+        sharedRanks_.swap(sharedRanksPermuted);
+        sharedRanksDispls_ = Displacements(sharedRanksCount);
+    }
+
     void makeG2LMap() {
         g2l_.clear();
         std::size_t local = 0;
