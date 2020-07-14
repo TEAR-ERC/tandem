@@ -347,17 +347,25 @@ private:
         sharedRanksSendCount.reserve(requestedFaces.size());
         std::size_t totalSharedRanksSendCount = 0;
         for (auto& face : requestedFaces) {
-            sharedRanksSendCount.emplace_back(sharedRanksInfo[face].size());
-            totalSharedRanksSendCount += sharedRanksInfo[face].size();
+            auto size = sharedRanksInfo[face].size();
+            assert(size > 0);
+            size -= 1;
+            sharedRanksSendCount.emplace_back(size);
+            totalSharedRanksSendCount += size;
         }
 
         auto sharedRanksRecvCount = a2a.exchange(sharedRanksSendCount);
 
         std::vector<int> requestedSharedRanks;
         requestedSharedRanks.reserve(totalSharedRanksSendCount);
-        for (auto& face : requestedFaces) {
-            std::copy(sharedRanksInfo[face].begin(), sharedRanksInfo[face].end(),
-                      std::back_inserter(requestedSharedRanks));
+        for (int p = 0; p < procs; ++p) {
+            for (auto&& i : a2a.sendRange(p)) {
+                for (auto&& shRk : sharedRanksInfo[requestedFaces[i]]) {
+                    if (shRk != p) {
+                        requestedSharedRanks.push_back(shRk);
+                    }
+                }
+            }
         }
         std::vector<int> sendcounts(procs, 0);
         std::vector<int> recvcounts(procs, 0);
