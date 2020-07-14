@@ -237,7 +237,7 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
         auto gid = lf.l2cg(lid);
         int p = elem2rank(gid);
         p = rank == p ? -1 : p;
-        return std::make_tuple(p, lf.getSharedRanks(lid).size(), gid);
+        return std::make_tuple(p, lf.getSharedRanks(lid).size() > 0, gid);
     };
     std::iota(permutation.begin(), permutation.end(), std::size_t(0));
     std::sort(permutation.begin(), permutation.end(),
