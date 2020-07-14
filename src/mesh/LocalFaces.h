@@ -25,11 +25,11 @@ public:
     using g2l_t = std::unordered_map<Simplex<D>, std::size_t, SimplexHash<D>>;
     using l2cg_t = std::vector<std::size_t>;
 
-    LocalFaces() {}
+    LocalFaces() : localSize_(0) {}
     LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<std::size_t>&& contiguousGIDs,
-               Displacements<std::size_t>&& owners, int myRank)
-        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), owners_(std::move(owners)),
-          rank_(myRank) {
+               std::size_t localSize)
+        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), localSize_(localSize) {
+        assert(localSize_ <= faces_.size());
         makeG2LMap();
     }
 
@@ -37,7 +37,16 @@ public:
         assert(lid < size());
         return faces_[lid];
     }
+    /**
+     * @brief Number of faces in interior & ghost
+     */
     std::size_t size() const { return faces_.size(); }
+    /**
+     * @brief Number of faces in interior
+     *
+     * Note that faces [0, localSize_) are interior and faces [localSize_, faces.size()) are ghost.
+     */
+    std::size_t localSize() const { return localSize_; }
     auto const& g2l() const { return g2l_; }
     auto const& l2cg(std::size_t lid) const {
         assert(lid < l2cg_.size());
@@ -60,18 +69,6 @@ public:
         return span(&sharedRanks_[from], sharedRanksDispls_.count(lid));
     }
 
-    /**
-     * @brief Returns interval [start, stop) of local ids owned by rank
-     */
-    auto lidRangeOwnedBy(int rank) const {
-        assert(rank < owners_.size());
-        return Range(owners_[rank], owners_[rank + 1]);
-    }
-
-    auto lidRangeOwnedByMe() const {
-        return lidRangeOwnedBy(rank_);
-    }
-
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
 
@@ -86,9 +83,8 @@ private:
 
     std::vector<Simplex<D>> faces_;
     l2cg_t l2cg_;
+    std::size_t localSize_;
     g2l_t g2l_;
-    Displacements<std::size_t> owners_;
-    int rank_;
     std::vector<int> sharedRanks_;
     Displacements<int> sharedRanksDispls_;
     std::unique_ptr<MeshData> meshData_;

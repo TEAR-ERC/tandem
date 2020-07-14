@@ -56,8 +56,8 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
 Mat Poisson::assemble() {
     Mat mat;
     PetscInt blockSize = tensor::A::Shape[0];
-    PetscInt localRows = owned_.size() * tensor::A::Shape[0];
-    PetscInt localCols = owned_.size() * tensor::A::Shape[1];
+    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
+    PetscInt localCols = numLocalElements() * tensor::A::Shape[1];
     MatCreateBAIJ(PETSC_COMM_WORLD, blockSize, localRows, localCols, PETSC_DETERMINE,
                   PETSC_DETERMINE, 5, nullptr, 5, nullptr, &mat);
     MatSetOption(mat, MAT_ROW_ORIENTED, PETSC_FALSE);
@@ -71,7 +71,7 @@ Mat Poisson::assemble() {
     assert(D_xi.shape(1) == tensor::D_xi::Shape[1]);
     assert(D_xi.shape(2) == tensor::D_xi::Shape[2]);
 
-    for (std::size_t elNo = owned_.from; elNo < owned_.to; ++elNo) {
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
         kernel::assembleVolume krnl;
         krnl.A = A;
         krnl.D_x = D_x;
@@ -176,7 +176,7 @@ Mat Poisson::assemble() {
 
 Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
     Vec B;
-    PetscInt localRows = owned_.size() * tensor::A::Shape[0];
+    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
     VecCreateMPI(PETSC_COMM_WORLD, localRows, PETSC_DETERMINE, &B);
     VecSetBlockSize(B, tensor::b::Shape[0]);
 
@@ -186,7 +186,7 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
 
     double F[tensor::F::size()];
     assert(tensor::F::size() == volRule.size());
-    for (std::size_t elNo = owned_.from; elNo < owned_.to; ++elNo) {
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
         auto coords = vol[elNo].template get<Coords>();
         for (unsigned q = 0; q < tensor::F::size(); ++q) {
             F[q] = forceFun(coords[q]);
@@ -247,7 +247,7 @@ FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) con
     PetscScalar const* values;
     VecGetArrayRead(x, &values);
     return FiniteElementFunction<DomainDimension>(refElement_->clone(), values, tensor::b::Shape[0],
-                                                  1, owned_.size());
+                                                  1, numLocalElements());
     VecRestoreArrayRead(x, &values);
 }
 

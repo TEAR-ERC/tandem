@@ -1,4 +1,5 @@
 #include "CommPattern.h"
+#include "util/Algorithm.h"
 
 #include <cassert>
 
@@ -12,8 +13,8 @@ AllToAllV::AllToAllV(std::vector<int>&& sndcnts, MPI_Comm comm)
     recvcounts.resize(procs);
     MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, comm);
 
-    sdispls.make(sendcounts);
-    rdispls.make(recvcounts);
+    makeDispls(sendcounts, sdispls);
+    makeDispls(recvcounts, rdispls);
 }
 
 AllToAllV::AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts, MPI_Comm comm)
@@ -22,21 +23,17 @@ AllToAllV::AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts, MP
     assert(sendcounts.size() == procs);
     assert(recvcounts.size() == procs);
 
-    sdispls.make(sendcounts);
-    rdispls.make(recvcounts);
+    makeDispls(sendcounts, sdispls);
+    makeDispls(recvcounts, rdispls);
 }
 
-AllToAllV::AllToAllV(Displacements<int> const& sdispls, MPI_Comm comm)
-    : comm(comm), sdispls(sdispls)  {
-    MPI_Comm_size(comm, &procs);
-    sendcounts.resize(procs);
-    for (int p = 0; p < procs; ++p) {
-        sendcounts[p] = sdispls.count(p);
+void AllToAllV::makeDispls(std::vector<int> const& counts, std::vector<int>& displs,
+                           std::function<int(int)> permutation) {
+    displs.resize(counts.size());
+    displs[permutation(0)] = 0;
+    for (std::size_t p = 0; p < counts.size() - 1; ++p) {
+        displs[permutation(p + 1)] = displs[permutation(p)] + counts[permutation(p)];
     }
-
-    recvcounts.resize(procs);
-    MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, comm);
-    rdispls.make(recvcounts);
 }
 
 void AllToAllV::swap() {
@@ -44,4 +41,9 @@ void AllToAllV::swap() {
     sdispls.swap(rdispls);
 }
 
+void AllToAllV::setRankPermutation(std::vector<int> const& permutation) {
+    makeDispls(sendcounts, sdispls, [&permutation](int p) { return permutation[p]; });
+    makeDispls(recvcounts, rdispls, [&permutation](int p) { return permutation[p]; });
 }
+
+} // namespace tndm

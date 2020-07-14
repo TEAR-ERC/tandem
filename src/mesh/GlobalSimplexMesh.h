@@ -140,13 +140,17 @@ private:
 
     template <std::size_t... Is>
     auto getAllLocalFaces(unsigned overlap, std::index_sequence<Is...>) const {
-        auto localElems = getGhostElements(elems_, overlap);
-        setSharedRanksAndElementData(localElems);
-        return std::make_tuple(getFaces<Is>(localElems.faces())..., std::move(localElems));
+        auto elemDist = makeSortedDistribution(elems_.size(), comm);
+        auto localElems = getGhostElements(elems_, overlap, elemDist);
+        setSharedRanksAndElementData(localElems, elemDist);
+        return std::make_tuple(getFaces<Is>(localElems.faces(), localElems.localSize())...,
+                               std::move(localElems));
     }
 
-    LocalFaces<D> getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap) const;
-    void setSharedRanksAndElementData(LocalFaces<D>& elems) const;
+    LocalFaces<D> getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap,
+                                   std::vector<std::size_t> const& elemDist) const;
+    void setSharedRanksAndElementData(LocalFaces<D>& elems,
+                                      std::vector<std::size_t> const& elemDist) const;
 
     auto getBoundaryFaces(std::vector<Simplex<D>> const& elems) const {
         // Construct upward map from faces to local element ids
@@ -196,7 +200,8 @@ private:
         return plex[0] - vtxdist[rank];
     }
 
-    template <std::size_t DD> auto getFaces(std::vector<Simplex<D>> const& elems) const {
+    template <std::size_t DD>
+    auto getFaces(std::vector<Simplex<D>> const& elems, std::size_t elemsLocalSize) const {
         auto plex2rank = getPlex2Rank<DD>();
 
         int rank, procs;
@@ -204,10 +209,19 @@ private:
         MPI_Comm_size(comm, &procs);
 
         std::vector<std::set<Simplex<DD>>> requiredFaces(procs);
-        for (auto& elem : elems) {
-            auto downward = elem.template downward<DD>();
+        std::unordered_map<Simplex<DD>, std::size_t, SimplexHash<DD>> faceOrder;
+        std::size_t faceNo = 0;
+        std::size_t localSize = 0;
+        for (std::size_t elNo = 0; elNo < elems.size(); ++elNo) {
+            auto downward = elems[elNo].template downward<DD>();
             for (auto& s : downward) {
                 requiredFaces[plex2rank(s)].insert(s);
+                if (faceOrder.find(s) == faceOrder.end()) {
+                    faceOrder[s] = faceNo++;
+                }
+            }
+            if (elNo < elemsLocalSize) {
+                localSize = faceNo;
             }
         }
         std::vector<int> counts(procs, 0);
@@ -218,8 +232,6 @@ private:
             total += size;
         }
 
-        auto owners = Displacements<std::size_t>(counts);
-
         std::vector<Simplex<DD>> faces;
         faces.reserve(total);
         for (auto& perRank : requiredFaces) {
@@ -227,13 +239,25 @@ private:
         }
 
         // Exchange data
-        AllToAllV a2a(counts, comm);
+        AllToAllV a2a(std::move(counts), comm);
         mpi_array_type<uint64_t> mpi_plex_t(DD + 1);
         auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
         a2a.swap();
 
-        auto lf = LocalFaces<DD>(std::move(faces), getContiguousGIDs(requestedFaces, a2a),
-                                 std::move(owners), rank);
+        // Sort faces
+        std::vector<std::size_t> permutation(faces.size());
+        std::iota(permutation.begin(), permutation.end(), std::size_t(0));
+        std::sort(permutation.begin(), permutation.end(),
+                  [&faces, &faceOrder](std::size_t a, std::size_t b) {
+                      return faceOrder[faces[a]] < faceOrder[faces[b]];
+                  });
+        apply_permutation(faces, permutation);
+
+        // Create local faces
+        auto contiguousGIDs = getContiguousGIDs(requestedFaces, a2a);
+        apply_permutation(contiguousGIDs, permutation);
+        auto lf = LocalFaces<DD>(std::move(faces), std::move(contiguousGIDs), localSize);
+
         if constexpr (DD == 0) {
             if (vertexData) {
                 std::vector<std::size_t> lids;
@@ -241,7 +265,9 @@ private:
                 for (auto& face : requestedFaces) {
                     lids.emplace_back(getVertexLID(face));
                 }
-                lf.setMeshData(vertexData->redistributed(lids, a2a));
+                auto meshData = vertexData->redistributed(lids, a2a);
+                meshData->permute(permutation);
+                lf.setMeshData(std::move(meshData));
             }
         } else if constexpr (0 < DD && DD < D) {
             auto& boundaryMesh = std::get<DD>(boundaryMeshes);
@@ -258,11 +284,26 @@ private:
                         lids.emplace_back(it->second);
                     }
                 }
-                lf.setMeshData(boundaryMesh->elementData->redistributed(lids, a2a));
+                auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
+                meshData->permute(permutation);
+                lf.setMeshData(std::move(meshData));
             }
         }
 
-        getSharedRanks(lf, requestedFaces, a2a);
+        auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedFaces, a2a);
+        // Permute shared ranks
+        assert(permutation.size() == sharedRanksDispls.size());
+        std::vector<int> sharedRanksPermuted, sharedRanksCount;
+        sharedRanksPermuted.reserve(sharedRanks.size());
+        sharedRanksCount.reserve(sharedRanksDispls.size());
+        for (auto&& p : permutation) {
+            auto count = sharedRanksDispls.count(p);
+            sharedRanksCount.push_back(count);
+            for (int i = sharedRanksDispls[p], end = sharedRanksDispls[p] + count; i < end; ++i) {
+                sharedRanksPermuted.push_back(sharedRanks[i]);
+            }
+        }
+        lf.setSharedRanks(std::move(sharedRanksPermuted), Displacements(sharedRanksCount));
         return lf;
     }
 
@@ -304,14 +345,16 @@ private:
     }
 
     template <std::size_t DD>
-    void getSharedRanks(LocalFaces<DD>& lf, std::vector<Simplex<DD>> const& requestedFaces,
+    auto getSharedRanks(std::vector<Simplex<DD>> const& requestedFaces,
                         AllToAllV const& a2a) const {
         int procs;
         MPI_Comm_size(comm, &procs);
 
         std::unordered_map<Simplex<DD>, std::vector<int>, SimplexHash<DD>> sharedRanksInfo;
-        for (auto [p, i] : a2a.getSDispls()) {
-            sharedRanksInfo[requestedFaces[i]].emplace_back(p);
+        for (int p = 0; p < procs; ++p) {
+            for (auto&& i : a2a.sendRange(p)) {
+                sharedRanksInfo[requestedFaces[i]].emplace_back(p);
+            }
         }
 
         std::vector<int> sharedRanksSendCount;
@@ -332,18 +375,22 @@ private:
         }
         std::vector<int> sendcounts(procs, 0);
         std::vector<int> recvcounts(procs, 0);
-        for (auto [p, i] : a2a.getSDispls()) {
-            sendcounts[p] += sharedRanksSendCount[i];
+        for (int p = 0; p < procs; ++p) {
+            for (auto&& i : a2a.sendRange(p)) {
+                sendcounts[p] += sharedRanksSendCount[i];
+            }
         }
-        for (auto [p, i] : a2a.getRDispls()) {
-            recvcounts[p] += sharedRanksRecvCount[i];
+        for (int p = 0; p < procs; ++p) {
+            for (auto&& i : a2a.recvRange(p)) {
+                recvcounts[p] += sharedRanksRecvCount[i];
+            }
         }
 
         AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts));
         auto sharedRanks = a2aSharedRanks.exchange(requestedSharedRanks);
         Displacements sharedRanksDispls(sharedRanksRecvCount);
 
-        lf.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
+        return std::make_pair(std::move(sharedRanks), std::move(sharedRanksDispls));
     }
 
     std::vector<simplex_t> elems_;
