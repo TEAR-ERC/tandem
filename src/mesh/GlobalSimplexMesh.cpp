@@ -62,22 +62,19 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
 }
 
 template <std::size_t D>
-LocalFaces<D> GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems,
-                                                     unsigned overlap) const {
+LocalFaces<D>
+GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap,
+                                       std::vector<std::size_t> const& elemDist) const {
     int rank, procs;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &procs);
     auto const myComm = comm;
 
-    auto elemDist = makeSortedDistribution(elems.size(), comm);
     std::vector<std::size_t> cGIDs(elems.size());
     std::iota(cGIDs.begin(), cGIDs.end(), elemDist[rank]);
 
     if (overlap == 0) {
-        auto ownerRanksCount = std::vector<std::size_t>(procs, 0);
-        ownerRanksCount[rank] = elems.size();
-        return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount),
-                             rank);
+        return LocalFaces<D>(std::move(elems), std::move(cGIDs), elems.size());
     }
 
     mpi_array_type<uint64_t> mpi_facet_t(D);
@@ -220,37 +217,55 @@ LocalFaces<D> GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> ele
     }
 
     // Sort by gid
+    auto elem2rank = SortedDistributionToRank(elemDist);
+    auto gid2order = [&elem2rank, &rank](std::size_t gid) {
+        int p = elem2rank(gid);
+        p = rank == p ? -1 : p;
+        return std::make_tuple(p, gid);
+    };
     std::vector<std::size_t> permutation(elems.size());
     std::iota(permutation.begin(), permutation.end(), std::size_t(0));
     std::sort(permutation.begin(), permutation.end(),
-              [&cGIDs](std::size_t a, std::size_t b) { return cGIDs[a] < cGIDs[b]; });
+              [&gid2order, &cGIDs](std::size_t a, std::size_t b) {
+                  return gid2order(cGIDs[a]) < gid2order(cGIDs[b]);
+              });
     apply_permutation(elems, permutation);
     apply_permutation(cGIDs, permutation);
-    auto elem2rank = SortedDistributionToRank(elemDist);
-    auto ownerRanksCount = std::vector<std::size_t>(procs);
+    std::size_t numLocal = 0;
     for (auto& c : cGIDs) {
-        ++ownerRanksCount[elem2rank(c)];
+        if (elem2rank(c) == rank) {
+            ++numLocal;
+        }
     }
-    return LocalFaces<D>(std::move(elems), std::move(cGIDs), Displacements(ownerRanksCount), rank);
+    return LocalFaces<D>(std::move(elems), std::move(cGIDs), numLocal);
 }
 
 template <std::size_t D>
-void GlobalSimplexMesh<D>::setSharedRanksAndElementData(LocalFaces<D>& elems) const {
-    int procs;
+void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
+    LocalFaces<D>& elems, std::vector<std::size_t> const& elemDist) const {
+    int rank, procs;
+    MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &procs);
 
-    std::vector<int> counts(procs);
-    for (int p = 0; p < procs; ++p) {
-        counts[p] = elems.lidRangeOwnedBy(p).size();
+    auto elem2rank = SortedDistributionToRank(elemDist);
+    std::vector<int> counts(procs, 0);
+    for (auto const& c : elems.continuousGIDs()) {
+        ++counts[elem2rank(c)];
     }
 
     // Exchange data
-    AllToAllV a2a(counts, comm);
+    std::vector<int> rankPerm(procs);
+    rankPerm[0] = rank;
+    std::iota(rankPerm.begin() + 1, rankPerm.begin() + 1 + rank, 0);
+    std::iota(rankPerm.begin() + 1 + rank, rankPerm.end(), rank + 1);
+    AllToAllV a2a(std::move(counts), comm);
+    a2a.setRankPermutation(rankPerm);
     mpi_array_type<uint64_t> mpi_plex_t(D + 1);
     auto requestedElems = a2a.exchange(elems.faces(), mpi_plex_t.get());
     a2a.swap();
 
-    getSharedRanks(elems, requestedElems, a2a);
+    auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedElems, a2a);
+    elems.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
 
     if (elementData) {
         auto map = makeG2LMap();

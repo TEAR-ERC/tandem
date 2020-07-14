@@ -24,9 +24,8 @@ public:
     virtual ~DG() = default;
 
     std::size_t numElements() const { return vol.size(); }
+    std::size_t numLocalElements() const { return numLocalElems_; }
     std::size_t numFacets() const { return fctInfo.size(); }
-
-    Range<std::size_t> owned() const { return owned_; }
 
     RefElement<D> const& refElement() const { return *refElement_; }
 
@@ -35,7 +34,7 @@ protected:
     void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
 
     std::unique_ptr<RefElement<D>> refElement_;
-    Range<std::size_t> owned_;
+    std::size_t numLocalElems_;
 
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;

@@ -4,9 +4,8 @@
 namespace tndm {
 
 template <std::size_t D>
-double Error<D>::L2(Curvilinear<D>& cl, Range<std::size_t> elementRange,
-                    FiniteElementFunction<D> const& numeric, SolutionInterface const& reference,
-                    int targetRank, MPI_Comm comm) {
+double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+                    SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
     auto rule = simplexQuadratureRule<D>(20);
 
     auto evalMatrix = numeric.evaluationMatrix(rule.points());
@@ -21,12 +20,12 @@ double Error<D>::L2(Curvilinear<D>& cl, Range<std::size_t> elementRange,
     auto ref = Managed<Matrix<double>>(rule.size(), reference.numQuantities());
 
     double error = 0.0;
-    for (std::size_t elNo = elementRange.from; elNo < elementRange.to; ++elNo) {
+    for (std::size_t elNo = 0; elNo < numeric.numElements(); ++elNo) {
         cl.jacobian(elNo, geoD_xi, J);
         cl.absDetJ(elNo, J, absDetJ);
         cl.map(elNo, geoE, coords);
         reference(coords, ref);
-        numeric.map(elNo - elementRange.from, evalMatrix, numAtQp);
+        numeric.map(elNo, evalMatrix, numAtQp);
         // int (x - xref)^2 dV = w_q |J|_q (x_k E_{kq} - xref(x_q))^2
         double localError = 0;
         for (std::size_t j = 0; j < numeric.numQuantities(); ++j) {
