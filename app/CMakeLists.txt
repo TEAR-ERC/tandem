@@ -12,6 +12,7 @@ target_include_directories(warp-blend-opt PRIVATE ../external/)
 target_link_libraries(warp-blend-opt PRIVATE tandem-fem-lib)
 
 add_executable(tandem tandem.cpp)
+target_include_directories(tandem PRIVATE ../external/)
 target_link_libraries(tandem PRIVATE tandem-lib tinyxml2)
 target_compile_definitions(tandem PUBLIC USE_MPI)
 
