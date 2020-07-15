@@ -26,9 +26,10 @@ public:
     using l2cg_t = std::vector<std::size_t>;
 
     LocalFaces() : localSize_(0) {}
-    LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<std::size_t>&& contiguousGIDs,
-               std::size_t localSize)
-        : faces_(std::move(faces)), l2cg_(std::move(contiguousGIDs)), localSize_(localSize) {
+    LocalFaces(std::vector<Simplex<D>>&& faces, std::vector<int>&& owner,
+               std::vector<std::size_t>&& contiguousGIDs, std::size_t localSize)
+        : faces_(std::move(faces)), owner_(owner), l2cg_(std::move(contiguousGIDs)),
+          localSize_(localSize) {
         assert(localSize_ <= faces_.size());
         makeG2LMap();
     }
@@ -47,11 +48,16 @@ public:
      * Note that faces [0, localSize_) are interior and faces [localSize_, faces.size()) are ghost.
      */
     std::size_t localSize() const { return localSize_; }
-    auto const& g2l() const { return g2l_; }
-    auto const& l2cg(std::size_t lid) const {
+
+    std::size_t owner(std::size_t lid) const {
+        assert(lid < owner_.size());
+        return owner_[lid];
+    }
+    std::size_t l2cg(std::size_t lid) const {
         assert(lid < l2cg_.size());
         return l2cg_[lid];
     }
+    auto const& g2l() const { return g2l_; }
     auto const& contiguousGIDs() const { return l2cg_; }
 
     auto const& faces() const { return faces_; }
@@ -75,6 +81,7 @@ public:
     void permute(std::vector<std::size_t> const& permutation) {
         assert(permutation.size() == faces_.size());
         apply_permutation(faces_, permutation);
+        apply_permutation(owner_, permutation);
         apply_permutation(l2cg_, permutation);
         if (meshData_) {
             meshData_->permute(permutation);
@@ -110,6 +117,7 @@ private:
     }
 
     std::vector<Simplex<D>> faces_;
+    std::vector<int> owner_;
     l2cg_t l2cg_;
     std::size_t localSize_;
     g2l_t g2l_;

@@ -233,9 +233,12 @@ private:
         }
 
         std::vector<Simplex<DD>> faces;
+        std::vector<int> owner;
         faces.reserve(total);
-        for (auto& perRank : requiredFaces) {
-            std::copy(perRank.begin(), perRank.end(), std::back_inserter(faces));
+        owner.reserve(total);
+        for (int p = 0; p < procs; ++p) {
+            std::copy(requiredFaces[p].begin(), requiredFaces[p].end(), std::back_inserter(faces));
+            std::fill_n(std::back_inserter(owner), requiredFaces[p].size(), p);
         }
 
         // Exchange data
@@ -246,7 +249,8 @@ private:
 
         // Create local faces
         auto contiguousGIDs = getContiguousGIDs(requestedFaces, a2a);
-        auto lf = LocalFaces<DD>(std::move(faces), std::move(contiguousGIDs), localSize);
+        auto lf = LocalFaces<DD>(std::move(faces), std::move(owner), std::move(contiguousGIDs),
+                                 localSize);
 
         if constexpr (DD == 0) {
             if (vertexData) {
