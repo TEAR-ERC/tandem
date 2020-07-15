@@ -30,6 +30,8 @@ public:
 
     RefElement<D> const& refElement() const { return *refElement_; }
 
+    MPI_Comm comm() const { return comm_; }
+
 protected:
     void facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
     void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);

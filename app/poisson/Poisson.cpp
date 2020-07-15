@@ -11,6 +11,7 @@
 #include "tensor/EigenMap.h"
 
 #include <limits>
+#include <petscerror.h>
 #include <petscmat.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
@@ -22,7 +23,11 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
                  std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                  MPI_Comm comm, functional_t kFun)
     : DG(mesh, cl, std::move(refElement), minQuadOrder, comm),
-      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
+      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
+      userVolInfo(numLocalElements()) {
+
+    int rank;
+    MPI_Comm_rank(comm, &rank);
 
     userVol.setStorage(
         std::make_shared<user_vol_t>(numElements() * nodalRefElement_.numBasisFunctions()), 0u,
@@ -36,13 +41,45 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
         auto rhs = Eigen::VectorXd(volRule.size());
 #pragma omp for
         for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
-            auto K = Vector<double>(userVol[elNo].data(), nodalRefElement_.numBasisFunctions());
+            auto Kfield =
+                Vector<double>(userVol[elNo].get<K>().data(), nodalRefElement_.numBasisFunctions());
 
             auto coords = vol[elNo].get<Coords>();
             for (std::size_t q = 0; q < volRule.size(); ++q) {
                 rhs(q) = kFun(coords[q]) * volRule.weights()[q];
             }
-            EigenMap(K) = P * rhs;
+            EigenMap(Kfield) = P * rhs;
+        }
+        std::size_t firstOwnedGID = std::numeric_limits<std::size_t>::max();
+        for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+            auto gid = volInfo[elNo].get<GID>();
+            if (gid < firstOwnedGID && mesh.elements().owner(elNo) == rank) {
+                firstOwnedGID = gid;
+            }
+        }
+#pragma omp for
+        for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+            auto dws = mesh.downward<DomainDimension - 1u, DomainDimension>(elNo);
+            PetscInt numLocal = 1, numGhost = 0;
+            for (auto&& dw : dws) {
+                auto up = mesh.upward<DomainDimension - 1u>(dw);
+                for (auto&& u : up) {
+                    if (u != elNo) {
+                        if (mesh.elements().owner(u) == rank) {
+                            ++numLocal;
+                        } else {
+                            ++numGhost;
+                        }
+                    }
+                }
+            }
+            // At most D + 1 neighbours plus element itself
+            assert(numLocal + numGhost <= DomainDimension + 2u);
+
+            auto gid = mesh.elements().l2cg(elNo);
+            assert(gid >= firstOwnedGID);
+            userVolInfo[gid - firstOwnedGID].get<NumLocalNeighbours>() = numLocal;
+            userVolInfo[gid - firstOwnedGID].get<NumGhostNeighbours>() = numGhost;
         }
     }
 
@@ -53,15 +90,37 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
     }
 }
 
-Mat Poisson::assemble() {
-    Mat mat;
+PetscErrorCode Poisson::createA(Mat* A) {
     PetscInt blockSize = tensor::A::Shape[0];
     PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
     PetscInt localCols = numLocalElements() * tensor::A::Shape[1];
-    MatCreateBAIJ(PETSC_COMM_WORLD, blockSize, localRows, localCols, PETSC_DETERMINE,
-                  PETSC_DETERMINE, 5, nullptr, 5, nullptr, &mat);
-    MatSetOption(mat, MAT_ROW_ORIENTED, PETSC_FALSE);
+    PetscErrorCode ierr;
+    ierr = MatCreateBAIJ(comm(), blockSize, localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE,
+                         0, &userVolInfo[0].get<NumLocalNeighbours>(), 0,
+                         &userVolInfo[0].get<NumGhostNeighbours>(), A);
+    CHKERRQ(ierr);
+    ierr = MatSetOption(*A, MAT_ROW_ORIENTED, PETSC_FALSE);
+    CHKERRQ(ierr);
+    ierr = MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE);
+    CHKERRQ(ierr);
+    return 0;
+}
+PetscErrorCode Poisson::createb(Vec* b) {
+    PetscErrorCode ierr;
+    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
+    ierr = VecCreate(comm(), b);
+    CHKERRQ(ierr);
+    ierr = VecSetSizes(*b, localRows, PETSC_DECIDE);
+    CHKERRQ(ierr);
+    ierr = VecSetFromOptions(*b);
+    CHKERRQ(ierr);
+    ierr = VecSetBlockSize(*b, tensor::b::Shape[0]);
+    CHKERRQ(ierr);
+    return 0;
+}
 
+PetscErrorCode Poisson::assemble(Mat mat) {
+    PetscErrorCode ierr;
     double D_x[tensor::D_x::size()];
     double A[tensor::A::size()];
     auto Aview = init::A::view::create(A);
@@ -77,7 +136,7 @@ Mat Poisson::assemble() {
         krnl.D_x = D_x;
         krnl.D_xi = D_xi.data();
         krnl.G = vol[elNo].template get<JInv>().data()->data();
-        krnl.K = userVol[elNo].data();
+        krnl.K = userVol[elNo].get<K>().data();
         krnl.Em = Em.data();
         krnl.J = vol[elNo].template get<AbsDetJ>().data();
         krnl.W = volRule.weights().data();
@@ -114,7 +173,7 @@ Mat Poisson::assemble() {
         local.e(0) = e[info.localNo[0]].data();
         local.em(0) = em[info.localNo[0]].data();
         local.g = fct[fctNo].template get<JInv>().data()->data();
-        local.K = userVol[info.up[0]].data();
+        local.K = userVol[info.up[0]].get<K>().data();
         local.n = fct[fctNo].template get<Normal>().data()->data();
         local.nl = fct[fctNo].template get<NormalLength>().data();
         local.w = fctRule.weights().data();
@@ -149,7 +208,7 @@ Mat Poisson::assemble() {
             neighbour.e(1) = e[info.localNo[1]].data();
             neighbour.em(1) = em[info.localNo[1]].data();
             neighbour.g = fct[fctNo].template get<JInvOther>().data()->data();
-            neighbour.K = userVol[info.up[1]].data();
+            neighbour.K = userVol[info.up[1]].get<K>().data();
             neighbour.n = local.n;
             neighbour.nl = local.nl;
             neighbour.w = local.w;
@@ -165,17 +224,15 @@ Mat Poisson::assemble() {
         }
     }
 
-    MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY);
-    MatSetOption(mat, MAT_SYMMETRIC, PETSC_TRUE);
-    return mat;
+    ierr = MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY);
+    CHKERRQ(ierr);
+    ierr = MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY);
+    CHKERRQ(ierr);
+    return 0;
 }
 
-Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
-    Vec B;
-    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
-    VecCreateMPI(PETSC_COMM_WORLD, localRows, PETSC_DETERMINE, &B);
-    VecSetBlockSize(B, tensor::b::Shape[0]);
+PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichletFun) {
+    PetscErrorCode ierr;
 
     double b[tensor::b::size()];
 
@@ -221,7 +278,7 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
             rhs.em(0) = em[info.localNo[0]].data();
             rhs.f = f;
             rhs.g = fct[fctNo].template get<JInv>().data()->data();
-            rhs.K = userVol[info.up[0]].data();
+            rhs.K = userVol[info.up[0]].get<K>().data();
             rhs.n = fct[fctNo].template get<Normal>().data()->data();
             rhs.nl = fct[fctNo].template get<NormalLength>().data();
             rhs.w = fctRule.weights().data();
@@ -231,9 +288,11 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
             VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
         }
     }
-    VecAssemblyBegin(B);
+    ierr = VecAssemblyBegin(B);
+    CHKERRQ(ierr);
     VecAssemblyEnd(B);
-    return B;
+    CHKERRQ(ierr);
+    return 0;
 }
 
 FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) const {
