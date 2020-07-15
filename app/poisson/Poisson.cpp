@@ -20,8 +20,8 @@ namespace tndm {
 
 Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
                  std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
-                 functional_t kFun)
-    : DG(mesh, cl, std::move(refElement), minQuadOrder),
+                 MPI_Comm comm, functional_t kFun)
+    : DG(mesh, cl, std::move(refElement), minQuadOrder, comm),
       nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
 
     userVol.setStorage(
@@ -82,8 +82,8 @@ Mat Poisson::assemble() {
         krnl.J = vol[elNo].template get<AbsDetJ>().data();
         krnl.W = volRule.weights().data();
         krnl.execute();
-        PetscInt ib = volInfo[elNo].cGID;
-        PetscInt jb = volInfo[elNo].cGID;
+        PetscInt ib = volInfo[elNo].get<GID>();
+        PetscInt jb = volInfo[elNo].get<GID>();
         MatSetValuesBlocked(mat, 1, &ib, 1, &jb, A, ADD_VALUES);
     }
 
@@ -101,11 +101,8 @@ Mat Poisson::assemble() {
     assert(d_xi[0].shape(1) == tensor::d_xi::Shape[0][1]);
     assert(d_xi[0].shape(2) == tensor::d_xi::Shape[0][2]);
 
-    for (std::size_t fctNo = 0; fctNo < numFacets(); ++fctNo) {
+    for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (!info.inside[0] && !info.inside[1]) {
-            continue;
-        }
         kernel::assembleFacetLocal local;
         double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
         local.c00 = -half;
@@ -200,18 +197,15 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
         rhs.b = b;
         rhs.execute();
 
-        PetscInt ib = volInfo[elNo].cGID;
+        PetscInt ib = volInfo[elNo].get<GID>();
         VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
     }
 
     double f[tensor::f::size()];
     assert(tensor::f::size() == fctRule.size());
 
-    for (std::size_t fctNo = 0; fctNo < numFacets(); ++fctNo) {
+    for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (!info.inside[0]) {
-            continue;
-        }
         if (info.up[0] == info.up[1]) {
             auto coords = fct[fctNo].template get<Coords>();
             for (unsigned q = 0; q < tensor::f::size(); ++q) {
@@ -243,12 +237,22 @@ Vec Poisson::rhs(functional_t forceFun, functional_t dirichletFun) {
 }
 
 FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) const {
-    // assert(numeric.rows() == numElements() * tensor::b::Shape[0]);
+    auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::b::Shape[0],
+                                                          1, numLocalElements());
     PetscScalar const* values;
+    PetscInt low, high;
+    VecGetOwnershipRange(x, &low, &high);
     VecGetArrayRead(x, &values);
-    return FiniteElementFunction<DomainDimension>(refElement_->clone(), values, tensor::b::Shape[0],
-                                                  1, numLocalElements());
+    auto& data = numeric.values();
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+        auto gid = volInfo[elNo].get<GID>() * tensor::b::Shape[0];
+        assert(low <= gid && gid < high);
+        for (std::size_t dof = 0; dof < tensor::b::Shape[0]; ++dof) {
+            data(dof, 0, elNo) = values[dof + (gid - low)];
+        }
+    }
     VecRestoreArrayRead(x, &values);
+    return numeric;
 }
 
 } // namespace tndm
