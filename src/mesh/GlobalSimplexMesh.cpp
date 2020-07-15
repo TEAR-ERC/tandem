@@ -74,7 +74,9 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
     std::iota(cGIDs.begin(), cGIDs.end(), elemDist[rank]);
 
     if (overlap == 0) {
-        auto lf = LocalFaces<D>(std::move(elems), std::move(cGIDs), elems.size());
+        auto owner = std::vector<int>(cGIDs.size());
+        std::fill(owner.begin(), owner.end(), rank);
+        auto lf = LocalFaces<D>(std::move(elems), std::move(owner), std::move(cGIDs), elems.size());
         setSharedRanksAndElementData(lf, elemDist);
         return lf;
     }
@@ -228,14 +230,17 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
     apply_permutation(elems, permutation);
     apply_permutation(cGIDs, permutation);
 
-    auto lf = LocalFaces<D>(std::move(elems), std::move(cGIDs), numLocal);
+    auto gid2owner = SortedDistributionToRank(elemDist);
+    auto owner = std::vector<int>(cGIDs.size());
+    std::transform(cGIDs.begin(), cGIDs.end(), owner.begin(), gid2owner);
+
+    auto lf = LocalFaces<D>(std::move(elems), std::move(owner), std::move(cGIDs), numLocal);
     setSharedRanksAndElementData(lf, elemDist);
 
     // Sort by interior, copy, and ghost
-    auto elem2rank = SortedDistributionToRank(elemDist);
-    auto const interiorCopyGhostOrder = [&elem2rank, &rank, &lf](std::size_t lid) {
+    auto const interiorCopyGhostOrder = [&owner, &rank, &lf](std::size_t lid) {
         auto gid = lf.l2cg(lid);
-        int p = elem2rank(gid);
+        int p = owner[lid];
         p = rank == p ? -1 : p;
         return std::make_tuple(p, lf.getSharedRanks(lid).size() > 0, gid);
     };
