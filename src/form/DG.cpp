@@ -5,15 +5,17 @@
 #include "util/Enumerate.h"
 
 #include <memory>
+#include <mpi.h>
 #include <utility>
 
 namespace tndm {
 
 template <std::size_t D>
 DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
-          std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder)
-    : refElement_(std::move(refElement)), numLocalElems_(mesh.elements().localSize()),
-      fctInfo(mesh.numFacets()), volInfo(mesh.numElements()) {
+          std::unique_ptr<RefElement<D>> refElement, unsigned minQuadOrder, MPI_Comm comm)
+    : refElement_(std::move(refElement)), numElems_(mesh.numElements()),
+      numLocalElems_(mesh.elements().localSize()), numLocalFacets_(mesh.facets().localSize()),
+      comm_(comm), fctInfo(mesh.facets().localSize()), volInfo(mesh.numElements()) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -26,11 +28,11 @@ DG<D>::DG(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
         d_xi.emplace_back(refElement_->evaluateGradientAt(points));
     }
 
-    fct.setStorage(std::make_shared<fct_t>(mesh.numFacets() * fctRule.size()), 0u, mesh.numFacets(),
+    fct.setStorage(std::make_shared<fct_t>(numLocalFacets() * fctRule.size()), 0u, numLocalFacets(),
                    fctRule.size());
 
-    vol.setStorage(std::make_shared<vol_t>(mesh.numElements() * volRule.size()), 0u,
-                   mesh.numElements(), volRule.size());
+    vol.setStorage(std::make_shared<vol_t>(numLocalElements() * volRule.size()), 0u,
+                   numLocalElements(), volRule.size());
 
     facetPrecompute(mesh, cl);
     volumePrecompute(mesh, cl);
@@ -55,7 +57,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
         auto detJ = Managed(cl.detJResultInfo(fctRule.size()));
 
 #pragma omp for
-        for (std::size_t fctNo = 0; fctNo < mesh.numFacets(); ++fctNo) {
+        for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
             auto elNos = mesh.template upward<D - 1u>(fctNo);
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             auto dws = mesh.template downward<D - 1u, D>(elNos[0]);
@@ -111,6 +113,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
                 fctInfo[fctNo].localNo[1] = fctInfo[fctNo].localNo[0];
                 fctInfo[fctNo].inside[1] = fctInfo[fctNo].inside[0];
             }
+            assert(fctInfo[fctNo].inside[0] || fctInfo[fctNo].inside[1]);
         }
     }
 }
@@ -125,7 +128,7 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
         auto J = Managed(cl.jacobianResultInfo(volRule.size()));
 
 #pragma omp for
-        for (std::size_t elNo = 0; elNo < mesh.numElements(); ++elNo) {
+        for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
             auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),
                                cl.jacobianResultInfo(volRule.size()));
             auto coords = Tensor(vol[elNo].template get<Coords>().data()->data(),
@@ -137,7 +140,7 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
             cl.jacobianInv(J, jInv);
             cl.map(elNo, geoE, coords);
 
-            volInfo[elNo].cGID = mesh.elements().l2cg(elNo);
+            volInfo[elNo].template get<GID>() = mesh.elements().l2cg(elNo);
 
             // Compute shape measure for interior penalty method
             // See Shahbazi, "An explicit expression for the penalty parameter of the
@@ -151,11 +154,29 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
             for (auto&& fctNo : dws) {
                 auto& info = fctInfo[fctNo];
                 double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
-                penalty += fctInfo[fctNo].area * half;
+                penalty += info.area * half;
             }
-            volInfo[elNo].penalty = penalty / volume;
+            volInfo[elNo].template get<Penalty>() = penalty / volume;
         }
     }
+
+    for (std::size_t elNo = numLocalElements(); elNo < numElements(); ++elNo) {
+        volInfo[elNo].template get<GID>() = mesh.elements().l2cg(elNo);
+    }
+
+    int rank;
+    MPI_Comm_rank(comm_, &rank);
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+        for (auto&& shRk : mesh.elements().getSharedRanks(elNo)) {
+            sendMap[shRk].push_back(elNo);
+        }
+    }
+    for (std::size_t elNo = numLocalElements(); elNo < numElements(); ++elNo) {
+        auto owner = mesh.elements().owner(elNo);
+        recvMap[owner].push_back(elNo);
+    }
+
+    scatter(&volInfo[0].template get<Penalty>());
 }
 
 template class DG<2u>;

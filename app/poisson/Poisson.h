@@ -19,7 +19,7 @@ public:
 
     Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
             std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
-            functional_t kFun);
+            MPI_Comm comm, functional_t kFun);
 
     Mat assemble();
     Vec rhs(functional_t forceFun, functional_t dirichletFun);
@@ -27,9 +27,9 @@ public:
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
     FiniteElementFunction<DomainDimension> discreteK() const {
-        return FiniteElementFunction<DomainDimension>(
-            nodalRefElement_.clone(), userVol[0].data(),
-            nodalRefElement_.numBasisFunctions(), 1, numLocalElements());
+        return FiniteElementFunction<DomainDimension>(nodalRefElement_.clone(), userVol[0].data(),
+                                                      nodalRefElement_.numBasisFunctions(), 1,
+                                                      numLocalElements());
     }
 
 private:
@@ -53,7 +53,8 @@ private:
         };
         double penaltyScale =
             (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
-        return penaltyScale * std::max(volInfo[info.up[0]].penalty, volInfo[info.up[1]].penalty) *
+        return penaltyScale *
+               std::max(volInfo[info.up[0]].get<Penalty>(), volInfo[info.up[1]].get<Penalty>()) *
                std::max(Kmax(info.up[0]), Kmax(info.up[1]));
     }
 

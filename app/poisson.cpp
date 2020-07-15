@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
-    auto mesh = globalMesh->getLocalMesh(2);
+    auto mesh = globalMesh->getLocalMesh(1);
 
     Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);
 
@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
 
     sw.start();
     Poisson poisson(*mesh, cl, std::make_unique<tndm::ModalRefElement<2ul>>(PolynomialDegree),
-                    MinQuadOrder(), scenario->K());
+                    MinQuadOrder(), PETSC_COMM_WORLD, scenario->K());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
     Mat A = poisson.assemble();
