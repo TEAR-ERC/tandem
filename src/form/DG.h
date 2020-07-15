@@ -4,7 +4,7 @@
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "mesh/LocalSimplexMesh.h"
-#include "parallel/MPITraits.h"
+#include "parallel/Scatter.h"
 #include "quadrules/AutoRule.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
@@ -30,45 +30,6 @@ public:
 
     RefElement<D> const& refElement() const { return *refElement_; }
 
-    // \todo: Create proper scatter class
-    template <typename T> void scatter(T* data) {
-        std::size_t sendSize = 0;
-        std::size_t recvSize = 0;
-        for (auto& [key, value] : sendMap) {
-            sendSize += value.size();
-        }
-        for (auto& [key, value] : recvMap) {
-            recvSize += value.size();
-        }
-        auto sendBuffer = std::vector<T>(sendSize);
-        auto recvBuffer = std::vector<T>(recvSize);
-        std::vector<MPI_Request> requests;
-        requests.reserve(sendMap.size() + recvMap.size());
-        std::size_t offset = 0;
-        for (auto& [key, value] : recvMap) {
-            requests.push_back(MPI_Request());
-            MPI_Irecv(&recvBuffer[offset], value.size(), mpi_type_t<T>(), key, 0, comm_,
-                      &requests.back());
-            offset += value.size();
-        }
-        offset = 0;
-        for (auto& [key, value] : sendMap) {
-            for (auto&& v : value) {
-                sendBuffer[offset++] = data[v];
-            }
-            requests.push_back(MPI_Request());
-            MPI_Isend(&sendBuffer[offset - value.size()], value.size(), mpi_type_t<T>(), key, 0,
-                      comm_, &requests.back());
-        }
-        MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
-        offset = 0;
-        for (auto& [key, value] : recvMap) {
-            for (auto&& v : value) {
-                data[v] = recvBuffer[offset++];
-            }
-        }
-    }
-
 protected:
     void facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
     void volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl);
@@ -78,9 +39,7 @@ protected:
     std::size_t numLocalElems_;
     std::size_t numLocalFacets_;
     MPI_Comm comm_;
-
-    std::unordered_map<int, std::vector<std::size_t>> sendMap;
-    std::unordered_map<int, std::vector<std::size_t>> recvMap;
+    Scatter elementScatter_;
 
     SimplexQuadratureRule<D - 1u> fctRule;
     SimplexQuadratureRule<D> volRule;
