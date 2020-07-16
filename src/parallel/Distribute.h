@@ -12,8 +12,11 @@ namespace tndm {
         if (perRank != 0) {
             extras %= perRank;
         }
+	if (perRank == 1) {
+	    extras = 0;
+	}
 
-        auto from = range.from + rank * perRank + (rank < extras ? rank : extras);
+	auto from = range.from + rank * perRank + (rank < extras ? rank : extras);
         return Range(from,
                      from + perRank + (rank < extras ? 1 : 0));
     }

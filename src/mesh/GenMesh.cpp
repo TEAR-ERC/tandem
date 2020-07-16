@@ -81,21 +81,25 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
     for (auto& n : N) {
         numElemsGlobal *= n;
     }
+    numElemsGlobal *= TessInfo<D>::NumSimplices;
 
     // An element (cuboid for D=3) has multi-index (n_1,...,n_d)
     // For parallel mesh generation we flatten the index and equally distribute elements
     auto elemsLocal = distribute(Range(numElemsGlobal), rank, size);
+    std::cout << elemsLocal.from << " " << elemsLocal.to << std::endl;
 
     // We have 2 vertices per dim i.e. 2^D vertices per element
     constexpr uint64_t numVertGIDs = (1 << D);
     std::array<uint64_t, D> D2;
     std::fill(D2.begin(), D2.end(), 2);
 
-    const std::size_t numElements = elemsLocal.length() * TessInfo<D>::NumSimplices;
+    const std::size_t numElements = elemsLocal.length();
     std::vector<simplex_t> elements(numElements);
 
-    for (auto eflat : elemsLocal) {
-        auto e = unflatten(eflat, N);
+    uint64_t ecubeFrom = elemsLocal.from / TessInfo<D>::NumSimplices;
+    uint64_t ecubeTo = 1 + (static_cast<int64_t>(elemsLocal.to) - 1) / TessInfo<D>::NumSimplices;
+    for (uint64_t ecube = ecubeFrom; ecube < ecubeTo; ++ecube) {
+        auto e = unflatten(ecube, N);
         std::array<uint64_t, numVertGIDs> vertGIDs;
         // Get 2^D vertices
         for (uint64_t vflat = 0; vflat < numVertGIDs; ++vflat) {
@@ -109,8 +113,11 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
 
         // Tessellate cuboid into D-simplices
         auto simplices = tessellate(vertGIDs, isOdd);
-        std::copy(simplices.begin(), simplices.end(),
-                  elements.begin() + TessInfo<D>::NumSimplices * (eflat - elemsLocal.from));
+	int64_t firstPlex = ecube == ecubeFrom ? elemsLocal.from - ecubeFrom * TessInfo<D>::NumSimplices : 0;
+	int64_t lastPlex = ecube == ecubeTo - 1 ? ecubeTo * TessInfo<D>::NumSimplices - elemsLocal.to : 0;
+	std::cout << rank << ": " << firstPlex << " " << lastPlex << " " << ecube * TessInfo<D>::NumSimplices + firstPlex - elemsLocal.from << " " << numElements << std::endl;
+        std::copy(simplices.begin() + firstPlex, simplices.begin() + (TessInfo<D>::NumSimplices - lastPlex),
+                  elements.begin() + ecube * TessInfo<D>::NumSimplices + firstPlex - elemsLocal.from);
     }
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
