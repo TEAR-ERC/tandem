@@ -50,13 +50,6 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
             }
             EigenMap(Kfield) = P * rhs;
         }
-        std::size_t firstOwnedGID = std::numeric_limits<std::size_t>::max();
-        for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-            auto gid = volInfo[elNo].get<GID>();
-            if (gid < firstOwnedGID && mesh.elements().owner(elNo) == rank) {
-                firstOwnedGID = gid;
-            }
-        }
 #pragma omp for
         for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
             auto dws = mesh.downward<DomainDimension - 1u, DomainDimension>(elNo);
@@ -75,11 +68,8 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
             }
             // At most D + 1 neighbours plus element itself
             assert(numLocal + numGhost <= DomainDimension + 2u);
-
-            auto gid = mesh.elements().l2cg(elNo);
-            assert(gid >= firstOwnedGID);
-            userVolInfo[gid - firstOwnedGID].get<NumLocalNeighbours>() = numLocal;
-            userVolInfo[gid - firstOwnedGID].get<NumGhostNeighbours>() = numGhost;
+            userVolInfo[elNo].get<NumLocalNeighbours>() = numLocal;
+            userVolInfo[elNo].get<NumGhostNeighbours>() = numGhost;
         }
     }
 
@@ -299,15 +289,11 @@ FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) con
     auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::b::Shape[0],
                                                           1, numLocalElements());
     PetscScalar const* values;
-    PetscInt low, high;
-    VecGetOwnershipRange(x, &low, &high);
     VecGetArrayRead(x, &values);
     auto& data = numeric.values();
     for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-        auto gid = volInfo[elNo].get<GID>() * tensor::b::Shape[0];
-        assert(low <= gid && gid < high);
         for (std::size_t dof = 0; dof < tensor::b::Shape[0]; ++dof) {
-            data(dof, 0, elNo) = values[dof + (gid - low)];
+            data(dof, 0, elNo) = values[dof + elNo * tensor::b::Shape[0]];
         }
     }
     VecRestoreArrayRead(x, &values);
