@@ -215,6 +215,7 @@ private:
         for (std::size_t elNo = 0; elNo < elems.size(); ++elNo) {
             auto downward = elems[elNo].template downward<DD>();
             for (auto& s : downward) {
+                assert(plex2rank(s) < procs);
                 requiredFaces[plex2rank(s)].insert(s);
                 if (faceOrder.find(s) == faceOrder.end()) {
                     faceOrder[s] = faceNo++;
