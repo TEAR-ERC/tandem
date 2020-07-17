@@ -20,6 +20,7 @@ std::vector<std::size_t> makeSortedDistribution(std::size_t num, MPI_Comm comm) 
 
 int SortedDistributionToRank::operator()(std::size_t id) const {
     int guess = static_cast<int>(id / guessSize);
+    assert(guess < dist.size());
     auto procs = dist.size() - 1;
     while (guess > 0 && id < dist[guess]) {
         --guess;

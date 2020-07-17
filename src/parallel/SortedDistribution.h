@@ -13,7 +13,7 @@ std::vector<std::size_t> makeSortedDistribution(std::size_t num, MPI_Comm comm =
 class SortedDistributionToRank {
 public:
     SortedDistributionToRank(std::vector<std::size_t> const& dist)
-        : dist(dist), guessSize(dist.back() / (dist.size() - 1)) {}
+        : dist(dist), guessSize(1 + (dist.back() - 1) / (dist.size() - 1)) {}
 
     int operator()(std::size_t id) const;
 
