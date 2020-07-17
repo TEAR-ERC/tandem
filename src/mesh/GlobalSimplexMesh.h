@@ -127,6 +127,8 @@ public:
 
 private:
     template <std::size_t DD> friend class GlobalSimplexMesh;
+    using upward_map_t = std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>>;
+    using facet_set_t = std::unordered_set<Simplex<D - 1u>, SimplexHash<D - 1u>>;
 
     auto makeG2LMap() const {
         std::unordered_map<Simplex<D>, std::size_t, SimplexHash<D>> map;
@@ -152,31 +154,29 @@ private:
     void setSharedRanksAndElementData(LocalFaces<D>& elems,
                                       std::vector<std::size_t> const& elemDist) const;
 
-    auto getBoundaryFaces(std::vector<Simplex<D>> const& elems) const {
+    auto makeUpwardMap(std::vector<Simplex<D>> const& elems) const {
         // Construct upward map from faces to local element ids
-        std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>> up;
+        upward_map_t up;
         for (std::size_t elNo = 0; elNo < elems.size(); ++elNo) {
             auto downward = elems[elNo].template downward<D - 1u>();
             for (auto& s : downward) {
                 up.emplace(s, elNo);
             }
         }
-        // Delete all internal faces and count number of faces per rank
-        auto const deleteInternalFaces = [](auto& up) {
-            for (auto it = up.begin(); it != up.end();) {
-                auto count = up.count(it->first);
-                assert(count <= 2);
-                if (count > 1) {
-                    auto range = up.equal_range(it->first);
-                    it = up.erase(range.first, range.second);
-                } else {
-                    ++it;
-                }
-            }
-        };
-        deleteInternalFaces(up);
         return up;
     }
+    auto getBoundaryFaces(upward_map_t const& up) const {
+        facet_set_t boundaryFaces;
+        for (auto&& it : up) {
+            auto count = up.count(it.first);
+            assert(1 <= count && count <= 2);
+            if (count == 1) {
+                boundaryFaces.insert(it.first);
+            }
+        }
+        return boundaryFaces;
+    }
+    void deleteDomainBoundaryFaces(facet_set_t& boundaryFaces) const;
 
     template <std::size_t DD> auto getPlex2Rank() const {
         int procs;
@@ -335,8 +335,8 @@ private:
     }
 
     template <std::size_t DD>
-    auto getSharedRanks(std::vector<Simplex<DD>> const& requestedFaces,
-                        AllToAllV const& a2a) const {
+    auto getSharedRanks(std::vector<Simplex<DD>> const& requestedFaces, AllToAllV const& a2a,
+                        std::vector<int> const* rankPermutation = nullptr) const {
         int procs;
         MPI_Comm_size(comm, &procs);
 
@@ -363,9 +363,10 @@ private:
         std::vector<int> requestedSharedRanks;
         requestedSharedRanks.reserve(totalSharedRanksSendCount);
         for (int p = 0; p < procs; ++p) {
-            for (auto&& i : a2a.sendRange(p)) {
+            int pp = rankPermutation ? (*rankPermutation)[p] : p;
+            for (auto&& i : a2a.sendRange(pp)) {
                 for (auto&& shRk : sharedRanksInfo[requestedFaces[i]]) {
-                    if (shRk != p) {
+                    if (shRk != pp) {
                         requestedSharedRanks.push_back(shRk);
                     }
                 }
@@ -385,6 +386,9 @@ private:
         }
 
         AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts));
+        if (rankPermutation) {
+            a2aSharedRanks.setRankPermutation(*rankPermutation);
+        }
         auto sharedRanks = a2aSharedRanks.exchange(requestedSharedRanks);
         Displacements sharedRanksDispls(sharedRanksRecvCount);
 

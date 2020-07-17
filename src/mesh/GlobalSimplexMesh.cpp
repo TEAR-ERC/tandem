@@ -1,5 +1,6 @@
 #include "GlobalSimplexMesh.h"
 #include "parallel/SortedDistribution.h"
+#include "util/Algorithm.h"
 
 namespace tndm {
 
@@ -85,18 +86,58 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
     mpi_array_type<uint64_t> mpi_elem_t(D + 1u);
     auto plex2rank = getPlex2Rank<D - 1u>();
 
-    auto const makeDistributedUpwardMap = [&procs, &myComm, &mpi_facet_t, &mpi_elem_t, &plex2rank](
-                                              auto&& elems, std::vector<std::size_t> const& cGIDs) {
-        std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>> up;
-        for (std::size_t elNo = 0; elNo < elems.size(); ++elNo) {
-            auto downward = elems[elNo].template downward<D - 1u>();
-            for (auto& s : downward) {
-                up.emplace(s, elNo);
+    auto const sortInteriorCopy = [this](auto& elems, unsigned overlap) {
+        auto up = makeUpwardMap(elems);
+        auto boundaryFaces = getBoundaryFaces(up);
+        deleteDomainBoundaryFaces(boundaryFaces);
+        std::unordered_set<std::size_t> copyElNos;
+        for (auto&& face : boundaryFaces) {
+            auto [it, end] = up.equal_range(face);
+            for (; it != end; ++it) {
+                copyElNos.insert(it->second);
+            }
+        }
+        for (unsigned level = 1; level < overlap; ++level) {
+            std::unordered_set<std::size_t> newCopyElNos;
+            for (auto&& elNo : copyElNos) {
+                auto dws = elems[elNo].template downward<D - 1u>();
+                for (auto&& dw : dws) {
+                    auto [it, end] = up.equal_range(dw);
+                    for (; it != end; ++it) {
+                        if (copyElNos.find(it->second) == copyElNos.end()) {
+                            newCopyElNos.insert(it->second);
+                        }
+                    }
+                }
+            }
+            copyElNos.insert(newCopyElNos.begin(), newCopyElNos.end());
+        }
+        auto elNos = std::vector<std::size_t>(elems.size());
+        std::iota(elNos.begin(), elNos.end(), 0ul);
+        std::sort(elNos.begin(), elNos.end(), [&copyElNos](std::size_t a, std::size_t b) {
+            auto copyA = copyElNos.find(a) != copyElNos.end() ? 1 : 0;
+            auto copyB = copyElNos.find(b) != copyElNos.end() ? 1 : 0;
+            return std::make_pair(copyA, a) < std::make_pair(copyB, b);
+        });
+        apply_permutation(elems, std::move(elNos));
+        return elems.size() - copyElNos.size();
+    };
+    std::size_t copyBegin = sortInteriorCopy(elems, overlap);
+
+    auto const makeDistributedUpwardMap = [&procs, &myComm, &mpi_facet_t, &mpi_elem_t,
+                                           &plex2rank](upward_map_t const& up, auto&& elems,
+                                                       std::vector<std::size_t> const& cGIDs,
+                                                       std::size_t copyBegin) {
+        facet_set_t requiredFaces;
+        for (std::size_t elNo = copyBegin; elNo < elems.size(); ++elNo) {
+            auto const dws = elems[elNo].template downward<D - 1u>();
+            for (auto const& dw : dws) {
+                requiredFaces.insert(dw);
             }
         }
         std::vector<int> counts(procs, 0);
-        for (auto&& u : up) {
-            ++counts[plex2rank(u.first)];
+        for (auto&& face : requiredFaces) {
+            counts[plex2rank(face)] += up.count(face);
         }
         std::vector<std::ptrdiff_t> offsets(procs + 1);
         offsets[0] = 0;
@@ -105,12 +146,15 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
         std::vector<Simplex<D - 1u>> upFaces(offsets.back());
         std::vector<Simplex<D>> upElems(offsets.back());
         std::vector<std::size_t> upCGIDs(offsets.back());
-        for (auto&& u : up) {
-            auto rank = plex2rank(u.first);
-            upFaces[offsets[rank]] = u.first;
-            upElems[offsets[rank]] = elems[u.second];
-            upCGIDs[offsets[rank]] = cGIDs[u.second];
-            ++offsets[rank];
+        for (auto&& face : requiredFaces) {
+            auto rank = plex2rank(face);
+            auto [it, end] = up.equal_range(face);
+            for (; it != end; ++it) {
+                upFaces[offsets[rank]] = face;
+                upElems[offsets[rank]] = elems[it->second];
+                upCGIDs[offsets[rank]] = cGIDs[it->second];
+                ++offsets[rank];
+            }
         }
 
         AllToAllV a2a(std::move(counts), myComm);
@@ -128,50 +172,53 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
         return distUp;
     };
 
-    auto distUp = makeDistributedUpwardMap(elems, cGIDs);
+    auto upMap = makeUpwardMap(elems);
+    auto distUp = makeDistributedUpwardMap(upMap, elems, cGIDs, copyBegin);
 
     std::size_t numLocal = elems.size();
 
     for (int level = 0; level < static_cast<int>(overlap); ++level) {
-        auto up = getBoundaryFaces(elems);
+        auto boundaryFaces = getBoundaryFaces(upMap);
 
-        auto const getRequestedFacesAndMissingVertices = [&procs, &myComm, &mpi_facet_t,
-                                                          &plex2rank](auto&& elems, auto&& up) {
-            std::vector<int> counts(procs, 0);
-            for (auto&& u : up) {
-                ++counts[plex2rank(u.first)];
-            }
-            std::vector<std::ptrdiff_t> offsets(procs + 1);
-            offsets[0] = 0;
-            std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
-
-            std::vector<Simplex<D - 1u>> boundaryFaces(offsets.back());
-            std::vector<uint64_t> missingVertex(offsets.back());
-            for (auto&& u : up) {
-                // Find missing vertex i.e. elem \ facet
-                auto& elem = elems[u.second];
-                auto f = u.first.begin();
-                auto e = elem.begin();
-                while (e != elem.end() && f != u.first.end() && *e == *f) {
-                    ++f;
-                    ++e;
+        auto const getRequestedFacesAndMissingVertices =
+            [&procs, &myComm, &mpi_facet_t, &plex2rank](auto&& elems, upward_map_t const& upMap,
+                                                        facet_set_t const& boundaryFaces) {
+                std::vector<int> counts(procs, 0);
+                for (auto&& face : boundaryFaces) {
+                    ++counts[plex2rank(face)];
                 }
-                assert(e != elem.end());
+                std::vector<std::ptrdiff_t> offsets(procs + 1);
+                offsets[0] = 0;
+                std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
 
-                auto rank = plex2rank(u.first);
-                boundaryFaces[offsets[rank]] = u.first;
-                missingVertex[offsets[rank]] = *e;
-                ++offsets[rank];
-            }
+                std::vector<Simplex<D - 1u>> boundaryFacesVec(offsets.back());
+                std::vector<uint64_t> missingVertex(offsets.back());
+                for (auto&& face : boundaryFaces) {
+                    assert(upMap.count(face) == 1);
+                    // Find missing vertex i.e. elem \ facet
+                    auto& elem = elems[upMap.find(face)->second];
+                    auto f = face.begin();
+                    auto e = elem.begin();
+                    while (e != elem.end() && f != face.end() && *e == *f) {
+                        ++f;
+                        ++e;
+                    }
+                    assert(e != elem.end());
 
-            AllToAllV a2a(std::move(counts), myComm);
-            auto requestedBoundaryFaces = a2a.exchange(boundaryFaces, mpi_facet_t.get());
-            auto requestedMissingVertices = a2a.exchange(missingVertex);
-            return std::make_tuple(requestedBoundaryFaces, requestedMissingVertices, a2a);
-        };
+                    auto rank = plex2rank(face);
+                    boundaryFacesVec[offsets[rank]] = face;
+                    missingVertex[offsets[rank]] = *e;
+                    ++offsets[rank];
+                }
+
+                AllToAllV a2a(std::move(counts), myComm);
+                auto requestedBoundaryFaces = a2a.exchange(boundaryFacesVec, mpi_facet_t.get());
+                auto requestedMissingVertices = a2a.exchange(missingVertex);
+                return std::make_tuple(requestedBoundaryFaces, requestedMissingVertices, a2a);
+            };
 
         auto [requestedBoundaryFaces, requestedMissingVertices, a2a] =
-            getRequestedFacesAndMissingVertices(elems, up);
+            getRequestedFacesAndMissingVertices(elems, upMap, boundaryFaces);
 
         std::vector<Simplex<D>> requestedBoundaryElems(requestedBoundaryFaces.size());
         std::vector<std::size_t> requestedCGIDs(requestedBoundaryFaces.size());
@@ -216,40 +263,43 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
 
         assert(boundaryElems.size() == boundaryCGIDs.size());
 
-        elems.reserve(elems.size() + boundaryElems.size());
+        auto oldSize = elems.size();
+        elems.reserve(oldSize + boundaryElems.size());
         elems.insert(elems.end(), boundaryElems.begin(), boundaryElems.end());
         cGIDs.reserve(cGIDs.size() + boundaryCGIDs.size());
         cGIDs.insert(cGIDs.end(), boundaryCGIDs.begin(), boundaryCGIDs.end());
+
+        for (std::size_t elNo = oldSize; elNo < elems.size(); ++elNo) {
+            auto downward = elems[elNo].template downward<D - 1u>();
+            for (auto& s : downward) {
+                upMap.emplace(s, elNo);
+            }
+        }
     }
 
     // Sort by gid
+    auto gid2owner = SortedDistributionToRank(elemDist);
+    auto const intCopyGhostOrder = [&rank, &gid2owner, &cGIDs](std::size_t lid) {
+        auto gid = cGIDs[lid];
+        int p = gid2owner(gid);
+        p = rank == p ? -1 : p;
+        return std::make_pair(p, gid);
+    };
     std::vector<std::size_t> permutation(elems.size());
     std::iota(permutation.begin(), permutation.end(), std::size_t(0));
     std::sort(permutation.begin(), permutation.end(),
-              [&cGIDs](std::size_t a, std::size_t b) { return cGIDs[a] < cGIDs[b]; });
+              [&intCopyGhostOrder](std::size_t a, std::size_t b) {
+                  return intCopyGhostOrder(a) < intCopyGhostOrder(b);
+              });
     apply_permutation(elems, permutation);
     apply_permutation(cGIDs, permutation);
 
-    auto gid2owner = SortedDistributionToRank(elemDist);
     auto owner = std::vector<int>(cGIDs.size());
     std::transform(cGIDs.begin(), cGIDs.end(), owner.begin(), gid2owner);
 
     auto lf = LocalFaces<D>(std::move(elems), std::move(owner), std::move(cGIDs), numLocal);
     setSharedRanksAndElementData(lf, elemDist);
 
-    // Sort by interior, copy, and ghost
-    auto const interiorCopyGhostOrder = [&owner, &rank, &lf](std::size_t lid) {
-        auto gid = lf.l2cg(lid);
-        int p = owner[lid];
-        p = rank == p ? -1 : p;
-        return std::make_tuple(p, lf.getSharedRanks(lid).size() > 0, gid);
-    };
-    std::iota(permutation.begin(), permutation.end(), std::size_t(0));
-    std::sort(permutation.begin(), permutation.end(),
-              [&interiorCopyGhostOrder](std::size_t a, std::size_t b) {
-                  return interiorCopyGhostOrder(a) < interiorCopyGhostOrder(b);
-              });
-    lf.permute(permutation);
     return lf;
 }
 
@@ -267,12 +317,17 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
     }
 
     // Exchange data
+    auto rankPerm = std::vector<int>(procs);
+    rankPerm[0] = rank;
+    std::iota(rankPerm.begin() + 1, rankPerm.begin() + 1 + rank, 0);
+    std::iota(rankPerm.begin() + 1 + rank, rankPerm.end(), rank + 1);
     AllToAllV a2a(std::move(counts), comm);
+    a2a.setRankPermutation(rankPerm);
     mpi_array_type<uint64_t> mpi_plex_t(D + 1);
     auto requestedElems = a2a.exchange(elems.faces(), mpi_plex_t.get());
     a2a.swap();
 
-    auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedElems, a2a);
+    auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedElems, a2a, &rankPerm);
     elems.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
 
     if (elementData) {
@@ -285,6 +340,54 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
             lids.emplace_back(it->second);
         }
         elems.setMeshData(elementData->redistributed(lids, a2a));
+    }
+}
+
+template <std::size_t D>
+void GlobalSimplexMesh<D>::deleteDomainBoundaryFaces(facet_set_t& boundaryFaces) const {
+    int procs;
+    MPI_Comm_size(comm, &procs);
+    auto myComm = comm;
+    auto plex2rank = getPlex2Rank<D - 1u>();
+    auto const figureOutWhichFacesAppearTwiceInDistributedMemory = [&procs, &myComm, &plex2rank](
+                                                                       facet_set_t const& bfaces) {
+        std::vector<int> counts(procs, 0);
+        for (auto const& u : bfaces) {
+            ++counts[plex2rank(u)];
+        }
+        // Send domain and partition boundary faces to face owner
+        std::vector<std::ptrdiff_t> offsets(procs + 1);
+        offsets[0] = 0;
+        std::partial_sum(counts.begin(), counts.end(), offsets.begin() + 1);
+        auto faces = std::vector<Simplex<D - 1u>>(offsets.back());
+        for (auto const& u : bfaces) {
+            auto rank = plex2rank(u);
+            faces[offsets[rank]++] = u;
+        }
+        AllToAllV a2a(std::move(counts), myComm);
+        mpi_array_type<uint64_t> mpi_plex_t(D);
+        auto requestedFaces = a2a.exchange(faces, mpi_plex_t.get());
+        auto requestedFacesAsMultiset =
+            std::unordered_multiset<Simplex<D - 1u>, SimplexHash<D - 1u>>(requestedFaces.begin(),
+                                                                          requestedFaces.end());
+        auto requestedFaceCount = std::vector<std::size_t>(requestedFaces.size());
+        for (std::size_t fNo = 0; fNo < requestedFaces.size(); ++fNo) {
+            requestedFaceCount[fNo] = requestedFacesAsMultiset.count(requestedFaces[fNo]);
+        }
+        a2a.swap();
+        auto faceCount = a2a.exchange(requestedFaceCount);
+        return std::make_pair(faces, faceCount);
+    };
+
+    auto [faces, faceCount] = figureOutWhichFacesAppearTwiceInDistributedMemory(boundaryFaces);
+
+    assert(faceCount.size() == faces.size());
+    for (std::size_t fNo = 0; fNo < faceCount.size(); ++fNo) {
+        assert(1 <= faceCount[fNo] && faceCount[fNo] <= 2);
+        if (faceCount[fNo] == 1) {
+            assert(boundaryFaces.find(faces[fNo]) != boundaryFaces.end());
+            boundaryFaces.erase(faces[fNo]);
+        }
     }
 }
 
