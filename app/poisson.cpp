@@ -27,6 +27,7 @@
 #include <memory>
 #include <tuple>
 
+using tndm::BC;
 using tndm::Curvilinear;
 using tndm::fnv1a;
 using tndm::GenMesh;
@@ -171,7 +172,9 @@ int main(int argc, char** argv) {
     auto n = program.get<unsigned long>("n");
     std::array<uint64_t, DomainDimension> size;
     size.fill(n);
-    GenMesh meshGen(size, PETSC_COMM_WORLD);
+    std::array<std::pair<BC, BC>, DomainDimension> BCs;
+    BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
+    GenMesh meshGen(size, BCs, PETSC_COMM_WORLD);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
