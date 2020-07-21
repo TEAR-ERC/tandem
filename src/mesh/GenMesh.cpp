@@ -45,7 +45,8 @@ std::array<GenMesh<3>::simplex_t, 5> GenMesh<3>::tessellate(std::array<uint64_t,
     return result;
 }
 
-template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() {
+template <std::size_t D>
+std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     int rank, size;
     MPI_Comm_rank(comm_, &rank);
     MPI_Comm_size(comm_, &size);
@@ -66,7 +67,14 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
     auto vertex_pos = [&](std::array<uint64_t, D> const& v) {
         vertex_t vert;
         for (std::size_t d = 0; d < D; ++d) {
-            vert[d] = static_cast<double>(v[d]) / N[d];
+            std::size_t region = 0;
+            while (v[d] > regions_[d][region + 1] && region < regions_[d].size() - 1u) {
+                ++region;
+            }
+            assert(region != regions_[d].size() - 1u);
+            double h = (points_[d][region + 1] - points_[d][region]) /
+                       (regions_[d][region + 1] - regions_[d][region]);
+            vert[d] = points_[d][region] + static_cast<double>(v[d] - regions_[d][region]) * h;
         }
         return vert;
     };
@@ -132,20 +140,30 @@ template <std::size_t D> std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>
 
 template <std::size_t D>
 std::unique_ptr<typename GenMesh<D>::boundary_mesh_t>
-GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) {
+GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     std::vector<boundary_simplex_t> boundaryElements;
-    std::vector<int> boundaryConditions;
+    std::vector<BC> boundaryConditions;
     for (auto& elem : mesh.getElements()) {
         for (auto& face : elem.downward()) {
-            for (std::size_t d = 0; d < D; ++d) {
-                bool faceAtBnd = true;
-                for (auto& vflat : face) {
-                    auto v = unflatten(vflat, Np1);
-                    faceAtBnd = faceAtBnd && ((v[d] == 0) || (v[d] == Np1[d] - 1));
+            auto v0 = unflatten(face[0], Np1);
+            std::array<bool, D> inPlane;
+            inPlane.fill(true);
+            for (auto vflat = face.begin() + 1; vflat != face.end(); ++vflat) {
+                auto v = unflatten(*vflat, Np1);
+                for (std::size_t d = 0; d < D; ++d) {
+                    inPlane[d] = inPlane[d] && (v[d] == v0[d]);
                 }
-                if (faceAtBnd) {
+            }
+            assert(std::count(inPlane.begin(), inPlane.end(), true) <= 1);
+            auto it = std::find(inPlane.begin(), inPlane.end(), true);
+            if (it != inPlane.end()) {
+                auto plane = std::distance(inPlane.begin(), it);
+                auto regionIt =
+                    std::find(regions_[plane].begin(), regions_[plane].end(), v0[plane]);
+                if (regionIt != regions_[plane].end()) {
+                    auto region = std::distance(regions_[plane].begin(), regionIt);
                     boundaryElements.emplace_back(face);
-                    boundaryConditions.emplace_back(d + 1);
+                    boundaryConditions.emplace_back(bcs_[plane][region]);
                 }
             }
         }

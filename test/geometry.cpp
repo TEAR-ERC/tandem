@@ -1,5 +1,6 @@
 #include "geometry/Curvilinear.h"
 #include "mesh/GenMesh.h"
+#include "mesh/MeshData.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 
@@ -10,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+using tndm::BC;
 using tndm::Curvilinear;
 using tndm::GenMesh;
 using tndm::Managed;
@@ -28,7 +30,9 @@ TEST_CASE("Curvilinear") {
         return GenMesh<D>::vertex_t{c * x - s * y, c * x + s * y};
     };
 
-    GenMesh<D> meshGen(N);
+    std::array<std::pair<BC, BC>, D> BCs;
+    BCs.fill(std::make_pair(BC::None, BC::None));
+    GenMesh<D> meshGen(N, BCs);
     auto globalMesh = meshGen.uniformMesh();
     auto mesh = globalMesh->getLocalMesh();
     Curvilinear<D> cl(*mesh, transform);

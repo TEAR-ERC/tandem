@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iostream>
 
+using tndm::BC;
 using tndm::BoundaryData;
 using tndm::Curvilinear;
 using tndm::GenMesh;
@@ -21,15 +22,14 @@ using tndm::VertexData;
 using tndm::VTUWriter;
 
 template <std::size_t D, typename Fun>
-void writeMesh(std::string const& baseName, std::array<uint64_t, D> const& N, Fun transform,
+void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun transform,
                int ghostLevels) {
-    GenMesh<D> meshGen(N);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
 
     auto mesh = globalMesh->getLocalMesh(ghostLevels);
 
-    unsigned degree = 15;
+    unsigned degree = 1;
     Curvilinear<D> cl(*mesh, *transform, degree);
 
     auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
@@ -40,7 +40,7 @@ void writeMesh(std::string const& baseName, std::array<uint64_t, D> const& N, Fu
     for (std::size_t fid = 0; fid < mesh->numFacets(); ++fid) {
         auto& eids = mesh->template upward<D - 1>(fid);
         for (auto& eid : eids) {
-            bc[eid] += boundaryData->getBoundaryConditions()[fid];
+            bc[eid] += static_cast<int>(boundaryData->getBoundaryConditions()[fid]);
         }
     }
 
@@ -87,13 +87,22 @@ int main(int argc, char** argv) {
     const auto n = program.get<unsigned long>("n");
 
     if (D == 2) {
-        std::array<uint64_t, 2> N = {n, n};
         auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
             double r = 0.5 * (v[0] + 1.0);
             double phi = 0.5 * M_PI * v[1];
             return {r * cos(phi), r * sin(phi)};
         };
-        writeMesh(out, N, transform, ghost);
+        std::array<double, 2> h = {1.0 / n, 1.0 / n};
+        auto points = std::array<std::vector<double>, 2>{{
+            {0.0, 0.2, 1.0},
+            {0.0, 0.01, 0.5, 0.95, 1.0},
+        }};
+        auto BCs = std::array<std::vector<BC>, 2>{{
+            {BC::Dirichlet, BC::Fault, BC::Dirichlet},
+            {BC::Natural, BC::None, BC::Fault, BC::None, BC::Natural},
+        }};
+        GenMesh<2> meshGen(points, h, BCs);
+        writeMesh(out, meshGen, transform, ghost);
     } else if (D == 3) {
         std::array<uint64_t, 3> N = {n, n, n};
         auto transform = [](std::array<double, 3> const& v) -> std::array<double, 3> {
@@ -102,7 +111,10 @@ int main(int argc, char** argv) {
             double theta = M_PI * (0.5 * v[2] + 0.25);
             return {r * sin(theta) * cos(phi), r * sin(theta) * sin(phi), r * cos(theta)};
         };
-        writeMesh(out, N, transform, ghost);
+        std::array<std::pair<BC, BC>, 3> BCs;
+        BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
+        GenMesh<3> meshGen(N, BCs);
+        writeMesh(out, meshGen, transform, ghost);
     } else {
         std::cerr << "Unsupported simplex dimension: " << D << std::endl;
     }

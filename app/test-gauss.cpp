@@ -3,6 +3,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/LocalSimplexMesh.h"
+#include "mesh/MeshData.h"
 #include "quadrules/AutoRule.h"
 #include "tensor/Tensor.h"
 
@@ -17,6 +18,7 @@
 #include <iostream>
 #include <vector>
 
+using tndm::BC;
 using tndm::Curvilinear;
 using tndm::dot;
 using tndm::GenMesh;
@@ -132,7 +134,9 @@ double volumeInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, VolumeFunc
 }
 
 template <std::size_t D> auto getMesh(std::array<uint64_t, D> const& size) {
-    GenMesh<D> meshGen(size);
+    std::array<std::pair<BC, BC>, D> BCs;
+    BCs.fill(std::make_pair(BC::None, BC::None));
+    GenMesh<D> meshGen(size, BCs);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
     return globalMesh->getLocalMesh();
