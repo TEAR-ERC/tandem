@@ -84,28 +84,36 @@ PetscErrorCode Poisson::createA(Mat* A) {
     PetscInt blockSize = tensor::A::Shape[0];
     PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
     PetscInt localCols = numLocalElements() * tensor::A::Shape[1];
-    PetscErrorCode ierr;
-    ierr = MatCreateBAIJ(comm(), blockSize, localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE,
-                         0, &userVolInfo[0].get<NumLocalNeighbours>(), 0,
-                         &userVolInfo[0].get<NumGhostNeighbours>(), A);
-    CHKERRQ(ierr);
-    ierr = MatSetOption(*A, MAT_ROW_ORIENTED, PETSC_FALSE);
-    CHKERRQ(ierr);
-    ierr = MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE);
-    CHKERRQ(ierr);
+    CHKERRQ(MatCreate(comm(), A));
+    CHKERRQ(MatSetSizes(*A, localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE));
+    CHKERRQ(MatSetBlockSize(*A, blockSize));
+    CHKERRQ(MatSetFromOptions(*A));
+
+    // Preallocation
+    auto d_nnz = std::vector<PetscInt>(blockSize * localRows);
+    auto o_nnz = std::vector<PetscInt>(blockSize * localRows);
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+        auto numLocal = userVolInfo[elNo].get<NumLocalNeighbours>();
+        auto numGhost = userVolInfo[elNo].get<NumGhostNeighbours>();
+        for (std::size_t b = 0; b < blockSize; ++b) {
+            d_nnz[b + elNo * blockSize] = numLocal * blockSize;
+            o_nnz[b + elNo * blockSize] = numGhost * blockSize;
+        }
+    }
+    CHKERRQ(MatSeqAIJSetPreallocation(*A, 0, d_nnz.data()));
+    CHKERRQ(MatMPIAIJSetPreallocation(*A, 0, d_nnz.data(), 0, o_nnz.data()));
+    CHKERRQ(MatSeqBAIJSetPreallocation(*A, blockSize, 0, &userVolInfo[0].get<NumLocalNeighbours>()));
+    CHKERRQ(MatMPIBAIJSetPreallocation(*A, blockSize, 0, &userVolInfo[0].get<NumLocalNeighbours>(), 0, &userVolInfo[0].get<NumGhostNeighbours>()));
+    CHKERRQ(MatSetOption(*A, MAT_ROW_ORIENTED, PETSC_FALSE));
+    CHKERRQ(MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE));
     return 0;
 }
 PetscErrorCode Poisson::createb(Vec* b) {
-    PetscErrorCode ierr;
     PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
-    ierr = VecCreate(comm(), b);
-    CHKERRQ(ierr);
-    ierr = VecSetSizes(*b, localRows, PETSC_DECIDE);
-    CHKERRQ(ierr);
-    ierr = VecSetFromOptions(*b);
-    CHKERRQ(ierr);
-    ierr = VecSetBlockSize(*b, tensor::b::Shape[0]);
-    CHKERRQ(ierr);
+    CHKERRQ(VecCreate(comm(), b));
+    CHKERRQ(VecSetSizes(*b, localRows, PETSC_DECIDE));
+    CHKERRQ(VecSetFromOptions(*b));
+    CHKERRQ(VecSetBlockSize(*b, tensor::b::Shape[0]));
     return 0;
 }
 
@@ -214,10 +222,8 @@ PetscErrorCode Poisson::assemble(Mat mat) {
         }
     }
 
-    ierr = MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY);
-    CHKERRQ(ierr);
-    ierr = MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY);
-    CHKERRQ(ierr);
+    CHKERRQ(MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY));
     return 0;
 }
 
@@ -278,10 +284,8 @@ PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichlet
             VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
         }
     }
-    ierr = VecAssemblyBegin(B);
-    CHKERRQ(ierr);
-    VecAssemblyEnd(B);
-    CHKERRQ(ierr);
+    CHKERRQ(VecAssemblyBegin(B));
+    CHKERRQ(VecAssemblyEnd(B));
     return 0;
 }
 
