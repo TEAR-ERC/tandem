@@ -115,6 +115,18 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
             },
             [](std::array<double, 2> const& x) { return (x[0] * x[1] >= 0) ? 5.0 : 1.0; });
     }
+    case "embedded"_fnv1a: {
+        auto scenario = std::make_unique<MyScenario>(
+            biunit, [](std::array<double, 2> const& x) { return 0.0; },
+            [](std::array<double, 2> const& x) { return x[0] < 0.5 ? 3.0 : 2.0; },
+            [](Vector<double> const& x) -> std::array<double, 1> {
+                return {x(0) < 0.5 ? 3.0 : 2.0};
+            });
+        scenario->setPointsAndBCs(
+            {{{0.0, 0.75, 1.0}, {0.0, 1.0}}},
+            {{{BC::Dirichlet, BC::Fault, BC::Dirichlet}, {BC::Natural, BC::Dirichlet}}});
+        return scenario;
+    }
     default:
         return nullptr;
     }
@@ -170,14 +182,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
     auto n = program.get<unsigned long>("n");
-    std::array<uint64_t, DomainDimension> size;
-    size.fill(n);
-    std::array<std::pair<BC, BC>, DomainDimension> BCs;
-    BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
-    GenMesh meshGen(size, BCs, PETSC_COMM_WORLD);
-    auto globalMesh = meshGen.uniformMesh();
-    globalMesh->repartition();
-
+    auto globalMesh = scenario->getGlobalMesh(n, PETSC_COMM_WORLD);
     auto mesh = globalMesh->getLocalMesh(1);
 
     Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);

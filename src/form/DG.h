@@ -76,6 +76,7 @@ protected:
         std::array<std::size_t, 2> g_up;
         std::array<std::size_t, 2> localNo;
         double area;
+        BC bc;
     };
     std::vector<FacetInfo> fctInfo;
 

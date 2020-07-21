@@ -160,6 +160,9 @@ PetscErrorCode Poisson::assemble(Mat mat) {
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
+        if (info.bc == BC::Fault || info.bc == BC::Natural) {
+            continue;
+        }
         kernel::assembleFacetLocal local;
         double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
         local.c00 = -half;
@@ -259,7 +262,7 @@ PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichlet
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.up[0] == info.up[1]) {
+        if (info.up[0] == info.up[1] && info.bc == BC::Dirichlet) {
             auto coords = fct[fctNo].template get<Coords>();
             for (unsigned q = 0; q < tensor::f::size(); ++q) {
                 f[q] = dirichletFun(coords[q]);
