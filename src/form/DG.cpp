@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <mpi.h>
+#include <stdexcept>
 #include <utility>
 
 namespace tndm {
@@ -43,6 +44,11 @@ template <std::size_t D>
 void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl) {
     std::vector<Managed<Matrix<double>>> fctE;
     std::vector<Managed<Tensor<double, 3u>>> fctGradE;
+
+    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
+    if (!boundaryData) {
+        throw std::runtime_error("Boundary conditions not set.");
+    }
 
     for (std::size_t f = 0; f < D + 1u; ++f) {
         fctE.emplace_back(cl.evaluateBasisAt(cl.facetParam(f, fctRule.points())));
@@ -91,6 +97,7 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
             fctInfo[fctNo].localNo[0] = localFctNo;
             fctInfo[fctNo].area = area;
             fctInfo[fctNo].inside[0] = elNos[0] < numLocalElems_;
+            fctInfo[fctNo].bc = boundaryData->getBoundaryConditions()[fctNo];
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);

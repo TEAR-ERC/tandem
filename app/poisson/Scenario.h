@@ -6,6 +6,8 @@
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "mesh/GenMesh.h"
+#include "mesh/GlobalSimplexMesh.h"
 
 namespace tndm {
 
@@ -20,6 +22,9 @@ public:
     virtual functional_t dirichlet() const = 0;
     virtual std::unique_ptr<SolutionInterface> reference() const = 0;
     virtual functional_t K() const = 0;
+
+    virtual std::unique_ptr<GlobalSimplexMesh<DomainDimension>>
+    getGlobalMesh(unsigned long n, MPI_Comm comm) const = 0;
 };
 
 class MyScenario : public Scenario {
@@ -39,11 +44,41 @@ public:
     }
     functional_t K() const override { return K_; }
 
+    void setPointsAndBCs(std::array<std::vector<double>, DomainDimension> const& points,
+                         std::array<std::vector<BC>, DomainDimension> const& BCs) {
+        points_ = points;
+        bcs_ = BCs;
+    }
+
+    std::unique_ptr<GlobalSimplexMesh<DomainDimension>>
+    getGlobalMesh(unsigned long n, MPI_Comm comm) const override {
+        auto meshGen = meshGenerator(n, comm);
+        auto globalMesh = meshGen.uniformMesh();
+        globalMesh->repartition();
+        return globalMesh;
+    }
+
 private:
+    GenMesh<DomainDimension> meshGenerator(unsigned long n, MPI_Comm comm) const {
+        if (points_ && bcs_) {
+            std::array<double, DomainDimension> h;
+            h.fill(1.0 / n);
+            return GenMesh(*points_, h, *bcs_, comm);
+        }
+        std::array<uint64_t, DomainDimension> size;
+        size.fill(n);
+        std::array<std::pair<BC, BC>, DomainDimension> BCs;
+        BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
+        return GenMesh(size, BCs, comm);
+    }
+
     transform_t trans_;
     functional_t force_, diri_;
     reference_t ref_;
     functional_t K_;
+
+    std::optional<std::array<std::vector<double>, DomainDimension>> points_ = std::nullopt;
+    std::optional<std::array<std::vector<BC>, DomainDimension>> bcs_ = std::nullopt;
 };
 
 } // namespace tndm
