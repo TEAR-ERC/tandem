@@ -13,6 +13,7 @@
 
 #include <argparse.hpp>
 #include <mpi.h>
+#include <petscerror.h>
 #include <petscksp.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
@@ -131,8 +132,7 @@ int main(int argc, char** argv) {
         }
     }
     PetscErrorCode ierr;
-    ierr = PetscInitialize(&pArgc, &pArgv, nullptr, nullptr);
-    CHKERRQ(ierr);
+    CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
     argparse::ArgumentParser program("poisson");
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
@@ -186,31 +186,30 @@ int main(int argc, char** argv) {
                     MinQuadOrder(), PETSC_COMM_WORLD, scenario->K());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
-    Mat A,Aaij;
-    Vec b,x,y;
+    Mat A;
+    Vec b, x, y;
     KSP ksp;
 
-    ierr = poisson.createA(&A);CHKERRQ(ierr);
-    ierr = poisson.createb(&b);CHKERRQ(ierr);
+    CHKERRQ(poisson.createA(&A));
+    CHKERRQ(poisson.createb(&b));
 
-    ierr = poisson.assemble(A);CHKERRQ(ierr);
-    ierr = poisson.rhs(b, scenario->force(), scenario->dirichlet());CHKERRQ(ierr);
+    CHKERRQ(poisson.assemble(A));
+    CHKERRQ(poisson.rhs(b, scenario->force(), scenario->dirichlet()));
     std::cout << "Assembled after " << sw.split() << std::endl;
 
-    ierr = VecDuplicate(b, &x);CHKERRQ(ierr);
-    ierr = VecDuplicate(b, &y);CHKERRQ(ierr);
-    ierr = VecSet(x, 1.0);CHKERRQ(ierr);
-    ierr = MatMult(A, x, y);CHKERRQ(ierr);
+    CHKERRQ(VecDuplicate(b, &x));
+    CHKERRQ(VecDuplicate(b, &y));
+    CHKERRQ(VecSet(x, 1.0));
+    CHKERRQ(MatMult(A, x, y));
     PetscReal l2norm;
-    ierr = VecNorm(y, NORM_2, &l2norm);CHKERRQ(ierr);
+    CHKERRQ(VecNorm(y, NORM_2, &l2norm));
     std::cout << "A*1 norm: " << l2norm << std::endl;
 
-    ierr = KSPCreate(PETSC_COMM_WORLD, &ksp);CHKERRQ(ierr);
-    ierr = KSPSetType(ksp, KSPCG);CHKERRQ(ierr);
-    ierr = MatConvert(A,MATAIJ,MAT_INITIAL_MATRIX,&Aaij);CHKERRQ(ierr);
-    ierr = KSPSetOperators(ksp, Aaij, Aaij);CHKERRQ(ierr);
-    ierr = KSPSetTolerances(ksp, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT);CHKERRQ(ierr);
-    ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
+    CHKERRQ(KSPCreate(PETSC_COMM_WORLD, &ksp));
+    CHKERRQ(KSPSetType(ksp, KSPCG));
+    CHKERRQ(KSPSetOperators(ksp, A, A));
+    CHKERRQ(KSPSetTolerances(ksp, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
+    CHKERRQ(KSPSetFromOptions(ksp));
 
     /* If you want to use the BAIJ operator on the finest level, forcefully insert it */
     /*
@@ -228,21 +227,20 @@ int main(int argc, char** argv) {
     }
     */
 
-    ierr = KSPSolve(ksp, b, x);CHKERRQ(ierr);
+    CHKERRQ(KSPSolve(ksp, b, x));
     std::cout << "Solved after " << sw.split() << std::endl;
     PetscReal rnorm;
     PetscInt its;
-    ierr = KSPGetResidualNorm(ksp, &rnorm);CHKERRQ(ierr);
-    ierr = KSPGetIterationNumber(ksp, &its);CHKERRQ(ierr);
+    CHKERRQ(KSPGetResidualNorm(ksp, &rnorm));
+    CHKERRQ(KSPGetIterationNumber(ksp, &its));
     if (rank == 0) {
         std::cout << "Residual norm: " << rnorm << std::endl;
         std::cout << "Iterations: " << its << std::endl;
     }
 
-    ierr = KSPDestroy(&ksp);CHKERRQ(ierr);
-    ierr = MatDestroy(&A);CHKERRQ(ierr);
-    ierr = MatDestroy(&Aaij);CHKERRQ(ierr);
-    ierr = VecDestroy(&b);CHKERRQ(ierr);
+    CHKERRQ(KSPDestroy(&ksp));
+    CHKERRQ(MatDestroy(&A));
+    CHKERRQ(VecDestroy(&b));
 
     auto numeric = poisson.finiteElementFunction(x);
     double error =
@@ -260,8 +258,8 @@ int main(int argc, char** argv) {
         writer.write(*fileName);
     }
 
-    ierr = VecDestroy(&x);CHKERRQ(ierr);
-    ierr = VecDestroy(&y);CHKERRQ(ierr);
+    CHKERRQ(VecDestroy(&x));
+    CHKERRQ(VecDestroy(&y));
 
     ierr = PetscFinalize();
 
