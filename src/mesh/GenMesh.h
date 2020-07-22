@@ -12,6 +12,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -45,6 +46,7 @@ public:
     using boundary_data_t = BoundaryData;
     using vertex_data_t = VertexData<D>;
     using vertex_t = typename vertex_data_t::vertex_t;
+    using bc_fun_t = std::function<BC(std::size_t, std::array<std::size_t, D - 1u> const&)>;
 
     /**
      * @brief Tessellate a line (D=1) / rectangle (D=2) / cuboid (D=3) into D-simplices.
@@ -75,7 +77,13 @@ public:
         for (std::size_t d = 0; d < D; ++d) {
             points_[d] = std::vector{0.0, 1.0};
             regions_[d] = std::vector{0ul, N[d]};
-            bcs_[d] = std::vector{BCs[d].first, BCs[d].second};
+            auto bc = BCs[d];
+            bcs_[d] = [bc](std::size_t plane, std::array<std::size_t, D - 1u> const&) {
+                if (plane == 0) {
+                    return bc.first;
+                }
+                return bc.second;
+            };
         }
         init();
     }
@@ -86,11 +94,20 @@ public:
      * The outer product of the points vectors ("corner points") gives the vertices of a cuboidal
      * mesh. These points are connected to cubes and then tessellated into triangles or tets.
      *
-     * The BCs vectors must have the same size as the points vectors. They indicate the boundary
-     * condition that shall be applied to the plane which passes through the corresponding point
+     * The boundary conditions are passed as functionals of the form
+     * [](std::size_t plane, std::array<std::size_t, D - 1u> const& regions) -> BC
+     * The plane parameter ranges from 0 to points[d].size() - 1. It indicates the boundary
+     * condition that shall be applied to the plane which passes through the point[d][plane]
      * and has its normal in d-direction.
+     * The regions parameter are defined such that for dimension d != i we have
+     * xb[i] \in [points[i][regions[i]], points[i][regions[i]+1]], where xb[i] is the i-th
+     * coordinate of a boundary faces vertex.
+     *
      * E.g. let
-     * points = {{0.0, 1.0}, {0.0, 0.5, 1.0}} and BCs = {{Diri, Diri}, {Natural, Fault, Natual}}
+     * points = {{0.0, 1.0}, {0.0, 0.5, 1.0}} and BCs = {
+     *      [](...){ return Diri; },
+     *      [](plane, ...) {if (plane == 1) return Fault; return Natural; }
+     * }
      * Then the initial mesh looks as following:
      *
      *       Natural
@@ -117,7 +134,7 @@ public:
      * @param comm MPI communicator
      */
     GenMesh(std::array<std::vector<double>, D> const& points, std::array<double, D> const& h,
-            std::array<std::vector<BC>, D> const& BCs, MPI_Comm comm = MPI_COMM_WORLD)
+            std::array<bc_fun_t, D> BCs, MPI_Comm comm = MPI_COMM_WORLD)
         : points_(points), bcs_(BCs), comm_(comm) {
         auto const initDim = [](double h, std::vector<double> const& points, uint64_t& N,
                                 std::vector<uint64_t>& regions) {
@@ -133,7 +150,6 @@ public:
             }
         };
         for (std::size_t d = 0; d < D; ++d) {
-            assert(points[d].size() == bcs_[d].size());
             initDim(h[d], points_[d], N[d], regions_[d]);
         }
         init();
@@ -158,9 +174,18 @@ private:
         }
     }
 
+    std::size_t findRegion(std::size_t d, std::array<uint64_t, D> const& v) const {
+        std::size_t region = 0;
+        while (v[d] > regions_[d][region + 1] && region < regions_[d].size() - 1u) {
+            ++region;
+        }
+        assert(region != regions_[d].size() - 1u);
+        return region;
+    }
+
     std::array<uint64_t, D> N;
     std::array<std::vector<double>, D> points_;
-    std::array<std::vector<BC>, D> bcs_;
+    std::array<bc_fun_t, D> bcs_;
     MPI_Comm comm_;
     std::array<uint64_t, D> Np1;
     std::array<std::vector<uint64_t>, D> regions_;

@@ -30,6 +30,7 @@ public:
 class MyScenario : public Scenario {
 public:
     using reference_t = std::function<std::array<double, 1>(Vector<double> const&)>;
+    using bc_fun_t = GenMesh<DomainDimension>::bc_fun_t;
 
     MyScenario(
         transform_t transform, functional_t force, functional_t dirichlet, reference_t reference,
@@ -45,7 +46,7 @@ public:
     functional_t K() const override { return K_; }
 
     void setPointsAndBCs(std::array<std::vector<double>, DomainDimension> const& points,
-                         std::array<std::vector<BC>, DomainDimension> const& BCs) {
+                         std::array<bc_fun_t, DomainDimension> const& BCs) {
         points_ = points;
         bcs_ = BCs;
     }
@@ -78,7 +79,7 @@ private:
     functional_t K_;
 
     std::optional<std::array<std::vector<double>, DomainDimension>> points_ = std::nullopt;
-    std::optional<std::array<std::vector<BC>, DomainDimension>> bcs_ = std::nullopt;
+    std::optional<std::array<bc_fun_t, DomainDimension>> bcs_ = std::nullopt;
 };
 
 } // namespace tndm

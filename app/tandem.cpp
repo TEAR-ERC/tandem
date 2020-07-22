@@ -90,18 +90,27 @@ int main(int argc, char** argv) {
         auto transform = [](std::array<double, 2> const& v) -> std::array<double, 2> {
             double r = 0.5 * (v[0] + 1.0);
             double phi = 0.5 * M_PI * v[1];
-            return {r * cos(phi), r * sin(phi)};
+            // return {r * cos(phi), r * sin(phi)};
+            return v;
         };
         std::array<double, 2> h = {1.0 / n, 1.0 / n};
-        auto points = std::array<std::vector<double>, 2>{{
-            {0.0, 0.2, 1.0},
-            {0.0, 0.01, 0.5, 0.95, 1.0},
-        }};
-        auto BCs = std::array<std::vector<BC>, 2>{{
-            {BC::Dirichlet, BC::Fault, BC::Dirichlet},
-            {BC::Natural, BC::None, BC::Fault, BC::None, BC::Natural},
-        }};
-        GenMesh<2> meshGen(points, h, BCs);
+        auto points = std::array<std::vector<double>, 2>{{{0.0, 0.75, 1.0}, {0.0, 0.5, 1.0}}};
+        auto xbc = [](std::size_t plane, std::array<std::size_t, 1> const& regions) {
+            if (plane == 1) {
+                if (regions[0] == 1) {
+                    return BC::Fault;
+                }
+                return BC::None;
+            }
+            return BC::Dirichlet;
+        };
+        auto ybc = [](std::size_t plane, std::array<std::size_t, 1> const&) {
+            if (plane == 1) {
+                return BC::None;
+            }
+            return BC::Dirichlet;
+        };
+        GenMesh<2> meshGen(points, h, {xbc, ybc});
         writeMesh(out, meshGen, transform, ghost);
     } else if (D == 3) {
         std::array<uint64_t, 3> N = {n, n, n};

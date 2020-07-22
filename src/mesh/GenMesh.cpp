@@ -67,11 +67,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     auto vertex_pos = [&](std::array<uint64_t, D> const& v) {
         vertex_t vert;
         for (std::size_t d = 0; d < D; ++d) {
-            std::size_t region = 0;
-            while (v[d] > regions_[d][region + 1] && region < regions_[d].size() - 1u) {
-                ++region;
-            }
-            assert(region != regions_[d].size() - 1u);
+            std::size_t region = findRegion(d, v);
             double h = (points_[d][region + 1] - points_[d][region]) /
                        (regions_[d][region + 1] - regions_[d][region]);
             vert[d] = points_[d][region] + static_cast<double>(v[d] - regions_[d][region]) * h;
@@ -157,13 +153,23 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
             assert(std::count(inPlane.begin(), inPlane.end(), true) <= 1);
             auto it = std::find(inPlane.begin(), inPlane.end(), true);
             if (it != inPlane.end()) {
-                auto plane = std::distance(inPlane.begin(), it);
-                auto regionIt =
-                    std::find(regions_[plane].begin(), regions_[plane].end(), v0[plane]);
-                if (regionIt != regions_[plane].end()) {
-                    auto region = std::distance(regions_[plane].begin(), regionIt);
+                auto dim = std::distance(inPlane.begin(), it);
+                auto planeIt = std::find(regions_[dim].begin(), regions_[dim].end(), v0[dim]);
+                if (planeIt != regions_[dim].end()) {
+                    auto plane = std::distance(regions_[dim].begin(), planeIt);
                     boundaryElements.emplace_back(face);
-                    boundaryConditions.emplace_back(bcs_[plane][region]);
+                    std::array<std::size_t, D - 1u> otherRegions{};
+                    for (auto&& vflat : face) {
+                        auto v = unflatten(vflat, Np1);
+                        auto it = otherRegions.begin();
+                        for (std::size_t d = 0; d < D; ++d) {
+                            if (dim != d) {
+                                *it = std::max(*it, findRegion(d, v));
+                                ++it;
+                            }
+                        }
+                    }
+                    boundaryConditions.emplace_back(bcs_[dim](plane, otherRegions));
                 }
             }
         }

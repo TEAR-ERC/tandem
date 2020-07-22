@@ -121,9 +121,58 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
             [](Vector<double> const& x) -> std::array<double, 1> {
                 return {x(0) < 0.5 ? 3.0 : 2.0};
             });
-        scenario->setPointsAndBCs(
-            {{{0.0, 0.75, 1.0}, {0.0, 1.0}}},
-            {{{BC::Dirichlet, BC::Fault, BC::Dirichlet}, {BC::Natural, BC::Dirichlet}}});
+        auto xbc = [](std::size_t plane, std::array<std::size_t, 1> const&) {
+            if (plane == 1) {
+                return BC::Fault;
+            }
+            return BC::Dirichlet;
+        };
+        auto ybc = [](std::size_t plane, std::array<std::size_t, 1> const&) {
+            if (plane == 1) {
+                return BC::Dirichlet;
+            }
+            return BC::Natural;
+        };
+        scenario->setPointsAndBCs({{{0.0, 0.75, 1.0}, {0.0, 1.0}}}, {{xbc, ybc}});
+        return scenario;
+    }
+    case "embedded_half"_fnv1a: {
+        auto smoothstep = [](double x) {
+            return 6.0 * std::pow(x, 5.0) - 15.0 * std::pow(x, 4.0) + 10.0 * std::pow(x, 3.0);
+        };
+        auto dsmoothstep_dx2 = [](double x) {
+            return 120.0 * std::pow(x, 3.0) - 180.0 * std::pow(x, 2.0) + 60.0 * x;
+        };
+        auto scenario = std::make_unique<MyScenario>(
+            biunit,
+            [dsmoothstep_dx2](std::array<double, 2> const& x) {
+                auto sign = x[0] > 0.5 ? -1.0 : 1.0;
+                return x[1] > 0.0 ? -sign * dsmoothstep_dx2(x[1]) : 0.0;
+            },
+            [smoothstep](std::array<double, 2> const& x) {
+                auto sign = x[0] > 0.5 ? -1.0 : 1.0;
+                return x[1] > 0.0 ? sign * smoothstep(x[1]) : 0.0;
+            },
+            [smoothstep](Vector<double> const& x) -> std::array<double, 1> {
+                auto sign = x(0) > 0.5 ? -1.0 : 1.0;
+                return {x(1) > 0.0 ? sign * smoothstep(x(1)) : 0.0};
+            });
+        auto xbc = [](std::size_t plane, std::array<std::size_t, 1> const& regions) {
+            if (plane == 1) {
+                if (regions[0] == 1) {
+                    return BC::Fault;
+                }
+                return BC::None;
+            }
+            return BC::Natural;
+        };
+        auto ybc = [](std::size_t plane, std::array<std::size_t, 1> const&) {
+            if (plane == 1) {
+                return BC::None;
+            }
+            return BC::Dirichlet;
+        };
+        scenario->setPointsAndBCs({{{0.0, 0.75, 1.0}, {0.0, 0.5, 1.0}}}, {{xbc, ybc}});
         return scenario;
     }
     default:
