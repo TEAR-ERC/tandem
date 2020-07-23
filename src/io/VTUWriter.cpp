@@ -93,21 +93,35 @@ template <std::size_t D>
 void VTUPiece<D>::addPointData(std::string const& name, FiniteElementFunction<D> const& function) {
     auto pointsPerElement = writer_.refNodes().size();
 
-    // TODO: add support for more than one quantity
-    assert(function.numQuantities() == 1);
-
     XMLElement* pdata = piece_->LastChildElement("PointData");
     if (!pdata) {
         pdata = piece_->InsertNewChildElement("PointData");
     }
 
     auto E = function.evaluationMatrix(writer_.refNodes());
-    auto data = std::vector<double>(function.numElements() * pointsPerElement);
+    auto data = Managed<Tensor<double, 3u>>(pointsPerElement, function.numElements(),
+                                            function.numQuantities());
+    auto result = Managed<Matrix<double>>(pointsPerElement, function.numQuantities());
     for (std::size_t elNo = 0; elNo < function.numElements(); ++elNo) {
-        auto result = Matrix<double>(&data[elNo * pointsPerElement], pointsPerElement, 1);
         function.map(elNo, E, result);
+        for (std::size_t p = 0; p < function.numQuantities(); ++p) {
+            for (std::size_t i = 0; i < pointsPerElement; ++i) {
+                data(i, elNo, p) = result(i, p);
+            }
+        }
     }
-    writer_.addDataArray(pdata, name, 1, data);
+    for (std::size_t p = 0; p < function.numQuantities(); ++p) {
+        std::string fname;
+        if (function.numQuantities() == 1) {
+            fname = name;
+        } else {
+            std::stringstream ss;
+            ss << name << p;
+            fname = ss.str();
+        }
+        writer_.addDataArray(pdata, fname, 1, &data(0, 0, p),
+                             pointsPerElement * function.numElements());
+    }
 }
 
 template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {

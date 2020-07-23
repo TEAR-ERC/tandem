@@ -99,6 +99,7 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
+## Poisson example
 generate_code(poisson)
 
 add_executable(poisson
@@ -106,3 +107,12 @@ add_executable(poisson
     poisson.cpp)
 target_link_libraries(poisson PRIVATE tandem-lib poisson-kernels-lib PkgConfig::PETSC)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+## Tandem
+generate_code(tandem)
+
+add_executable(tandem
+    tandem/Elasticity.cpp
+    tandem.cpp)
+target_link_libraries(tandem PRIVATE tandem-lib tandem-kernels-lib PkgConfig::PETSC)
+target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
