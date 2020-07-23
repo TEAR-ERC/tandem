@@ -11,10 +11,9 @@ add_executable(warp-blend-opt warp-blend-opt.cpp)
 target_include_directories(warp-blend-opt PRIVATE ../external/)
 target_link_libraries(warp-blend-opt PRIVATE tandem-fem-lib)
 
-add_executable(tandem tandem.cpp)
-target_include_directories(tandem PRIVATE ../external/)
-target_link_libraries(tandem PRIVATE tandem-lib tinyxml2)
-target_compile_definitions(tandem PUBLIC USE_MPI)
+add_executable(test-mesh test-mesh.cpp)
+target_include_directories(test-mesh PRIVATE ../external/)
+target_link_libraries(test-mesh PRIVATE tandem-lib tinyxml2)
 
 add_executable(test-gauss test-gauss.cpp)
 target_include_directories(test-gauss PRIVATE ../external/)
