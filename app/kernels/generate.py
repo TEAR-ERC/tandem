@@ -12,8 +12,10 @@ from yateto.ast.visitor import PrettyPrinter
 from yateto.gemm_configuration import GeneratorCollection, Eigen
 
 import poisson
+import tandem
 
 cmdLineParser = argparse.ArgumentParser()
+cmdLineParser.add_argument('--app', required=True)
 cmdLineParser.add_argument('--arch', required=True)
 cmdLineParser.add_argument('--options', required=True)
 cmdLineParser.add_argument('--outputDir', required=True)
@@ -26,12 +28,18 @@ options = None
 with open(cmdLineArgs.options) as j:
     options = json.load(j)
 
-
-poisson.add(g,
-        options['dim'],
-        options['numBasisFunctions'],
-        options['numFacetQuadPoints'],
-        options['numElementQuadPoints'])
+if cmdLineArgs.app == 'poisson':
+    poisson.add(g,
+            options['dim'],
+            options['numBasisFunctions'],
+            options['numFacetQuadPoints'],
+            options['numElementQuadPoints'])
+elif cmdLineArgs.app == 'tandem':
+    tandem.add(g,
+            options['dim'],
+            options['numBasisFunctions'],
+            options['numFacetQuadPoints'],
+            options['numElementQuadPoints'])
 
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,

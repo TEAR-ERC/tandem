@@ -38,11 +38,6 @@ add_custom_command(
 
 # Generate kernels
 
-add_custom_target(
-    make-kernels-directory
-    COMMAND
-    ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/kernels")
-
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
 else()
@@ -50,49 +45,52 @@ else()
     set(Python3_EXECUTABLE ${PYTHON_EXECUTABLE})
 endif()
 
-add_custom_command(
-    COMMAND
-        ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
-        "--arch" "dnoarch"
-        "--options" ${OPTIONS_FILE_NAME}
-        "--outputDir" ${CMAKE_CURRENT_BINARY_DIR}/kernels
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
-    DEPENDS
-        make-kernels-directory
-        ${OPTIONS_FILE_NAME}
-        kernels/generate.py
-        kernels/poisson.py
-    OUTPUT
-        kernels/init.h
-        kernels/init.cpp
-        kernels/kernel.h
-        kernels/kernel.cpp
-        kernels/test-kernel.cpp
-        kernels/subroutine.h
-        kernels/subroutine.cpp
-        kernels/tensor.h
-        kernels/tensor.cpp
-    COMMENT "Kernel generation script.")
-
 find_package(Eigen3 REQUIRED NO_MODULE)
-
-add_library(kernels-lib
-    kernels/init.cpp
-    kernels/kernel.cpp
-    kernels/subroutine.cpp
-    kernels/tensor.cpp
-)
-target_include_directories(kernels-lib PUBLIC
-    ../external/
-    ../submodules/yateto/include/
-)
-target_link_libraries(kernels-lib PUBLIC Eigen3::Eigen)
-
 include(CTest)
 include(../cmake/doctest.cmake)
-add_executable(test-kernel kernels/test-kernel.cpp)
-target_link_libraries(test-kernel kernels-lib test-runner)
-doctest_discover_tests(test-kernel)
+
+function(generate_code APP)
+    set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/kernels/${APP})
+    file(MAKE_DIRECTORY ${OUTPUT_DIR})
+    add_custom_command(
+        COMMAND
+            ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
+            "--app" ${APP}
+            "--arch" "dnoarch"
+            "--options" ${OPTIONS_FILE_NAME}
+            "--outputDir" ${OUTPUT_DIR}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
+        DEPENDS
+            ${OPTIONS_FILE_NAME}
+            kernels/generate.py
+            kernels/${APP}.py
+        OUTPUT
+            kernels/${APP}/init.h
+            kernels/${APP}/init.cpp
+            kernels/${APP}/kernel.h
+            kernels/${APP}/kernel.cpp
+            kernels/${APP}/test-kernel.cpp
+            kernels/${APP}/subroutine.h
+            kernels/${APP}/subroutine.cpp
+            kernels/${APP}/tensor.h
+            kernels/${APP}/tensor.cpp
+        COMMENT "Kernel generation script.")
+    add_library(${APP}-kernels-lib
+        kernels/${APP}/init.cpp
+        kernels/${APP}/kernel.cpp
+        kernels/${APP}/subroutine.cpp
+        kernels/${APP}/tensor.cpp
+    )
+    target_include_directories(${APP}-kernels-lib PUBLIC
+        ../external/
+        ../submodules/yateto/include/
+    )
+    target_link_libraries(${APP}-kernels-lib PUBLIC Eigen3::Eigen)
+
+    add_executable(test-${APP}-kernel kernels/${APP}/test-kernel.cpp)
+    target_link_libraries(test-${APP}-kernel ${APP}-kernels-lib test-runner)
+    doctest_discover_tests(test-${APP}-kernel)
+endfunction()
 
 # Apps using generated kernels
 
@@ -101,9 +99,10 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
+generate_code(poisson)
+
 add_executable(poisson
     poisson/Poisson.cpp
     poisson.cpp)
-target_link_libraries(poisson PRIVATE tandem-lib kernels-lib PkgConfig::PETSC)
+target_link_libraries(poisson PRIVATE tandem-lib poisson-kernels-lib PkgConfig::PETSC)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(poisson PRIVATE USE_MPI)

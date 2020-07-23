@@ -4,9 +4,9 @@
 #include "config.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
-#include "kernels/init.h"
-#include "kernels/kernel.h"
-#include "kernels/tensor.h"
+#include "kernels/poisson/init.h"
+#include "kernels/poisson/kernel.h"
+#include "kernels/poisson/tensor.h"
 #include "parallel/MPITraits.h"
 #include "tensor/EigenMap.h"
 
