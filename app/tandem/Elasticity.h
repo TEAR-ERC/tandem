@@ -42,6 +42,8 @@ public:
         user->apply(xraw, yraw);
         VecRestoreArray(y, &yraw);
         VecRestoreArrayRead(x, &xraw);
+        VecAssemblyBegin(y);
+        VecAssemblyEnd(y);
         return 0;
     }
 

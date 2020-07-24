@@ -159,7 +159,7 @@ void Elasticity::apply(double const* U, double* Unew) {
     assert(d_xi[0].shape(1) == tensor::d_xi::Shape[0][1]);
     assert(d_xi[0].shape(2) == tensor::d_xi::Shape[0][2]);
 
-#pragma omp parallel for private(d_x0, d_x1, u_jump, traction_avg)
+//#pragma omp parallel for private(d_x0, d_x1, u_jump, traction_avg)
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
         if (info.bc == BC::Fault || info.bc == BC::Natural) {
