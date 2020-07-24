@@ -81,6 +81,8 @@ function(generate_code APP)
         kernels/${APP}/subroutine.cpp
         kernels/${APP}/tensor.cpp
     )
+    # Use C++-17 in order to enforce inline "constexpr static" variables 
+    target_compile_features(${APP}-kernels-lib PUBLIC cxx_std_17)
     target_include_directories(${APP}-kernels-lib PUBLIC
         ../external/
         ../submodules/yateto/include/
