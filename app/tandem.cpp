@@ -29,6 +29,7 @@ using tndm::BC;
 using tndm::Curvilinear;
 using tndm::Elasticity;
 using tndm::GenMesh;
+using tndm::LambdaSolution;
 using tndm::Vector;
 using tndm::VertexData;
 using tndm::VTUWriter;
@@ -88,16 +89,19 @@ int main(int argc, char** argv) {
     sw.start();
     Elasticity elasticity(
         *mesh, cl, std::make_unique<tndm::ModalRefElement<DomainDimension>>(PolynomialDegree),
-        MinQuadOrder(), PETSC_COMM_WORLD, [](auto) { return 0.0; }, [](auto) { return 1.0; });
+        MinQuadOrder(), PETSC_COMM_WORLD, [](auto) { return 1.0; }, [](auto) { return 1.0; });
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
     Mat A;
     Vec b, x, y;
     KSP ksp;
 
-    auto forceFun = [](auto const& x) -> std::array<double, DomainDimension> { return {0.0, 1.0}; };
+    auto forceFun = [](auto const& x) -> std::array<double, DomainDimension> {
+        return {M_PI * M_PI * 4.0 * cos(M_PI * x[0]) * cos(M_PI * x[1]),
+                -M_PI * M_PI * 2.0 * sin(M_PI * x[0]) * sin(M_PI * x[1])};
+    };
     auto dirichletFun = [](auto const& x) -> std::array<double, DomainDimension> {
-        return {0.0, x[0] * x[0]};
+        return {cos(M_PI * x[0]) * cos(M_PI * x[1]), 0.0};
     };
 
     CHKERRQ(elasticity.createA(&A));
@@ -141,12 +145,15 @@ int main(int argc, char** argv) {
     CHKERRQ(VecDestroy(&b));
 
     auto numeric = elasticity.finiteElementFunction(x);
-    // double error =
-    // tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->reference(), 0, PETSC_COMM_WORLD);
+    auto solution =
+        LambdaSolution([](Vector<double> const& x) -> std::array<double, DomainDimension> {
+            return {cos(M_PI * x(0)) * cos(M_PI * x(1)), 0.0};
+        });
+    double error = tndm::Error<DomainDimension>::L2(cl, numeric, solution, 0, PETSC_COMM_WORLD);
 
-    // if (rank == 0) {
-    // std::cout << "L2 error: " << error << std::endl;
-    //}
+    if (rank == 0) {
+        std::cout << "L2 error: " << error << std::endl;
+    }
 
     if (auto fileName = program.present("-o")) {
         VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
