@@ -247,8 +247,11 @@ int main(int argc, char** argv) {
     Vec b, x, y;
     KSP ksp;
 
-    CHKERRQ(poisson.createA(&A));
-    CHKERRQ(poisson.createb(&b));
+    {
+        auto interface = poisson.interfacePetsc();
+        CHKERRQ(interface.createA(&A));
+        CHKERRQ(interface.createb(&b));
+    }
 
     CHKERRQ(poisson.assemble(A));
     CHKERRQ(poisson.rhs(b, scenario->force(), scenario->dirichlet()));

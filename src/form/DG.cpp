@@ -128,6 +128,8 @@ void DG<D>::facetPrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl)
 
 template <std::size_t D>
 void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl) {
+    int rank;
+    MPI_Comm_rank(comm(), &rank);
     auto geoE = cl.evaluateBasisAt(volRule.points());
     auto gradE = cl.evaluateGradientAt(volRule.points());
 
@@ -171,6 +173,24 @@ void DG<D>::volumePrecompute(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl
                 penalty += info.area * half;
             }
             volInfo[elNo].template get<Penalty>() = penalty / volume;
+
+            unsigned numLocal = 1, numGhost = 0;
+            for (auto&& dw : dws) {
+                auto up = mesh.template upward<D - 1u>(dw);
+                for (auto&& u : up) {
+                    if (u != elNo) {
+                        if (mesh.elements().owner(u) == rank) {
+                            ++numLocal;
+                        } else {
+                            ++numGhost;
+                        }
+                    }
+                }
+            }
+            // At most D + 1 neighbours plus element itself
+            assert(numLocal + numGhost <= D + 2u);
+            volInfo[elNo].template get<NumLocalNeighbours>() = numLocal;
+            volInfo[elNo].template get<NumGhostNeighbours>() = numGhost;
         }
     }
 

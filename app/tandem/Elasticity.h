@@ -1,6 +1,7 @@
 #ifndef ELASTICITY_20200723_H
 #define ELASTICITY_20200723_H
 
+#include "common/InterfacePetsc.h"
 #include "config.h"
 #include "form/DG.h"
 #include "form/FiniteElementFunction.h"
@@ -24,9 +25,15 @@ public:
                std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                MPI_Comm comm, functional_t const& lambdaFun, functional_t const& muFun);
 
-    PetscErrorCode createA(Mat* A);
-    PetscErrorCode createb(Vec* b);
+    InterfacePetsc interfacePetsc() {
+        auto blockSize = refElement_->numBasisFunctions() * DomainDimension;
+        return InterfacePetsc(blockSize, numLocalElements(), &volInfo[0].get<NumLocalNeighbours>(),
+                              &volInfo[0].get<NumGhostNeighbours>(), comm());
+    }
 
+    PetscErrorCode createAShell(Mat* A);
+
+    PetscErrorCode assemble(Mat mat);
     PetscErrorCode rhs(Vec B, vector_functional_t forceFun, vector_functional_t dirichletFun);
 
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;

@@ -1,6 +1,7 @@
 #ifndef POISSON_20200627_H
 #define POISSON_20200627_H
 
+#include "common/InterfacePetsc.h"
 #include "config.h"
 #include "form/DG.h"
 #include "form/FiniteElementFunction.h"
@@ -22,8 +23,11 @@ public:
             std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
             MPI_Comm comm, functional_t kFun);
 
-    PetscErrorCode createA(Mat* A);
-    PetscErrorCode createb(Vec* b);
+    InterfacePetsc interfacePetsc() {
+        return InterfacePetsc(refElement_->numBasisFunctions(), numLocalElements(),
+                              &volInfo[0].get<NumLocalNeighbours>(),
+                              &volInfo[0].get<NumGhostNeighbours>(), comm());
+    }
 
     PetscErrorCode assemble(Mat mat);
     PetscErrorCode rhs(Vec B, functional_t forceFun, functional_t dirichletFun);
@@ -40,19 +44,9 @@ private:
     struct K {
         using type = double;
     };
-    struct NumLocalNeighbours {
-        using type = PetscInt;
-    };
-    struct NumGhostNeighbours {
-        using type = PetscInt;
-    };
 
     using user_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K>;
     mneme::StridedView<user_vol_t> userVol;
-
-    using user_vol_info_t =
-        mneme::MultiStorage<mneme::DataLayout::SoA, NumLocalNeighbours, NumGhostNeighbours>;
-    user_vol_info_t userVolInfo;
 
     Managed<Matrix<double>> Em;
     std::vector<Managed<Matrix<double>>> em;
