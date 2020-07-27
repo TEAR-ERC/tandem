@@ -23,8 +23,7 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
                  std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                  MPI_Comm comm, functional_t kFun)
     : DG(mesh, cl, std::move(refElement), minQuadOrder, comm),
-      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
-      userVolInfo(numLocalElements()) {
+      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
 
     int rank;
     MPI_Comm_rank(comm, &rank);
@@ -50,27 +49,6 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
             }
             EigenMap(Kfield) = P * rhs;
         }
-#pragma omp for
-        for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-            auto dws = mesh.downward<DomainDimension - 1u, DomainDimension>(elNo);
-            PetscInt numLocal = 1, numGhost = 0;
-            for (auto&& dw : dws) {
-                auto up = mesh.upward<DomainDimension - 1u>(dw);
-                for (auto&& u : up) {
-                    if (u != elNo) {
-                        if (mesh.elements().owner(u) == rank) {
-                            ++numLocal;
-                        } else {
-                            ++numGhost;
-                        }
-                    }
-                }
-            }
-            // At most D + 1 neighbours plus element itself
-            assert(numLocal + numGhost <= DomainDimension + 2u);
-            userVolInfo[elNo].get<NumLocalNeighbours>() = numLocal;
-            userVolInfo[elNo].get<NumGhostNeighbours>() = numGhost;
-        }
     }
 
     Em = nodalRefElement_.evaluateBasisAt(volRule.points(), {1, 0});
@@ -78,43 +56,6 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
         auto points = cl.facetParam(f, fctRule.points());
         em.emplace_back(nodalRefElement_.evaluateBasisAt(points, {1, 0}));
     }
-}
-
-PetscErrorCode Poisson::createA(Mat* A) {
-    PetscInt blockSize = tensor::A::Shape[0];
-    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
-    PetscInt localCols = numLocalElements() * tensor::A::Shape[1];
-    CHKERRQ(MatCreate(comm(), A));
-    CHKERRQ(MatSetSizes(*A, localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE));
-    CHKERRQ(MatSetBlockSize(*A, blockSize));
-    CHKERRQ(MatSetFromOptions(*A));
-
-    // Preallocation
-    auto d_nnz = std::vector<PetscInt>(blockSize * localRows);
-    auto o_nnz = std::vector<PetscInt>(blockSize * localRows);
-    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-        auto numLocal = userVolInfo[elNo].get<NumLocalNeighbours>();
-        auto numGhost = userVolInfo[elNo].get<NumGhostNeighbours>();
-        for (std::size_t b = 0; b < blockSize; ++b) {
-            d_nnz[b + elNo * blockSize] = numLocal * blockSize;
-            o_nnz[b + elNo * blockSize] = numGhost * blockSize;
-        }
-    }
-    CHKERRQ(MatSeqAIJSetPreallocation(*A, 0, d_nnz.data()));
-    CHKERRQ(MatMPIAIJSetPreallocation(*A, 0, d_nnz.data(), 0, o_nnz.data()));
-    CHKERRQ(MatSeqBAIJSetPreallocation(*A, blockSize, 0, &userVolInfo[0].get<NumLocalNeighbours>()));
-    CHKERRQ(MatMPIBAIJSetPreallocation(*A, blockSize, 0, &userVolInfo[0].get<NumLocalNeighbours>(), 0, &userVolInfo[0].get<NumGhostNeighbours>()));
-    CHKERRQ(MatSetOption(*A, MAT_ROW_ORIENTED, PETSC_FALSE));
-    CHKERRQ(MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE));
-    return 0;
-}
-PetscErrorCode Poisson::createb(Vec* b) {
-    PetscInt localRows = numLocalElements() * tensor::A::Shape[0];
-    CHKERRQ(VecCreate(comm(), b));
-    CHKERRQ(VecSetSizes(*b, localRows, PETSC_DECIDE));
-    CHKERRQ(VecSetFromOptions(*b));
-    CHKERRQ(VecSetBlockSize(*b, tensor::b::Shape[0]));
-    return 0;
 }
 
 PetscErrorCode Poisson::assemble(Mat mat) {

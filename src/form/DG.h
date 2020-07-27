@@ -86,7 +86,15 @@ protected:
     struct Penalty {
         using type = double;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, GID, Penalty> volInfo;
+    struct NumLocalNeighbours {
+        using type = unsigned;
+    };
+    struct NumGhostNeighbours {
+        using type = unsigned;
+    };
+    mneme::MultiStorage<mneme::DataLayout::SoA, GID, Penalty, NumLocalNeighbours,
+                        NumGhostNeighbours>
+        volInfo;
 
     using fct_t =
         mneme::MultiStorage<mneme::DataLayout::SoA, JInv, JInvOther, Normal, NormalLength, Coords>;

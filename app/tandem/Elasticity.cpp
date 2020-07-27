@@ -104,7 +104,7 @@ Elasticity::Elasticity(LocalSimplexMesh<DomainDimension> const& mesh,
     }
 }
 
-PetscErrorCode Elasticity::createA(Mat* A) {
+PetscErrorCode Elasticity::createAShell(Mat* A) {
     PetscInt blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
     PetscInt localRows = numLocalElements() * blockSize;
     PetscInt localCols = numLocalElements() * blockSize;
@@ -115,13 +115,121 @@ PetscErrorCode Elasticity::createA(Mat* A) {
     CHKERRQ(MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE));
     return 0;
 }
-PetscErrorCode Elasticity::createb(Vec* b) {
-    PetscInt blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
-    PetscInt localRows = numLocalElements() * blockSize;
-    CHKERRQ(VecCreate(comm(), b));
-    CHKERRQ(VecSetSizes(*b, localRows, PETSC_DECIDE));
-    CHKERRQ(VecSetFromOptions(*b));
-    CHKERRQ(VecSetBlockSize(*b, blockSize));
+
+PetscErrorCode Elasticity::assemble(Mat mat) {
+    double A[tensor::A::size()];
+    double D_x[tensor::D_x::size()];
+
+    assert(volRule.size() == tensor::W::Shape[0]);
+    assert(D_xi.shape(0) == tensor::D_xi::Shape[0]);
+    assert(D_xi.shape(1) == tensor::D_xi::Shape[1]);
+    assert(D_xi.shape(2) == tensor::D_xi::Shape[2]);
+
+    auto blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
+#pragma omp parallel for private(A, D_x)
+    for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+        kernel::D_x dxKrnl;
+        dxKrnl.D_x = D_x;
+        dxKrnl.D_xi = D_xi.data();
+        dxKrnl.G = vol[elNo].template get<JInv>().data()->data();
+        dxKrnl.execute();
+
+        kernel::assembleVolume krnl;
+        krnl.A = A;
+        krnl.delta = init::delta::Values;
+        krnl.D_x = D_x;
+        krnl.lam_W_J = userVolPre[elNo].get<lam_W_J>().data();
+        krnl.mu_W_J = userVolPre[elNo].get<mu_W_J>().data();
+        krnl.execute();
+
+        PetscInt ib = volInfo[elNo].get<GID>();
+        PetscInt jb = volInfo[elNo].get<GID>();
+        MatSetValuesBlocked(mat, 1, &ib, 1, &jb, A, ADD_VALUES);
+    }
+
+    double d_x0[tensor::d_x::size(0)];
+    double d_x1[tensor::d_x::size(1)];
+    double a00[tensor::a::size(0, 0)];
+    double a01[tensor::a::size(0, 1)];
+    double a10[tensor::a::size(1, 0)];
+    double a11[tensor::a::size(1, 1)];
+
+    assert(fctRule.size() == tensor::w::Shape[0]);
+    assert(e[0].shape(0) == tensor::e::Shape[0][0]);
+    assert(e[0].shape(1) == tensor::e::Shape[0][1]);
+    assert(d_xi[0].shape(0) == tensor::d_xi::Shape[0][0]);
+    assert(d_xi[0].shape(1) == tensor::d_xi::Shape[0][1]);
+    assert(d_xi[0].shape(2) == tensor::d_xi::Shape[0][2]);
+
+    for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
+        auto const& info = fctInfo[fctNo];
+        if (info.bc == BC::Fault || info.bc == BC::Natural) {
+            continue;
+        }
+
+        auto push = [&info, &mat](auto x, auto y, double* a) {
+            PetscInt ib = info.g_up[x()];
+            PetscInt jb = info.g_up[y()];
+            MatSetValuesBlocked(mat, 1, &ib, 1, &jb, a, ADD_VALUES);
+        };
+
+        kernel::d_x dxKrnl;
+        dxKrnl.d_x(0) = d_x0;
+        dxKrnl.d_x(1) = d_x1;
+        dxKrnl.d_xi(0) = d_xi[info.localNo[0]].data();
+        dxKrnl.d_xi(1) = d_xi[info.localNo[1]].data();
+        dxKrnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
+        dxKrnl.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
+
+        double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
+        kernel::assembleSurface krnl;
+        krnl.c00 = -half;
+        krnl.c01 = -krnl.c00;
+        krnl.c10 = epsilon * half;
+        krnl.c11 = -krnl.c10;
+        krnl.c20 = penalty(info);
+        krnl.c21 = -krnl.c20;
+        krnl.d_x(0) = d_x0;
+        krnl.d_x(1) = d_x1;
+        for (unsigned side = 0; side < 2; ++side) {
+            krnl.e(side) = e[info.localNo[side]].data();
+        }
+        krnl.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
+        krnl.lam_w(1) = userFctPre[fctNo].template get<lam_w_1>().data();
+        krnl.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
+        krnl.mu_w(1) = userFctPre[fctNo].template get<mu_w_1>().data();
+        krnl.n = fct[fctNo].template get<Normal>().data()->data();
+        krnl.nl = fct[fctNo].template get<NormalLength>().data();
+        krnl.w = fctRule.weights().data();
+        krnl.a(0, 0) = a00;
+        krnl.a(0, 1) = a01;
+        krnl.a(1, 0) = a10;
+        krnl.a(1, 1) = a11;
+        krnl.delta = init::delta::Values;
+
+        dxKrnl.execute(0);
+        if (info.inside[0]) {
+            krnl.execute(0, 0);
+            push(std::integral_constant<int, 0>(), std::integral_constant<int, 0>(), a00);
+        }
+
+        if (info.up[0] != info.up[1]) {
+            dxKrnl.execute(1);
+            if (info.inside[0]) {
+                krnl.execute(0, 1);
+                push(std::integral_constant<int, 0>(), std::integral_constant<int, 1>(), a01);
+            }
+            if (info.inside[1]) {
+                krnl.execute(1, 0);
+                push(std::integral_constant<int, 1>(), std::integral_constant<int, 0>(), a10);
+                krnl.execute(1, 1);
+                push(std::integral_constant<int, 1>(), std::integral_constant<int, 1>(), a11);
+            }
+        }
+    }
+
+    CHKERRQ(MatAssemblyBegin(mat, MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(mat, MAT_FINAL_ASSEMBLY));
     return 0;
 }
 
@@ -136,10 +244,14 @@ void Elasticity::apply(double const* U, double* Unew) {
     auto blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
 #pragma omp parallel for private(D_x)
     for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
+        kernel::D_x dxKrnl;
+        dxKrnl.D_x = D_x;
+        dxKrnl.D_xi = D_xi.data();
+        dxKrnl.G = vol[elNo].template get<JInv>().data()->data();
+        dxKrnl.execute();
+
         kernel::volumeOp krnl;
         krnl.D_x = D_x;
-        krnl.D_xi = D_xi.data();
-        krnl.G = vol[elNo].template get<JInv>().data()->data();
         krnl.U = U + elNo * blockSize;
         krnl.Unew = Unew + elNo * blockSize;
         krnl.lam_W_J = userVolPre[elNo].get<lam_W_J>().data();
@@ -159,12 +271,21 @@ void Elasticity::apply(double const* U, double* Unew) {
     assert(d_xi[0].shape(1) == tensor::d_xi::Shape[0][1]);
     assert(d_xi[0].shape(2) == tensor::d_xi::Shape[0][2]);
 
-//#pragma omp parallel for private(d_x0, d_x1, u_jump, traction_avg)
+    //#pragma omp parallel for private(d_x0, d_x1, u_jump, traction_avg)
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
         if (info.bc == BC::Fault || info.bc == BC::Natural) {
             continue;
         }
+
+        kernel::d_x dxKrnl;
+        dxKrnl.d_x(0) = d_x0;
+        dxKrnl.d_x(1) = d_x1;
+        dxKrnl.d_xi(0) = d_xi[info.localNo[0]].data();
+        dxKrnl.d_xi(1) = d_xi[info.localNo[1]].data();
+        dxKrnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
+        dxKrnl.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
+        dxKrnl.execute(0);
 
         if (info.up[0] == info.up[1]) {
             kernel::surfaceOpBnd krnl;
@@ -172,11 +293,9 @@ void Elasticity::apply(double const* U, double* Unew) {
             krnl.c10 = epsilon;
             krnl.c20 = penalty(info);
             krnl.d_x(0) = d_x0;
-            krnl.d_xi(0) = d_xi[info.localNo[0]].data();
             krnl.e(0) = e[info.localNo[0]].data();
             krnl.u(0) = U + info.up[0] * blockSize;
             krnl.unew(0) = Unew + info.up[0] * blockSize;
-            krnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
             krnl.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
             krnl.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
             krnl.n = fct[fctNo].template get<Normal>().data()->data();
@@ -186,6 +305,8 @@ void Elasticity::apply(double const* U, double* Unew) {
             krnl.u_jump = u_jump;
             krnl.execute();
         } else {
+            dxKrnl.execute(1);
+
             kernel::surfaceOp krnl;
             krnl.c00 = -1.0;
             krnl.c01 = -krnl.c00;
@@ -196,13 +317,10 @@ void Elasticity::apply(double const* U, double* Unew) {
             krnl.d_x(0) = d_x0;
             krnl.d_x(1) = d_x1;
             for (unsigned side = 0; side < 2; ++side) {
-                krnl.d_xi(side) = d_xi[info.localNo[side]].data();
                 krnl.e(side) = e[info.localNo[side]].data();
                 krnl.u(side) = U + info.up[side] * blockSize;
                 krnl.unew(side) = Unew + info.up[side] * blockSize;
             }
-            krnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
-            krnl.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
             krnl.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
             krnl.lam_w(1) = userFctPre[fctNo].template get<lam_w_1>().data();
             krnl.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();

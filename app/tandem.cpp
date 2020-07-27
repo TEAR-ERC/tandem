@@ -104,8 +104,12 @@ int main(int argc, char** argv) {
         return {cos(M_PI * x[0]) * cos(M_PI * x[1]), 0.0};
     };
 
-    CHKERRQ(elasticity.createA(&A));
-    CHKERRQ(elasticity.createb(&b));
+    {
+        auto interface = elasticity.interfacePetsc();
+        CHKERRQ(interface.createA(&A));
+        CHKERRQ(interface.createb(&b));
+    }
+    CHKERRQ(elasticity.assemble(A));
     CHKERRQ(elasticity.rhs(b, forceFun, dirichletFun));
     std::cout << "Assembled after " << sw.split() << std::endl;
 
