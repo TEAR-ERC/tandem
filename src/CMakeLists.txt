@@ -27,14 +27,17 @@ add_library(tandem-lib
     form/DG.cpp
     form/Error.cpp
     io/VTUWriter.cpp
+    io/VTUWriter.cpp
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
+    script/LuaLib.cpp
 )
 
+find_package(Lua REQUIRED)
 find_package(MPI REQUIRED)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -43,9 +46,11 @@ find_package(ZLIB REQUIRED)
 target_include_directories(tandem-lib PUBLIC 
     ../submodules/
     ../submodules/mneme/include/
+    ${LUA_INCLUDE_DIR}
 )
 target_link_libraries(tandem-lib PUBLIC
     tandem-fem-lib
+    ${LUA_LIBRARIES}
     MPI::MPI_CXX
     OpenMP::OpenMP_CXX
     PARMETIS::PARMETIS

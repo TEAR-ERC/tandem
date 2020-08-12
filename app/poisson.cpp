@@ -9,15 +9,18 @@
 #include "mesh/MeshData.h"
 #include "tensor/Tensor.h"
 #include "util/Hash.h"
+#include "util/Schema.h"
 #include "util/Stopwatch.h"
 
 #include <argparse.hpp>
+#include <fstream>
 #include <mpi.h>
 #include <petscerror.h>
 #include <petscksp.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscvec.h>
+#include <toml.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -35,6 +38,7 @@ using tndm::operator""_fnv1a;
 using tndm::MyScenario;
 using tndm::Poisson;
 using tndm::Scenario;
+using tndm::TableSchema;
 using tndm::Vector;
 using tndm::VertexData;
 using tndm::VTUWriter;
@@ -196,21 +200,30 @@ int main(int argc, char** argv) {
     PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
+    TableSchema schema;
+    schema.add_value<std::string>("scenario").required().help("Name of scenario");
+    schema.add_value<int64_t>("resolution")
+        .required()
+        .validator([](auto&& x) { return x > 0; })
+        .help("Non-negative integral resolution parameter");
+    schema.add_value<std::string>("output").help("Output file name");
+
     argparse::ArgumentParser program("poisson");
-    program.add_argument("--petsc").help("PETSc options, must be passed last!");
-    program.add_argument("-o").help("Output file name");
-    program.add_argument("-s")
-        .default_value(std::string("manufactured"))
-        .help("Scenario name")
-        .action([](std::string const& value) {
-            std::string result;
-            std::transform(value.begin(), value.end(), std::back_inserter(result),
-                           [](unsigned char c) { return std::tolower(c); });
-            return result;
-        });
-    program.add_argument("n")
-        .help("Number of elements per dimension")
-        .action([](std::string const& value) { return std::stoul(value); });
+    // program.add_argument("--petsc").help("PETSc options, must be passed last!");
+    // program.add_argument("-o").help("Output file name");
+    // program.add_argument("-s")
+    //.default_value(std::string("manufactured"))
+    //.help("Scenario name")
+    //.action([](std::string const& value) {
+    // std::string result;
+    // std::transform(value.begin(), value.end(), std::back_inserter(result),
+    //[](unsigned char c) { return std::tolower(c); });
+    // return result;
+    //});
+    // program.add_argument("n")
+    //.help("Number of elements per dimension")
+    //.action([](std::string const& value) { return std::stoul(value); });
+    program.add_argument("config").help("Configuration file (.toml)");
 
     try {
         program.parse_args(argc, argv);
@@ -220,9 +233,32 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    auto scenario = getScenario(program.get("-s"));
+    toml::table cfg;
+    try {
+        cfg = toml::parse_file(program.get("config"));
+    } catch (toml::parse_error const& err) {
+        std::cerr << "Parsing failed:" << std::endl << err << std::endl;
+        PetscFinalize();
+        return -1;
+    }
+
+    try {
+        schema.translate(cfg);
+    } catch (std::runtime_error const& e) {
+        std::cerr << e.what() << std::endl << std::endl;
+        std::cerr << "You provided" << std::endl << "------------" << std::endl << cfg << std::endl;
+        std::cerr << "You should have provided" << std::endl
+                  << "------------------------" << std::endl;
+        std::cerr << schema << std::endl;
+        PetscFinalize();
+        return -1;
+    }
+
+    std::string scenarioName = cfg["scenario"].value_or("");
+    auto scenario = getScenario(scenarioName);
     if (!scenario) {
-        std::cerr << "Unknown scenario " << program.get("-s") << std::endl;
+        std::cerr << "Unknown scenario " << scenarioName << std::endl;
+        PetscFinalize();
         return -1;
     }
 
@@ -230,7 +266,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto n = program.get<unsigned long>("n");
+    auto n = cfg["resolution"].value_or(1);
     auto globalMesh = scenario->getGlobalMesh(n, PETSC_COMM_WORLD);
     auto mesh = globalMesh->getLocalMesh(1);
 
@@ -310,7 +346,7 @@ int main(int argc, char** argv) {
         std::cout << "L2 error: " << error << std::endl;
     }
 
-    if (auto fileName = program.present("-o")) {
+    if (auto fileName = cfg["output"].value<std::string>()) {
         VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto piece = writer.addPiece(cl, poisson.numLocalElements());
         piece.addPointData("u", numeric);
