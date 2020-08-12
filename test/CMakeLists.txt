@@ -33,6 +33,10 @@ add_executable(test-quadrules quadrules.cpp)
 target_link_libraries(test-quadrules test-runner)
 doctest_discover_tests(test-quadrules)
 
+add_executable(test-script script.cpp)
+target_link_libraries(test-script test-runner)
+doctest_discover_tests(test-script)
+
 add_executable(test-simplex simplex.cpp)
 target_link_libraries(test-simplex test-runner)
 doctest_discover_tests(test-simplex)
