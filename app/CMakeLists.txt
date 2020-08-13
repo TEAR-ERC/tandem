@@ -107,7 +107,7 @@ generate_code(poisson)
 add_executable(poisson
     poisson/Poisson.cpp
     poisson.cpp)
-target_link_libraries(poisson PRIVATE tandem-lib poisson-kernels-lib PkgConfig::PETSC toml)
+target_link_libraries(poisson PRIVATE tandem-lib poisson-kernels-lib PkgConfig::PETSC)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Tandem
