@@ -9,106 +9,160 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace tndm {
 
-class SchemaBase {
-public:
-    virtual ~SchemaBase() {}
-    virtual void translate(toml::node_view<const toml::node> node) = 0;
-    virtual void print_help(std::ostream& out) const = 0;
-    virtual bool is_value() const { return false; }
+template <typename Derived> struct SchemaTraits;
+template <template <typename> typename Derived, typename T> struct SchemaTraits<Derived<T>> {
+    using value_type = T;
+};
 
-    bool is_required() const { return required_; }
+template <typename Derived> class SchemaCommon {
+public:
+    using value_type = typename SchemaTraits<Derived>::value_type;
+    using validator_fun_t = std::function<bool(value_type const& value)>;
+
+    Derived& help(std::string&& help) {
+        help_ = std::move(help);
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& validator(validator_fun_t&& validator) {
+        validator_ = std::move(validator);
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& default_value(value_type&& val) {
+        default_ = std::optional<value_type>(std::move(val));
+        return static_cast<Derived&>(*this);
+    }
+
+    auto const& get_default_value() const { return default_; }
+
+    void print_help(std::ostream& out) const { out << help_; }
 
 protected:
-    bool required_ = false;
+    std::string help_;
+    validator_fun_t validator_ = [](value_type const& value) { return true; };
+    std::optional<value_type> default_ = std::nullopt;
 };
 
-std::ostream& operator<<(std::ostream& lhs, SchemaBase const& rhs) {
-    rhs.print_help(lhs);
-    return lhs;
-}
-
-template <typename T> class ValueSchema : public SchemaBase {
+template <typename T> class ValueSchema : public SchemaCommon<ValueSchema<T>> {
 public:
-    using validator_fun_t = std::function<bool(T const& value)>;
-
-    ValueSchema& required() {
-        required_ = true;
-        return *this;
-    }
-
-    ValueSchema& help(std::string&& help) {
-        help_ = std::move(help);
-        return *this;
-    }
-
-    ValueSchema& validator(validator_fun_t&& validator) {
-        validator_ = std::move(validator);
-        return *this;
-    }
-
-    void translate(toml::node_view<const toml::node> node) {
-        if (!node) {
-            if (required_) {
-                throw std::runtime_error("Value missing although required");
-            }
-            return;
+    T translate(toml::node_view<const toml::node> node) const {
+        auto result = node.value<T>();
+        if (!result) {
+            throw std::runtime_error("Value type could not be converted to schema type");
         }
-        if (!node.is_value() || !node.is<T>()) {
-            throw std::runtime_error("Value type does not match schema");
-        }
-        if (!validator_(node.as<T>()->get())) {
+        if (!this->validator_(*result)) {
             throw std::runtime_error("Validator returned false");
         }
+        return result.value();
     }
-
-    virtual void print_help(std::ostream& out) const {
-        out << help_;
-    }
-
-    virtual bool is_value() const { return true; }
-
-private:
-    std::string help_;
-    validator_fun_t validator_ = [](T const& value) { return true; };
 };
 
-class TableSchema : public SchemaBase {
+template <typename T> class TableSchema : public SchemaCommon<TableSchema<T>> {
 public:
     TableSchema() {}
 
-    template <typename T> ValueSchema<T>& add_value(std::string&& name) {
-        entries_.emplace_back(std::make_pair(std::move(name), std::make_unique<ValueSchema<T>>()));
-        return static_cast<ValueSchema<T>&>(*entries_.back().second);
+    template <typename U> auto& add_value(std::string&& name, U T::*member) {
+        auto entry = std::make_unique<EntryModel<U, ValueSchema>>(member);
+        auto& schema = entry->schema();
+        entries_.emplace_back(std::make_pair(std::move(name), std::move(entry)));
+        return schema;
     }
 
-    void translate(toml::node_view<const toml::node> node) {
-        for (auto&& [key, schema] : entries_) {
+    template <typename U> auto& add_table(std::string&& name, U T::*member) {
+        auto entry = std::make_unique<EntryModel<U, TableSchema>>(member);
+        auto& schema = entry->schema();
+        entries_.emplace_back(std::make_pair(std::move(name), std::move(entry)));
+        return schema;
+    }
+
+    T translate(toml::node_view<const toml::node> node) const {
+        T table;
+        for (auto&& [key, model] : entries_) {
             try {
-                schema->translate(node[key]);
+                model->translate(table, node[key]);
             } catch (std::runtime_error const& e) {
                 throw std::runtime_error("Error while checking \"" + key + "\": " + e.what());
             }
         }
+        return table;
     }
 
     virtual void print_help(std::ostream& out) const {
+        if (!this->help_.empty()) {
+            out << this->help_ << std::endl;
+        }
         for (auto&& [key, schema] : entries_) {
             out << key;
-            if (schema->is_required()) {
-                out << " (*)";
-            }
-            out << ": " << *schema << std::endl;
+            out << ": ";
+            schema->print_help(out);
+            out << std::endl;
         }
     }
 
 private:
-    std::vector<std::pair<std::string, std::unique_ptr<SchemaBase>>> entries_;
+    class EntryConcept {
+    public:
+        virtual ~EntryConcept() {}
+        virtual void translate(T& table, toml::node_view<const toml::node> node) const = 0;
+        virtual void print_help(std::ostream& out) const = 0;
+    };
+
+    template <typename U, template <typename> typename S> class EntryModel : public EntryConcept {
+    public:
+        EntryModel(U T::*member) : member_(member) {}
+        void translate(T& table, toml::node_view<const toml::node> node) const override {
+            if (!node) {
+                if (!schema_.get_default_value()) {
+                    throw std::runtime_error(
+                        "Value missing although non-optional and no default is provided");
+                }
+                table.*member_ = *schema_.get_default_value();
+                return;
+            }
+            table.*member_ = schema_.translate(node);
+        }
+        void print_help(std::ostream& out) const override {
+            schema_.print_help(out);
+            out << " (*)";
+        }
+        S<U>& schema() { return schema_; }
+
+    private:
+        U T::*member_;
+        S<U> schema_;
+    };
+
+    template <typename U, template <typename> typename S>
+    class EntryModel<std::optional<U>, S> : public EntryConcept {
+    public:
+        EntryModel(std::optional<U> T::*member) : member_(member) {}
+        void translate(T& table, toml::node_view<const toml::node> node) const override {
+            if (node) {
+                table.*member_ = std::make_optional(schema_.translate(node));
+            }
+        }
+        void print_help(std::ostream& out) const override { schema_.print_help(out); }
+        S<U>& schema() { return schema_; }
+
+    private:
+        std::optional<U> T::*member_;
+        S<U> schema_;
+    };
+
+    std::vector<std::pair<std::string, std::unique_ptr<EntryConcept>>> entries_;
 };
 
 } // namespace tndm
+
+template <typename T> std::ostream& operator<<(std::ostream& lhs, tndm::TableSchema<T> const& rhs) {
+    rhs.print_help(lhs);
+    return lhs;
+}
 
 #endif // SCHEMA_20200812_H

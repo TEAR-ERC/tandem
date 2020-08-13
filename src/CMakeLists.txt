@@ -55,5 +55,6 @@ target_link_libraries(tandem-lib PUBLIC
     OpenMP::OpenMP_CXX
     PARMETIS::PARMETIS
     tinyxml2
+    toml
     ZLIB::ZLIB
 )

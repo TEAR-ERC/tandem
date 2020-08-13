@@ -39,6 +39,7 @@ using tndm::MyScenario;
 using tndm::Poisson;
 using tndm::Scenario;
 using tndm::TableSchema;
+using tndm::ValueSchema;
 using tndm::Vector;
 using tndm::VertexData;
 using tndm::VTUWriter;
@@ -186,6 +187,17 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
     return nullptr;
 }
 
+struct MeshConfig {
+    double test;
+};
+
+struct Config {
+    std::string scenario;
+    int64_t resolution;
+    std::optional<std::string> output;
+    std::optional<MeshConfig> mesh;
+};
+
 int main(int argc, char** argv) {
     int pArgc = 0;
     char** pArgv = nullptr;
@@ -199,14 +211,6 @@ int main(int argc, char** argv) {
     }
     PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
-
-    TableSchema schema;
-    schema.add_value<std::string>("scenario").required().help("Name of scenario");
-    schema.add_value<int64_t>("resolution")
-        .required()
-        .validator([](auto&& x) { return x > 0; })
-        .help("Non-negative integral resolution parameter");
-    schema.add_value<std::string>("output").help("Output file name");
 
     argparse::ArgumentParser program("poisson");
     // program.add_argument("--petsc").help("PETSc options, must be passed last!");
@@ -233,20 +237,34 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    toml::table cfg;
+    toml::table rawCfg;
     try {
-        cfg = toml::parse_file(program.get("config"));
+        rawCfg = toml::parse_file(program.get("config"));
     } catch (toml::parse_error const& err) {
         std::cerr << "Parsing failed:" << std::endl << err << std::endl;
         PetscFinalize();
         return -1;
     }
 
+    TableSchema<Config> schema;
+    schema.add_value("scenario", &Config::scenario)
+        .help("Name of scenario")
+        .default_value("manufactured");
+    schema.add_value("resolution", &Config::resolution)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Non-negative integral resolution parameter");
+    schema.add_value("output", &Config::output).help("Output file name");
+    auto& meshSchema = schema.add_table("mesh", &Config::mesh);
+    meshSchema.add_value("test", &MeshConfig::test);
+
+    Config cfg;
     try {
-        schema.translate(cfg);
+        cfg = schema.translate(rawCfg);
     } catch (std::runtime_error const& e) {
         std::cerr << e.what() << std::endl << std::endl;
-        std::cerr << "You provided" << std::endl << "------------" << std::endl << cfg << std::endl;
+        std::cerr << "You provided" << std::endl
+                  << "------------" << std::endl
+                  << rawCfg << std::endl;
         std::cerr << "You should have provided" << std::endl
                   << "------------------------" << std::endl;
         std::cerr << schema << std::endl;
@@ -254,10 +272,9 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    std::string scenarioName = cfg["scenario"].value_or("");
-    auto scenario = getScenario(scenarioName);
+    auto scenario = getScenario(cfg.scenario);
     if (!scenario) {
-        std::cerr << "Unknown scenario " << scenarioName << std::endl;
+        std::cerr << "Unknown scenario " << cfg.scenario << std::endl;
         PetscFinalize();
         return -1;
     }
@@ -266,8 +283,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto n = cfg["resolution"].value_or(1);
-    auto globalMesh = scenario->getGlobalMesh(n, PETSC_COMM_WORLD);
+    auto globalMesh = scenario->getGlobalMesh(cfg.resolution, PETSC_COMM_WORLD);
     auto mesh = globalMesh->getLocalMesh(1);
 
     Curvilinear<DomainDimension> cl(*mesh, scenario->transform(), PolynomialDegree);
@@ -346,12 +362,12 @@ int main(int argc, char** argv) {
         std::cout << "L2 error: " << error << std::endl;
     }
 
-    if (auto fileName = cfg["output"].value<std::string>()) {
+    if (cfg.output) {
         VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto piece = writer.addPiece(cl, poisson.numLocalElements());
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());
-        writer.write(*fileName);
+        writer.write(*cfg.output);
     }
 
     CHKERRQ(VecDestroy(&x));
