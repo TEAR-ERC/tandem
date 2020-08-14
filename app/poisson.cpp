@@ -187,15 +187,18 @@ std::unique_ptr<Scenario> getScenario(std::string const& name) {
     return nullptr;
 }
 
-struct MeshConfig {
-    double test;
+struct Receiver {
+    std::optional<std::string> name;
+    std::array<double, 3> position;
 };
 
 struct Config {
     std::string scenario;
     int64_t resolution;
+    std::optional<std::array<double, 2>> normal;
+    std::vector<std::string> names;
     std::optional<std::string> output;
-    std::optional<MeshConfig> mesh;
+    std::optional<std::vector<Receiver>> receivers;
 };
 
 int main(int argc, char** argv) {
@@ -253,9 +256,12 @@ int main(int argc, char** argv) {
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative integral resolution parameter");
+    schema.add_array("normal", &Config::normal).of_values();
+    schema.add_array("names", &Config::names).min(3).max(3).of_values();
     schema.add_value("output", &Config::output).help("Output file name");
-    auto& meshSchema = schema.add_table("mesh", &Config::mesh);
-    meshSchema.add_value("test", &MeshConfig::test);
+    auto& receiverSchema = schema.add_array("receivers", &Config::receivers).of_tables();
+    receiverSchema.add_value("name", &Receiver::name);
+    receiverSchema.add_array("position", &Receiver::position).of_values();
 
     Config cfg;
     try {
@@ -270,6 +276,16 @@ int main(int argc, char** argv) {
         std::cerr << schema << std::endl;
         PetscFinalize();
         return -1;
+    }
+
+    if (cfg.receivers) {
+        for (auto&& receiver : *cfg.receivers) {
+            if (receiver.name) {
+                std::cout << *receiver.name << std::endl;
+            }
+            std::cout << receiver.position[0] << " " << receiver.position[1] << " "
+                      << receiver.position[2] << std::endl;
+        }
     }
 
     auto scenario = getScenario(cfg.scenario);
