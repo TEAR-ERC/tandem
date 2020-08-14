@@ -5,6 +5,7 @@
 #include <toml.hpp>
 
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -63,22 +64,140 @@ public:
     }
 };
 
+template <typename T> class ArraySchema;
+template <typename T> class TableSchema;
+template <typename T> class ArraySchemaCommon : public SchemaCommon<ArraySchemaCommon<T>> {
+public:
+    using value_type = typename T::value_type;
+
+    template <template <typename> typename S> auto& of() {
+        auto model = std::make_unique<Model<S>>();
+        auto& schema = model->schema();
+        of_ = std::move(model);
+        return schema;
+    }
+
+    auto& of_values() { return of<ValueSchema>(); }
+    auto& of_arrays() { return of<ArraySchema>(); }
+    auto& of_tables() { return of<TableSchema>(); }
+
+    virtual void print_help(std::ostream& out) const {
+        out << "[";
+        if (of_) {
+            of_->print_help(out);
+        }
+        out << "]";
+    }
+
+protected:
+    void commonChecks() const {
+        if (!this->of_) {
+            throw std::runtime_error("Missing value schema in array schema");
+        }
+    }
+
+    auto get_array(toml::node_view<const toml::node> node) const {
+        toml::array const* raw = node.as_array();
+        if (!raw) {
+            throw std::runtime_error("Expected array");
+        }
+        return raw;
+    }
+
+    class Concept {
+    public:
+        virtual ~Concept() {}
+        virtual void translate(value_type& entry, toml::node_view<const toml::node> node) const = 0;
+        virtual void print_help(std::ostream& out) const = 0;
+    };
+
+    template <template <typename> typename S> class Model : public Concept {
+    public:
+        void translate(value_type& entry, toml::node_view<const toml::node> node) const override {
+            entry = schema_.translate(node);
+        }
+        void print_help(std::ostream& out) const override { schema_.print_help(out); }
+        S<value_type>& schema() { return schema_; }
+
+    private:
+        S<value_type> schema_;
+    };
+
+    std::unique_ptr<Concept> of_;
+};
+
+template <typename T> class ArraySchema : public ArraySchemaCommon<T> {
+public:
+    ArraySchema<T>& min(std::size_t m) {
+        min_ = m;
+        return *this;
+    }
+    ArraySchema<T>& max(std::size_t m) {
+        max_ = m;
+        return *this;
+    }
+
+    auto translate(toml::node_view<const toml::node> node) const {
+        this->commonChecks();
+        auto raw = this->get_array(node);
+        if (raw->size() < min_) {
+            std::stringstream ss;
+            ss << "Array too small (min size = " << min_ << ")";
+            throw std::runtime_error(ss.str());
+        }
+        if (raw->size() > max_) {
+            std::stringstream ss;
+            ss << "Array too large (max size = " << max_ << ")";
+            throw std::runtime_error(ss.str());
+        }
+        T vector(raw->size());
+        for (std::size_t idx = 0; idx < raw->size(); ++idx) {
+            this->of_->translate(vector[idx], node[idx]);
+        }
+        return vector;
+    }
+
+private:
+    std::size_t min_ = 0, max_ = std::numeric_limits<std::size_t>::max();
+};
+
+template <typename T, std::size_t N>
+class ArraySchema<std::array<T, N>> : public ArraySchemaCommon<std::array<T, N>> {
+public:
+    auto translate(toml::node_view<const toml::node> node) const {
+        this->commonChecks();
+        auto raw = this->get_array(node);
+        if (raw->size() != N) {
+            throw std::runtime_error("Array size mismatch");
+        }
+        std::array<T, N> array;
+        for (std::size_t idx = 0; idx < raw->size(); ++idx) {
+            this->of_->translate(array[idx], node[idx]);
+        }
+        return array;
+    }
+};
+
 template <typename T> class TableSchema : public SchemaCommon<TableSchema<T>> {
 public:
-    TableSchema() {}
-
-    template <typename U> auto& add_value(std::string&& name, U T::*member) {
-        auto entry = std::make_unique<EntryModel<U, ValueSchema>>(member);
+    template <typename U, template <typename> typename S>
+    auto& add(std::string&& name, U T::*member) {
+        auto entry = std::make_unique<Model<U, S>>(member);
         auto& schema = entry->schema();
         entries_.emplace_back(std::make_pair(std::move(name), std::move(entry)));
         return schema;
     }
 
+    template <typename U> auto& add_value(std::string&& name, U T::*member) {
+        return add<U, ValueSchema>(std::move(name), member);
+    }
+
+    template <typename U> auto& add_array(std::string&& name, U T::*member) {
+        return add<U, ArraySchema>(std::move(name), member);
+    }
+
     template <typename U> auto& add_table(std::string&& name, U T::*member) {
-        auto entry = std::make_unique<EntryModel<U, TableSchema>>(member);
-        auto& schema = entry->schema();
-        entries_.emplace_back(std::make_pair(std::move(name), std::move(entry)));
-        return schema;
+        return add<U, TableSchema>(std::move(name), member);
     }
 
     T translate(toml::node_view<const toml::node> node) const {
@@ -106,16 +225,16 @@ public:
     }
 
 private:
-    class EntryConcept {
+    class Concept {
     public:
-        virtual ~EntryConcept() {}
+        virtual ~Concept() {}
         virtual void translate(T& table, toml::node_view<const toml::node> node) const = 0;
         virtual void print_help(std::ostream& out) const = 0;
     };
 
-    template <typename U, template <typename> typename S> class EntryModel : public EntryConcept {
+    template <typename U, template <typename> typename S> class Model : public Concept {
     public:
-        EntryModel(U T::*member) : member_(member) {}
+        Model(U T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (!node) {
                 if (!schema_.get_default_value()) {
@@ -139,9 +258,9 @@ private:
     };
 
     template <typename U, template <typename> typename S>
-    class EntryModel<std::optional<U>, S> : public EntryConcept {
+    class Model<std::optional<U>, S> : public Concept {
     public:
-        EntryModel(std::optional<U> T::*member) : member_(member) {}
+        Model(std::optional<U> T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (node) {
                 table.*member_ = std::make_optional(schema_.translate(node));
@@ -155,7 +274,7 @@ private:
         S<U> schema_;
     };
 
-    std::vector<std::pair<std::string, std::unique_ptr<EntryConcept>>> entries_;
+    std::vector<std::pair<std::string, std::unique_ptr<Concept>>> entries_;
 };
 
 } // namespace tndm
