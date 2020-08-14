@@ -15,6 +15,7 @@
 #include <argparse.hpp>
 #include <fstream>
 #include <mpi.h>
+#include <ostream>
 #include <petscerror.h>
 #include <petscksp.h>
 #include <petscsys.h>
@@ -195,10 +196,11 @@ struct Receiver {
 struct Config {
     std::string scenario;
     int64_t resolution;
-    std::optional<std::array<double, 2>> normal;
+    std::optional<std::array<std::array<double, 2>, 3>> normal;
     std::vector<std::string> names;
     std::optional<std::string> output;
     std::optional<std::vector<Receiver>> receivers;
+    Receiver receiver;
 };
 
 int main(int argc, char** argv) {
@@ -256,24 +258,31 @@ int main(int argc, char** argv) {
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative integral resolution parameter");
-    schema.add_array("normal", &Config::normal).of_values();
+    schema.add_array("normal", &Config::normal).of_arrays().of_values();
     schema.add_array("names", &Config::names).min(3).max(3).of_values();
     schema.add_value("output", &Config::output).help("Output file name");
     auto& receiverSchema = schema.add_array("receivers", &Config::receivers).of_tables();
     receiverSchema.add_value("name", &Receiver::name);
     receiverSchema.add_array("position", &Receiver::position).of_values();
+    auto& receiverSchema2 = schema.add_table("receiver", &Config::receiver);
+    receiverSchema2.add_value("name", &Receiver::name);
+    receiverSchema2.add_array("position", &Receiver::position).of_values();
 
     Config cfg;
     try {
         cfg = schema.translate(rawCfg);
     } catch (std::runtime_error const& e) {
-        std::cerr << e.what() << std::endl << std::endl;
-        std::cerr << "You provided" << std::endl
+        std::cerr << "Error in configuration file" << std::endl
+                  << "---------------------------" << std::endl
+                  << e.what() << std::endl
+                  << std::endl
+                  << "You provided" << std::endl
                   << "------------" << std::endl
-                  << rawCfg << std::endl;
-        std::cerr << "You should have provided" << std::endl
-                  << "------------------------" << std::endl;
-        std::cerr << schema << std::endl;
+                  << rawCfg << std::endl
+                  << std::endl
+                  << "Schema" << std::endl
+                  << "------" << std::endl
+                  << schema << std::endl;
         PetscFinalize();
         return -1;
     }
