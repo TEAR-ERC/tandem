@@ -8,8 +8,18 @@
 #include "geometry/Curvilinear.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
+#include "script/LuaLib.h"
 
 namespace tndm {
+
+struct ProblemConfig {
+    std::string lib;
+    std::optional<std::string> warp;
+    std::optional<std::string> force;
+    std::optional<std::string> boundary;
+    std::optional<std::string> coefficient;
+    std::optional<std::string> solution;
+};
 
 class Scenario {
 public:
@@ -19,67 +29,60 @@ public:
     virtual ~Scenario() {}
     virtual transform_t transform() const = 0;
     virtual functional_t force() const = 0;
-    virtual functional_t dirichlet() const = 0;
-    virtual std::unique_ptr<SolutionInterface> reference() const = 0;
-    virtual functional_t K() const = 0;
-
-    virtual std::unique_ptr<GlobalSimplexMesh<DomainDimension>>
-    getGlobalMesh(unsigned long n, MPI_Comm comm) const = 0;
+    virtual functional_t boundary() const = 0;
+    virtual std::unique_ptr<SolutionInterface> solution() const = 0;
+    virtual functional_t coefficient() const = 0;
 };
 
-class MyScenario : public Scenario {
+class LuaScenario : public Scenario {
 public:
-    using reference_t = std::function<std::array<double, 1>(Vector<double> const&)>;
-    using bc_fun_t = GenMesh<DomainDimension>::bc_fun_t;
+    using solution_t = std::function<std::array<double, 1>(Vector<double> const&)>;
 
-    MyScenario(
-        transform_t transform, functional_t force, functional_t dirichlet, reference_t reference,
-        functional_t K = [](auto) { return 1.0; })
-        : trans_(std::move(transform)), force_(std::move(force)), diri_(std::move(dirichlet)),
-          ref_(std::move(reference)), K_(std::move(K)) {}
-    Curvilinear<DomainDimension>::transform_t transform() const override { return trans_; }
+    LuaScenario(ProblemConfig const& problem) {
+        lib_.loadFile(problem.lib);
+
+        if (problem.warp) {
+            warp_ = lib_.getFunction<DomainDimension, DomainDimension>(*problem.warp);
+        }
+        auto functional = [](LuaLib& lib, std::optional<std::string> const& opt,
+                             functional_t& target) {
+            if (opt) {
+                auto myF = lib.getFunction<DomainDimension, 1>(*opt);
+                target = [myF](std::array<double, DomainDimension> const& v) -> double {
+                    return myF(v)[0];
+                };
+            }
+        };
+        functional(lib_, problem.force, force_);
+        functional(lib_, problem.boundary, boundary_);
+        functional(lib_, problem.coefficient, coefficient_);
+        if (problem.solution) {
+            auto myF = lib_.getFunction<DomainDimension, 1>(*problem.solution);
+            solution_ = [myF](Vector<double> const& v) -> std::array<double, 1> {
+                std::array<double, DomainDimension> x;
+                for (std::size_t i = 0; i < DomainDimension; ++i) {
+                    x[i] = v(i);
+                }
+                return myF(x);
+            };
+        }
+    }
+
+    Curvilinear<DomainDimension>::transform_t transform() const override { return warp_; }
     functional_t force() const override { return force_; }
-    functional_t dirichlet() const override { return diri_; }
-    std::unique_ptr<SolutionInterface> reference() const override {
-        return std::make_unique<LambdaSolution<decltype(ref_)>>(ref_);
+    functional_t boundary() const override { return boundary_; }
+    std::unique_ptr<SolutionInterface> solution() const override {
+        return std::make_unique<LambdaSolution<decltype(solution_)>>(solution_);
     }
-    functional_t K() const override { return K_; }
-
-    void setPointsAndBCs(std::array<std::vector<double>, DomainDimension> const& points,
-                         std::array<bc_fun_t, DomainDimension> const& BCs) {
-        points_ = points;
-        bcs_ = BCs;
-    }
-
-    std::unique_ptr<GlobalSimplexMesh<DomainDimension>>
-    getGlobalMesh(unsigned long n, MPI_Comm comm) const override {
-        auto meshGen = meshGenerator(n, comm);
-        auto globalMesh = meshGen.uniformMesh();
-        globalMesh->repartition();
-        return globalMesh;
-    }
+    functional_t coefficient() const override { return coefficient_; }
 
 private:
-    GenMesh<DomainDimension> meshGenerator(unsigned long n, MPI_Comm comm) const {
-        if (points_ && bcs_) {
-            std::array<double, DomainDimension> h;
-            h.fill(1.0 / n);
-            return GenMesh(*points_, h, *bcs_, comm);
-        }
-        std::array<uint64_t, DomainDimension> size;
-        size.fill(n);
-        std::array<std::pair<BC, BC>, DomainDimension> BCs;
-        BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
-        return GenMesh(size, BCs, comm);
-    }
-
-    transform_t trans_;
-    functional_t force_, diri_;
-    reference_t ref_;
-    functional_t K_;
-
-    std::optional<std::array<std::vector<double>, DomainDimension>> points_ = std::nullopt;
-    std::optional<std::array<bc_fun_t, DomainDimension>> bcs_ = std::nullopt;
+    LuaLib lib_;
+    transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
+    functional_t force_ = [](std::array<double, DomainDimension> const& v) { return 0.0; };
+    functional_t boundary_ = [](std::array<double, DomainDimension> const& v) { return 0.0; };
+    functional_t coefficient_ = [](std::array<double, DomainDimension> const& v) { return 1.0; };
+    solution_t solution_ = [](Vector<double> const&) -> std::array<double, 1> { return {0.0}; };
 };
 
 } // namespace tndm

@@ -101,13 +101,21 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
+add_library(app-common
+    common/Scenario.cpp
+)
+target_link_libraries(app-common PUBLIC tandem-lib)
+
 ## Poisson example
 generate_code(poisson)
 
 add_executable(poisson
     poisson/Poisson.cpp
     poisson.cpp)
-target_link_libraries(poisson PRIVATE tandem-lib poisson-kernels-lib PkgConfig::PETSC)
+target_link_libraries(poisson PRIVATE
+    app-common
+    poisson-kernels-lib
+    PkgConfig::PETSC)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Tandem

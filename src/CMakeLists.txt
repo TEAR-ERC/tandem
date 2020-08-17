@@ -42,6 +42,7 @@ find_package(MPI REQUIRED)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
+include(../cmake/filesystem.cmake)
 
 target_include_directories(tandem-lib PUBLIC 
     ../submodules/
@@ -50,6 +51,7 @@ target_include_directories(tandem-lib PUBLIC
 )
 target_link_libraries(tandem-lib PUBLIC
     tandem-fem-lib
+    ${FILESYSTEM_LIBRARIES}
     ${LUA_LIBRARIES}
     MPI::MPI_CXX
     OpenMP::OpenMP_CXX

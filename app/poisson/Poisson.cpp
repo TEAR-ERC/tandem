@@ -35,20 +35,16 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
     auto Minv = nodalRefElement_.inverseMassMatrix();
     auto E = nodalRefElement_.evaluateBasisAt(volRule.points());
     Eigen::MatrixXd P = EigenMap(Minv) * EigenMap(E);
-#pragma omp parallel
-    {
-        auto rhs = Eigen::VectorXd(volRule.size());
-#pragma omp for
-        for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
-            auto Kfield =
-                Vector<double>(userVol[elNo].get<K>().data(), nodalRefElement_.numBasisFunctions());
+    auto rhs = Eigen::VectorXd(volRule.size());
+    for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
+        auto Kfield =
+            Vector<double>(userVol[elNo].get<K>().data(), nodalRefElement_.numBasisFunctions());
 
-            auto coords = vol[elNo].get<Coords>();
-            for (std::size_t q = 0; q < volRule.size(); ++q) {
-                rhs(q) = kFun(coords[q]) * volRule.weights()[q];
-            }
-            EigenMap(Kfield) = P * rhs;
+        auto coords = vol[elNo].get<Coords>();
+        for (std::size_t q = 0; q < volRule.size(); ++q) {
+            rhs(q) = kFun(coords[q]) * volRule.weights()[q];
         }
+        EigenMap(Kfield) = P * rhs;
     }
 
     Em = nodalRefElement_.evaluateBasisAt(volRule.points(), {1, 0});
