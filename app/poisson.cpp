@@ -1,4 +1,5 @@
 #include "poisson/Poisson.h"
+#include "common/CmdLine.h"
 #include "common/Scenario.h"
 #include "config.h"
 #include "poisson/Scenario.h"
@@ -59,7 +60,6 @@ int main(int argc, char** argv) {
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
-    Config cfg;
     TableSchema<Config> schema;
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
@@ -79,90 +79,23 @@ int main(int argc, char** argv) {
     problemSchema.add_value("coefficient", &ProblemConfig::coefficient);
     problemSchema.add_value("solution", &ProblemConfig::solution);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
-    genMeshSchema.add_array("intercepts", &GenMeshConfig<DomainDimension>::intercepts)
-        .of_arrays()
-        .min(2)
-        .of_values();
-    auto& bcConfigSchema = genMeshSchema.add_array("bcs", &GenMeshConfig<DomainDimension>::bcs)
-                               .of_arrays()
-                               .of_tables();
-    bcConfigSchema.add_value("bc", &BCConfig<DomainDimension>::bc)
-        .converter([](std::string_view bc) {
-            if (!bc.empty()) {
-                switch (bc[0]) {
-                case 'd':
-                case 'D':
-                    return BC::Dirichlet;
-                case 'n':
-                case 'N':
-                    return BC::Natural;
-                case 'f':
-                case 'F':
-                    return BC::Fault;
-                default:
-                    break;
-                }
-            }
-            throw std::invalid_argument("Unknown boundary condition type " + std::string(bc));
-            return BC::None;
-        });
-    bcConfigSchema.add_value("plane", &BCConfig<DomainDimension>::plane);
-    bcConfigSchema.add_array("region", &BCConfig<DomainDimension>::region).of_values();
+    GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
-    schema.cmd_line_args([&program](std::string_view key, std::string_view help) {
-        program.add_argument("--" + std::string(key)).help(std::string(help));
-    });
-
-    try {
-        program.parse_args(argc, argv);
-    } catch (std::runtime_error& err) {
-        std::cout << err.what() << std::endl;
-        std::cout << program;
-        return 0;
-    }
-
-    toml::table rawCfg;
-    try {
-        rawCfg = toml::parse_file(program.get("config"));
-    } catch (toml::parse_error const& err) {
-        std::cerr << "Parsing failed of " << program.get("config") << " failed:" << std::endl
-                  << err << std::endl;
-        return -1;
-    }
-
-    try {
-        cfg = schema.translate(rawCfg);
-        schema.cmd_line_args(
-            [&cfg, &program, &schema](std::string_view key, std::string_view help) {
-                if (auto val = program.present("--" + std::string(key))) {
-                    schema.set(cfg, key, *val);
-                }
-            });
-    } catch (std::runtime_error const& e) {
-        std::cerr << "Error in configuration file" << std::endl
-                  << "---------------------------" << std::endl
-                  << e.what() << std::endl
-                  << std::endl
-                  << "You provided" << std::endl
-                  << "------------" << std::endl
-                  << rawCfg << std::endl
-                  << std::endl
-                  << "Schema" << std::endl
-                  << "------" << std::endl
-                  << schema << std::endl;
+    std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
+    if (!cfg) {
         return -1;
     }
 
     PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
-    auto scenario = std::make_unique<LuaScenario>(cfg.problem);
+    auto scenario = std::make_unique<LuaScenario>(cfg->problem);
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto meshGen = cfg.generate_mesh.create(cfg.resolution, PETSC_COMM_WORLD);
+    auto meshGen = cfg->generate_mesh.create(cfg->resolution, PETSC_COMM_WORLD);
     auto globalMesh = meshGen.uniformMesh();
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
@@ -172,7 +105,8 @@ int main(int argc, char** argv) {
     tndm::Stopwatch sw;
 
     sw.start();
-    Poisson poisson(*mesh, cl, std::make_unique<tndm::ModalRefElement<2ul>>(PolynomialDegree),
+    Poisson poisson(*mesh, cl,
+                    std::make_unique<tndm::ModalRefElement<DomainDimension>>(PolynomialDegree),
                     MinQuadOrder(), PETSC_COMM_WORLD, scenario->coefficient());
     std::cout << "Constructed Poisson after " << sw.split() << std::endl;
 
@@ -243,12 +177,12 @@ int main(int argc, char** argv) {
         std::cout << "L2 error: " << error << std::endl;
     }
 
-    if (cfg.output) {
-        VTUWriter<2u> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
+    if (cfg->output) {
+        VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto piece = writer.addPiece(cl, poisson.numLocalElements());
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());
-        writer.write(*cfg.output);
+        writer.write(*cfg->output);
     }
 
     CHKERRQ(VecDestroy(&x));

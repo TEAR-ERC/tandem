@@ -338,7 +338,7 @@ public:
 
     T translate(std::string_view value) const { throw std::logic_error{"Not implemented"}; }
 
-    void set(T& table, std::string_view key, std::string_view value) {
+    void set(T& table, std::string_view key, std::string_view value) const {
         for (auto&& [k, model] : entries_) {
             if (key == k) {
                 try {

@@ -4,6 +4,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/MeshData.h"
+#include "util/Schema.h"
 
 #include <array>
 #include <cstddef>
@@ -23,6 +24,7 @@ template <std::size_t D> struct GenMeshConfig {
     std::array<std::vector<BCConfig<D>>, D> bcs;
 
     GenMesh<D> create(double resolution, MPI_Comm comm);
+    static void setSchema(TableSchema<GenMeshConfig<D>>& schema);
 };
 
 } // namespace tndm
