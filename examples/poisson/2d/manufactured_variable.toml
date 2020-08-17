@@ -1,0 +1,20 @@
+resolution = 0.125
+
+[problem]
+lib = "manufactured_variable.lua"
+warp = "warp"
+force = "force"
+boundary = "solution"
+coefficient = "coefficient"
+solution = "solution"
+
+[generate_mesh]
+intercepts = [
+    [0, 1],
+    [0, 1]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]
+

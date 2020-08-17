@@ -1,0 +1,18 @@
+resolution = 0.125
+
+[problem]
+lib = "singular.lua"
+boundary = "solution"
+coefficient = "coefficient"
+solution = "solution"
+
+[generate_mesh]
+intercepts = [
+    [-1, 1],
+    [-1, 1]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]
+

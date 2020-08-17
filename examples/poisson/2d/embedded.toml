@@ -1,0 +1,17 @@
+resolution = 0.125
+
+[problem]
+lib = "embedded.lua"
+boundary = "solution"
+solution = "solution"
+
+[generate_mesh]
+intercepts = [
+    [-1, 0.5, 1],
+    [-1, 1]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "f", plane = 1}, {bc = "d", plane = 2}],
+    [{bc = "n", plane = 0}, {bc = "d", plane = 1}]
+]
+
