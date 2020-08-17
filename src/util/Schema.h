@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <toml.hpp>
 
+#include <charconv>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -70,6 +71,38 @@ public:
             throw std::runtime_error("Validator returned false");
         }
         return result.value();
+    }
+
+    T translate(std::string_view value) const {
+        T result;
+        if constexpr (std::is_same_v<bool, T>) {
+            std::string data;
+            std::transform(value.begin(), value.end(), data.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            result = data == "yes" || data == "true";
+            if (!result) {
+                if (data != "no" && data != "false") {
+                    std::stringstream ss;
+                    ss << "Could not convert " << value << " to boolean";
+                    throw std::runtime_error(ss.str());
+                }
+            }
+        } else if constexpr (std::is_integral<T>() || std::is_floating_point<T>()) {
+            std::from_chars_result res =
+                std::from_chars(value.begin(), value.end() + value.size(), result);
+            if (res.ec == std::errc::invalid_argument) {
+                throw std::invalid_argument{"Invalid argument"};
+            } else if (res.ec == std::errc::result_out_of_range) {
+                throw std::out_of_range{"Out of range"};
+            }
+        } else if constexpr (is_string<T>()) {
+            result = value;
+        }
+        if (!this->validator_(result)) {
+            std::stringstream ss;
+            throw std::runtime_error("Validator returned false");
+        }
+        return result;
     }
 
     void print_schema(std::ostream& out, bool) const {
@@ -154,7 +187,11 @@ public:
         return array;
     }
 
-    virtual void print_schema(std::ostream& out, bool) const {
+    array_type translate(std::string_view value) const {
+        throw std::logic_error{"Not implemented"};
+    }
+
+    void print_schema(std::ostream& out, bool) const {
         out << "[";
         if (min_ == max_) {
             out << min_;
@@ -243,21 +280,29 @@ public:
         for (auto&& [key, model] : entries_) {
             try {
                 model->translate(table, node[key]);
-            } catch (std::runtime_error const& e) {
-                std::stringstream ss;
-                ss << e.what() << std::endl;
-                ss << "  --> " << key;
-                auto help = model->get_help();
-                if (!help.empty()) {
-                    ss << " (\"" << help << "\")";
-                }
-                throw std::runtime_error(ss.str());
+            } catch (std::exception const& e) {
+                throw std::runtime_error(format_error(e, key, *model));
             }
         }
         return table;
     }
 
-    virtual void print_schema(std::ostream& out, bool inLine) const {
+    T translate(std::string_view value) const { throw std::logic_error{"Not implemented"}; }
+
+    void set(T& table, std::string_view key, std::string_view value) {
+        for (auto&& [k, model] : entries_) {
+            if (key == k) {
+                try {
+                    model->translate(table, value);
+                } catch (std::exception const& e) {
+                    throw std::runtime_error(format_error(e, key, *model));
+                }
+                return;
+            }
+        }
+    }
+
+    void print_schema(std::ostream& out, bool inLine) const {
         if (inLine) {
             out << "{";
             std::size_t num = 0;
@@ -280,59 +325,94 @@ public:
         }
     }
 
+    void cmd_line_args(std::function<void(std::string_view, std::string_view)> callback) const {
+        for (auto&& [key, schema] : entries_) {
+            schema->cmd_line_args(key, callback);
+        }
+    }
+
 private:
     class Concept {
     public:
         virtual ~Concept() {}
         virtual void translate(T& table, toml::node_view<const toml::node> node) const = 0;
+        virtual void translate(T& table, std::string_view value) const = 0;
         virtual void print_schema(std::ostream& out, bool inLine) const = 0;
         virtual std::string_view get_help() const = 0;
+        virtual void
+        cmd_line_args(std::string_view key,
+                      std::function<void(std::string_view, std::string_view)> callback) const = 0;
     };
 
-    template <typename U, template <typename> typename S> class Model : public Concept {
+    template <typename U, template <typename> typename S> class ModelCommon : public Concept {
+    public:
+        void print_schema(std::ostream& out, bool inLine) const override {
+            schema_.print_schema(out, inLine);
+        }
+        std::string_view get_help() const override { return schema_.get_help(); }
+        S<U>& schema() { return schema_; }
+        void cmd_line_args(
+            std::string_view key,
+            std::function<void(std::string_view, std::string_view)> callback) const override {
+            if constexpr (std::is_same_v<S<U>, ValueSchema<U>>) {
+                callback(key, schema_.get_help());
+            }
+        }
+
+    protected:
+        S<U> schema_;
+    };
+
+    template <typename U, template <typename> typename S> class Model : public ModelCommon<U, S> {
     public:
         Model(U T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (!node) {
-                if (!schema_.get_default_value()) {
+                if (!this->schema_.get_default_value()) {
                     throw std::runtime_error(
                         "Value missing although non-optional and no default is provided");
                 }
-                table.*member_ = *schema_.get_default_value();
+                table.*member_ = *this->schema_.get_default_value();
                 return;
             }
-            table.*member_ = schema_.translate(node);
+            table.*member_ = this->schema_.translate(node);
         }
-        void print_schema(std::ostream& out, bool inLine) const override {
-            schema_.print_schema(out, inLine);
+        void translate(T& table, std::string_view value) const override {
+            table.*member_ = this->schema_.translate(value);
         }
-        std::string_view get_help() const override { return schema_.get_help(); }
-        S<U>& schema() { return schema_; }
 
     private:
         U T::*member_;
-        S<U> schema_;
     };
 
     template <typename U, template <typename> typename S>
-    class Model<std::optional<U>, S> : public Concept {
+    class Model<std::optional<U>, S> : public ModelCommon<U, S> {
     public:
         Model(std::optional<U> T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (node) {
-                table.*member_ = std::make_optional(schema_.translate(node));
+                table.*member_ = std::make_optional(this->schema_.translate(node));
             }
         }
-        void print_schema(std::ostream& out, bool inLine) const override {
-            schema_.print_schema(out, inLine);
+        void translate(T& table, std::string_view value) const override {
+            table.*member_ = std::make_optional(this->schema_.translate(value));
         }
-        std::string_view get_help() const override { return schema_.get_help(); }
-        S<U>& schema() { return schema_; }
 
     private:
         std::optional<U> T::*member_;
-        S<U> schema_;
     };
+
+    std::string format_error(std::exception const& e, std::string_view key,
+                             Concept const& model) const {
+        std::stringstream ss;
+        ss << e.what() << std::endl;
+        ss << "  --> " << key;
+        auto help = model.get_help();
+        if (!help.empty()) {
+            ss << " (\"" << help << "\")";
+        }
+        return ss.str();
+    }
 
     std::vector<std::pair<std::string, std::unique_ptr<Concept>>> entries_;
 };
