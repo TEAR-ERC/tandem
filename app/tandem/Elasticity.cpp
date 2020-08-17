@@ -54,7 +54,8 @@ Elasticity::Elasticity(LocalSimplexMesh<DomainDimension> const& mesh,
 #pragma omp parallel
     {
         auto rhs = Eigen::VectorXd(volRule.size());
-#pragma omp for
+        // Lua functions not thread-safe
+#pragma omp single
         for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
             auto l = Vector<double>(userVol[elNo].get<lam>().data(),
                                     nodalRefElement_.numBasisFunctions());

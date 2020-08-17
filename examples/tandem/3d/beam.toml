@@ -1,0 +1,21 @@
+resolution = 0.125
+
+[problem]
+lib = "beam.lua"
+force = "gravity"
+boundary = "left_boundary"
+lam = "lam"
+mu = "mu"
+
+[generate_mesh]
+intercepts = [
+    [0, 1],
+    [0, 0.2],
+    [0, 0.2]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "n", plane = 1}],
+    [{bc = "n", plane = 0}, {bc = "n", plane = 1}],
+    [{bc = "n", plane = 0}, {bc = "n", plane = 1}]
+]
+
