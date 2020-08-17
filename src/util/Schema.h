@@ -39,7 +39,7 @@ public:
     }
 
     Derived& validator(validator_fun_t&& validator) {
-        validator_ = std::move(validator);
+        validator_ = std::optional<validator_fun_t>(std::move(validator));
         return static_cast<Derived&>(*this);
     }
 
@@ -52,65 +52,106 @@ public:
     std::string_view get_help() const { return help_; }
 
 protected:
+    void validate(value_type const& result) const {
+        if (validator_ && !(*validator_)(result)) {
+            std::stringstream ss;
+            throw std::runtime_error("Validator returned false");
+        }
+    }
+
     std::string help_;
-    validator_fun_t validator_ = [](value_type const& value) { return true; };
+    std::optional<validator_fun_t> validator_ = std::nullopt;
     std::optional<value_type> default_ = std::nullopt;
 };
 
 template <typename T> class ValueSchema : public SchemaCommon<ValueSchema<T>> {
 public:
+    using converter_fun_t = std::function<T(std::string_view value)>;
+
+    ValueSchema& converter(converter_fun_t&& converter) {
+        converter_ = std::optional<converter_fun_t>(std::move(converter));
+        return *this;
+    }
+
     T translate(toml::node_view<const toml::node> node) const {
-        auto result = node.value<T>();
-        if (!result) {
-            std::stringstream ss;
-            ss << "Value " << node << " could not be converted to expected type " << type_name();
-            throw std::runtime_error(ss.str());
+        auto checkResult = [&](auto&& result) {
+            if (!result) {
+                std::stringstream ss;
+                ss << "Value " << node << " could not be converted to expected type "
+                   << type_name();
+                throw std::runtime_error(ss.str());
+            }
+        };
+        T result;
+        if (converter_) {
+            auto val = node.value<std::string_view>();
+            checkResult(val);
+            result = (*converter_)(*val);
+        } else {
+            if constexpr (is_native()) {
+                auto val = node.value<T>();
+                checkResult(val);
+                result = *val;
+            } else {
+                throw std::runtime_error("Non-native type requires converter function.");
+            }
         }
-        if (!this->validator_(*result)) {
-            std::stringstream ss;
-            throw std::runtime_error("Validator returned false");
-        }
-        return result.value();
+        this->validate(result);
+        return result;
     }
 
     T translate(std::string_view value) const {
         T result;
-        if constexpr (std::is_same_v<bool, T>) {
-            std::string data;
-            std::transform(value.begin(), value.end(), data.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
-            result = data == "yes" || data == "true";
-            if (!result) {
-                if (data != "no" && data != "false") {
-                    std::stringstream ss;
-                    ss << "Could not convert " << value << " to boolean";
-                    throw std::runtime_error(ss.str());
+        if (converter_) {
+            result = (*converter_)(value);
+        } else {
+            if constexpr (std::is_same_v<bool, T>) {
+                std::string data;
+                std::transform(value.begin(), value.end(), data.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                result = data == "yes" || data == "true";
+                if (!result) {
+                    if (data != "no" && data != "false") {
+                        std::stringstream ss;
+                        ss << "Could not convert " << value << " to boolean";
+                        throw std::runtime_error(ss.str());
+                    }
                 }
+            } else if constexpr (std::is_integral<T>()) {
+                std::from_chars_result res =
+                    std::from_chars(value.begin(), value.end() + value.size(), result);
+                if (res.ec == std::errc::invalid_argument) {
+                    throw std::invalid_argument{"Invalid argument"};
+                } else if (res.ec == std::errc::result_out_of_range) {
+                    throw std::out_of_range{"Out of range"};
+                }
+                // from_chars implementation for floating point is missing
+            } else if constexpr (std::is_same<T, float>()) {
+                result = std::stof(std::string(value));
+            } else if constexpr (std::is_same<T, double>()) {
+                result = std::stod(std::string(value));
+            } else if constexpr (std::is_same<T, long double>()) {
+                result = std::stold(std::string(value));
+            } else if constexpr (is_string<T>()) {
+                result = value;
+            } else {
+                throw std::runtime_error("Non-native type requires converter function.");
             }
-        } else if constexpr (std::is_integral<T>() || std::is_floating_point<T>()) {
-            std::from_chars_result res =
-                std::from_chars(value.begin(), value.end() + value.size(), result);
-            if (res.ec == std::errc::invalid_argument) {
-                throw std::invalid_argument{"Invalid argument"};
-            } else if (res.ec == std::errc::result_out_of_range) {
-                throw std::out_of_range{"Out of range"};
-            }
-        } else if constexpr (is_string<T>()) {
-            result = value;
         }
-        if (!this->validator_(result)) {
-            std::stringstream ss;
-            throw std::runtime_error("Validator returned false");
-        }
+        this->validate(result);
         return result;
     }
 
     void print_schema(std::ostream& out, bool) const {
-        if (this->default_) {
-            if constexpr (is_string<T>()) {
-                out << "\"" << *this->default_ << "\"";
+        if constexpr (is_native()) {
+            if (this->default_) {
+                if constexpr (is_string<T>()) {
+                    out << "\"" << *this->default_ << "\"";
+                } else {
+                    out << *this->default_;
+                }
             } else {
-                out << *this->default_;
+                out << type_name();
             }
         } else {
             out << type_name();
@@ -125,10 +166,16 @@ private:
             return "<integer>";
         } else if constexpr (std::is_floating_point<T>()) {
             return "<float>";
-        } else if constexpr (is_string<T>()) {
+        } else {
             return "<string>";
         }
     }
+
+    constexpr static bool is_native() {
+        return std::is_integral<T>() || std::is_floating_point<T>() || is_string<T>();
+    }
+
+    std::optional<converter_fun_t> converter_ = std::nullopt;
 };
 
 template <typename Derived> class ArraySchemaCommon : public SchemaCommon<Derived> {
@@ -184,6 +231,7 @@ public:
                 throw std::runtime_error(ss.str());
             }
         }
+        this->validate(array);
         return array;
     }
 
@@ -284,6 +332,7 @@ public:
                 throw std::runtime_error(format_error(e, key, *model));
             }
         }
+        this->validate(table);
         return table;
     }
 
