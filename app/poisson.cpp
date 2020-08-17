@@ -214,43 +214,8 @@ int main(int argc, char** argv) {
             break;
         }
     }
-    PetscErrorCode ierr;
-    CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
-    argparse::ArgumentParser program("poisson");
-    // program.add_argument("--petsc").help("PETSc options, must be passed last!");
-    // program.add_argument("-o").help("Output file name");
-    // program.add_argument("-s")
-    //.default_value(std::string("manufactured"))
-    //.help("Scenario name")
-    //.action([](std::string const& value) {
-    // std::string result;
-    // std::transform(value.begin(), value.end(), std::back_inserter(result),
-    //[](unsigned char c) { return std::tolower(c); });
-    // return result;
-    //});
-    // program.add_argument("n")
-    //.help("Number of elements per dimension")
-    //.action([](std::string const& value) { return std::stoul(value); });
-    program.add_argument("config").help("Configuration file (.toml)");
-
-    try {
-        program.parse_args(argc, argv);
-    } catch (std::runtime_error& err) {
-        std::cout << err.what() << std::endl;
-        std::cout << program;
-        return 0;
-    }
-
-    toml::table rawCfg;
-    try {
-        rawCfg = toml::parse_file(program.get("config"));
-    } catch (toml::parse_error const& err) {
-        std::cerr << "Parsing failed:" << std::endl << err << std::endl;
-        PetscFinalize();
-        return -1;
-    }
-
+    Config cfg;
     TableSchema<Config> schema;
     schema.add_value("scenario", &Config::scenario)
         .help("Name of scenario")
@@ -268,9 +233,38 @@ int main(int argc, char** argv) {
     receiverSchema2.add_value("name", &Receiver::name);
     receiverSchema2.add_array("position", &Receiver::position).of_values();
 
-    Config cfg;
+    argparse::ArgumentParser program("poisson");
+    program.add_argument("--petsc").help("PETSc options, must be passed last!");
+    program.add_argument("config").help("Configuration file (.toml)");
+
+    schema.cmd_line_args([&program](std::string_view key, std::string_view help) {
+        program.add_argument("--" + std::string(key)).help(std::string(help));
+    });
+
+    try {
+        program.parse_args(argc, argv);
+    } catch (std::runtime_error& err) {
+        std::cout << err.what() << std::endl;
+        std::cout << program;
+        return 0;
+    }
+
+    toml::table rawCfg;
+    try {
+        rawCfg = toml::parse_file(program.get("config"));
+    } catch (toml::parse_error const& err) {
+        std::cerr << "Parsing failed:" << std::endl << err << std::endl;
+        return -1;
+    }
+
     try {
         cfg = schema.translate(rawCfg);
+        schema.cmd_line_args(
+            [&cfg, &program, &schema](std::string_view key, std::string_view help) {
+                if (auto val = program.present("--" + std::string(key))) {
+                    schema.set(cfg, key, *val);
+                }
+            });
     } catch (std::runtime_error const& e) {
         std::cerr << "Error in configuration file" << std::endl
                   << "---------------------------" << std::endl
@@ -283,9 +277,11 @@ int main(int argc, char** argv) {
                   << "Schema" << std::endl
                   << "------" << std::endl
                   << schema << std::endl;
-        PetscFinalize();
         return -1;
     }
+
+    PetscErrorCode ierr;
+    CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
     if (cfg.receivers) {
         for (auto&& receiver : *cfg.receivers) {
