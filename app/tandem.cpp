@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
     problemSchema.add_value("warp", &ProblemConfig::warp);
     problemSchema.add_value("force", &ProblemConfig::force);
     problemSchema.add_value("boundary", &ProblemConfig::boundary);
+    problemSchema.add_value("slip", &ProblemConfig::slip);
     problemSchema.add_value("lam", &ProblemConfig::lam);
     problemSchema.add_value("mu", &ProblemConfig::mu);
     problemSchema.add_value("solution", &ProblemConfig::solution);
@@ -115,7 +116,7 @@ int main(int argc, char** argv) {
         CHKERRQ(interface.createb(&b));
     }
     CHKERRQ(elasticity.assemble(A));
-    CHKERRQ(elasticity.rhs(b, scenario->force(), scenario->boundary()));
+    CHKERRQ(elasticity.rhs(b, scenario->force(), scenario->boundary(), scenario->slip()));
     std::cout << "Assembled after " << sw.split() << std::endl;
 
     CHKERRQ(VecDuplicate(b, &x));

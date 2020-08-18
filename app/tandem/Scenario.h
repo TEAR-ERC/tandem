@@ -17,6 +17,7 @@ struct ProblemConfig {
     std::optional<std::string> warp;
     std::optional<std::string> force;
     std::optional<std::string> boundary;
+    std::optional<std::string> slip;
     std::optional<std::string> lam;
     std::optional<std::string> mu;
     std::optional<std::string> solution;
@@ -40,6 +41,9 @@ public:
         }
         if (problem.boundary) {
             boundary_ = lib_.getFunction<DomainDimension, DomainDimension>(*problem.boundary);
+        }
+        if (problem.slip) {
+            slip_ = lib_.getFunction<DomainDimension, DomainDimension>(*problem.slip);
         }
         auto functional = [](LuaLib& lib, std::optional<std::string> const& opt,
                              functional_t& target) {
@@ -67,6 +71,7 @@ public:
     Curvilinear<DomainDimension>::transform_t transform() const { return warp_; }
     vector_functional_t force() const { return force_; }
     vector_functional_t boundary() const { return boundary_; }
+    vector_functional_t slip() const { return slip_; }
     functional_t lam() const { return lam_; }
     functional_t mu() const { return mu_; }
     std::unique_ptr<SolutionInterface> solution() const {
@@ -83,6 +88,9 @@ private:
         return std::array<double, DomainDimension>{};
     };
     vector_functional_t boundary_ = [](std::array<double, DomainDimension> const& v) {
+        return std::array<double, DomainDimension>{};
+    };
+    vector_functional_t slip_ = [](std::array<double, DomainDimension> const& v) {
         return std::array<double, DomainDimension>{};
     };
     functional_t lam_ = [](std::array<double, DomainDimension> const& v) { return 1.0; };

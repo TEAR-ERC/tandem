@@ -164,7 +164,7 @@ PetscErrorCode Elasticity::assemble(Mat mat) {
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.bc == BC::Fault || info.bc == BC::Natural) {
+        if (info.bc == BC::Natural) {
             continue;
         }
 
@@ -275,7 +275,7 @@ void Elasticity::apply(double const* U, double* Unew) {
     //#pragma omp parallel for private(d_x0, d_x1, u_jump, traction_avg)
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.bc == BC::Fault || info.bc == BC::Natural) {
+        if (info.bc == BC::Natural) {
             continue;
         }
 
@@ -337,7 +337,7 @@ void Elasticity::apply(double const* U, double* Unew) {
 }
 
 PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
-                               vector_functional_t dirichletFun) {
+                               vector_functional_t dirichletFun, vector_functional_t slipFun) {
     PetscErrorCode ierr;
 
     double b[tensor::b::size()];
@@ -370,33 +370,55 @@ PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.up[0] == info.up[1] && info.bc == BC::Dirichlet) {
+        if (info.bc == BC::Fault || info.bc == BC::Dirichlet) {
+            vector_functional_t& fun = (info.bc == BC::Fault) ? slipFun : dirichletFun;
             auto coords = fct[fctNo].template get<Coords>();
             for (unsigned q = 0; q < tensor::f::Shape[1]; ++q) {
-                auto f = dirichletFun(coords[q]);
+                auto f = fun(coords[q]);
                 for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
                     fview(p, q) = f[p];
                 }
+                // \todo Make side detection configurable
+                auto n = fct[fctNo].template get<Normal>()[q];
+                if (info.bc == BC::Fault && n[0] < 0.0) {
+                    for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
+                        fview(p, q) *= -1.0;
+                    }
+                }
             }
-
+            double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
             kernel::rhsFacet rhs;
-            rhs.c10 = epsilon;
-            rhs.c20 = penalty(info);
             rhs.b = b;
+            rhs.c10 = half * epsilon;
+            rhs.c20 = penalty(info);
             rhs.d_x(0) = d_x;
-            rhs.d_xi(0) = d_xi[info.localNo[0]].data();
-            rhs.e(0) = e[info.localNo[0]].data();
             rhs.f = f;
-            rhs.g(0) = fct[fctNo].template get<JInv>().data()->data();
-            rhs.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
-            rhs.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
             rhs.n = fct[fctNo].template get<Normal>().data()->data();
             rhs.nl = fct[fctNo].template get<NormalLength>().data();
             rhs.w = fctRule.weights().data();
-            rhs.execute();
+            if (info.inside[0]) {
+                rhs.d_xi(0) = d_xi[info.localNo[0]].data();
+                rhs.e(0) = e[info.localNo[0]].data();
+                rhs.g(0) = fct[fctNo].template get<JInv>().data()->data();
+                rhs.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
+                rhs.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
+                rhs.execute();
 
-            PetscInt ib = info.g_up[0];
-            VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+                PetscInt ib = info.g_up[0];
+                VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+            }
+            if (info.inside[1] && info.up[0] != info.up[1]) {
+                rhs.c20 *= -1.0;
+                rhs.d_xi(0) = d_xi[info.localNo[1]].data();
+                rhs.e(0) = e[info.localNo[1]].data();
+                rhs.g(0) = fct[fctNo].template get<JInvOther>().data()->data();
+                rhs.lam_w(0) = userFctPre[fctNo].template get<lam_w_1>().data();
+                rhs.mu_w(0) = userFctPre[fctNo].template get<mu_w_1>().data();
+                rhs.execute();
+
+                PetscInt ib = info.g_up[1];
+                VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+            }
         }
     }
 

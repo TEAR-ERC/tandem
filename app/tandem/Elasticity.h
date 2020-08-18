@@ -34,7 +34,8 @@ public:
     PetscErrorCode createAShell(Mat* A);
 
     PetscErrorCode assemble(Mat mat);
-    PetscErrorCode rhs(Vec B, vector_functional_t forceFun, vector_functional_t dirichletFun);
+    PetscErrorCode rhs(Vec B, vector_functional_t forceFun, vector_functional_t dirichletFun,
+                       vector_functional_t slipFun);
 
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
