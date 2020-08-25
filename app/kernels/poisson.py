@@ -2,7 +2,7 @@
 
 from yateto import *
 
-def add(generator, dim, Nbf, nq, Nq):
+def add(generator, dim, nbf, Nbf, nq, Nq):
     J = Tensor('J', (Nq,))
     G = Tensor('G', (dim, dim, Nq))
     K = Tensor('K', (Nbf,))

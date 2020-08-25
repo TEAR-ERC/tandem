@@ -25,7 +25,8 @@ Elasticity::Elasticity(LocalSimplexMesh<DomainDimension> const& mesh,
                        unsigned minQuadOrder, MPI_Comm comm, functional_t const& lambdaFun,
                        functional_t const& muFun)
     : DG(mesh, cl, std::move(refElement), minQuadOrder, comm),
-      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
+      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
+      facetRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()) {
 
     int rank;
     MPI_Comm_rank(comm, &rank);
@@ -39,6 +40,9 @@ Elasticity::Elasticity(LocalSimplexMesh<DomainDimension> const& mesh,
 
     userFctPre.setStorage(std::make_shared<user_fct_pre_t>(numLocalFacets() * fctRule.size()), 0u,
                           numLocalFacets(), fctRule.size());
+
+    minv = facetRefElement_.inverseMassMatrix();
+    enodal = facetRefElement_.evaluateBasisAt(fctRule.points(), {1, 0});
 
     auto Ematerial = nodalRefElement_.evaluateBasisAt(volRule.points(), {1, 0});
     std::vector<Managed<Matrix<double>>> ematerial;
@@ -105,19 +109,19 @@ Elasticity::Elasticity(LocalSimplexMesh<DomainDimension> const& mesh,
     }
 }
 
-PetscErrorCode Elasticity::createAShell(Mat* A) {
+PetscErrorCode Elasticity::createAShell(Mat* A) const {
     PetscInt blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
     PetscInt localRows = numLocalElements() * blockSize;
     PetscInt localCols = numLocalElements() * blockSize;
-    CHKERRQ(
-        MatCreateShell(comm(), localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE, this, A));
+    CHKERRQ(MatCreateShell(comm(), localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE,
+                           const_cast<tndm::Elasticity*>(this), A));
     CHKERRQ(MatShellSetOperation(*A, MATOP_MULT, (void (*)(void))Elasticity::ApplyDGOperator));
     CHKERRQ(MatSetOption(*A, MAT_ROW_ORIENTED, PETSC_FALSE));
     CHKERRQ(MatSetOption(*A, MAT_SYMMETRIC, PETSC_TRUE));
     return 0;
 }
 
-PetscErrorCode Elasticity::assemble(Mat mat) {
+PetscErrorCode Elasticity::assemble(Mat mat) const {
     double A[tensor::A::size()];
     double D_x[tensor::D_x::size()];
 
@@ -234,7 +238,7 @@ PetscErrorCode Elasticity::assemble(Mat mat) {
     return 0;
 }
 
-void Elasticity::apply(double const* U, double* Unew) {
+void Elasticity::apply(double const* U, double* Unew) const {
     double D_x[tensor::D_x::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
@@ -337,7 +341,8 @@ void Elasticity::apply(double const* U, double* Unew) {
 }
 
 PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
-                               vector_functional_t dirichletFun, vector_functional_t slipFun) {
+                               vector_functional_t dirichletFun,
+                               vector_functional_t slipFun) const {
     PetscErrorCode ierr;
 
     double b[tensor::b::size()];
@@ -444,6 +449,45 @@ FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) 
     }
     VecRestoreArrayRead(x, &values);
     return numeric;
+}
+
+TensorBase<Matrix<double>> Elasticity::tractionResultInfo() const {
+    return TensorBase<Matrix<double>>(tensor::traction_avg_proj::Shape[0],
+                                      tensor::traction_avg_proj::Shape[1]);
+}
+
+void Elasticity::traction(std::size_t fctNo, double const* U, Matrix<double>& result) const {
+    double d_x0[tensor::d_x::size(0)];
+    double d_x1[tensor::d_x::size(1)];
+    double traction_avg[tensor::traction_avg::size()];
+
+    auto blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
+    auto const& info = fctInfo[fctNo];
+    kernel::d_x dxKrnl;
+    dxKrnl.d_x(0) = d_x0;
+    dxKrnl.d_x(1) = d_x1;
+    dxKrnl.d_xi(0) = d_xi[info.localNo[0]].data();
+    dxKrnl.d_xi(1) = d_xi[info.localNo[1]].data();
+    dxKrnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
+    dxKrnl.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
+    dxKrnl.execute(0);
+    dxKrnl.execute(1);
+
+    kernel::traction_avg_proj krnl;
+    krnl.d_x(0) = d_x0;
+    krnl.d_x(1) = d_x1;
+    krnl.enodal = enodal.data();
+    krnl.lam_w(0) = userFctPre[fctNo].template get<lam_w_0>().data();
+    krnl.lam_w(1) = userFctPre[fctNo].template get<lam_w_1>().data();
+    krnl.minv = minv.data();
+    krnl.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
+    krnl.mu_w(1) = userFctPre[fctNo].template get<mu_w_1>().data();
+    krnl.n = fct[fctNo].template get<Normal>().data()->data();
+    krnl.traction_avg = traction_avg;
+    krnl.traction_avg_proj = result.data();
+    krnl.u(0) = U + info.up[0] * blockSize;
+    krnl.u(1) = U + info.up[1] * blockSize;
+    krnl.execute();
 }
 
 } // namespace tndm

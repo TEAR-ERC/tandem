@@ -16,7 +16,9 @@ public:
     SimplexQuadratureRule(unsigned n, int order) : points_(n), weights_(n), order_(order) {}
 
     std::vector<std::array<double, D>>& points() { return points_; }
+    std::vector<std::array<double, D>> const& points() const { return points_; }
     std::vector<double>& weights() { return weights_; }
+    std::vector<double> const& weights() const { return weights_; }
 
     std::size_t size() const { return points_.size(); }
     int order() const { return order_; }

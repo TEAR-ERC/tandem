@@ -31,13 +31,15 @@ with open(cmdLineArgs.options) as j:
 if cmdLineArgs.app == 'poisson':
     poisson.add(g,
             options['dim'],
-            options['numBasisFunctions'],
+            options['numFacetBasisFunctions'],
+            options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
 elif cmdLineArgs.app == 'tandem':
     tandem.add(g,
             options['dim'],
-            options['numBasisFunctions'],
+            options['numFacetBasisFunctions'],
+            options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
 

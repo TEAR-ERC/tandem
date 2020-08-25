@@ -160,8 +160,10 @@ NodalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const&
     return gradE;
 }
 
+template class ModalRefElement<1ul>;
 template class ModalRefElement<2ul>;
 template class ModalRefElement<3ul>;
+template class NodalRefElement<1ul>;
 template class NodalRefElement<2ul>;
 template class NodalRefElement<3ul>;
 

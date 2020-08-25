@@ -25,17 +25,17 @@ public:
                std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                MPI_Comm comm, functional_t const& lambdaFun, functional_t const& muFun);
 
-    InterfacePetsc interfacePetsc() {
+    InterfacePetsc interfacePetsc() const {
         auto blockSize = refElement_->numBasisFunctions() * DomainDimension;
         return InterfacePetsc(blockSize, numLocalElements(), &volInfo[0].get<NumLocalNeighbours>(),
                               &volInfo[0].get<NumGhostNeighbours>(), comm());
     }
 
-    PetscErrorCode createAShell(Mat* A);
+    PetscErrorCode createAShell(Mat* A) const;
 
-    PetscErrorCode assemble(Mat mat);
+    PetscErrorCode assemble(Mat mat) const;
     PetscErrorCode rhs(Vec B, vector_functional_t forceFun, vector_functional_t dirichletFun,
-                       vector_functional_t slipFun);
+                       vector_functional_t slipFun) const;
 
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
@@ -55,10 +55,13 @@ public:
         return 0;
     }
 
-    void apply(double const* U, double* Unew);
+    void apply(double const* U, double* Unew) const;
 
     FiniteElementFunction<DomainDimension> discreteLambda() const { return discreteField<lam>(); }
     FiniteElementFunction<DomainDimension> discreteMu() const { return discreteField<mu>(); }
+
+    TensorBase<Matrix<double>> tractionResultInfo() const;
+    void traction(std::size_t fctNo, double const* U, Matrix<double>& result) const;
 
 private:
     template <typename T> FiniteElementFunction<DomainDimension> discreteField() const {
@@ -103,6 +106,9 @@ private:
     mneme::StridedView<user_fct_pre_t> userFctPre;
 
     NodalRefElement<DomainDimension> nodalRefElement_;
+    NodalRefElement<DomainDimension - 1u> facetRefElement_;
+    Managed<Matrix<double>> minv;
+    Managed<Matrix<double>> enodal;
 
     double penalty(FacetInfo const& info) const {
         auto lambdaMax = [&](std::size_t elNo) {

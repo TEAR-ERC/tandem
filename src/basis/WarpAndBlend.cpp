@@ -1,5 +1,6 @@
 #include "WarpAndBlend.h"
 #include "Functions.h"
+#include "basis/Nodal.h"
 #include "geometry/Affine.h"
 #include "mesh/Simplex.h"
 #include "util/Combinatorics.h"
@@ -32,6 +33,19 @@ double warpAndBlendAlpha(std::size_t D, unsigned degree) {
 
     return (D == 2) ? tabAlpha(alphaOpt2, sizeof(alphaOpt2) / sizeof(double))
                     : tabAlpha(alphaOpt3, sizeof(alphaOpt3) / sizeof(double));
+}
+
+template <>
+std::vector<std::array<double, 1>> WarpAndBlendFactory<1>::operator()(unsigned degree) const {
+    assert(degree > 0);
+
+    unsigned numNodes = degree + 1;
+    std::vector<std::array<double, 1>> result(numNodes);
+    auto gll = LegendreGaussLobattoPoints(numNodes, 0, 0);
+    for (unsigned i = 0; i < numNodes; ++i) {
+        result[i][0] = gll[i];
+    }
+    return result;
 }
 
 template <>

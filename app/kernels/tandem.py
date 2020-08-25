@@ -3,7 +3,7 @@
 from yateto import *
 import numpy as np
 
-def add(generator, dim, Nbf, nq, Nq):
+def add(generator, dim, nbf, Nbf, nq, Nq):
     # volume
 
     J = Tensor('J', (Nq,))
@@ -113,3 +113,12 @@ def add(generator, dim, Nbf, nq, Nq):
             c2[0] * w['q'] * e[0]['kq'] * f['pq'] * nl['q']
     ])
 
+    # traction
+
+    traction_avg_proj = Tensor('traction_avg_proj', (dim, nbf))
+    minv = Tensor('minv', (nbf, nbf))
+    enodal = Tensor('enodal', (nq, nbf))
+    generator.add('traction_avg_proj', [
+        traction_avg['pq'] <= 0.5 * (traction(0) + traction(1)),
+        traction_avg_proj['pk'] <= traction_avg['pq'] * enodal['ql'] * minv['lk']
+    ])

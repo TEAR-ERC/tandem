@@ -2,6 +2,7 @@
 #define GEOMETRY_VECTOR_H
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 
 template <typename RealT, std::size_t D>
