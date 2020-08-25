@@ -23,7 +23,7 @@ template <std::size_t D> struct GenMeshConfig {
     std::array<std::vector<double>, D> intercepts;
     std::array<std::vector<BCConfig<D>>, D> bcs;
 
-    GenMesh<D> create(double resolution, MPI_Comm comm);
+    GenMesh<D> create(double resolution, MPI_Comm comm) const;
     static void setSchema(TableSchema<GenMeshConfig<D>>& schema);
 };
 

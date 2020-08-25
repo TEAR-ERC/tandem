@@ -2,7 +2,8 @@
 
 namespace tndm {
 
-template <std::size_t D> GenMesh<D> GenMeshConfig<D>::create(double resolution, MPI_Comm comm) {
+template <std::size_t D>
+GenMesh<D> GenMeshConfig<D>::create(double resolution, MPI_Comm comm) const {
     std::array<double, D> h;
     h.fill(resolution);
     std::array<typename GenMesh<D>::bc_fun_t, D> BCs;

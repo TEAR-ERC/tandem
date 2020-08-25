@@ -123,6 +123,7 @@ generate_code(tandem)
 
 add_executable(tandem
     tandem/Elasticity.cpp
+    tandem/Static.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE
     app-common
