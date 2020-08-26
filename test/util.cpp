@@ -1,17 +1,21 @@
 #include "doctest.h"
 #include "util/Combinatorics.h"
+#include "util/Zero.h"
+
+#include <cmath>
 
 using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::Choose;
+using tndm::zeroIn;
 
 TEST_CASE("Combinatorics") {
     SUBCASE("binom") {
-        CHECK(binom(4,3) == 4);
-        CHECK(binom(4,1) == 4);
-        CHECK(binom(4,0) == 1);
-        CHECK(binom(4,4) == 1);
-        CHECK(binom(4,2) == 6);
+        CHECK(binom(4, 3) == 4);
+        CHECK(binom(4, 1) == 4);
+        CHECK(binom(4, 0) == 1);
+        CHECK(binom(4, 4) == 1);
+        CHECK(binom(4, 2) == 6);
     }
 
     SUBCASE("Choose 0") {
@@ -128,4 +132,18 @@ TEST_CASE("Combinatorics") {
         }
         CHECK(it == sums.end());
     }
+}
+
+TEST_CASE("Root finding") {
+    auto F1 = [](double x) { return x * (x * x - 2.0) - 5.0; };
+    CHECK(zeroIn(2.0, 3.0, F1) == doctest::Approx(2.0945514815));
+
+    auto F2 = [](double x) { return 1.0 / (x - 3.0) - 6.0; };
+    CHECK(zeroIn(3.0, 4.0, F2) == doctest::Approx(3.0 + 1.0 / 6.0));
+
+    auto F3 = [](double x) { return x; };
+    CHECK(zeroIn(-1.0, 0.0, F3) == 0.0);
+
+    auto F4 = [](double x) { return 1.0 - std::asinh(x) - x; };
+    CHECK(zeroIn(-1.0, 1.0, F4) == doctest::Approx(0.50992693151945222578));
 }

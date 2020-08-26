@@ -35,6 +35,7 @@ add_library(tandem-lib
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
     script/LuaLib.cpp
+    util/Zero.cpp
 )
 
 find_package(Lua REQUIRED)
