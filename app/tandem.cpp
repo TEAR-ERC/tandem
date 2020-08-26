@@ -1,5 +1,6 @@
 #include "common/CmdLine.h"
 #include "tandem/Config.h"
+#include "tandem/SEAS.h"
 #include "tandem/Static.h"
 
 #include "util/Schema.h"
@@ -33,7 +34,13 @@ int main(int argc, char** argv) {
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative resolution parameter");
+    schema.add_value("final_time", &Config::final_time)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Non-negative final time of simulation");
     schema.add_value("output", &Config::output).help("Output file name");
+    schema.add_value("output_interval", &Config::output_interval)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Non-negative output interval");
     auto& problemSchema = schema.add_table("problem", &Config::problem);
     problemSchema.add_value("lib", &ProblemConfig::lib)
         .converter([&program](std::string_view path) {
@@ -60,7 +67,8 @@ int main(int argc, char** argv) {
     PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
-    solveStaticProblem(*cfg);
+    // solveStaticProblem(*cfg);
+    solveSEASProblem(*cfg);
 
     ierr = PetscFinalize();
 

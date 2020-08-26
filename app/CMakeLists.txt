@@ -122,7 +122,10 @@ target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_C
 generate_code(tandem)
 
 add_executable(tandem
+    tandem/BP1.cpp
     tandem/Elasticity.cpp
+    tandem/Fault.cpp
+    tandem/SEAS.cpp
     tandem/Static.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE

@@ -20,6 +20,8 @@ public:
     using functional_t = std::function<double(std::array<double, DomainDimension> const&)>;
     using vector_functional_t = std::function<std::array<double, DomainDimension>(
         std::array<double, DomainDimension> const&)>;
+    using volume_functional_t = std::function<void(std::size_t elNo, double* F)>;
+    using facet_functional_t = std::function<void(std::size_t fctNo, double* f)>;
 
     Elasticity(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
                std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
@@ -34,8 +36,16 @@ public:
     PetscErrorCode createAShell(Mat* A) const;
 
     PetscErrorCode assemble(Mat mat) const;
+    PetscErrorCode rhs(Vec B, volume_functional_t forceFun, facet_functional_t dirichletFun,
+                       facet_functional_t slipFun) const;
     PetscErrorCode rhs(Vec B, vector_functional_t forceFun, vector_functional_t dirichletFun,
-                       vector_functional_t slipFun) const;
+                       vector_functional_t slipFun) const {
+        return rhs(B, makeVolumeFunctional(forceFun), makeFacetFunctional(dirichletFun),
+                   makeFacetFunctional(slipFun));
+    }
+
+    volume_functional_t makeVolumeFunctional(vector_functional_t fun) const;
+    facet_functional_t makeFacetFunctional(vector_functional_t fun) const;
 
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
@@ -60,7 +70,6 @@ public:
     FiniteElementFunction<DomainDimension> discreteLambda() const { return discreteField<lam>(); }
     FiniteElementFunction<DomainDimension> discreteMu() const { return discreteField<mu>(); }
 
-    TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction(std::size_t fctNo, double const* U, Matrix<double>& result) const;
 
 private:

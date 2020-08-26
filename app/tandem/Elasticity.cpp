@@ -340,22 +340,14 @@ void Elasticity::apply(double const* U, double* Unew) const {
     }
 }
 
-PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
-                               vector_functional_t dirichletFun,
-                               vector_functional_t slipFun) const {
+PetscErrorCode Elasticity::rhs(Vec B, volume_functional_t forceFun, facet_functional_t dirichletFun,
+                               facet_functional_t slipFun) const {
     PetscErrorCode ierr;
 
     double b[tensor::b::size()];
     double F[tensor::F::size()];
-    auto Fview = init::F::view::create(F);
     for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-        auto coords = vol[elNo].template get<Coords>();
-        for (unsigned q = 0; q < tensor::F::Shape[1]; ++q) {
-            auto f = forceFun(coords[q]);
-            for (unsigned p = 0; p < tensor::F::Shape[0]; ++p) {
-                Fview(p, q) = f[p];
-            }
-        }
+        forceFun(elNo, F);
 
         kernel::rhsVolume rhs;
         rhs.E = E.data();
@@ -371,26 +363,13 @@ PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
 
     double f[tensor::f::size()];
     double d_x[tensor::d_x::size(0)];
-    auto fview = init::f::view::create(f);
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
         if (info.bc == BC::Fault || info.bc == BC::Dirichlet) {
-            vector_functional_t& fun = (info.bc == BC::Fault) ? slipFun : dirichletFun;
-            auto coords = fct[fctNo].template get<Coords>();
-            for (unsigned q = 0; q < tensor::f::Shape[1]; ++q) {
-                auto f = fun(coords[q]);
-                for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
-                    fview(p, q) = f[p];
-                }
-                // \todo Make side detection configurable
-                auto n = fct[fctNo].template get<Normal>()[q];
-                if (info.bc == BC::Fault && n[0] < 0.0) {
-                    for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
-                        fview(p, q) *= -1.0;
-                    }
-                }
-            }
+            facet_functional_t& fun = (info.bc == BC::Fault) ? slipFun : dirichletFun;
+            fun(fctNo, f);
+
             double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
             kernel::rhsFacet rhs;
             rhs.b = b;
@@ -432,6 +411,40 @@ PetscErrorCode Elasticity::rhs(Vec B, vector_functional_t forceFun,
     return 0;
 }
 
+auto Elasticity::makeVolumeFunctional(vector_functional_t fun) const -> volume_functional_t {
+    return [fun, this](std::size_t elNo, double* F) {
+        auto Fview = init::F::view::create(F);
+        auto coords = this->vol[elNo].template get<Coords>();
+        for (unsigned q = 0; q < tensor::F::Shape[1]; ++q) {
+            auto fx = fun(coords[q]);
+            for (unsigned p = 0; p < tensor::F::Shape[0]; ++p) {
+                Fview(p, q) = fx[p];
+            }
+        }
+    };
+}
+
+auto Elasticity::makeFacetFunctional(vector_functional_t fun) const -> facet_functional_t {
+    return [fun, this](std::size_t fctNo, double* f) {
+        auto coords = this->fct[fctNo].template get<Coords>();
+        auto const& info = this->fctInfo[fctNo];
+        auto fview = init::f::view::create(f);
+        for (unsigned q = 0; q < tensor::f::Shape[1]; ++q) {
+            auto fx = fun(coords[q]);
+            for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
+                fview(p, q) = fx[p];
+            }
+            // \todo Make side detection configurable
+            auto n = this->fct[fctNo].template get<Normal>()[q];
+            if (info.bc == BC::Fault && n[0] < 0.0) {
+                for (unsigned p = 0; p < tensor::f::Shape[0]; ++p) {
+                    fview(p, q) *= -1.0;
+                }
+            }
+        }
+    };
+}
+
 FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) const {
     auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::U::Shape[0],
                                                           tensor::U::Shape[1], numLocalElements());
@@ -451,12 +464,9 @@ FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) 
     return numeric;
 }
 
-TensorBase<Matrix<double>> Elasticity::tractionResultInfo() const {
-    return TensorBase<Matrix<double>>(tensor::traction_avg_proj::Shape[0],
-                                      tensor::traction_avg_proj::Shape[1]);
-}
-
 void Elasticity::traction(std::size_t fctNo, double const* U, Matrix<double>& result) const {
+    assert(result.size() == tensor::traction_avg_proj::size());
+
     double d_x0[tensor::d_x::size(0)];
     double d_x1[tensor::d_x::size(1)];
     double traction_avg[tensor::traction_avg::size()];

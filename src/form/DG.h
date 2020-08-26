@@ -29,6 +29,8 @@ public:
     std::size_t numLocalFacets() const { return numLocalFacets_; }
 
     RefElement<D> const& refElement() const { return *refElement_; }
+    auto const& facetRule() const { return fctRule; }
+    auto const& volumeRule() const { return volRule; }
 
     MPI_Comm comm() const { return comm_; }
 
