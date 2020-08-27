@@ -453,7 +453,6 @@ FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) 
     auto& data = numeric.values();
     auto blockSize = tensor::U::Shape[0] * tensor::U::Shape[1];
     for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-        auto coords = vol[elNo].template get<Coords>();
         for (std::size_t p = 0; p < tensor::U::Shape[1]; ++p) {
             for (std::size_t dof = 0; dof < tensor::U::Shape[0]; ++dof) {
                 data(dof, p, elNo) = values[dof + p * tensor::U::Shape[0] + elNo * blockSize];
@@ -464,7 +463,8 @@ FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) 
     return numeric;
 }
 
-void Elasticity::traction(std::size_t fctNo, double const* U, Matrix<double>& result) const {
+void Elasticity::traction(std::size_t fctNo, double const* Rnodal, double const* U,
+                          Matrix<double>& result) const {
     assert(result.size() == tensor::traction_avg_proj::size());
 
     double d_x0[tensor::d_x::size(0)];
@@ -493,6 +493,7 @@ void Elasticity::traction(std::size_t fctNo, double const* U, Matrix<double>& re
     krnl.mu_w(0) = userFctPre[fctNo].template get<mu_w_0>().data();
     krnl.mu_w(1) = userFctPre[fctNo].template get<mu_w_1>().data();
     krnl.n = fct[fctNo].template get<Normal>().data()->data();
+    krnl.Rnodal = Rnodal;
     krnl.traction_avg = traction_avg;
     krnl.traction_avg_proj = result.data();
     krnl.u(0) = U + info.up[0] * blockSize;

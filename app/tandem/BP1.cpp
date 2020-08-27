@@ -4,12 +4,11 @@
 
 #include <cassert>
 #include <cmath>
-#include <iostream>
 
 namespace tndm {
 
 void BP1::setX(point_t x) {
-    double const z = x[1];
+    double const z = -x[1];
     if (z < H_) {
         a_ = a0_;
     } else if (z < H_ + h_) {

@@ -41,6 +41,7 @@ public:
     std::size_t numElements() const { return data_.shape(2); }
 
     auto& values() { return data_; }
+    auto const& values() const { return data_; }
 
 private:
     std::unique_ptr<RefElement<D>> refElement_;

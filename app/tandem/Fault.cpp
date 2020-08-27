@@ -36,22 +36,50 @@ Fault::Fault(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDi
     info_.setStorage(std::make_shared<info_t>(fctNos_.size() * nbf), 0u, fctNos_.size(), nbf);
 
     std::vector<Managed<Matrix<double>>> fctE;
+    std::vector<Managed<Tensor<double, 3u>>> fctGradE;
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        fctE.emplace_back(cl.evaluateBasisAt(cl.facetParam(f, refElement_.refNodes())));
+        auto facetParam = cl.facetParam(f, refElement_.refNodes());
+        fctE.emplace_back(cl.evaluateBasisAt(facetParam));
+        fctGradE.emplace_back(cl.evaluateGradientAt(facetParam));
     }
 
-#pragma omp parallel for
-    for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
-        auto fctNo = fctNos_[faultNo];
-        auto elNos = mesh.template upward<DomainDimension - 1u>(fctNo);
-        assert(elNos.size() >= 1u && elNos.size() <= 2u);
-        auto dws = mesh.template downward<DomainDimension - 1u, DomainDimension>(elNos[0]);
-        auto localFctNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
-        assert(localFctNo < DomainDimension + 1u);
+    sign_.resize(fctNos_.size(), 1.0);
+    elNos_.resize(fctNos_.size(), std::numeric_limits<std::size_t>::max());
+    localFaceNos_.resize(fctNos_.size(), std::numeric_limits<std::size_t>::max());
+#pragma omp parallel
+    {
 
-        auto coords =
-            Tensor(info_[faultNo].template get<Coords>().data()->data(), cl.mapResultInfo(nbf));
-        cl.map(elNos[0], fctE[localFctNo], coords);
+        auto J = Managed(cl.jacobianResultInfo(nbf));
+        auto jInv = Managed(cl.jacobianResultInfo(nbf));
+        auto normal = Managed(cl.normalResultInfo(nbf));
+        auto detJ = Managed(cl.detJResultInfo(nbf));
+#pragma omp for
+        for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
+            auto fctNo = fctNos_[faultNo];
+            auto elNos = mesh.template upward<DomainDimension - 1u>(fctNo);
+            assert(elNos.size() >= 1u && elNos.size() <= 2u);
+            auto dws = mesh.template downward<DomainDimension - 1u, DomainDimension>(elNos[0]);
+            auto localFaceNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
+            assert(localFaceNo < DomainDimension + 1u);
+
+            elNos_[faultNo] = elNos[0];
+            localFaceNos_[faultNo] = localFaceNo;
+
+            auto coords =
+                Tensor(info_[faultNo].template get<Coords>().data()->data(), cl.mapResultInfo(nbf));
+            cl.map(elNos[0], fctE[localFaceNo], coords);
+
+            auto R = Tensor<double, 3u>(info_[faultNo].template get<Rnodal>().data()->data(),
+                                        DomainDimension, DomainDimension, nbf);
+            cl.jacobian(elNos[0], fctGradE[localFaceNo], J);
+            cl.detJ(elNos[0], J, detJ);
+            cl.jacobianInv(J, jInv);
+            cl.normal(localFaceNo, detJ, jInv, normal);
+            if (normal(0, 0) < 0.0) {
+                sign_[faultNo] = -1.0;
+            }
+            cl.facetBasis(localFaceNo, J, normal, R);
+        }
     }
 }
 
@@ -61,65 +89,73 @@ PetscErrorCode Fault::createState(Vec* state) const {
     CHKERRQ(VecCreate(comm_, state));
     CHKERRQ(VecSetSizes(*state, localRows, PETSC_DECIDE));
     CHKERRQ(VecSetFromOptions(*state));
-    CHKERRQ(VecSetBlockSize(*state, blockSize_));
     return 0;
 }
 
-PetscErrorCode Fault::initial(Vec psi) const {
+PetscErrorCode Fault::initial(Vec state) const {
     BP1 bp1;
 
+    PetscScalar* Xraw;
+    VecGetArray(state, &Xraw);
+    auto X = tensor(Xraw);
     std::size_t nbf = refElement_.numBasisFunctions();
     for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
         auto coords = info_[faultNo].get<Coords>();
         for (std::size_t node = 0; node < nbf; ++node) {
             bp1.setX(coords[node]);
-            PetscInt row = node + 2 * faultNo * nbf;
-            VecSetValue(psi, row, bp1.psi0(), INSERT_VALUES);
-            VecSetValue(psi, row + nbf, 0.0, INSERT_VALUES);
+            X(node, 0, faultNo) = bp1.psi0();
+            X(node, 1, faultNo) = 0.0;
         }
     }
-    CHKERRQ(VecAssemblyBegin(psi));
-    CHKERRQ(VecAssemblyEnd(psi));
+    VecRestoreArray(state, &Xraw);
+    CHKERRQ(VecAssemblyBegin(state));
+    CHKERRQ(VecAssemblyEnd(state));
     return 0;
 }
 
 void Fault::rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const {
-    PetscScalar const* X;
+    PetscScalar const* Xraw;
     PetscScalar const* U;
-    PetscScalar* F;
-    VecGetArrayRead(x, &X);
+    PetscScalar* Fraw;
+    VecGetArrayRead(x, &Xraw);
     VecGetArrayRead(u, &U);
-    VecGetArray(f, &F);
+    VecGetArray(f, &Fraw);
+
+    auto X = tensor(Xraw);
+    auto F = tensor(Fraw);
 
     std::size_t nbf = refElement_.numBasisFunctions();
 #pragma omp parallel
     {
         BP1 bp1;
-        double traction[tensor::traction_avg_proj::size()];
-        auto tau = Matrix<double>(traction, tensor::traction_avg_proj::Shape[0],
-                                  tensor::traction_avg_proj::Shape[1]);
+        double tractionBuf[tensor::traction_avg_proj::size()];
+        auto traction = Matrix<double>(tractionBuf, tensor::traction_avg_proj::Shape[0],
+                                       tensor::traction_avg_proj::Shape[1]);
 #pragma omp for
         for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
             auto coords = info_[faultNo].get<Coords>();
-            elasticity.traction(fctNos_[faultNo], U, tau);
+            double const* R = info_[faultNo].get<Rnodal>().data()->data();
+            elasticity.traction(fctNos_[faultNo], R, U, traction);
             for (std::size_t node = 0; node < nbf; ++node) {
                 bp1.setX(coords[node]);
                 PetscInt row = node + 2 * faultNo * nbf;
                 if (coords[node][1] <= -40000.0) {
-                    F[row] = 0.0;
-                    F[row + nbf] = 1e-9;
+                    F(node, 0, faultNo) = 0.0;
+                    F(node, 1, faultNo) = 1e-9;
                 } else {
-                    double V = bp1.computeSlipRate(tau(1, node), X[row]);
-                    F[row] = bp1.G(tau(1, node), V, X[row]);
-                    F[row + nbf] = V;
+                    double tau = std::copysign(traction(1, node), sign_[faultNo]);
+                    double psi = X(node, 0, faultNo);
+                    double V = bp1.computeSlipRate(tau, psi);
+                    F(node, 0, faultNo) = bp1.G(tau, V, psi);
+                    F(node, 1, faultNo) = V;
                 }
             }
         }
     }
 
-    VecRestoreArray(f, &F);
+    VecRestoreArray(f, &Fraw);
     VecRestoreArrayRead(u, &U);
-    VecRestoreArrayRead(x, &X);
+    VecRestoreArrayRead(x, &Xraw);
     VecAssemblyBegin(f);
     VecAssemblyEnd(f);
 }
@@ -127,21 +163,24 @@ void Fault::rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const {
 auto Fault::slip(Vec x) const -> facet_functional_t {
     std::size_t nbf = refElement_.numBasisFunctions();
     return [this, nbf, x](std::size_t fctNo, double* f) {
-        double const* X;
-        VecGetArrayRead(x, &X);
+        double const* Xraw;
+        VecGetArrayRead(x, &Xraw);
+        auto X = tensor(Xraw);
         auto faultNo = this->faultNos_[fctNo];
         double g[tensor::slip_proj::size()];
         auto gview = init::slip_proj::view::create(g);
         for (std::size_t i = 0; i < nbf; ++i) {
             gview(0, i) = 0.0;
-            gview(1, i) = X[i + nbf + 2 * faultNo * nbf];
+            gview(1, i) = std::copysign(X(i, 1, faultNo), this->sign_[faultNo]);
         }
-        VecRestoreArrayRead(x, &X);
+        VecRestoreArrayRead(x, &Xraw);
 
+        double const* R = info_[faultNo].get<Rnodal>().data()->data();
         kernel::evaluate_slip krnl;
         krnl.slip_proj = g;
         krnl.enodalT = this->enodalT.data();
         krnl.f = f;
+        krnl.Rnodal = R;
         krnl.execute();
     };
 }

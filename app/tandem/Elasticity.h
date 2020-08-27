@@ -70,7 +70,8 @@ public:
     FiniteElementFunction<DomainDimension> discreteLambda() const { return discreteField<lam>(); }
     FiniteElementFunction<DomainDimension> discreteMu() const { return discreteField<mu>(); }
 
-    void traction(std::size_t fctNo, double const* U, Matrix<double>& result) const;
+    void traction(std::size_t fctNo, double const* Rnodal, double const* U,
+                  Matrix<double>& result) const;
 
 private:
     template <typename T> FiniteElementFunction<DomainDimension> discreteField() const {

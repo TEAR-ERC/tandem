@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <ostream>
 #include <sstream>
 
 using tinyxml2::XMLAttribute;
@@ -19,7 +20,12 @@ using tinyxml2::XMLPrinter;
 namespace tndm {
 
 template <std::size_t D> int32_t VTUWriter<D>::VTKType(bool linear) {
-    if constexpr (D == 2u) {
+    if constexpr (D == 1u) {
+        if (linear) {
+            return 3; // VTK_LINE
+        }
+        return 68; // VTK_LAGRANGE_CURVE
+    } else if constexpr (D == 2u) {
         if (linear) {
             return 5; // VTK_TRIANGLE
         }
@@ -33,31 +39,30 @@ template <std::size_t D> int32_t VTUWriter<D>::VTKType(bool linear) {
     return 0; // VTK_EMPTY_CELL
 };
 
-template <std::size_t D>
-VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl, Range<std::size_t> elementRange) {
-    assert(elementRange.from <= cl.numElements() && elementRange.to <= cl.numElements());
-
+template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapter) {
     auto pointsPerElement = refNodes_.size();
 
+    std::size_t numElements = adapter.numElements();
+    std::size_t pointDim = adapter.pointDim();
+    adapter.setRefNodes(refNodes_);
     auto piece = doc_.RootElement()->InsertNewChildElement("Piece");
-    piece->SetAttribute("NumberOfPoints", pointsPerElement * elementRange.size());
-    piece->SetAttribute("NumberOfCells", elementRange.size());
+    piece->SetAttribute("NumberOfPoints", pointsPerElement * numElements);
+    piece->SetAttribute("NumberOfCells", numElements);
     {
         auto points = piece->InsertNewChildElement("Points");
-        auto E = cl.evaluateBasisAt(refNodes_);
-        auto vertices = std::vector<double>(elementRange.size() * pointsPerElement * PointDim);
-        for (std::size_t elNo = elementRange.from; elNo < elementRange.to; ++elNo) {
-            auto firstVertex = &vertices[(elNo - elementRange.from) * pointsPerElement * PointDim];
-            auto result = Matrix<double>(firstVertex, D, pointsPerElement);
-            cl.map(elNo, E, result);
+        auto vertices = std::vector<double>(numElements * pointsPerElement * PointDim);
+        for (std::size_t elNo = 0; elNo < numElements; ++elNo) {
+            auto firstVertex = &vertices[elNo * pointsPerElement * PointDim];
+            auto result = Matrix<double>(firstVertex, pointDim, pointsPerElement);
+            adapter.map(elNo, result);
             // Points must be 3d in VTK. Therefore, we set z = 0 for D = 2.
-            if constexpr (D < PointDim) {
+            if (pointDim < PointDim) {
                 for (std::ptrdiff_t i = pointsPerElement - 1; i >= 0; --i) {
-                    for (std::ptrdiff_t d = PointDim - 1; d >= D; --d) {
+                    for (std::ptrdiff_t d = PointDim - 1; d >= pointDim; --d) {
                         firstVertex[d + i * PointDim] = 0.0;
                     }
-                    for (std::ptrdiff_t d = D - 1; d >= 0; --d) {
-                        firstVertex[d + i * PointDim] = firstVertex[d + i * D];
+                    for (std::ptrdiff_t d = pointDim - 1; d >= 0; --d) {
+                        firstVertex[d + i * PointDim] = firstVertex[d + i * pointDim];
                     }
                 }
             }
@@ -67,24 +72,24 @@ VTUPiece<D> VTUWriter<D>::addPiece(Curvilinear<D>& cl, Range<std::size_t> elemen
 
     auto cells = piece->InsertNewChildElement("Cells");
     {
-        auto connectivity = std::vector<int32_t>(elementRange.size() * pointsPerElement);
+        auto connectivity = std::vector<int32_t>(numElements * pointsPerElement);
         std::iota(connectivity.begin(), connectivity.end(), 0);
         addDataArray(cells, "connectivity", 1, connectivity);
 
-        auto offsets = std::vector<int32_t>(elementRange.size());
+        auto offsets = std::vector<int32_t>(numElements);
         std::generate(offsets.begin(), offsets.end(),
                       [&pointsPerElement, n = 1]() mutable { return pointsPerElement * n++; });
         addDataArray(cells, "offsets", 1, offsets);
 
         auto vtkType = VTKType(refNodes_.size() == (D + 1ul));
-        auto types = std::vector<uint8_t>(elementRange.size(), vtkType);
+        auto types = std::vector<uint8_t>(numElements, vtkType);
         addDataArray(cells, "types", 1, types);
     }
 
     auto vtupiece = VTUPiece<D>(piece, *this);
     int rank;
     MPI_Comm_rank(comm_, &rank);
-    auto partition = std::vector<int32_t>(elementRange.size(), rank);
+    auto partition = std::vector<int32_t>(numElements, rank);
     vtupiece.addCellData("partition", partition);
     return vtupiece;
 }
@@ -220,8 +225,10 @@ bool ParallelVTUVisitor::VisitExit(tinyxml2::XMLElement const& element) {
     return true;
 }
 
+template class VTUPiece<1u>;
 template class VTUPiece<2u>;
 template class VTUPiece<3u>;
+template class VTUWriter<1u>;
 template class VTUWriter<2u>;
 template class VTUWriter<3u>;
 

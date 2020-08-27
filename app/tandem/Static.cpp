@@ -95,7 +95,8 @@ PetscErrorCode solveStaticProblem(Config const& cfg) {
 
     if (cfg.output) {
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto piece = writer.addPiece(cl, elasticity.numLocalElements());
+        auto adapter = CurvilinearVTUAdapter(cl, elasticity.numLocalElements());
+        auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
         piece.addPointData("lam", elasticity.discreteLambda());
         piece.addPointData("mu", elasticity.discreteMu());

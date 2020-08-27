@@ -6,6 +6,7 @@
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
 #include "mesh/MeshData.h"
@@ -179,7 +180,8 @@ int main(int argc, char** argv) {
 
     if (cfg->output) {
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto piece = writer.addPiece(cl, poisson.numLocalElements());
+        auto adapter = CurvilinearVTUAdapter(cl, poisson.numLocalElements());
+        auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
         piece.addPointData("K", poisson.discreteK());
         writer.write(*cfg->output);

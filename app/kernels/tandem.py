@@ -120,9 +120,10 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     minv = Tensor('minv', (nbf, nbf))
     enodal = Tensor('enodal', (nq, nbf))
     enodalT = Tensor('enodalT', (nbf, nq))
+    Rnodal = Tensor('Rnodal', (dim, dim, nbf))
     generator.add('traction_avg_proj', [
         traction_avg['pq'] <= 0.5 * (traction(0) + traction(1)),
-        traction_avg_proj['pk'] <= traction_avg['pq'] * enodal['ql'] * minv['lk']
+        traction_avg_proj['pk'] <= Rnodal['rpk'] * traction_avg['rq'] * enodal['ql'] * minv['lk']
     ])
 
-    generator.add('evaluate_slip', f['pq'] <= slip_proj['pl'] * enodalT['lq'])
+    generator.add('evaluate_slip', f['pq'] <= Rnodal['prl'] * slip_proj['rl'] * enodalT['lq'])

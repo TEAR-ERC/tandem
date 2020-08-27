@@ -5,7 +5,7 @@
 #include "basis/Equidistant.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
-#include "geometry/Curvilinear.h"
+#include "io/VTUAdapter.h"
 #include "tensor/Tensor.h"
 #include "util/Range.h"
 
@@ -35,7 +35,7 @@ public:
         doc_.InsertFirstChild(grid);
     }
 
-    VTUPiece<D> addPiece(Curvilinear<D>& cl, Range<std::size_t> elementRange);
+    VTUPiece<D> addPiece(VTUAdapter<D>& adapter);
 
     /**
      * @brief Write VTU to disk.

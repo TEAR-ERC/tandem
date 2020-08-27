@@ -30,6 +30,7 @@ void FiniteElementFunction<D>::map(std::size_t eleNo, Matrix<double> const& eval
     EigenMap(result) = EigenMap(evalMatrix) * EigenMap(mat);
 }
 
+template class FiniteElementFunction<1ul>;
 template class FiniteElementFunction<2ul>;
 template class FiniteElementFunction<3ul>;
 
