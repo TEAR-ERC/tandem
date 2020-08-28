@@ -48,6 +48,25 @@ public:
 
     std::vector<std::array<double, D>> const& refNodes() const { return refNodes_; }
 
+    /**
+     * @brief Adds field data with name "name" to VTU file.
+     */
+    template <typename T>
+    void addFieldData(std::string const& name, T const* data, std::size_t numElements) {
+        auto cdata = doc_.RootElement()->LastChildElement("FieldData");
+        if (!cdata) {
+            cdata = doc_.RootElement()->InsertNewChildElement("FieldData");
+        }
+        auto da = addDataArray<T>(cdata, name, 1, data, numElements);
+        da->SetAttribute("NumberOfTuples", 1);
+    }
+    /**
+     * @brief Wrapper for addFieldData(std::string const&, double const*, std::size_t)
+     */
+    template <typename T> void addFieldData(std::string const& name, std::vector<T> const& data) {
+        addFieldData(name, data.data(), data.size());
+    }
+
 private:
     friend class VTUPiece<D>;
 

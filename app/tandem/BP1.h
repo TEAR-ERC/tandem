@@ -34,12 +34,8 @@ private:
     constexpr static double Vinit_ = 1.0e-9;
     constexpr static double L_ = 0.008;
     constexpr static double f0_ = 0.6;
-    // constexpr static double sn_ = 50e6;
-    constexpr static double sn_ = 1e6;
-    // constexpr static double sn_ = 50;
+    constexpr static double sn_ = 50e6;
     constexpr static double eta_ = 2670.0 * 3464.0 / 2.0;
-    // constexpr static double eta_ = 2.670 * 3.464 / 2.0;
-    constexpr static std::size_t maxIts_ = 100;
 };
 
 } // namespace tndm

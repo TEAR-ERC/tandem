@@ -45,16 +45,19 @@ public:
     auto finiteElementFunction(Vec x) const {
         double const* Xraw;
         VecGetArrayRead(x, &Xraw);
-        auto X = tensor(Xraw);
         // auto fun = FiniteElementFunction<DomainDimension - 1u>(
-        // refElement_.clone(), X, refElement_.numBasisFunctions(), 2, fctNos_.size());
+        // refElement_.clone(), Xraw, refElement_.numBasisFunctions(), 2, fctNos_.size());
+        auto X = tensor(Xraw);
         auto fun = FiniteElementFunction<DomainDimension - 1u>(
-            refElement_.clone(), refElement_.numBasisFunctions(), 2, fctNos_.size());
+            refElement_.clone(), refElement_.numBasisFunctions(), 4, fctNos_.size());
         for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
-            auto coords = info_[faultNo].get<Coords>();
+            auto tau = info_[faultNo].get<Tau>();
+            auto V = info_[faultNo].get<SlipRate>();
             for (std::size_t node = 0; node < refElement_.numBasisFunctions(); ++node) {
                 fun.values()(node, 0, faultNo) = X(node, 0, faultNo);
                 fun.values()(node, 1, faultNo) = X(node, 1, faultNo);
+                fun.values()(node, 2, faultNo) = tau[node];
+                fun.values()(node, 3, faultNo) = V[node];
             }
         }
         VecRestoreArrayRead(x, &Xraw);
@@ -75,12 +78,17 @@ private:
     struct Coords {
         using type = std::array<double, DomainDimension>;
     };
-
     struct Rnodal {
         using type = std::array<double, DomainDimension * DomainDimension>;
     };
+    struct Tau {
+        using type = double;
+    };
+    struct SlipRate {
+        using type = double;
+    };
 
-    using info_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, Rnodal>;
+    using info_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, Rnodal, Tau, SlipRate>;
     mneme::StridedView<info_t> info_;
 };
 

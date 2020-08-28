@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <ostream>
 #include <sstream>
 
@@ -134,7 +133,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     MPI_Comm_rank(comm_, &rank);
     auto formatName = [&baseName](int rk) {
         std::stringstream nameS;
-        nameS << baseName << "-" << rk << ".vtu";
+        nameS << baseName << "_" << rk << ".vtu";
         return nameS.str();
     };
 

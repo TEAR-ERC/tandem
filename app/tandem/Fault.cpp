@@ -75,10 +75,15 @@ Fault::Fault(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDi
             cl.detJ(elNos[0], J, detJ);
             cl.jacobianInv(J, jInv);
             cl.normal(localFaceNo, detJ, jInv, normal);
-            if (normal(0, 0) < 0.0) {
+            if (normal(0, 0) > 0.0) {
                 sign_[faultNo] = -1.0;
             }
             cl.facetBasis(localFaceNo, J, normal, R);
+
+            auto tau = info_[faultNo].get<Tau>();
+            std::fill(tau.begin(), tau.end(), 0.0);
+            auto V = info_[faultNo].get<SlipRate>();
+            std::fill(V.begin(), V.end(), 0.0);
         }
     }
 }
@@ -136,18 +141,21 @@ void Fault::rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const {
             auto coords = info_[faultNo].get<Coords>();
             double const* R = info_[faultNo].get<Rnodal>().data()->data();
             elasticity.traction(fctNos_[faultNo], R, U, traction);
+            auto tau = info_[faultNo].get<Tau>();
+            auto V = info_[faultNo].get<SlipRate>();
             for (std::size_t node = 0; node < nbf; ++node) {
                 bp1.setX(coords[node]);
-                PetscInt row = node + 2 * faultNo * nbf;
+                tau[node] = traction(1, node) * sign_[faultNo];
                 if (coords[node][1] <= -40000.0) {
+                    V[node] = 1e-9;
                     F(node, 0, faultNo) = 0.0;
-                    F(node, 1, faultNo) = 1e-9;
+                    F(node, 1, faultNo) = V[node];
                 } else {
-                    double tau = std::copysign(traction(1, node), sign_[faultNo]);
                     double psi = X(node, 0, faultNo);
-                    double V = bp1.computeSlipRate(tau, psi);
-                    F(node, 0, faultNo) = bp1.G(tau, V, psi);
-                    F(node, 1, faultNo) = V;
+                    double Vn = bp1.computeSlipRate(tau[node], psi);
+                    F(node, 0, faultNo) = bp1.G(tau[node], Vn, psi);
+                    F(node, 1, faultNo) = Vn;
+                    V[node] = Vn;
                 }
             }
         }
@@ -171,7 +179,7 @@ auto Fault::slip(Vec x) const -> facet_functional_t {
         auto gview = init::slip_proj::view::create(g);
         for (std::size_t i = 0; i < nbf; ++i) {
             gview(0, i) = 0.0;
-            gview(1, i) = std::copysign(X(i, 1, faultNo), this->sign_[faultNo]);
+            gview(1, i) = X(i, 1, faultNo) * this->sign_[faultNo];
         }
         VecRestoreArrayRead(x, &Xraw);
 

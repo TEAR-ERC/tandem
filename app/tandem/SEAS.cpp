@@ -4,6 +4,7 @@
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "geometry/Vector.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "util/Stopwatch.h"
@@ -36,11 +37,15 @@ struct SEASContext {
 PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
     SEASContext* user = reinterpret_cast<SEASContext*>(ctx);
 
+    auto constant_integral = [t, user](std::array<double, DomainDimension> const& x) {
+        return t * user->scenario->boundary()(x);
+    };
+
     Stopwatch sw;
     sw.start();
     CHKERRQ(user->elasticity->rhs(
         user->b, user->elasticity->makeVolumeFunctional(user->scenario->force()),
-        user->elasticity->makeFacetFunctional(user->scenario->boundary()), user->fault->slip(x)));
+        user->elasticity->makeFacetFunctional(constant_integral), user->fault->slip(x)));
     user->timeAssembly += sw.stop();
 
     sw.start();
@@ -63,6 +68,7 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
 
         auto fault = user->fault->finiteElementFunction(X);
         VTUWriter<DomainDimension - 1u> fWriter(PolynomialDegree, true, PETSC_COMM_WORLD);
+        fWriter.addFieldData("time", &time, 1);
         auto fAdapter = CurvilinearBoundaryVTUAdapter(*user->cl, user->fault->elNos(),
                                                       user->fault->localFaceNos());
         auto fPiece = fWriter.addPiece(fAdapter);
@@ -73,6 +79,7 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
 
         auto numeric = user->elasticity->finiteElementFunction(user->u);
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
+        writer.addFieldData("time", &time, 1);
         auto adapter = CurvilinearVTUAdapter(*user->cl, user->elasticity->numLocalElements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
