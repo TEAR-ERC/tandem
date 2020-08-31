@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
     problemSchema.add_value("warp", &ProblemConfig::warp);
     problemSchema.add_value("force", &ProblemConfig::force);
     problemSchema.add_value("boundary", &ProblemConfig::boundary);
+    problemSchema.add_value("slip", &ProblemConfig::slip);
     problemSchema.add_value("coefficient", &ProblemConfig::coefficient);
     problemSchema.add_value("solution", &ProblemConfig::solution);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
@@ -122,7 +123,7 @@ int main(int argc, char** argv) {
     }
 
     CHKERRQ(poisson.assemble(A));
-    CHKERRQ(poisson.rhs(b, scenario->force(), scenario->boundary()));
+    CHKERRQ(poisson.rhs(b, scenario->force(), scenario->boundary(), scenario->slip()));
     std::cout << "Assembled after " << sw.split() << std::endl;
 
     CHKERRQ(VecDuplicate(b, &x));

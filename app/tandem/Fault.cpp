@@ -3,10 +3,14 @@
 #include "BP1.h"
 #include "basis/WarpAndBlend.h"
 #include "config.h"
-#include "kernels/tandem/init.h"
-#include "kernels/tandem/kernel.h"
-#include "kernels/tandem/tensor.h"
+#include "kernels/poisson/init.h"
+#include "kernels/poisson/kernel.h"
+#include "kernels/poisson/tensor.h"
 #include "tandem/Elasticity.h"
+
+namespace tensor = tndm::poisson::tensor;
+namespace init = tndm::poisson::init;
+namespace kernel = tndm::poisson::kernel;
 
 namespace tndm {
 
@@ -118,7 +122,7 @@ PetscErrorCode Fault::initial(Vec state) const {
     return 0;
 }
 
-void Fault::rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const {
+void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const {
     PetscScalar const* Xraw;
     PetscScalar const* U;
     PetscScalar* Fraw;
@@ -133,19 +137,18 @@ void Fault::rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const {
 #pragma omp parallel
     {
         BP1 bp1;
-        double tractionBuf[tensor::traction_avg_proj::size()];
-        auto traction = Matrix<double>(tractionBuf, tensor::traction_avg_proj::Shape[0],
-                                       tensor::traction_avg_proj::Shape[1]);
+        double tractionBuf[tensor::grad_u::size()];
+        auto traction =
+            Matrix<double>(tractionBuf, tensor::grad_u::Shape[0], tensor::grad_u::Shape[1]);
 #pragma omp for
         for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
             auto coords = info_[faultNo].get<Coords>();
-            double const* R = info_[faultNo].get<Rnodal>().data()->data();
-            elasticity.traction(fctNos_[faultNo], R, U, traction);
+            poisson.grad_u(fctNos_[faultNo], U, traction);
             auto tau = info_[faultNo].get<Tau>();
             auto V = info_[faultNo].get<SlipRate>();
             for (std::size_t node = 0; node < nbf; ++node) {
                 bp1.setX(coords[node]);
-                tau[node] = traction(1, node) * sign_[faultNo];
+                tau[node] = traction(0, node);
                 if (coords[node][1] <= -40000.0) {
                     V[node] = 1e-9;
                     F(node, 0, faultNo) = 0.0;
@@ -176,19 +179,15 @@ auto Fault::slip(Vec x) const -> facet_functional_t {
         auto X = tensor(Xraw);
         auto faultNo = this->faultNos_[fctNo];
         double g[tensor::slip_proj::size()];
-        auto gview = init::slip_proj::view::create(g);
         for (std::size_t i = 0; i < nbf; ++i) {
-            gview(0, i) = 0.0;
-            gview(1, i) = X(i, 1, faultNo) * this->sign_[faultNo];
+            g[i] = X(i, 1, faultNo) * this->sign_[faultNo];
         }
         VecRestoreArrayRead(x, &Xraw);
 
-        double const* R = info_[faultNo].get<Rnodal>().data()->data();
         kernel::evaluate_slip krnl;
         krnl.slip_proj = g;
         krnl.enodalT = this->enodalT.data();
         krnl.f = f;
-        krnl.Rnodal = R;
         krnl.execute();
     };
 }

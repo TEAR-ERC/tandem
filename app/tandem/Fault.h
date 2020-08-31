@@ -7,7 +7,7 @@
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "mesh/LocalSimplexMesh.h"
-#include "tandem/Elasticity.h"
+#include "poisson/Poisson.h"
 
 #include <mneme/storage.hpp>
 
@@ -20,7 +20,7 @@ namespace tndm {
 
 class Fault {
 public:
-    using facet_functional_t = Elasticity::facet_functional_t;
+    using facet_functional_t = Poisson::facet_functional_t;
 
     Fault(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
           std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints, MPI_Comm comm);
@@ -28,7 +28,7 @@ public:
     PetscErrorCode createState(Vec* state) const;
     PetscErrorCode initial(Vec state) const;
 
-    void rhs(Elasticity const& elasticity, Vec u, Vec x, Vec f) const;
+    void rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const;
 
     auto slip(Vec x) const -> facet_functional_t;
 

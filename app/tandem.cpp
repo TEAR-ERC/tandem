@@ -1,7 +1,7 @@
 #include "common/CmdLine.h"
 #include "tandem/Config.h"
 #include "tandem/SEAS.h"
-#include "tandem/Static.h"
+//#include "tandem/Static.h"
 
 #include "util/Schema.h"
 

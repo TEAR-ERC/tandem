@@ -1,6 +1,6 @@
 #include "SEAS.h"
-#include "Elasticity.h"
 #include "Fault.h"
+#include "poisson/Poisson.h"
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
@@ -21,7 +21,7 @@
 namespace tndm {
 
 struct SEASContext {
-    std::unique_ptr<Elasticity> elasticity;
+    std::unique_ptr<Poisson> poisson;
     std::unique_ptr<Fault> fault;
     std::unique_ptr<LuaScenario> scenario;
     Vec u;
@@ -43,9 +43,10 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
 
     Stopwatch sw;
     sw.start();
-    CHKERRQ(user->elasticity->rhs(
-        user->b, user->elasticity->makeVolumeFunctional(user->scenario->force()),
-        user->elasticity->makeFacetFunctional(constant_integral), user->fault->slip(x)));
+    VecZeroEntries(user->b);
+    CHKERRQ(user->poisson->rhs(
+        user->b, user->poisson->makeVolumeFunctional(user->scenario->force()),
+        user->poisson->makeFacetFunctional(constant_integral), user->fault->slip(x)));
     user->timeAssembly += sw.stop();
 
     sw.start();
@@ -53,7 +54,7 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
     user->timeSolve += sw.stop();
 
     sw.start();
-    user->fault->rhs(*user->elasticity, user->u, x, F);
+    user->fault->rhs(*user->poisson, user->u, x, F);
     user->timeFault += sw.stop();
 
     return 0;
@@ -77,10 +78,10 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
         fss << *user->output << "-fault_" << (step / step_interval);
         fWriter.write(fss.str());
 
-        auto numeric = user->elasticity->finiteElementFunction(user->u);
+        auto numeric = user->poisson->finiteElementFunction(user->u);
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         writer.addFieldData("time", &time, 1);
-        auto adapter = CurvilinearVTUAdapter(*user->cl, user->elasticity->numLocalElements());
+        auto adapter = CurvilinearVTUAdapter(*user->cl, user->poisson->numLocalElements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
         std::stringstream ss;
@@ -113,21 +114,21 @@ PetscErrorCode solveSEASProblem(Config const& cfg) {
     ctx.cl = std::make_unique<Curvilinear<DomainDimension>>(*mesh, ctx.scenario->transform(),
                                                             PolynomialDegree);
 
-    ctx.elasticity = std::make_unique<Elasticity>(
+    ctx.poisson = std::make_unique<Poisson>(
         *mesh, *ctx.cl, std::make_unique<tndm::ModalRefElement<DomainDimension>>(PolynomialDegree),
-        MinQuadOrder(), PETSC_COMM_WORLD, ctx.scenario->lam(), ctx.scenario->mu());
-    ctx.fault = std::make_unique<Fault>(*mesh, *ctx.cl, ctx.elasticity->facetRule().points(),
+        MinQuadOrder(), PETSC_COMM_WORLD, ctx.scenario->mu());
+    ctx.fault = std::make_unique<Fault>(*mesh, *ctx.cl, ctx.poisson->facetRule().points(),
                                         PETSC_COMM_WORLD);
 
     // Assemble
     {
-        auto interface = ctx.elasticity->interfacePetsc();
+        auto interface = ctx.poisson->interfacePetsc();
         CHKERRQ(interface.createA(&A));
         CHKERRQ(interface.createb(&ctx.b));
     }
-    CHKERRQ(ctx.elasticity->assemble(A));
-    CHKERRQ(ctx.elasticity->rhs(ctx.b, ctx.scenario->force(), ctx.scenario->boundary(),
-                                ctx.scenario->slip()));
+    CHKERRQ(ctx.poisson->assemble(A));
+    CHKERRQ(ctx.poisson->rhs(ctx.b, ctx.scenario->force(), ctx.scenario->boundary(),
+                             ctx.scenario->slip()));
     CHKERRQ(VecDuplicate(ctx.b, &ctx.u));
 
     CHKERRQ(ctx.fault->createState(&psi));

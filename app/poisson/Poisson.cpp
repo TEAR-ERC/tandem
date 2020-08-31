@@ -17,13 +17,18 @@
 #include <petscsystypes.h>
 #include <petscvec.h>
 
+namespace tensor = tndm::poisson::tensor;
+namespace init = tndm::poisson::init;
+namespace kernel = tndm::poisson::kernel;
+
 namespace tndm {
 
 Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
                  std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
                  MPI_Comm comm, functional_t kFun)
     : DG(mesh, cl, std::move(refElement), minQuadOrder, comm),
-      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()) {
+      nodalRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
+      facetRefElement_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()) {
 
     int rank;
     MPI_Comm_rank(comm, &rank);
@@ -52,9 +57,12 @@ Poisson::Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<Doma
         auto points = cl.facetParam(f, fctRule.points());
         em.emplace_back(nodalRefElement_.evaluateBasisAt(points, {1, 0}));
     }
+
+    minv = facetRefElement_.inverseMassMatrix();
+    enodal = facetRefElement_.evaluateBasisAt(fctRule.points(), {1, 0});
 }
 
-PetscErrorCode Poisson::assemble(Mat mat) {
+PetscErrorCode Poisson::assemble(Mat mat) const {
     PetscErrorCode ierr;
     double D_x[tensor::D_x::size()];
     double A[tensor::A::size()];
@@ -97,7 +105,7 @@ PetscErrorCode Poisson::assemble(Mat mat) {
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.bc == BC::Fault || info.bc == BC::Natural) {
+        if (info.bc == BC::Natural) {
             continue;
         }
         kernel::assembleFacetLocal local;
@@ -110,7 +118,7 @@ PetscErrorCode Poisson::assemble(Mat mat) {
         local.d_xi(0) = d_xi[info.localNo[0]].data();
         local.e(0) = e[info.localNo[0]].data();
         local.em(0) = em[info.localNo[0]].data();
-        local.g = fct[fctNo].template get<JInv>().data()->data();
+        local.g(0) = fct[fctNo].template get<JInv>().data()->data();
         local.K = userVol[info.up[0]].get<K>().data();
         local.n = fct[fctNo].template get<Normal>().data()->data();
         local.nl = fct[fctNo].template get<NormalLength>().data();
@@ -145,7 +153,7 @@ PetscErrorCode Poisson::assemble(Mat mat) {
             neighbour.em(0) = local.em(0);
             neighbour.e(1) = e[info.localNo[1]].data();
             neighbour.em(1) = em[info.localNo[1]].data();
-            neighbour.g = fct[fctNo].template get<JInvOther>().data()->data();
+            neighbour.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
             neighbour.K = userVol[info.up[1]].get<K>().data();
             neighbour.n = local.n;
             neighbour.nl = local.nl;
@@ -167,7 +175,8 @@ PetscErrorCode Poisson::assemble(Mat mat) {
     return 0;
 }
 
-PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichletFun) {
+PetscErrorCode Poisson::rhs(Vec B, volume_functional_t forceFun, facet_functional_t dirichletFun,
+                            facet_functional_t slipFun) const {
     PetscErrorCode ierr;
 
     double b[tensor::b::size()];
@@ -177,10 +186,7 @@ PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichlet
     double F[tensor::F::size()];
     assert(tensor::F::size() == volRule.size());
     for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
-        auto coords = vol[elNo].template get<Coords>();
-        for (unsigned q = 0; q < tensor::F::size(); ++q) {
-            F[q] = forceFun(coords[q]);
-        }
+        forceFun(elNo, F);
 
         kernel::rhsVolume rhs;
         rhs.E = E.data();
@@ -199,34 +205,99 @@ PetscErrorCode Poisson::rhs(Vec B, functional_t forceFun, functional_t dirichlet
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
         auto const& info = fctInfo[fctNo];
-        if (info.up[0] == info.up[1] && info.bc == BC::Dirichlet) {
-            auto coords = fct[fctNo].template get<Coords>();
-            for (unsigned q = 0; q < tensor::f::size(); ++q) {
-                f[q] = dirichletFun(coords[q]);
-            }
+        if (info.bc == BC::Fault || info.bc == BC::Dirichlet) {
+            facet_functional_t& fun = (info.bc == BC::Fault) ? slipFun : dirichletFun;
+            fun(fctNo, f);
 
+            double half = (info.up[0] != info.up[1]) ? 0.5 : 1.0;
             kernel::rhsFacet rhs;
-            rhs.c10 = epsilon;
-            rhs.c20 = penalty(info);
             rhs.b = b;
-            rhs.d_xi(0) = d_xi[info.localNo[0]].data();
-            rhs.e(0) = e[info.localNo[0]].data();
-            rhs.em(0) = em[info.localNo[0]].data();
+            rhs.c10 = half * epsilon;
+            rhs.c20 = penalty(info);
             rhs.f = f;
-            rhs.g = fct[fctNo].template get<JInv>().data()->data();
-            rhs.K = userVol[info.up[0]].get<K>().data();
             rhs.n = fct[fctNo].template get<Normal>().data()->data();
             rhs.nl = fct[fctNo].template get<NormalLength>().data();
             rhs.w = fctRule.weights().data();
-            rhs.execute();
+            if (info.inside[0]) {
+                rhs.d_xi(0) = d_xi[info.localNo[0]].data();
+                rhs.e(0) = e[info.localNo[0]].data();
+                rhs.em(0) = em[info.localNo[0]].data();
+                rhs.g(0) = fct[fctNo].template get<JInv>().data()->data();
+                rhs.K = userVol[info.up[0]].template get<K>().data();
+                rhs.execute();
 
-            PetscInt ib = info.g_up[0];
-            VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+                PetscInt ib = info.g_up[0];
+                VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+            }
+            if (info.inside[1] && info.up[0] != info.up[1]) {
+                rhs.c20 *= -1.0;
+                rhs.d_xi(0) = d_xi[info.localNo[1]].data();
+                rhs.e(0) = e[info.localNo[1]].data();
+                rhs.em(0) = em[info.localNo[1]].data();
+                rhs.g(0) = fct[fctNo].template get<JInvOther>().data()->data();
+                rhs.K = userVol[info.up[1]].template get<K>().data();
+                rhs.execute();
+
+                PetscInt ib = info.g_up[1];
+                VecSetValuesBlocked(B, 1, &ib, b, ADD_VALUES);
+            }
         }
     }
     CHKERRQ(VecAssemblyBegin(B));
     CHKERRQ(VecAssemblyEnd(B));
     return 0;
+}
+
+auto Poisson::makeVolumeFunctional(functional_t fun) const -> volume_functional_t {
+    return [fun, this](std::size_t elNo, double* F) {
+        auto coords = this->vol[elNo].template get<Coords>();
+        for (unsigned q = 0; q < tensor::F::Shape[0]; ++q) {
+            F[q] = fun(coords[q]);
+        }
+    };
+}
+
+auto Poisson::makeFacetFunctional(functional_t fun) const -> facet_functional_t {
+    return [fun, this](std::size_t fctNo, double* f) {
+        auto coords = this->fct[fctNo].template get<Coords>();
+        auto const& info = this->fctInfo[fctNo];
+        for (unsigned q = 0; q < tensor::f::Shape[0]; ++q) {
+            f[q] = fun(coords[q]);
+            // \todo Make side detection configurable
+            auto n = this->fct[fctNo].template get<Normal>()[q];
+            if (info.bc == BC::Fault && n[0] < 0.0) {
+                f[q] *= -1.0;
+            }
+        }
+    };
+}
+
+void Poisson::grad_u(std::size_t fctNo, double const* U, Matrix<double>& result) const {
+    assert(result.size() == tensor::grad_u::size());
+
+    double d_x0[tensor::d_x::size(0)];
+    double d_x1[tensor::d_x::size(1)];
+
+    auto blockSize = refElement_->numBasisFunctions();
+    auto const& info = fctInfo[fctNo];
+    kernel::grad_u krnl;
+    krnl.d_x(0) = d_x0;
+    krnl.d_x(1) = d_x1;
+    krnl.d_xi(0) = d_xi[info.localNo[0]].data();
+    krnl.d_xi(1) = d_xi[info.localNo[1]].data();
+    krnl.em(0) = em[info.localNo[0]].data();
+    krnl.em(1) = em[info.localNo[1]].data();
+    krnl.enodal = enodal.data();
+    krnl.g(0) = fct[fctNo].template get<JInv>().data()->data();
+    krnl.g(1) = fct[fctNo].template get<JInvOther>().data()->data();
+    krnl.k(0) = userVol[info.up[0]].template get<K>().data();
+    krnl.k(1) = userVol[info.up[1]].template get<K>().data();
+    krnl.minv = minv.data();
+    krnl.grad_u = result.data();
+    krnl.u(0) = U + info.up[0] * blockSize;
+    krnl.u(1) = U + info.up[1] * blockSize;
+    krnl.w = fctRule.weights().data();
+    krnl.execute();
 }
 
 FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) const {

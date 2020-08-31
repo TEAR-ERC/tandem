@@ -3,6 +3,7 @@ resolution = 0.125
 [problem]
 lib = "embedded.lua"
 boundary = "solution"
+slip = "slip"
 solution = "solution"
 
 [generate_mesh]

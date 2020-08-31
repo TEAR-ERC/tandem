@@ -17,6 +17,7 @@ struct ProblemConfig {
     std::optional<std::string> warp;
     std::optional<std::string> force;
     std::optional<std::string> boundary;
+    std::optional<std::string> slip;
     std::optional<std::string> coefficient;
     std::optional<std::string> solution;
 };
@@ -30,6 +31,7 @@ public:
     virtual transform_t transform() const = 0;
     virtual functional_t force() const = 0;
     virtual functional_t boundary() const = 0;
+    virtual functional_t slip() const = 0;
     virtual std::unique_ptr<SolutionInterface> solution() const = 0;
     virtual functional_t coefficient() const = 0;
 };
@@ -55,6 +57,7 @@ public:
         };
         functional(lib_, problem.force, force_);
         functional(lib_, problem.boundary, boundary_);
+        functional(lib_, problem.slip, slip_);
         functional(lib_, problem.coefficient, coefficient_);
         if (problem.solution) {
             auto myF = lib_.getFunction<DomainDimension, 1>(*problem.solution);
@@ -71,6 +74,7 @@ public:
     Curvilinear<DomainDimension>::transform_t transform() const override { return warp_; }
     functional_t force() const override { return force_; }
     functional_t boundary() const override { return boundary_; }
+    functional_t slip() const override { return slip_; }
     std::unique_ptr<SolutionInterface> solution() const override {
         return std::make_unique<LambdaSolution<decltype(solution_)>>(solution_);
     }
@@ -81,6 +85,7 @@ private:
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t force_ = [](std::array<double, DomainDimension> const& v) { return 0.0; };
     functional_t boundary_ = [](std::array<double, DomainDimension> const& v) { return 0.0; };
+    functional_t slip_ = [](std::array<double, DomainDimension> const& v) { return 0.0; };
     functional_t coefficient_ = [](std::array<double, DomainDimension> const& v) { return 1.0; };
     solution_t solution_ = [](Vector<double> const&) -> std::array<double, 1> { return {0.0}; };
 };

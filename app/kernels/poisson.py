@@ -18,7 +18,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         A['kl'] <= J['q'] * W['q'] * K['m'] * Em['qm'] * D_x['kiq'] * D_x['liq']
     ])
 
-    g = Tensor('g', (dim, dim, nq))
+    g = [Tensor('g({})'.format(x), (dim, dim, nq)) for x in range(2)]
     n = Tensor('n', (dim, nq))
     nl = Tensor('nl', (nq,))
     w = Tensor('w', (nq,))
@@ -37,11 +37,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
                                 c2[abs(y-x)] * w['q'] * e[x]['kq'] * e[y]['lq'] * nl['q']
 
     surfaceKernelsLocal = [
-        d_x[0]['kiq'] <= K['m'] * em[0]['qm'] * g['eiq'] * d_xi[0]['keq'],
+        d_x[0]['kiq'] <= K['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
         surface(0, 0)
     ]
     surfaceKernelsNeighbour = [
-        d_x[1]['kiq'] <= K['m'] * em[1]['qm'] * g['eiq'] * d_xi[1]['keq'],
+        d_x[1]['kiq'] <= K['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],
         surface(0, 1),
         surface(1, 0),
         surface(1, 1)]
@@ -54,6 +54,26 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     f = Tensor('f', (nq,))
     generator.add('rhsFacet', b['k'] <= \
-            c1[0] * w['q'] * K['m'] * em[0]['qm'] * g['eiq'] * d_xi[0]['keq'] * n['iq'] * f['q'] + \
+            c1[0] * w['q'] * K['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'] * n['iq'] * f['q'] + \
             c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f['q'])
 
+    # traction
+
+    def traction(x):
+        return lam_w[x]['q'] * d_x[x]['lsq'] * u[x]['ls'] * n['pq'] + mu_w[x]['q'] * \
+                (d_x[x]['ljq'] * u[x]['lp'] * n['jq'] + d_x[x]['lpq'] * u[x]['lj'] * n['jq'])
+
+    u = [Tensor('u({})'.format(x), (Nbf,)) for x in range(2)]
+    k = [Tensor('k({})'.format(x), (Nbf,)) for x in range(2)]
+    grad_u = Tensor('grad_u', (dim, nbf))
+    slip_proj = Tensor('slip_proj', (nbf, ))
+    minv = Tensor('minv', (nbf, nbf))
+    enodal = Tensor('enodal', (nq, nbf))
+    enodalT = Tensor('enodalT', (nbf, nq))
+    generator.add('grad_u', [
+        d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
+        d_x[1]['kiq'] <= k[1]['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],
+        grad_u['pk'] <= 0.5 * (d_x[0]['lpq'] * u[0]['l'] + d_x[1]['lpq'] * u[1]['l']) * w['q'] * \
+                        enodal['qr'] * minv['rk']
+    ])
+    generator.add('evaluate_slip', f['q'] <= slip_proj['l'] * enodalT['lq'])

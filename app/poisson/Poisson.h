@@ -18,6 +18,8 @@ namespace tndm {
 class Poisson : public DG<DomainDimension> {
 public:
     using functional_t = std::function<double(std::array<double, DomainDimension> const&)>;
+    using volume_functional_t = std::function<void(std::size_t elNo, double* F)>;
+    using facet_functional_t = std::function<void(std::size_t fctNo, double* f)>;
 
     Poisson(LocalSimplexMesh<DomainDimension> const& mesh, Curvilinear<DomainDimension>& cl,
             std::unique_ptr<RefElement<DomainDimension>> refElement, unsigned minQuadOrder,
@@ -29,8 +31,19 @@ public:
                               &volInfo[0].get<NumGhostNeighbours>(), comm());
     }
 
-    PetscErrorCode assemble(Mat mat);
-    PetscErrorCode rhs(Vec B, functional_t forceFun, functional_t dirichletFun);
+    PetscErrorCode assemble(Mat mat) const;
+    PetscErrorCode rhs(Vec B, volume_functional_t forceFun, facet_functional_t dirichletFun,
+                       facet_functional_t slipFun) const;
+    PetscErrorCode rhs(Vec B, functional_t forceFun, functional_t dirichletFun,
+                       functional_t slipFun) const {
+        return rhs(B, makeVolumeFunctional(forceFun), makeFacetFunctional(dirichletFun),
+                   makeFacetFunctional(slipFun));
+    }
+
+    volume_functional_t makeVolumeFunctional(functional_t fun) const;
+    facet_functional_t makeFacetFunctional(functional_t fun) const;
+
+    void grad_u(std::size_t fctNo, double const* U, Matrix<double>& result) const;
 
     FiniteElementFunction<DomainDimension> finiteElementFunction(Vec x) const;
 
@@ -52,6 +65,9 @@ private:
     std::vector<Managed<Matrix<double>>> em;
 
     NodalRefElement<DomainDimension> nodalRefElement_;
+    NodalRefElement<DomainDimension - 1u> facetRefElement_;
+    Managed<Matrix<double>> minv;
+    Managed<Matrix<double>> enodal;
 
     double penalty(FacetInfo const& info) const {
         auto Kmax = [&](std::size_t elNo) {

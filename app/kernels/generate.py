@@ -12,7 +12,7 @@ from yateto.ast.visitor import PrettyPrinter
 from yateto.gemm_configuration import GeneratorCollection, Eigen
 
 import poisson
-import tandem
+import elasticity
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -35,8 +35,8 @@ if cmdLineArgs.app == 'poisson':
             options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
-elif cmdLineArgs.app == 'tandem':
-    tandem.add(g,
+elif cmdLineArgs.app == 'elasticity':
+    elasticity.add(g,
             options['dim'],
             options['numFacetBasisFunctions'],
             options['numElementBasisFunctions'],
@@ -46,7 +46,7 @@ elif cmdLineArgs.app == 'tandem':
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,
            gemm_cfg=GeneratorCollection([Eigen(arch)]),
-           namespace='tndm')
+           namespace='tndm::{}'.format(cmdLineArgs.app))
 
 for kernel in g.kernels():
     title = 'AST of {}'.format(kernel.name)

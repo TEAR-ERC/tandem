@@ -119,17 +119,19 @@ target_link_libraries(poisson PRIVATE
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Tandem
-generate_code(tandem)
+generate_code(elasticity)
 
 add_executable(tandem
+    poisson/Poisson.cpp
     tandem/BP1.cpp
     tandem/Elasticity.cpp
     tandem/Fault.cpp
     tandem/SEAS.cpp
-    tandem/Static.cpp
+    #tandem/Static.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE
     app-common
-    tandem-kernels-lib
+    elasticity-kernels-lib
+    poisson-kernels-lib
     PkgConfig::PETSC)
 target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

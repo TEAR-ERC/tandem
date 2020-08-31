@@ -4,6 +4,7 @@ resolution = 0.125
 lib = "embedded_half.lua"
 force = "force"
 boundary = "solution"
+slip = "slip"
 solution = "solution"
 
 [generate_mesh]

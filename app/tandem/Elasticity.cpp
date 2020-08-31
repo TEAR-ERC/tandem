@@ -4,9 +4,9 @@
 #include "config.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
-#include "kernels/tandem/init.h"
-#include "kernels/tandem/kernel.h"
-#include "kernels/tandem/tensor.h"
+#include "kernels/elasticity/init.h"
+#include "kernels/elasticity/kernel.h"
+#include "kernels/elasticity/tensor.h"
 #include "parallel/MPITraits.h"
 #include "tensor/EigenMap.h"
 
@@ -16,6 +16,10 @@
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscvec.h>
+
+namespace tensor = tndm::elasticity::tensor;
+namespace init = tndm::elasticity::init;
+namespace kernel = tndm::elasticity::kernel;
 
 namespace tndm {
 
