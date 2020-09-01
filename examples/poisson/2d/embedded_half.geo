@@ -1,0 +1,20 @@
+// gmsh -2 -format msh2 embedded_half.geo
+Point(1) = {-1, 1, 0, 0.5};
+Point(2) = {1, 1, 0, 0.5};
+Point(3) = {1, -1, 0, 0.5};
+Point(4) = {-1, -1, 0, 0.5};
+Point(5) = {0.5, 0, 0, 0.1};
+Point(6) = {0.5, 1, 0, 0.1};
+Line(1) = {1, 6};
+Line(2) = {6, 2};
+Line(3) = {2, 3};
+Line(4) = {3, 4};
+Line(5) = {4, 1};
+Line(6) = {5, 6};
+Curve Loop(1) = {5, 1, 2, 3, 4};
+Plane Surface(1) = {1};
+Line{6} In Surface{1};
+Physical Curve(5) = {1, 2, 4};
+Physical Curve(3) = {6};
+Physical Curve(1) = {3, 5};
+Physical Surface(1) = {1};

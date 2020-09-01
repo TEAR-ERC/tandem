@@ -26,6 +26,8 @@ target_link_libraries(tandem-fem-lib PUBLIC
 add_library(tandem-lib
     form/DG.cpp
     form/Error.cpp
+    io/GMSHLexer.cpp
+    io/GMSHParser.cpp
     io/VTUWriter.cpp
     io/VTUWriter.cpp
     mesh/GenMesh.cpp
