@@ -6,6 +6,8 @@
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "io/GMSHParser.h"
+#include "io/GlobalSimplexMeshBuilder.h"
 #include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
 #include "mesh/MeshData.h"
@@ -38,10 +40,11 @@ namespace fs = std::filesystem;
 using namespace tndm;
 
 struct Config {
-    double resolution;
+    std::optional<double> resolution;
     std::optional<std::string> output;
+    std::optional<std::string> mesh_file;
     ProblemConfig problem;
-    GenMeshConfig<DomainDimension> generate_mesh;
+    std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
 int main(int argc, char** argv) {
@@ -60,18 +63,23 @@ int main(int argc, char** argv) {
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
+    auto makePathRelativeToConfig = [&program](std::string_view path) {
+        auto newPath = fs::path(program.get("config")).parent_path();
+        newPath /= fs::path(path);
+        return newPath;
+    };
+
     TableSchema<Config> schema;
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative resolution parameter");
     schema.add_value("output", &Config::output).help("Output file name");
+    schema.add_value("mesh_file", &Config::mesh_file)
+        .converter(makePathRelativeToConfig)
+        .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
     auto& problemSchema = schema.add_table("problem", &Config::problem);
     problemSchema.add_value("lib", &ProblemConfig::lib)
-        .converter([&program](std::string_view path) {
-            auto newPath = fs::path(program.get("config")).parent_path();
-            newPath /= fs::path(path);
-            return newPath;
-        })
+        .converter(makePathRelativeToConfig)
         .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
     problemSchema.add_value("warp", &ProblemConfig::warp);
     problemSchema.add_value("force", &ProblemConfig::force);
@@ -95,8 +103,28 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto meshGen = cfg->generate_mesh.create(cfg->resolution, PETSC_COMM_WORLD);
-    auto globalMesh = meshGen.uniformMesh();
+    std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
+    if (cfg->mesh_file) {
+        GlobalSimplexMeshBuilder<DomainDimension> builder;
+        GMSHParser parser(&builder);
+        bool ok = parser.parseFile(*cfg->mesh_file);
+        if (ok) {
+            globalMesh = builder.create(PETSC_COMM_WORLD);
+        } else {
+            std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
+        }
+    } else if (cfg->generate_mesh && cfg->resolution) {
+        auto meshGen = cfg->generate_mesh->create(*cfg->resolution, PETSC_COMM_WORLD);
+        globalMesh = meshGen.uniformMesh();
+    }
+    if (!globalMesh) {
+        std::cerr
+            << "You must either provide a valid mesh file or provide the mesh generation config "
+               "(including the resolution parameter)."
+            << std::endl;
+        PetscFinalize();
+        return -1;
+    }
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
 
