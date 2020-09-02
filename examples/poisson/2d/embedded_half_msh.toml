@@ -1,0 +1,9 @@
+mesh_file = "embedded_half.msh"
+
+[problem]
+lib = "embedded_half.lua"
+force = "force"
+boundary = "solution"
+solution = "solution"
+
+
