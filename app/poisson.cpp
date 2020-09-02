@@ -105,13 +105,22 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
     if (cfg->mesh_file) {
+        bool ok = false;
         GlobalSimplexMeshBuilder<DomainDimension> builder;
-        GMSHParser parser(&builder);
-        bool ok = parser.parseFile(*cfg->mesh_file);
+        if (rank == 0) {
+            GMSHParser parser(&builder);
+            ok = parser.parseFile(*cfg->mesh_file);
+            if (!ok) {
+                std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
+            }
+        }
+        MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
         if (ok) {
             globalMesh = builder.create(PETSC_COMM_WORLD);
-        } else {
-            std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
+        }
+        if (procs > 1) {
+            // ensure initial element distribution for metis
+            globalMesh->repartitionByHash();
         }
     } else if (cfg->generate_mesh && cfg->resolution) {
         auto meshGen = cfg->generate_mesh->create(*cfg->resolution, PETSC_COMM_WORLD);
