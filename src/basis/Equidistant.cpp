@@ -97,8 +97,8 @@ std::vector<std::array<double, D>> EquidistantNodesFactory<D>::operator()(unsign
     if constexpr (D == 1) {
         auto refVertices = Simplex<D>::referenceSimplexVertices();
         result.push_back(refVertices[0]);
-        edge(degree - 1, refVertices, result);
         result.push_back(refVertices[1]);
+        edge(degree - 1, refVertices, result);
     } else if constexpr (D == 2) {
         triangle(degree, Simplex<D>::referenceSimplexVertices(), result);
     } else if constexpr (D == 3) {
