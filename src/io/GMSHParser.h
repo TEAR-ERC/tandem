@@ -3,6 +3,7 @@
 
 #include "GMSHLexer.h"
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
