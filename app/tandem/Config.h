@@ -11,12 +11,13 @@
 namespace tndm {
 
 struct Config {
-    double resolution;
+    std::optional<double> resolution;
     double final_time;
     std::optional<std::string> output;
     std::optional<double> output_interval;
+    std::optional<std::string> mesh_file;
     ProblemConfig problem;
-    GenMeshConfig<DomainDimension> generate_mesh;
+    std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
 } // namespace tndm

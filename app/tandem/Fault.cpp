@@ -122,7 +122,7 @@ PetscErrorCode Fault::initial(Vec state) const {
     return 0;
 }
 
-void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const {
+void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) {
     PetscScalar const* Xraw;
     PetscScalar const* U;
     PetscScalar* Fraw;
@@ -133,6 +133,7 @@ void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const {
     auto X = tensor(Xraw);
     auto F = tensor(Fraw);
 
+    VMax_ = 0.0;
     std::size_t nbf = refElement_.numBasisFunctions();
 #pragma omp parallel
     {
@@ -140,7 +141,7 @@ void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const {
         double tractionBuf[tensor::grad_u::size()];
         auto traction =
             Matrix<double>(tractionBuf, tensor::grad_u::Shape[0], tensor::grad_u::Shape[1]);
-#pragma omp for
+#pragma omp for reduction(max : VMax_)
         for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
             auto coords = info_[faultNo].get<Coords>();
             poisson.grad_u(fctNos_[faultNo], U, traction);
@@ -160,6 +161,7 @@ void Fault::rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const {
                     F(node, 1, faultNo) = Vn;
                     V[node] = Vn;
                 }
+                VMax_ = std::max(VMax_, V[node]);
             }
         }
     }

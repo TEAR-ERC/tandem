@@ -28,7 +28,7 @@ public:
     PetscErrorCode createState(Vec* state) const;
     PetscErrorCode initial(Vec state) const;
 
-    void rhs(Poisson const& poisson, Vec u, Vec x, Vec f) const;
+    void rhs(Poisson const& poisson, Vec u, Vec x, Vec f);
 
     auto slip(Vec x) const -> facet_functional_t;
 
@@ -64,6 +64,8 @@ public:
         return fun;
     }
 
+    auto getVMax() const { return VMax_; }
+
 private:
     NodalRefElement<DomainDimension - 1u> refElement_;
     MPI_Comm comm_;
@@ -72,6 +74,7 @@ private:
     std::vector<std::size_t> elNos_;
     std::vector<std::size_t> localFaceNos_;
     std::vector<double> sign_;
+    double VMax_;
 
     Managed<Matrix<double>> enodalT;
 

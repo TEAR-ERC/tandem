@@ -5,6 +5,8 @@
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
+#include "io/GMSHParser.h"
+#include "io/GlobalSimplexMeshBuilder.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "util/Stopwatch.h"
@@ -24,6 +26,7 @@ struct SEASContext {
     std::unique_ptr<Poisson> poisson;
     std::unique_ptr<Fault> fault;
     std::unique_ptr<LuaScenario> scenario;
+    Mat A;
     Vec u;
     Vec b;
     KSP ksp;
@@ -32,6 +35,8 @@ struct SEASContext {
     double timeFault = 0.0;
     std::optional<std::string> output;
     std::unique_ptr<Curvilinear<DomainDimension>> cl;
+    double lastOutputTime = std::numeric_limits<double>::lowest();
+    std::size_t outputNo = 0;
 };
 
 PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
@@ -41,9 +46,12 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
         return t * user->scenario->boundary()(x);
     };
 
+    Stopwatch sw2;
+    sw2.start();
     Stopwatch sw;
     sw.start();
     VecZeroEntries(user->b);
+
     CHKERRQ(user->poisson->rhs(
         user->b, user->poisson->makeVolumeFunctional(user->scenario->force()),
         user->poisson->makeFacetFunctional(constant_integral), user->fault->slip(x)));
@@ -56,6 +64,7 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
     sw.start();
     user->fault->rhs(*user->poisson, user->u, x, F);
     user->timeFault += sw.stop();
+    std::cout << sw2.stop() << std::endl;
 
     return 0;
 }
@@ -63,8 +72,16 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec x, Vec F, void* ctx) {
 PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
     SEASContext* user = reinterpret_cast<SEASContext*>(ctx);
 
-    unsigned step_interval = 1;
-    if (user->output && step % step_interval == 0) {
+    constexpr double V0 = 1e-9;
+    constexpr double V1 = 1;
+    constexpr double tmin = 0.01;
+    constexpr double tmax = 365 * 24 * 3600;
+    double falloff = log(tmin / tmax) * (V1 - V0);
+    auto VMax = user->fault->getVMax();
+    VMax = std::min(1.0, std::max(1e-9, VMax)); // Clamp to [1e-9, 1]
+    double outputInterval = tmax * exp(falloff * VMax);
+    std::cout << "Output interval: " << outputInterval << std::endl;
+    if (user->output && time - user->lastOutputTime >= outputInterval) {
         std::cout << "Output at time " << time << std::endl;
 
         auto fault = user->fault->finiteElementFunction(X);
@@ -75,7 +92,7 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
         auto fPiece = fWriter.addPiece(fAdapter);
         fPiece.addPointData("x", fault);
         std::stringstream fss;
-        fss << *user->output << "-fault_" << (step / step_interval);
+        fss << *user->output << "-fault_" << user->outputNo;
         fWriter.write(fss.str());
 
         auto numeric = user->poisson->finiteElementFunction(user->u);
@@ -85,8 +102,11 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
         std::stringstream ss;
-        ss << *user->output << "_" << (step / step_interval);
+        ss << *user->output << "_" << user->outputNo;
         writer.write(ss.str());
+
+        user->lastOutputTime = time;
+        ++user->outputNo;
     }
     return 0;
 }
@@ -94,7 +114,6 @@ PetscErrorCode monitor(TS ts, PetscInt step, PetscReal time, Vec X, void* ctx) {
 PetscErrorCode solveSEASProblem(Config const& cfg) {
     // Scenario
 
-    Mat A;
     Vec psi;
     TS ts;
     SEASContext ctx;
@@ -106,8 +125,37 @@ PetscErrorCode solveSEASProblem(Config const& cfg) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto meshGen = cfg.generate_mesh.create(cfg.resolution, PETSC_COMM_WORLD);
-    auto globalMesh = meshGen.uniformMesh();
+    std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
+    if (cfg.mesh_file) {
+        bool ok = false;
+        GlobalSimplexMeshBuilder<DomainDimension> builder;
+        if (rank == 0) {
+            GMSHParser parser(&builder);
+            ok = parser.parseFile(*cfg.mesh_file);
+            if (!ok) {
+                std::cerr << *cfg.mesh_file << std::endl << parser.getErrorMessage();
+            }
+        }
+        MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
+        if (ok) {
+            globalMesh = builder.create(PETSC_COMM_WORLD);
+        }
+        if (procs > 1) {
+            // ensure initial element distribution for metis
+            globalMesh->repartitionByHash();
+        }
+    } else if (cfg.generate_mesh && cfg.resolution) {
+        auto meshGen = cfg.generate_mesh->create(*cfg.resolution, PETSC_COMM_WORLD);
+        globalMesh = meshGen.uniformMesh();
+    }
+    if (!globalMesh) {
+        std::cerr
+            << "You must either provide a valid mesh file or provide the mesh generation config "
+               "(including the resolution parameter)."
+            << std::endl;
+        PetscFinalize();
+        return -1;
+    }
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
 
@@ -123,10 +171,10 @@ PetscErrorCode solveSEASProblem(Config const& cfg) {
     // Assemble
     {
         auto interface = ctx.poisson->interfacePetsc();
-        CHKERRQ(interface.createA(&A));
+        CHKERRQ(interface.createA(&ctx.A));
         CHKERRQ(interface.createb(&ctx.b));
     }
-    CHKERRQ(ctx.poisson->assemble(A));
+    CHKERRQ(ctx.poisson->assemble(ctx.A));
     CHKERRQ(ctx.poisson->rhs(ctx.b, ctx.scenario->force(), ctx.scenario->boundary(),
                              ctx.scenario->slip()));
     CHKERRQ(VecDuplicate(ctx.b, &ctx.u));
@@ -137,7 +185,7 @@ PetscErrorCode solveSEASProblem(Config const& cfg) {
     // Setup KSP
     CHKERRQ(KSPCreate(PETSC_COMM_WORLD, &ctx.ksp));
     CHKERRQ(KSPSetType(ctx.ksp, KSPCG));
-    CHKERRQ(KSPSetOperators(ctx.ksp, A, A));
+    CHKERRQ(KSPSetOperators(ctx.ksp, ctx.A, ctx.A));
     CHKERRQ(KSPSetTolerances(ctx.ksp, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
     CHKERRQ(KSPSetFromOptions(ctx.ksp));
 
@@ -168,7 +216,7 @@ PetscErrorCode solveSEASProblem(Config const& cfg) {
     // Clean up
     CHKERRQ(KSPDestroy(&ctx.ksp));
     CHKERRQ(TSDestroy(&ts));
-    CHKERRQ(MatDestroy(&A));
+    CHKERRQ(MatDestroy(&ctx.A));
     CHKERRQ(VecDestroy(&ctx.b));
     CHKERRQ(VecDestroy(&ctx.u));
     CHKERRQ(VecDestroy(&psi));

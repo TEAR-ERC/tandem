@@ -30,6 +30,12 @@ int main(int argc, char** argv) {
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
+    auto makePathRelativeToConfig = [&program](std::string_view path) {
+        auto newPath = fs::path(program.get("config")).parent_path();
+        newPath /= fs::path(path);
+        return newPath;
+    };
+
     TableSchema<Config> schema;
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
@@ -41,13 +47,12 @@ int main(int argc, char** argv) {
     schema.add_value("output_interval", &Config::output_interval)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative output interval");
+    schema.add_value("mesh_file", &Config::mesh_file)
+        .converter(makePathRelativeToConfig)
+        .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
     auto& problemSchema = schema.add_table("problem", &Config::problem);
     problemSchema.add_value("lib", &ProblemConfig::lib)
-        .converter([&program](std::string_view path) {
-            auto newPath = fs::path(program.get("config")).parent_path();
-            newPath /= fs::path(path);
-            return newPath;
-        })
+        .converter(makePathRelativeToConfig)
         .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
     problemSchema.add_value("warp", &ProblemConfig::warp);
     problemSchema.add_value("force", &ProblemConfig::force);
