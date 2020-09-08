@@ -1,6 +1,7 @@
 #include "GMSHParser.h"
 #include "io/GMSHLexer.h"
 
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 

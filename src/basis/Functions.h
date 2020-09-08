@@ -33,7 +33,7 @@
 #define FUNCTIONS_H
 
 #include <array>
-#include <cmath>
+#include <cstddef>
 #include <cstdint>
 
 namespace tndm {

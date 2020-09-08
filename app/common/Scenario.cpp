@@ -1,4 +1,9 @@
 #include "Scenario.h"
+#include "util/Schema.h"
+
+#include <stdexcept>
+#include <string>
+#include <string_view>
 
 namespace tndm {
 

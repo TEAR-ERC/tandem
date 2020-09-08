@@ -1,14 +1,23 @@
 #include "common/CmdLine.h"
+#include "common/Scenario.h"
+#include "config.h"
 #include "tandem/Config.h"
+#include "tandem/Scenario.h"
 #include "tandem/Static.h"
 
 #include "util/Schema.h"
 
 #include <argparse.hpp>
-#include <mpi.h>
 #include <petscsys.h>
+#include <petscsystypes.h>
 
+#include <cstring>
 #include <filesystem>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace fs = std::filesystem;
 using namespace tndm;

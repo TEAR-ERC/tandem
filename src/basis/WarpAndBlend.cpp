@@ -2,8 +2,15 @@
 #include "Functions.h"
 #include "basis/Nodal.h"
 #include "geometry/Affine.h"
+#include "geometry/Vector.h"
 #include "mesh/Simplex.h"
 #include "util/Combinatorics.h"
+
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <iterator>
+#include <limits>
 
 using Eigen::ColPivHouseholderQR;
 using Eigen::Dynamic;

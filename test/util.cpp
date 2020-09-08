@@ -2,6 +2,7 @@
 #include "util/Combinatorics.h"
 #include "util/Zero.h"
 
+#include <array>
 #include <cmath>
 
 using tndm::AllIntegerSums;

@@ -1,11 +1,15 @@
 #include "VTUWriter.h"
 #include "Endianness.h"
+#include "form/FiniteElementFunction.h"
+#include "geometry/Curvilinear.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 
-#include <functional>
 #include <mpi.h>
 #include <numeric>
 
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <iostream>

@@ -1,4 +1,5 @@
 #include "GlobalSimplexMesh.h"
+#include "parallel/MetisPartitioner.h"
 #include "parallel/SortedDistribution.h"
 #include "util/Algorithm.h"
 

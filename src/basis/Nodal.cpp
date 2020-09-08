@@ -1,11 +1,13 @@
 #include "Nodal.h"
 #include "Functions.h"
 #include "quadrules/GaussJacobi.h"
+#include "quadrules/IntervalQuadratureRule.h"
 #include "util/Combinatorics.h"
 
 #include <Eigen/LU>
 
 #include <algorithm>
+#include <cassert>
 #include <iterator>
 
 using Eigen::MatrixXd;

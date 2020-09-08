@@ -1,5 +1,6 @@
 #include "geometry/Curvilinear.h"
 #include "mesh/GenMesh.h"
+#include "mesh/GlobalSimplexMesh.h"
 #include "mesh/MeshData.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
@@ -8,7 +9,11 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 using tndm::BC;

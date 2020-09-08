@@ -6,26 +6,31 @@
 #include "MeshData.h"
 #include "Simplex.h"
 
-#include "mneme/displacements.hpp"
 #include "parallel/CommPattern.h"
 #include "parallel/DistributedCSR.h"
 #include "parallel/MPITraits.h"
-#include "parallel/MetisPartitioner.h"
 #include "parallel/SortedDistribution.h"
-#include "util/Algorithm.h"
+#include "util/Range.h"
 #include "util/Utility.h"
 
+#include <metis.h>
 #include <mpi.h>
 
+#include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
-#include <functional>
+#include <cstdint>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <set>
+#include <tuple>
+#include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 

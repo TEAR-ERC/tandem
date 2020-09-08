@@ -1,17 +1,19 @@
 #ifndef FINITEELEMENTFUNCTION_20200630_H
 #define FINITEELEMENTFUNCTION_20200630_H
 
-#include "form/RefElement.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <memory>
-#include <utility>
+#include <vector>
 
 namespace tndm {
+
+template <std::size_t D> class RefElement;
 
 template <std::size_t D> class FiniteElementFunction {
 public:

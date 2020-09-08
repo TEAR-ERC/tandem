@@ -1,7 +1,8 @@
 #include "CommPattern.h"
-#include "util/Algorithm.h"
 
 #include <cassert>
+#include <cstddef>
+#include <utility>
 
 namespace tndm {
 

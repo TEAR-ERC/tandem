@@ -1,16 +1,30 @@
 #include "Static.h"
 #include "Elasticity.h"
+#include "config.h"
+#include "tandem/Config.h"
+#include "tandem/Scenario.h"
 
+#include "common/InterfacePetsc.h"
+#include "common/Scenario.h"
 #include "form/Error.h"
+#include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "io/VTUWriter.h"
+#include "mesh/GenMesh.h"
+#include "mesh/GlobalSimplexMesh.h"
+#include "tensor/Managed.h"
 #include "util/Stopwatch.h"
 
+#include <mpi.h>
 #include <petscksp.h>
 #include <petscmat.h>
+#include <petscsys.h>
 #include <petscvec.h>
 
 #include <iostream>
+#include <memory>
+#include <optional>
+#include <vector>
 
 namespace tndm {
 

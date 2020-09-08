@@ -1,14 +1,19 @@
-#include <iostream>
-
 #include "basis/Functions.h"
 #include "form/RefElement.h"
 #include "quadrules/AutoRule.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
+#include "tensor/Managed.h"
 #include "util/Combinatorics.h"
 
 #include <Eigen/Core>
 
+#include <array>
+#include <cmath>
 #include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <vector>
 
 using Eigen::DiagonalMatrix;
 using Eigen::MatrixXd;

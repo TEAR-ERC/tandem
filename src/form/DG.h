@@ -1,22 +1,27 @@
 #ifndef DG_20200615_H
 #define DG_20200615_H
 
-#include "form/RefElement.h"
-#include "geometry/Curvilinear.h"
-#include "mesh/LocalSimplexMesh.h"
+#include "mesh/MeshData.h"
 #include "parallel/Scatter.h"
-#include "quadrules/AutoRule.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 
 #include <mneme/storage.hpp>
 #include <mneme/view.hpp>
+#include <mpi.h>
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <vector>
 
 namespace tndm {
+
+template <std::size_t D> class Curvilinear;
+template <std::size_t D> class LocalSimplexMesh;
+template <std::size_t D> class RefElement;
+
 
 template <std::size_t D> class DG {
 public:

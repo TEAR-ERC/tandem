@@ -1,6 +1,13 @@
+#include "form/RefElement.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
+#include "tensor/TensorBase.h"
+
 #include "doctest.h"
 
-#include "form/RefElement.h"
+#include <array>
+#include <cstddef>
+#include <memory>
 
 using namespace tndm;
 

@@ -3,18 +3,18 @@
 
 #include "GlobalSimplexMesh.h"
 #include "MeshData.h"
-#include "parallel/Distribute.h"
-#include "util/MultiIndex.h"
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 

@@ -4,18 +4,23 @@
 #include "config.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
+#include "geometry/Curvilinear.h"
 #include "kernels/poisson/init.h"
 #include "kernels/poisson/kernel.h"
 #include "kernels/poisson/tensor.h"
-#include "parallel/MPITraits.h"
+#include "mesh/MeshData.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
 
-#include <limits>
-#include <petscerror.h>
+#include <Eigen/Core>
 #include <petscmat.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscvec.h>
+
+#include <cassert>
+#include <type_traits>
+#include <utility>
 
 namespace tndm {
 

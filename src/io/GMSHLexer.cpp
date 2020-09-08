@@ -3,7 +3,7 @@
 
 #include <cctype>
 #include <cstdlib>
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 namespace tndm {

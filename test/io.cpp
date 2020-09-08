@@ -1,7 +1,11 @@
+#include "io/GMSHLexer.h"
 #include "io/GMSHParser.h"
 
 #include "doctest.h"
+
+#include <array>
 #include <iostream>
+#include <string_view>
 
 using namespace tndm;
 
