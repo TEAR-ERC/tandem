@@ -1,20 +1,24 @@
 #ifndef CURVILINEAR_20200609_H
 #define CURVILINEAR_20200609_H
 
-#include "basis/Nodal.h"
 #include "basis/WarpAndBlend.h"
 #include "form/RefElement.h"
-#include "mesh/LocalSimplexMesh.h"
-#include "tensor/Managed.h"
+#include "mesh/Simplex.h"
 #include "tensor/Tensor.h"
+#include "tensor/TensorBase.h"
 
+#include <Eigen/Core>
 #include <mneme/storage.hpp>
 #include <mneme/view.hpp>
 
 #include <array>
+#include <cstddef>
 #include <functional>
+#include <vector>
 
 namespace tndm {
+
+template <std::size_t D> class LocalSimplexMesh;
 
 template <std::size_t D> class Curvilinear {
 public:

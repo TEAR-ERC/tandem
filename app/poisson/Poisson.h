@@ -6,12 +6,23 @@
 #include "form/DG.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
-#include "mneme/storage.hpp"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 
+#include "mneme/span.hpp"
+#include "mneme/storage.hpp"
+#include "mneme/view.hpp"
 #include <petscmat.h>
+#include <petscsys.h>
+#include <petscsystypes.h>
 #include <petscvec.h>
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <functional>
+#include <memory>
+#include <vector>
 
 namespace tndm {
 

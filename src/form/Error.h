@@ -1,19 +1,18 @@
 #ifndef ERROR_20200625_H
 #define ERROR_20200625_H
 
-#include "form/FiniteElementFunction.h"
-#include "form/RefElement.h"
-#include "geometry/Curvilinear.h"
-#include "quadrules/AutoRule.h"
-#include "tensor/EigenMap.h"
-#include "tensor/Managed.h"
 #include "tensor/Tensor.h"
-#include "util/Range.h"
 
-#include <array>
-#include <utility>
+#include <mpi.h>
+
+#include <cassert>
+#include <cstddef>
+#include <type_traits>
 
 namespace tndm {
+
+template <std::size_t D> class Curvilinear;
+template <std::size_t D> class FiniteElementFunction;
 
 class SolutionInterface {
 public:

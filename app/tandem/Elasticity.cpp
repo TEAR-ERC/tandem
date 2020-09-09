@@ -1,21 +1,21 @@
 #include "Elasticity.h"
 
 #include "basis/WarpAndBlend.h"
-#include "config.h"
-#include "form/FiniteElementFunction.h"
-#include "form/RefElement.h"
+#include "geometry/Curvilinear.h"
 #include "kernels/elasticity/init.h"
 #include "kernels/elasticity/kernel.h"
 #include "kernels/elasticity/tensor.h"
-#include "parallel/MPITraits.h"
+#include "mesh/MeshData.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
 
-#include <limits>
-#include <petscerror.h>
-#include <petscmat.h>
-#include <petscsys.h>
-#include <petscsystypes.h>
-#include <petscvec.h>
+#include "yateto/TensorView.h"
+#include <Eigen/Core>
+
+#include <cassert>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace tensor = tndm::elasticity::tensor;
 namespace init = tndm::elasticity::init;

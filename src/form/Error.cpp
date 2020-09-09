@@ -1,5 +1,11 @@
 #include "Error.h"
 #include "form/FiniteElementFunction.h"
+#include "geometry/Curvilinear.h"
+#include "parallel/MPITraits.h"
+#include "quadrules/AutoRule.h"
+#include "tensor/Managed.h"
+
+#include <cmath>
 
 namespace tndm {
 

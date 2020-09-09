@@ -1,6 +1,8 @@
 #include "mesh/Simplex.h"
 #include "doctest.h"
 
+#include <array>
+
 using tndm::Simplex;
 
 TEST_CASE("Simplex") {

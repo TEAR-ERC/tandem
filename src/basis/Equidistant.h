@@ -4,6 +4,8 @@
 #include "Nodal.h"
 
 #include <array>
+#include <cstddef>
+#include <vector>
 
 namespace tndm {
 

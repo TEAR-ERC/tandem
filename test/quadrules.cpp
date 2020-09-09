@@ -1,14 +1,21 @@
 #include "basis/Functions.h"
 #include "quadrules/AutoRule.h"
 #include "quadrules/GaussJacobi.h"
+#include "quadrules/IntervalQuadratureRule.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "quadrules/TabulatedRules.h"
 #include "quadrules/TensorProductRule.h"
 #include "util/Combinatorics.h"
 
 #include "doctest.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
+#include <numeric>
 #include <type_traits>
+#include <vector>
 
 using namespace tndm;
 

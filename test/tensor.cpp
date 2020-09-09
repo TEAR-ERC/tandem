@@ -1,7 +1,9 @@
-#include "doctest.h"
 #include "tensor/Tensor.h"
+#include "doctest.h"
 #include "tensor/Managed.h"
+#include "tensor/TensorBase.h"
 
+#include <cstddef>
 #include <numeric>
 
 using namespace tndm;

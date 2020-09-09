@@ -1,14 +1,18 @@
 #include "RefElement.h"
 #include "basis/Functions.h"
+#include "basis/Nodal.h"
 #include "quadrules/AutoRule.h"
 #include "tensor/EigenMap.h"
 #include "tensor/Reshape.h"
+#include "tensor/TensorBase.h"
 #include "util/Combinatorics.h"
 #include "util/Enumerate.h"
 #include "util/MultiIndex.h"
 
 #include <Eigen/Core>
 #include <Eigen/LU>
+
+#include <cassert>
 
 namespace tndm {
 

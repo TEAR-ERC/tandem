@@ -1,8 +1,10 @@
 #include "Curvilinear.h"
 #include "Affine.h"
 #include "Vector.h"
-#include "form/RefElement.h"
+#include "mesh/LocalSimplexMesh.h"
+#include "mesh/MeshData.h"
 #include "tensor/EigenMap.h"
+#include "tensor/Managed.h"
 #include "tensor/Reshape.h"
 
 #include <Eigen/Core>
@@ -11,7 +13,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <stdexcept>

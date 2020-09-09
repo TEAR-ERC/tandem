@@ -1,6 +1,7 @@
 #include "SortedDistribution.h"
-
 #include "MPITraits.h"
+
+#include <cassert>
 
 namespace tndm {
 

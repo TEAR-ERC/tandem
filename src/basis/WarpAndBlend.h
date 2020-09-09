@@ -7,8 +7,11 @@
 #include <Eigen/QR>
 
 #include <array>
+#include <cmath>
+#include <cstddef>
 #include <functional>
 #include <vector>
+#include <utility>
 
 namespace tndm {
 

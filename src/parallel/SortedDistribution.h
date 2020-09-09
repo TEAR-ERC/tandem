@@ -1,7 +1,6 @@
 #ifndef SORTEDDISTRIBUTION_20200710_H
 #define SORTEDDISTRIBUTION_20200710_H
 
-#include <cassert>
 #include <cstddef>
 #include <mpi.h>
 #include <vector>

@@ -1,4 +1,5 @@
 #include "FiniteElementFunction.h"
+#include "form/RefElement.h"
 #include "tensor/EigenMap.h"
 
 #include <Eigen/Core>

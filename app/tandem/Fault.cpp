@@ -6,7 +6,16 @@
 #include "kernels/poisson/init.h"
 #include "kernels/poisson/kernel.h"
 #include "kernels/poisson/tensor.h"
-#include "tandem/Elasticity.h"
+#include "mesh/LocalFaces.h"
+#include "mesh/MeshData.h"
+
+#include <petscsys.h>
+
+#include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
 
 namespace tensor = tndm::poisson::tensor;
 namespace init = tndm::poisson::init;

@@ -1,7 +1,6 @@
 #ifndef REFELEMENT_20200618_H
 #define REFELEMENT_20200618_H
 
-#include "basis/Nodal.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/Combinatorics.h"
@@ -9,10 +8,13 @@
 #include <Eigen/Core>
 
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
 namespace tndm {
+
+template <std::size_t D> class NodesFactory;
 
 /**
  * @brief Function space in reference element

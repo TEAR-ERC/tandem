@@ -8,13 +8,20 @@
 #include "geometry/Curvilinear.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "poisson/Poisson.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 
-#include <mneme/storage.hpp>
-
+#include "mneme/span.hpp"
+#include "mneme/storage.hpp"
+#include "mneme/view.hpp"
 #include <mpi.h>
 #include <petscsystypes.h>
-#include <petscts.h>
 #include <petscvec.h>
+
+#include <array>
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace tndm {
 

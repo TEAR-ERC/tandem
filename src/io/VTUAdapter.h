@@ -2,6 +2,7 @@
 #define VTUADAPTER_20200827_H
 
 #include "geometry/Curvilinear.h"
+#include "util/Range.h"
 
 #include <cstddef>
 #include <vector>

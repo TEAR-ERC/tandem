@@ -7,6 +7,7 @@ extern "C" {
 }
 
 #include <array>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>

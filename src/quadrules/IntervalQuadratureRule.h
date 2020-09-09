@@ -1,7 +1,7 @@
 #ifndef INTERVALQUADRATURERULE_20200615_H
 #define INTERVALQUADRATURERULE_20200615_H
 
-#include <limits>
+#include <cstddef>
 #include <vector>
 
 namespace tndm {
@@ -29,6 +29,6 @@ private:
     double a, b;
 };
 
-}
+} // namespace tndm
 
 #endif // INTERVALQUADRATURERULE_20200615_H

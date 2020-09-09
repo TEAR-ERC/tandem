@@ -1,4 +1,10 @@
 #include "GenMesh.h"
+#include "parallel/Distribute.h"
+#include "util/MultiIndex.h"
+#include "util/Range.h"
+
+#include <algorithm>
+#include <iterator>
 #include <utility>
 
 namespace tndm {

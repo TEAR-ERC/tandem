@@ -1,14 +1,16 @@
 #include "VTUWriter.h"
 #include "Endianness.h"
+#include "form/FiniteElementFunction.h"
+#include "io/VTUAdapter.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 
-#include <functional>
 #include <mpi.h>
 #include <numeric>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <ostream>
 #include <sstream>
 
 using tinyxml2::XMLAttribute;

@@ -1,5 +1,9 @@
 #include "TensorProductRule.h"
 #include "GaussJacobi.h"
+#include "IntervalQuadratureRule.h"
+#include "SimplexQuadratureRule.h"
+
+#include <vector>
 
 namespace tndm {
 

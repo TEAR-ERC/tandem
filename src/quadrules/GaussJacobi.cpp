@@ -1,11 +1,13 @@
 #include "GaussJacobi.h"
 #include "basis/Functions.h"
+#include "quadrules/IntervalQuadratureRule.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+#include <vector>
 
 namespace tndm {
 
@@ -34,4 +36,4 @@ IntervalQuadratureRule GaussJacobi(unsigned n, unsigned a, unsigned b) {
     return rule;
 }
 
-}
+} // namespace tndm

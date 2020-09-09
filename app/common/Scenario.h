@@ -2,9 +2,9 @@
 #define SCENARIO_20200817_H
 
 #include "mesh/GenMesh.h"
-#include "mesh/GlobalSimplexMesh.h"
 #include "mesh/MeshData.h"
-#include "util/Schema.h"
+
+#include <mpi.h>
 
 #include <array>
 #include <cstddef>
@@ -12,6 +12,8 @@
 #include <vector>
 
 namespace tndm {
+
+template <typename T> class TableSchema;
 
 template <std::size_t D> struct BCConfig {
     BC bc;

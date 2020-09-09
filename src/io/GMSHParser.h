@@ -4,12 +4,10 @@
 #include "GMSHLexer.h"
 
 #include <array>
-#include <cstddef>
-#include <memory>
 #include <optional>
 #include <streambuf>
 #include <string>
-#include <vector>
+#include <string_view>
 
 namespace tndm {
 

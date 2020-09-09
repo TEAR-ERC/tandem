@@ -3,22 +3,22 @@
 
 #include "DataType.h"
 #include "basis/Equidistant.h"
-#include "form/FiniteElementFunction.h"
-#include "form/RefElement.h"
-#include "io/VTUAdapter.h"
-#include "tensor/Tensor.h"
-#include "util/Range.h"
 
 #include <mpi.h>
 #include <tinyxml2.h>
 #include <zlib.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
 namespace tndm {
 
+template <std::size_t D> class FiniteElementFunction;
+template <std::size_t D> class VTUAdapter;
 template <std::size_t D> class VTUPiece;
 
 template <std::size_t D> class VTUWriter {

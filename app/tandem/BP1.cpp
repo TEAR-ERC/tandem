@@ -2,7 +2,6 @@
 
 #include "util/Zero.h"
 
-#include <cassert>
 #include <cmath>
 
 namespace tndm {

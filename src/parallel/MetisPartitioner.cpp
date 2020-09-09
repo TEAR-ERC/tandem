@@ -1,5 +1,7 @@
 #include "MetisPartitioner.h"
 
+#include <parmetis.h>
+
 namespace tndm {
 
 std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr, idx_t ncommonnodes,

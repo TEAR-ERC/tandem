@@ -3,12 +3,15 @@
 
 #include <argparse.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
-#include <memory>
-#include <random>
-
 #include <iostream>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 using tndm::LebesgueFunction;
 using tndm::warpAndBlendAlpha;

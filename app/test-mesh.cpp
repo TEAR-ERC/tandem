@@ -2,16 +2,26 @@
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
-#include "mesh/GlobalSimplexMesh.h"
+#include "mesh/LocalFaces.h"
+#include "mesh/LocalSimplexMesh.h"
 #include "mesh/MeshData.h"
+#include "tensor/Managed.h"
 #include "util/Range.h"
 
 #include <argparse.hpp>
 #include <mpi.h>
-#include <parmetis.h>
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 using tndm::BC;
 using tndm::BoundaryData;

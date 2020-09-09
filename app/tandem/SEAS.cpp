@@ -1,24 +1,43 @@
 #include "SEAS.h"
 #include "Fault.h"
+#include "common/InterfacePetsc.h"
+#include "common/Scenario.h"
+#include "config.h"
 #include "poisson/Poisson.h"
+#include "tandem/Config.h"
+#include "tandem/Scenario.h"
+#include "tensor/Managed.h"
 
-#include "form/Error.h"
+#include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
-#include "geometry/Vector.h"
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
+#include "mesh/GenMesh.h"
+#include "mesh/GlobalSimplexMesh.h"
+#include "quadrules/SimplexQuadratureRule.h"
+#include "util/Range.h"
 #include "util/Stopwatch.h"
 
+#include <mpi.h>
 #include <petscksp.h>
 #include <petscmat.h>
 #include <petscsys.h>
 #include <petscts.h>
 #include <petscvec.h>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
 #include <iostream>
+#include <limits>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace tndm {
 

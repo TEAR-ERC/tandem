@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 template <std::size_t D>

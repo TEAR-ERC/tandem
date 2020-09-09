@@ -2,6 +2,7 @@
 #define BASIS_NODAL_H
 
 #include <array>
+#include <cstddef>
 #include <vector>
 
 #include <Eigen/Core>

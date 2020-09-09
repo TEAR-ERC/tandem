@@ -1,10 +1,12 @@
 #ifndef METISPARTITIONER_H
 #define METISPARTITIONER_H
 
-#include <mpi.h>
-#include <parmetis.h>
+#include "parallel/DistributedCSR.h"
 
-#include "DistributedCSR.h"
+#include <metis.h>
+#include <mpi.h>
+
+#include <vector>
 
 namespace tndm {
 

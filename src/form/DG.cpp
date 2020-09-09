@@ -1,13 +1,16 @@
 #include "DG.h"
 #include "form/RefElement.h"
+#include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
-#include "util/Combinatorics.h"
-#include "util/Enumerate.h"
+#include "mesh/LocalSimplexMesh.h"
+#include "quadrules/AutoRule.h"
 
-#include <memory>
 #include <mpi.h>
+
+#include <cassert>
+#include <iterator>
+#include <memory>
 #include <stdexcept>
-#include <utility>
 
 namespace tndm {
 
