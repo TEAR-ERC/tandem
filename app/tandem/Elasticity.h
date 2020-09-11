@@ -131,7 +131,7 @@ private:
     Managed<Matrix<double>> minv;
     Managed<Matrix<double>> enodal;
 
-    double penalty(FacetInfo const& info) const {
+    double penalty(MyFacetInfo const& info) const {
         auto lambdaMax = [&](std::size_t elNo) {
             auto nbf = nodalRefElement_.numBasisFunctions();
             auto field = userVol[elNo].get<lam>().data();

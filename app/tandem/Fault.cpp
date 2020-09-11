@@ -3,6 +3,7 @@
 #include "BP1.h"
 #include "basis/WarpAndBlend.h"
 #include "config.h"
+#include "form/BC.h"
 #include "kernels/poisson/init.h"
 #include "kernels/poisson/kernel.h"
 #include "kernels/poisson/tensor.h"

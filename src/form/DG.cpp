@@ -3,6 +3,7 @@
 #include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
 #include "mesh/LocalSimplexMesh.h"
+#include "mesh/MeshData.h"
 #include "quadrules/AutoRule.h"
 
 #include <mpi.h>

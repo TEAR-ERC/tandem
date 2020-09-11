@@ -6,12 +6,16 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     J = Tensor('J', (Nq,))
     G = Tensor('G', (dim, dim, Nq))
     K = Tensor('K', (Nbf,))
+    K_Q = Tensor('K_Q', (Nq,))
     W = Tensor('W', (Nq,))
     E = Tensor('E', (Nbf, Nq))
     Em = Tensor('Em', (Nq, Nbf))
     D_xi = Tensor('D_xi', (Nbf, dim, Nq))
     D_x = Tensor('D_x', D_xi.shape())
     A = Tensor('A', (Nbf, Nbf))
+    matMinv = Tensor('matMinv', (Nbf, Nbf))
+
+    generator.add('project_K', K['p'] <= matMinv['pk'] * K_Q['q'] * Em['qk'] * W['q'])
 
     generator.add('assembleVolume', [
         D_x['kiq'] <= G['eiq'] * D_xi['keq'],

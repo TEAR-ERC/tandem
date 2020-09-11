@@ -1,7 +1,7 @@
 #ifndef DG_20200615_H
 #define DG_20200615_H
 
-#include "mesh/MeshData.h"
+#include "form/BC.h"
 #include "parallel/Scatter.h"
 #include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
@@ -21,7 +21,6 @@ namespace tndm {
 template <std::size_t D> class Curvilinear;
 template <std::size_t D> class LocalSimplexMesh;
 template <std::size_t D> class RefElement;
-
 
 template <std::size_t D> class DG {
 public:
@@ -77,7 +76,7 @@ protected:
         using type = std::array<double, D>;
     };
 
-    struct FacetInfo {
+    struct MyFacetInfo {
         std::array<bool, 2> inside;
         std::array<std::size_t, 2> up;
         std::array<std::size_t, 2> g_up;
@@ -85,7 +84,7 @@ protected:
         double area;
         BC bc;
     };
-    std::vector<FacetInfo> fctInfo;
+    std::vector<MyFacetInfo> fctInfo;
 
     struct GID {
         using type = std::size_t;

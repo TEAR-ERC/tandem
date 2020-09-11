@@ -25,6 +25,8 @@ target_link_libraries(tandem-fem-lib PUBLIC
 # Add everything else here
 add_library(tandem-lib
     form/DG.cpp
+    form/DGCurvilinearCommon.cpp
+    form/DGOperatorTopo.cpp
     form/Error.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
@@ -37,6 +39,7 @@ add_library(tandem-lib
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
     script/LuaLib.cpp
+    util/LinearAllocator.cpp
     util/Zero.cpp
 )
 

@@ -4,6 +4,7 @@
 #include "TensorBase.h"
 #include "util/Sequence.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <type_traits>
@@ -70,6 +71,8 @@ public:
 
     multi_index_t const& stride() const { return stride_; }
     index_t stride(index_t pos) const { return stride_[pos]; }
+
+    void set_zero() { std::fill(data_, data_ + size(), RealT(0.0)); }
 
 protected:
     void computeStride() {

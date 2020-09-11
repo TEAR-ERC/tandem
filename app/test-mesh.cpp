@@ -1,3 +1,4 @@
+#include "form/BC.h"
 #include "geometry/Curvilinear.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"

@@ -7,9 +7,9 @@
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
 
+#include "mneme/storage.hpp"
+#include "mneme/view.hpp"
 #include <Eigen/Core>
-#include <mneme/storage.hpp>
-#include <mneme/view.hpp>
 
 #include <array>
 #include <cstddef>

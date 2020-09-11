@@ -6,6 +6,7 @@
 #include "form/DG.h"
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
+#include "geometry/Curvilinear.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 
@@ -80,7 +81,7 @@ private:
     Managed<Matrix<double>> minv;
     Managed<Matrix<double>> enodal;
 
-    double penalty(FacetInfo const& info) const {
+    double penalty(MyFacetInfo const& info) const {
         auto Kmax = [&](std::size_t elNo) {
             auto nbf = nodalRefElement_.numBasisFunctions();
             auto Kfield = userVol[elNo].get<K>().data();

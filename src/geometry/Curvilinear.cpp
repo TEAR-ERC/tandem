@@ -178,6 +178,7 @@ TensorBase<Matrix<double>> Curvilinear<D>::normalResultInfo(std::size_t numPoint
 template <std::size_t D>
 void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
                             Tensor<double, 3u> const& jInv, Tensor<double, 2u>& result) const {
+    assert(faceNo < D + 1u);
     // n_{iq} = |J|_q J^{-T}_{ijq} N_j
     for (std::ptrdiff_t i = 0; i < detJ.shape(0); ++i) {
         auto jInvAtP = jInv.subtensor(slice{}, slice{}, i);

@@ -5,6 +5,7 @@ lib = "embedded.lua"
 boundary = "solution"
 slip = "slip"
 solution = "solution"
+ref_normal = [1, 0]
 
 [generate_mesh]
 intercepts = [

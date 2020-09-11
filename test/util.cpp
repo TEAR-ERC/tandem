@@ -1,13 +1,16 @@
 #include "doctest.h"
 #include "util/Combinatorics.h"
+#include "util/LinearAllocator.h"
 #include "util/Zero.h"
 
 #include <array>
 #include <cmath>
+#include <new>
 
 using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::Choose;
+using tndm::LinearAllocator;
 using tndm::zeroIn;
 
 TEST_CASE("Combinatorics") {
@@ -147,4 +150,33 @@ TEST_CASE("Root finding") {
 
     auto F4 = [](double x) { return 1.0 - std::asinh(x) - x; };
     CHECK(zeroIn(-1.0, 1.0, F4) == doctest::Approx(0.50992693151945222578));
+}
+
+TEST_CASE("Allocator") {
+    alignas(32) char test[128];
+    auto allocator = LinearAllocator(test, test + 128);
+
+    void* mem = allocator.allocate(32);
+    CHECK(mem == reinterpret_cast<void*>(&test[0]));
+
+    double* dmem = allocator.allocate<double>(2);
+    CHECK(reinterpret_cast<void*>(dmem) == reinterpret_cast<void*>(&test[32]));
+
+    mem = allocator.allocate(1);
+    CHECK(mem == reinterpret_cast<void*>(&test[48]));
+
+    bool except = false;
+    try {
+        mem = allocator.allocate(1000);
+    } catch (std::bad_alloc const&) {
+        except = true;
+    }
+    REQUIRE(except);
+
+    dmem = allocator.allocate<double>(4, 32);
+    CHECK(reinterpret_cast<void*>(dmem) == reinterpret_cast<void*>(&test[64]));
+
+    allocator.reset();
+    mem = allocator.allocate(128);
+    CHECK(mem == reinterpret_cast<void*>(&test[0]));
 }

@@ -1,8 +1,8 @@
 #ifndef SCENARIO_20200817_H
 #define SCENARIO_20200817_H
 
+#include "form/BC.h"
 #include "mesh/GenMesh.h"
-#include "mesh/MeshData.h"
 
 #include <mpi.h>
 

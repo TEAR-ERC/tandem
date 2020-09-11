@@ -1,11 +1,11 @@
 #include "Elasticity.h"
 
 #include "basis/WarpAndBlend.h"
+#include "form/BC.h"
 #include "geometry/Curvilinear.h"
 #include "kernels/elasticity/init.h"
 #include "kernels/elasticity/kernel.h"
 #include "kernels/elasticity/tensor.h"
-#include "mesh/MeshData.h"
 #include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
 
