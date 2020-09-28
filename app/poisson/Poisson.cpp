@@ -306,8 +306,9 @@ void Poisson::grad_u(std::size_t fctNo, double const* U, Matrix<double>& result)
 }
 
 FiniteElementFunction<DomainDimension> Poisson::finiteElementFunction(Vec x) const {
-    auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::b::Shape[0],
-                                                          1, numLocalElements());
+    assert(tensor::b::Shape[0] == refElement_->numBasisFunctions());
+    auto numeric =
+        FiniteElementFunction<DomainDimension>(refElement_->clone(), 1, numLocalElements());
     PetscScalar const* values;
     VecGetArrayRead(x, &values);
     auto& data = numeric.values();

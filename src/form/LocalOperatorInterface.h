@@ -46,6 +46,10 @@ public:
                       LinearAllocator& scratch) const {
         return false;
     }
+
+    auto solution_prototype(std::size_t numLocalElements) const;
+    auto coefficients_prototype(std::size_t numLocalElements) const;
+    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator& scratch) const;
 };
 
 } // namespace tndm

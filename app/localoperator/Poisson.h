@@ -5,6 +5,7 @@
 
 #include "form/DGCurvilinearCommon.h"
 #include "form/FacetInfo.h"
+#include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "tensor/Managed.h"
@@ -60,7 +61,15 @@ public:
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
 
-    RefElement<DomainDimension> const& space() const { return space_; }
+    FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
+        return FiniteElementFunction<DomainDimension>(space_.clone(), 1, numLocalElements);
+    }
+
+    FiniteElementFunction<DomainDimension>
+    coefficients_prototype(std::size_t numLocalElements) const {
+        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), 1, numLocalElements);
+    }
+    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const;
 
 private:
     double penalty(FacetInfo const& info) const {

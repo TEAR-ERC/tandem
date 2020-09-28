@@ -14,6 +14,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <utility>
 
 namespace tndm {
 
@@ -73,17 +74,20 @@ public:
         CHKERRTHROW(KSPSolve(ksp_, b_, x_));
     }
 
-    // TODO: Shouldn't really be here -> move
-    template <std::size_t D> FiniteElementFunction<D> solution(RefElement<D> const& space) const {
-        assert(blockSize_ != 0 && blockSize_ % space.numBasisFunctions() == 0);
-        auto numQuantities = blockSize_ / space.numBasisFunctions();
-        PetscScalar const* values;
-        VecGetArrayRead(x_, &values);
-        auto numeric =
-            FiniteElementFunction<D>(space.clone(), values, numQuantities, numLocalElems_);
-        VecRestoreArrayRead(x_, &values);
-        return numeric;
+    void begin_solution() {
+        CHKERRTHROW(VecGetArrayRead(x_, &xv_));
+        CHKERRTHROW(VecGetOwnershipRange(x_, &gidRange_.first, &gidRange_.second));
     }
+    void get_solution(std::size_t ib, Vector<double>& x) {
+        assert(blockSize_ == x.size());
+        std::size_t i = ib * blockSize_;
+        assert(gidRange_.first <= i && i < gidRange_.second);
+        std::size_t offset = i - gidRange_.first;
+        for (std::size_t i = 0; i < blockSize_; ++i) {
+            x(i) = xv_[offset + i];
+        }
+    }
+    void end_solution() { CHKERRTHROW(VecRestoreArrayRead(x_, &xv_)); }
 
     KSP ksp() { return ksp_; }
 
@@ -94,6 +98,9 @@ private:
     KSP ksp_ = nullptr;
     std::size_t numLocalElems_ = 0;
     std::size_t blockSize_ = 0;
+
+    PetscScalar const* xv_;
+    std::pair<PetscInt, PetscInt> gidRange_;
 };
 
 } // namespace tndm

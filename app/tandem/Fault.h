@@ -55,8 +55,8 @@ public:
         // auto fun = FiniteElementFunction<DomainDimension - 1u>(
         // refElement_.clone(), Xraw, refElement_.numBasisFunctions(), 2, fctNos_.size());
         auto X = tensor(Xraw);
-        auto fun = FiniteElementFunction<DomainDimension - 1u>(
-            refElement_.clone(), refElement_.numBasisFunctions(), 4, fctNos_.size());
+        auto fun =
+            FiniteElementFunction<DomainDimension - 1u>(refElement_.clone(), 4, fctNos_.size());
         for (std::size_t faultNo = 0; faultNo < info_.size(); ++faultNo) {
             auto tau = info_[faultNo].get<Tau>();
             auto V = info_[faultNo].get<SlipRate>();

@@ -92,7 +92,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const&
         std::cout << "Iterations: " << its << std::endl;
     }
 
-    auto numeric = solver.solution(dgop.lop().space());
+    auto numeric = dgop.solution(solver);
     auto solution = scenario->solution();
     if (solution) {
         double error = tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->solution(), 0,
@@ -103,10 +103,12 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const&
     }
 
     if (cfg.output) {
+        auto coeffs = dgop.coefficients();
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.numLocalElements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
+        piece.addPointData("K", coeffs);
         writer.write(*cfg.output);
     }
 }

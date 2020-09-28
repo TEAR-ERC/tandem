@@ -2,10 +2,13 @@
 #define DGOPERATOR_20200909_H
 
 #include "form/DGOperatorTopo.h"
+#include "form/FiniteElementFunction.h"
 #include "tensor/Managed.h"
+#include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
 
+#include <cassert>
 #include <memory>
 #include <utility>
 
@@ -135,6 +138,35 @@ public:
             }
         }
         solver.end_rhs();
+    }
+
+    template <typename Solver> auto solution(Solver& solver) const {
+        auto soln = lop_->solution_prototype(base::numLocalElements());
+        auto& values = soln.values();
+        auto value_matrix = reshape(values, lop_->block_size(), base::numLocalElements());
+
+        solver.begin_solution();
+        for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
+            auto ib = base::volInfo[elNo].template get<typename base::GID>();
+            auto block = value_matrix.subtensor(slice{}, elNo);
+            solver.get_solution(ib, block);
+        }
+        solver.end_solution();
+        return soln;
+    }
+
+    auto coefficients() const {
+        auto coeffs = lop_->coefficients_prototype(base::numLocalElements());
+        auto& values = coeffs.values();
+
+        auto scratch =
+            LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
+            scratch.reset();
+            auto C = values.subtensor(slice{}, slice{}, elNo);
+            lop_->coefficients_volume(elNo, C, scratch);
+        }
+        return coeffs;
     }
 
 private:

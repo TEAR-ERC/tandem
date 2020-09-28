@@ -21,6 +21,10 @@ public:
     void begin_rhs() {}
     void add_rhs(std::size_t ib, Vector<double> const& B) {}
     void end_rhs() {}
+
+    void begin_solution() {}
+    void get_solution(std::size_t ib, Vector<double>& X) {}
+    void end_solution() {}
 };
 
 } // namespace tndm

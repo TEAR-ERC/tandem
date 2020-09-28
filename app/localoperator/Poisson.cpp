@@ -265,4 +265,12 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     return true;
 }
 
+void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const {
+    auto const coeff_K = material[elNo].get<K>();
+    assert(coeff_K.size() == C.shape(0));
+    for (std::size_t i = 0; i < coeff_K.size(); ++i) {
+        C(i, 0) = coeff_K[i];
+    }
+}
+
 } // namespace tndm::tmp

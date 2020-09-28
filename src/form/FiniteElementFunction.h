@@ -24,11 +24,10 @@ public:
         std::copy(data, data + data_.size(), data_.data());
     }
 
-    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement,
-                          std::size_t numberOfBasisFunctions, std::size_t numberOfQuantities,
+    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement, std::size_t numberOfQuantities,
                           std::size_t numberOfElements)
         : refElement_(std::move(refElement)),
-          data_(numberOfBasisFunctions, numberOfQuantities, numberOfElements) {}
+          data_(refElement_->numBasisFunctions(), numberOfQuantities, numberOfElements) {}
 
     Managed<Matrix<double>>
     evaluationMatrix(std::vector<std::array<double, D>> const& points) const;

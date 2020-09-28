@@ -450,8 +450,9 @@ auto Elasticity::makeFacetFunctional(vector_functional_t fun) const -> facet_fun
 }
 
 FiniteElementFunction<DomainDimension> Elasticity::finiteElementFunction(Vec x) const {
-    auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::U::Shape[0],
-                                                          tensor::U::Shape[1], numLocalElements());
+    assert(refElement_->numBasisFunctions() == tensor::U::Shape[0]);
+    auto numeric = FiniteElementFunction<DomainDimension>(refElement_->clone(), tensor::U::Shape[1],
+                                                          numLocalElements());
     PetscScalar const* values;
     VecGetArrayRead(x, &values);
     auto& data = numeric.values();
