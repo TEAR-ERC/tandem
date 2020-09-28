@@ -87,8 +87,7 @@ public:
 private:
     template <typename T> FiniteElementFunction<DomainDimension> discreteField() const {
         return FiniteElementFunction<DomainDimension>(
-            nodalRefElement_.clone(), userVol[0].get<T>().data(),
-            nodalRefElement_.numBasisFunctions(), 1, numLocalElements());
+            nodalRefElement_.clone(), userVol[0].get<T>().data(), 1, numLocalElements());
     }
 
     struct lam {

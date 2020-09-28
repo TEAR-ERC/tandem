@@ -61,8 +61,7 @@ public:
 
     FiniteElementFunction<DomainDimension> discreteK() const {
         return FiniteElementFunction<DomainDimension>(
-            nodalRefElement_.clone(), userVol[0].get<K>().data(),
-            nodalRefElement_.numBasisFunctions(), 1, numLocalElements());
+            nodalRefElement_.clone(), userVol[0].get<K>().data(), 1, numLocalElements());
     }
 
 private:

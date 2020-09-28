@@ -18,10 +18,9 @@ template <std::size_t D> class RefElement;
 template <std::size_t D> class FiniteElementFunction {
 public:
     FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement, double const* data,
-                          std::size_t numberOfBasisFunctions, std::size_t numberOfQuantities,
-                          std::size_t numberOfElements)
+                          std::size_t numberOfQuantities, std::size_t numberOfElements)
         : refElement_(std::move(refElement)),
-          data_(numberOfBasisFunctions, numberOfQuantities, numberOfElements) {
+          data_(refElement_->numBasisFunctions(), numberOfQuantities, numberOfElements) {
         std::copy(data, data + data_.size(), data_.data());
     }
 

@@ -79,8 +79,8 @@ public:
         auto numQuantities = blockSize_ / space.numBasisFunctions();
         PetscScalar const* values;
         VecGetArrayRead(x_, &values);
-        auto numeric = FiniteElementFunction<D>(space.clone(), values, space.numBasisFunctions(),
-                                                numQuantities, numLocalElems_);
+        auto numeric =
+            FiniteElementFunction<D>(space.clone(), values, numQuantities, numLocalElems_);
         VecRestoreArrayRead(x_, &values);
         return numeric;
     }
