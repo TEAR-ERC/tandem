@@ -79,7 +79,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 }
 
 template <std::size_t D>
-void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator& scratch) {
+void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
+                                                          LinearAllocator& scratch) {
     double* Jmem = scratch.allocate<double>(volRule.size() * D * D);
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(volRule.size()));
     auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),

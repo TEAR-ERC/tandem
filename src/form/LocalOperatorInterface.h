@@ -17,9 +17,10 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets) {}
+    void prepare_volume(std::size_t elNo, LinearAllocator& scratch) {}
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {}
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {}
-    void prepare_volume(std::size_t elNo, LinearAllocator& scratch) {}
+    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch) {}
     void end_preparation(Scatter& elementScatter) {}
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00, LinearAllocator& scratch) const {
@@ -34,6 +35,10 @@ public:
                            Matrix<double>& A01, LinearAllocator& scratch) const {
         return false;
     }
+    bool assemble_volume_post_skeleton(std::size_t elNo, Matrix<double>& A00,
+                                       LinearAllocator& scratch) const {
+        return false;
+    }
 
     bool rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const {
         return false;
@@ -44,6 +49,10 @@ public:
     }
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator& scratch) const {
+        return false;
+    }
+    bool rhs_volume_post_skeleton(std::size_t elNo, Vector<double>& B,
+                                  LinearAllocator& scratch) const {
         return false;
     }
 

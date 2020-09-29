@@ -35,7 +35,7 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
-    void prepare_volume(std::size_t elNo, LinearAllocator& scratch);
+    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch);
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00, LinearAllocator& scratch) const;
     bool assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
@@ -50,6 +50,16 @@ public:
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator& scratch) const;
 
+    FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
+        return FiniteElementFunction<DomainDimension>(space_.clone(), 1, numLocalElements);
+    }
+
+    FiniteElementFunction<DomainDimension>
+    coefficients_prototype(std::size_t numLocalElements) const {
+        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), 1, numLocalElements);
+    }
+    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const;
+
     void set_force(functional_t<1> fun) { fun_force = make_volume_functional(std::move(fun)); }
     void set_force(volume_functional_t fun) { fun_force = std::move(fun); }
     void set_dirichlet(functional_t<1> fun) {
@@ -60,16 +70,6 @@ public:
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
-
-    FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(space_.clone(), 1, numLocalElements);
-    }
-
-    FiniteElementFunction<DomainDimension>
-    coefficients_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), 1, numLocalElements);
-    }
-    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const;
 
 private:
     double penalty(FacetInfo const& info) const {

@@ -48,8 +48,8 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
         numElements, materialSpace_.numBasisFunctions());
 }
 
-void Poisson::prepare_volume(std::size_t elNo, LinearAllocator& scratch) {
-    base::prepare_volume(elNo, scratch);
+void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch) {
+    base::prepare_volume_post_skeleton(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
     double K_Q_raw[tensor::K_Q::size()];

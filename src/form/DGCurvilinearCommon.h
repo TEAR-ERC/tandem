@@ -42,7 +42,7 @@ public:
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {
         prepare_bndskl(fctNo, info, true, scratch);
     }
-    void prepare_volume(std::size_t elNo, LinearAllocator& scratch);
+    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch);
     void end_preparation(Scatter& elementScatter);
 
     template <std::size_t Q>
@@ -131,13 +131,10 @@ protected:
     struct Coords {
         using type = std::array<double, D>;
     };
-    struct K {
-        using type = double;
-    };
 
     using fct_t =
         mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, NormalLength, Coords>;
-    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, K>;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
