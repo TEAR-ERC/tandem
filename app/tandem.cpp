@@ -1,5 +1,5 @@
 #include "common/CmdLine.h"
-#include "common/Scenario.h"
+#include "common/MeshConfig.h"
 #include "config.h"
 #include "tandem/Config.h"
 #include "tandem/SEAS.h"

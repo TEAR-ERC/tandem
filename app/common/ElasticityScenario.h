@@ -1,8 +1,8 @@
-#ifndef POISSONSCENARIO_20200930_H
-#define POISSONSCENARIO_20200930_H
+#ifndef ELASTICITYSCENARIO_20200930_H
+#define ELASTICITYSCENARIO_20200930_H
 
 #include "config.h"
-#include "localoperator/Poisson.h"
+#include "localoperator/Elasticity.h"
 
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
@@ -10,56 +10,63 @@
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
+#include <Eigen/src/Core/util/Macros.h>
 #include <optional>
 #include <string>
 
 namespace tndm {
 
-struct PoissonScenarioConfig {
+struct ElasticityScenarioConfig {
     std::string lib;
     std::optional<std::string> warp;
     std::optional<std::string> force;
     std::optional<std::string> boundary;
     std::optional<std::string> slip;
-    std::optional<std::string> coefficient;
+    std::optional<std::string> lam;
+    std::optional<std::string> mu;
     std::optional<std::string> solution;
     std::optional<std::array<double, DomainDimension>> ref_normal;
 
     template <typename PathConverter>
-    static void setSchema(TableSchema<PoissonScenarioConfig>& schema,
+    static void setSchema(TableSchema<ElasticityScenarioConfig>& schema,
                           PathConverter path_converter) {
-        schema.add_value("lib", &PoissonScenarioConfig::lib)
+        schema.add_value("lib", &ElasticityScenarioConfig::lib)
             .converter(path_converter)
             .validator(PathExists());
-        schema.add_value("warp", &PoissonScenarioConfig::warp);
-        schema.add_value("force", &PoissonScenarioConfig::force);
-        schema.add_value("boundary", &PoissonScenarioConfig::boundary);
-        schema.add_value("slip", &PoissonScenarioConfig::slip);
-        schema.add_value("coefficient", &PoissonScenarioConfig::coefficient);
-        schema.add_value("solution", &PoissonScenarioConfig::solution);
-        schema.add_array("ref_normal", &PoissonScenarioConfig::ref_normal).of_values();
+        schema.add_value("warp", &ElasticityScenarioConfig::warp);
+        schema.add_value("force", &ElasticityScenarioConfig::force);
+        schema.add_value("boundary", &ElasticityScenarioConfig::boundary);
+        schema.add_value("slip", &ElasticityScenarioConfig::slip);
+        schema.add_value("lam", &ElasticityScenarioConfig::lam);
+        schema.add_value("mu", &ElasticityScenarioConfig::mu);
+        schema.add_value("solution", &ElasticityScenarioConfig::solution);
+        schema.add_array("ref_normal", &ElasticityScenarioConfig::ref_normal).of_values();
     }
 };
 
-class PoissonScenario {
+class ElasticityScenario {
 public:
     using solution_t = std::function<std::array<double, 1>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
-    template <std::size_t Q> using functional_t = tmp::Poisson::functional_t<Q>;
+    template <std::size_t Q> using functional_t = tmp::Elasticity::functional_t<Q>;
+    static constexpr std::size_t NumQuantities = tmp::Elasticity::NumQuantities;
 
-    PoissonScenario(PoissonScenarioConfig const& problem) : ref_normal_(problem.ref_normal) {
+    ElasticityScenario(ElasticityScenarioConfig const& problem) : ref_normal_(problem.ref_normal) {
         lib_.loadFile(problem.lib);
 
         if (problem.warp) {
             warp_ = lib_.getFunction<DomainDimension, DomainDimension>(*problem.warp);
         }
-        if (problem.coefficient) {
-            coefficient_ = lib_.getFunction<DomainDimension, 1>(*problem.coefficient);
+        if (problem.lam) {
+            lam_ = lib_.getFunction<DomainDimension, 1>(*problem.lam);
+        }
+        if (problem.mu) {
+            mu_ = lib_.getFunction<DomainDimension, 1>(*problem.mu);
         }
         auto functional = [](LuaLib& lib, std::optional<std::string> const& opt,
-                             std::optional<functional_t<1>>& target) {
+                             std::optional<functional_t<NumQuantities>>& target) {
             if (opt) {
-                target = std::make_optional(lib.getFunction<DomainDimension, 1>(*opt));
+                target = std::make_optional(lib.getFunction<DomainDimension, NumQuantities>(*opt));
             }
         };
         functional(lib_, problem.force, force_);
@@ -87,10 +94,11 @@ public:
         }
         return nullptr;
     }
-    auto const& coefficient() const { return coefficient_; }
+    auto const& lam() const { return lam_; }
+    auto const& mu() const { return mu_; }
 
     auto make_local_operator(Curvilinear<DomainDimension> const& cl) const {
-        auto poisson = std::make_unique<tmp::Poisson>(cl, coefficient_);
+        auto poisson = std::make_unique<tmp::Elasticity>(cl, lam_, mu_);
         if (force_) {
             poisson->set_force(*force_);
         }
@@ -107,14 +115,16 @@ private:
     std::optional<std::array<double, DomainDimension>> ref_normal_;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
-    functional_t<1> coefficient_ =
+    functional_t<1> lam_ =
         [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> { return {1.0}; };
-    std::optional<functional_t<1>> force_ = std::nullopt;
-    std::optional<functional_t<1>> boundary_ = std::nullopt;
-    std::optional<functional_t<1>> slip_ = std::nullopt;
+    functional_t<1> mu_ =
+        [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> { return {1.0}; };
+    std::optional<functional_t<NumQuantities>> force_ = std::nullopt;
+    std::optional<functional_t<NumQuantities>> boundary_ = std::nullopt;
+    std::optional<functional_t<NumQuantities>> slip_ = std::nullopt;
     std::optional<solution_t> solution_ = std::nullopt;
 };
 
 } // namespace tndm
 
-#endif // POISSONSCENARIO_20200930_H
+#endif // ELASTICITYSCENARIO_20200930_H

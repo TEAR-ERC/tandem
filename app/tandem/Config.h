@@ -1,7 +1,7 @@
 #ifndef CONFIG_20200825_H
 #define CONFIG_20200825_H
 
-#include "common/Scenario.h"
+#include "common/MeshConfig.h"
 #include "config.h"
 #include "tandem/Scenario.h"
 

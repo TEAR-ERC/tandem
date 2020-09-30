@@ -1,9 +1,10 @@
 #include "localoperator/Poisson.h"
 #include "common/CmdLine.h"
+#include "common/ElasticityScenario.h"
+#include "common/MeshConfig.h"
 #include "common/PetscSolver.h"
 #include "common/PetscUtil.h"
 #include "common/PoissonScenario.h"
-#include "common/Scenario.h"
 #include "config.h"
 #include "mesh/LocalSimplexMesh.h"
 
@@ -20,6 +21,7 @@
 #include "tensor/Managed.h"
 #include "util/Range.h"
 #include "util/Schema.h"
+#include "util/SchemaHelper.h"
 #include "util/Stopwatch.h"
 
 #include <argparse.hpp>
@@ -31,7 +33,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -40,39 +41,30 @@
 #include <utility>
 #include <vector>
 
-namespace fs = std::filesystem;
 using namespace tndm;
 
 struct Config {
     std::optional<double> resolution;
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
-    PoissonScenarioConfig problem;
+    std::optional<PoissonScenarioConfig> poisson;
+    std::optional<ElasticityScenarioConfig> elasticity;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
-void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+template <class Scenario>
+void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
+                    std::optional<std::string> const& output) {
     tndm::Stopwatch sw;
 
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
-    auto scenario = std::make_unique<PoissonScenario>(cfg.problem);
-    Curvilinear<DomainDimension> cl(mesh, scenario->transform(), PolynomialDegree);
+    Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
 
-    auto poisson = std::make_unique<tmp::Poisson>(cl, scenario->coefficient());
-    if (scenario->force()) {
-        poisson->set_force(*scenario->force());
-    }
-    if (scenario->boundary()) {
-        poisson->set_dirichlet(*scenario->boundary());
-    }
-    if (scenario->slip() && cfg.problem.ref_normal) {
-        poisson->set_slip(*scenario->slip(), *cfg.problem.ref_normal);
-    }
-
-    auto dgop =
-        DGOperator<DomainDimension, tmp::Poisson>(mesh, std::move(poisson), PETSC_COMM_WORLD);
+    auto lop = scenario.make_local_operator(cl);
+    auto dgop = DGOperator<DomainDimension, typename decltype(lop)::element_type>(
+        mesh, std::move(lop), PETSC_COMM_WORLD);
 
     sw.start();
     PetscSolver solver;
@@ -93,23 +85,23 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const&
     }
 
     auto numeric = dgop.solution(solver);
-    auto solution = scenario->solution();
+    auto solution = scenario.solution();
     if (solution) {
-        double error = tndm::Error<DomainDimension>::L2(cl, numeric, *scenario->solution(), 0,
-                                                        PETSC_COMM_WORLD);
+        double error =
+            tndm::Error<DomainDimension>::L2(cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
-            std::cout << "L2 error (new): " << error << std::endl;
+            std::cout << "L2 error: " << error << std::endl;
         }
     }
 
-    if (cfg.output) {
+    if (output) {
         auto coeffs = dgop.coefficients();
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.numLocalElements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
-        piece.addPointData("K", coeffs);
-        writer.write(*cfg.output);
+        piece.addPointData("material", coeffs);
+        writer.write(*output);
     }
 }
 
@@ -125,15 +117,12 @@ int main(int argc, char** argv) {
         }
     }
 
-    argparse::ArgumentParser program("poisson");
+    argparse::ArgumentParser program("static");
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
-    auto makePathRelativeToConfig = [&program](std::string_view path) {
-        auto newPath = fs::path(program.get("config")).parent_path();
-        newPath /= fs::path(path);
-        return newPath;
-    };
+    auto makePathRelativeToConfig =
+        MakePathRelativeToOtherPath([&program]() { return program.get("config"); });
 
     TableSchema<Config> schema;
     schema.add_value("resolution", &Config::resolution)
@@ -142,18 +131,11 @@ int main(int argc, char** argv) {
     schema.add_value("output", &Config::output).help("Output file name");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
-        .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
-    auto& problemSchema = schema.add_table("problem", &Config::problem);
-    problemSchema.add_value("lib", &PoissonScenarioConfig::lib)
-        .converter(makePathRelativeToConfig)
-        .validator([](std::string const& path) { return fs::exists(fs::path(path)); });
-    problemSchema.add_value("warp", &PoissonScenarioConfig::warp);
-    problemSchema.add_value("force", &PoissonScenarioConfig::force);
-    problemSchema.add_value("boundary", &PoissonScenarioConfig::boundary);
-    problemSchema.add_value("slip", &PoissonScenarioConfig::slip);
-    problemSchema.add_value("coefficient", &PoissonScenarioConfig::coefficient);
-    problemSchema.add_value("solution", &PoissonScenarioConfig::solution);
-    problemSchema.add_array("ref_normal", &PoissonScenarioConfig::ref_normal).of_values();
+        .validator(PathExists());
+    auto& poissonSchema = schema.add_table("poisson", &Config::poisson);
+    PoissonScenarioConfig::setSchema(poissonSchema, makePathRelativeToConfig);
+    auto& elasticitySchema = schema.add_table("elasticity", &Config::elasticity);
+    ElasticityScenarioConfig::setSchema(elasticitySchema, makePathRelativeToConfig);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
@@ -203,7 +185,15 @@ int main(int argc, char** argv) {
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
 
-    static_problem(*mesh, *cfg);
+    if (cfg->poisson && !cfg->elasticity) {
+        auto scenario = PoissonScenario(*cfg->poisson);
+        static_problem(*mesh, scenario, cfg->output);
+    } else if (!cfg->poisson && cfg->elasticity) {
+        auto scenario = ElasticityScenario(*cfg->elasticity);
+        static_problem(*mesh, scenario, cfg->output);
+    } else {
+        std::cerr << "Please specify either [poisson] or [elasticity] (but not both)." << std::endl;
+    }
 
     ierr = PetscFinalize();
 

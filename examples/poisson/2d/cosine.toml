@@ -1,6 +1,6 @@
 resolution = 0.125
 
-[problem]
+[poisson]
 lib = "cosine.lua"
 warp = "warp"
 force = "force"

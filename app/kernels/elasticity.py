@@ -9,7 +9,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     J = Tensor('J', (Nq,))
     G = Tensor('G', (dim, dim, Nq))
     lam = Tensor('lam', (Nbf,))
+    lam_Q = Tensor('lam_Q', (Nq,))
     mu = Tensor('mu', (Nbf,))
+    mu_Q = Tensor('mu_Q', (Nq,))
     W = Tensor('W', (Nq,))
     lam_W_J = Tensor('lam_W_J', (Nq,))
     mu_W_J = Tensor('mu_W_J', (Nq,))
@@ -21,6 +23,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     Unew = Tensor('Unew', (Nbf, dim))
     A = Tensor('A', (Nbf, dim, Nbf, dim))
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
+    matMinv = Tensor('matMinv', (Nbf, Nbf))
+
+    generator.add('project_material', [
+        lam['p'] <= matMinv['pk'] * lam_Q['q'] * Ematerial['qk'] * W['q'],
+        mu['p'] <= matMinv['pk'] * mu_Q['q'] * Ematerial['qk'] * W['q']
+    ])
 
     generator.add('precomputeVolume', [
         lam_W_J['q'] <= Ematerial['qt'] * lam['t'] * J['q'] * W['q'],

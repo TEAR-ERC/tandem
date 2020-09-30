@@ -1,6 +1,6 @@
 resolution = 0.125
 
-[problem]
+[poisson]
 lib = "embedded_half.lua"
 force = "force"
 boundary = "solution"

@@ -1,5 +1,5 @@
-#ifndef SCENARIO_20200817_H
-#define SCENARIO_20200817_H
+#ifndef MESHCONFIG_20200930_H
+#define MESHCONFIG_20200930_H
 
 #include "form/BC.h"
 #include "mesh/GenMesh.h"
@@ -31,4 +31,4 @@ template <std::size_t D> struct GenMeshConfig {
 
 } // namespace tndm
 
-#endif // SCENARIO_20200817_H
+#endif // MESHCONFIG_20200930_H

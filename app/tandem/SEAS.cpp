@@ -1,7 +1,7 @@
 #include "SEAS.h"
 #include "Fault.h"
 #include "common/InterfacePetsc.h"
-#include "common/Scenario.h"
+#include "common/MeshConfig.h"
 #include "config.h"
 #include "poisson/Poisson.h"
 #include "tandem/Config.h"

@@ -102,12 +102,14 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 add_library(app-common
+    common/MeshConfig.cpp
     common/PetscSolver.cpp
-    common/Scenario.cpp
+    localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
 )
 target_link_libraries(app-common PUBLIC
     poisson-kernels-lib
+    elasticity-kernels-lib
     tandem-lib
     PkgConfig::PETSC)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -119,8 +121,7 @@ add_executable(poisson
     poisson/Poisson.cpp
     poisson.cpp)
 target_link_libraries(poisson PRIVATE
-    app-common
-    poisson-kernels-lib)
+    app-common)
 target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Tandem
@@ -135,7 +136,5 @@ add_executable(tandem
     #tandem/Static.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE
-    app-common
-    elasticity-kernels-lib
-    poisson-kernels-lib)
+    app-common)
 target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
