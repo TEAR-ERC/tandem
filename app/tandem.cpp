@@ -3,7 +3,6 @@
 #include "config.h"
 #include "tandem/Config.h"
 #include "tandem/SEAS.h"
-//#include "tandem/Static.h"
 #include "tandem/Scenario.h"
 
 #include "util/Schema.h"
@@ -81,7 +80,6 @@ int main(int argc, char** argv) {
     PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
-    // solveStaticProblem(*cfg);
     solveSEASProblem(*cfg);
 
     ierr = PetscFinalize();

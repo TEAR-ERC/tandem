@@ -1,4 +1,3 @@
-#include "localoperator/Poisson.h"
 #include "common/CmdLine.h"
 #include "common/ElasticityScenario.h"
 #include "common/MeshConfig.h"

@@ -101,6 +101,11 @@ pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
+## Generate code
+generate_code(poisson)
+generate_code(elasticity)
+
+## Common
 add_library(app-common
     common/MeshConfig.cpp
     common/PetscSolver.cpp
@@ -114,18 +119,13 @@ target_link_libraries(app-common PUBLIC
     PkgConfig::PETSC)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-## Poisson example
-generate_code(poisson)
+## Static solver
 
-add_executable(poisson
-    poisson/Poisson.cpp
-    poisson.cpp)
-target_link_libraries(poisson PRIVATE
-    app-common)
-target_include_directories(poisson PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+add_executable(static static.cpp)
+target_link_libraries(static PRIVATE app-common)
+target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Tandem
-generate_code(elasticity)
 
 add_executable(tandem
     poisson/Poisson.cpp
@@ -133,8 +133,6 @@ add_executable(tandem
     tandem/Elasticity.cpp
     tandem/Fault.cpp
     tandem/SEAS.cpp
-    #tandem/Static.cpp
     tandem.cpp)
-target_link_libraries(tandem PRIVATE
-    app-common)
+target_link_libraries(tandem PRIVATE app-common)
 target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
