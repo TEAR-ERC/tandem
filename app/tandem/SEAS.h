@@ -1,14 +1,13 @@
 #ifndef SEAS_20200825_H
 #define SEAS_20200825_H
 
-#include "Config.h"
+#include "config.h"
+#include "tandem/Config.h"
 
-#include <petscsystypes.h>
+#include "mesh/LocalSimplexMesh.h"
 
 namespace tndm {
-
-PetscErrorCode solveSEASProblem(Config const& cfg);
-
+void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg);
 }
 
 #endif // SEAS_20200825_H
