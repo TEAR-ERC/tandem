@@ -37,8 +37,7 @@ public:
         : DGOperatorTopo<D>(mesh, comm), lop_(std::move(lop)) {
         scratch_mem_ = std::make_unique<char[]>(lop_->scratch_mem_size());
 
-        auto scratch =
-            LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        auto scratch = make_scratch();
         lop_->begin_preparation(base::numElements(), base::numLocalElements(),
                                 base::numLocalFacets());
         if constexpr (std::experimental::is_detected_v<prepare_volume_t, LocalOperator>) {
@@ -85,8 +84,7 @@ public:
         auto A10 = Managed<Matrix<double>>(bs, bs);
         auto A11 = Managed<Matrix<double>>(bs, bs);
 
-        auto scratch =
-            LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        auto scratch = make_scratch();
         solver.begin_assembly();
         if constexpr (std::experimental::is_detected_v<assemble_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
@@ -144,8 +142,7 @@ public:
         auto B0 = Managed<Vector<double>>(bs);
         auto B1 = Managed<Vector<double>>(bs);
 
-        auto scratch =
-            LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        auto scratch = make_scratch();
         solver.begin_rhs();
         if constexpr (std::experimental::is_detected_v<rhs_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
@@ -212,8 +209,7 @@ public:
         auto coeffs = lop_->coefficients_prototype(base::numLocalElements());
         auto& values = coeffs.values();
 
-        auto scratch =
-            LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        auto scratch = make_scratch();
         for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
             scratch.reset();
             auto C = values.subtensor(slice{}, slice{}, elNo);
@@ -223,6 +219,9 @@ public:
     }
 
 private:
+    auto make_scratch() const {
+        return LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+    }
     std::unique_ptr<LocalOperator> lop_;
     std::unique_ptr<char[]> scratch_mem_;
 };
