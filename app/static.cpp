@@ -7,7 +7,6 @@
 #include "config.h"
 #include "mesh/LocalSimplexMesh.h"
 
-#include "form/BC.h"
 #include "form/DGOperator.h"
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
@@ -18,7 +17,6 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "tensor/Managed.h"
-#include "util/Range.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 #include "util/Stopwatch.h"

@@ -8,7 +8,6 @@
 #include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
-#include "tandem/Elasticity.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"

@@ -2,8 +2,6 @@
 #define PETSCSOLVER_20200910_H
 
 #include "PetscUtil.h"
-#include "form/FiniteElementFunction.h"
-#include "form/RefElement.h"
 #include "tensor/Tensor.h"
 
 #include <petscksp.h>
