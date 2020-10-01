@@ -1,6 +1,6 @@
 resolution = 0.125
 
-[problem]
+[elasticity]
 lib = "cosine.lua"
 force = "force"
 boundary = "solution"

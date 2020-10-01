@@ -1,12 +1,13 @@
 resolution = 0.125
 
-[problem]
+[elasticity]
 lib = "embedded_half.lua"
 force = "force"
 boundary = "solution"
 slip = "slip"
 solution = "solution"
 lam = "lam"
+ref_normal = [1, 0]
 
 [generate_mesh]
 intercepts = [

@@ -117,7 +117,7 @@ public:
                     }
                 } else {
                     if (info.inside[0]) {
-                        if (lop_->assemble_boundary(fctNo, info, A00, A01, scratch)) {
+                        if (lop_->assemble_boundary(fctNo, info, A00, scratch)) {
                             solver.add_block(ib0, ib0, A00);
                         }
                     }

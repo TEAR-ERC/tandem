@@ -147,7 +147,7 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
 }
 
 bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                                Matrix<double>& A01, LinearAllocator& scratch) const {
+                                LinearAllocator& scratch) const {
     if (info.bc == BC::Natural) {
         return false;
     }

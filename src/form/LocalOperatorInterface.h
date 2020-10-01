@@ -32,7 +32,7 @@ public:
         return false;
     }
     bool assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                           Matrix<double>& A01, LinearAllocator& scratch) const {
+                           LinearAllocator& scratch) const {
         return false;
     }
     bool assemble_volume_post_skeleton(std::size_t elNo, Matrix<double>& A00,

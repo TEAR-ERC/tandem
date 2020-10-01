@@ -215,7 +215,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 }
 
 bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                                   Matrix<double>& A01, LinearAllocator& scratch) const {
+                                   LinearAllocator& scratch) const {
     if (info.bc == BC::Natural) {
         return false;
     }
@@ -240,7 +240,6 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.c10 = epsilon;
     krnl.c20 = penalty(info);
     krnl.a(0, 0) = A00.data();
-    krnl.a(0, 1) = A01.data();
     krnl.d_x(0) = Dx_q0;
     krnl.delta = init::delta::Values;
     krnl.e(0) = E_q[info.localNo[0]].data();
@@ -250,7 +249,6 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.nl = fct[fctNo].get<NormalLength>().data();
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
-    krnl.execute(0, 1);
 
     return true;
 }
@@ -259,9 +257,9 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
     double F_Q_raw[tensor::F::size()];
-    assert(tensor::F::size() == volRule.size());
+    assert(tensor::F::Shape[1] == volRule.size());
 
-    auto F_Q = Matrix<double>(F_Q_raw, 1, volRule.size());
+    auto F_Q = Matrix<double>(F_Q_raw, NumQuantities, volRule.size());
     fun_force(elNo, F_Q);
 
     kernel::rhsVolume rhs;
@@ -282,9 +280,9 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 
     double Dx_q[tensor::d_x::size(0)];
     double f_q_raw[tensor::f::size()];
-    assert(tensor::f::size() == fctRule.size());
+    assert(tensor::f::Shape[1] == fctRule.size());
 
-    auto f_q = Matrix<double>(f_q_raw, 1, fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
     fun_slip(fctNo, f_q);
 
     kernel::rhsFacet rhs;
@@ -323,9 +321,9 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
 
     double Dx_q[tensor::d_x::size(0)];
     double f_q_raw[tensor::f::size()];
-    assert(tensor::f::size() == fctRule.size());
+    assert(tensor::f::Shape[1] == fctRule.size());
 
-    auto f_q = Matrix<double>(f_q_raw, 1, fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
     fun_dirichlet(fctNo, f_q);
 
     kernel::rhsFacet rhs;

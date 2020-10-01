@@ -46,10 +46,10 @@ struct ElasticityScenarioConfig {
 
 class ElasticityScenario {
 public:
-    using solution_t = std::function<std::array<double, 1>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = tmp::Elasticity::functional_t<Q>;
     static constexpr std::size_t NumQuantities = tmp::Elasticity::NumQuantities;
+    using solution_t = std::function<std::array<double, NumQuantities>(Vector<double> const&)>;
 
     ElasticityScenario(ElasticityScenarioConfig const& problem) : ref_normal_(problem.ref_normal) {
         lib_.loadFile(problem.lib);
@@ -73,8 +73,8 @@ public:
         functional(lib_, problem.boundary, boundary_);
         functional(lib_, problem.slip, slip_);
         if (problem.solution) {
-            auto myF = lib_.getFunction<DomainDimension, 1>(*problem.solution);
-            solution_ = [myF](Vector<double> const& v) -> std::array<double, 1> {
+            auto myF = lib_.getFunction<DomainDimension, NumQuantities>(*problem.solution);
+            solution_ = [myF](Vector<double> const& v) -> std::array<double, NumQuantities> {
                 std::array<double, DomainDimension> x;
                 for (std::size_t i = 0; i < DomainDimension; ++i) {
                     x[i] = v(i);

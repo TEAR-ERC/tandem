@@ -42,7 +42,7 @@ public:
                            Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
                            LinearAllocator& scratch) const;
     bool assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                           Matrix<double>& A01, LinearAllocator& scratch) const;
+                           LinearAllocator& scratch) const;
 
     bool rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const;
     bool rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
