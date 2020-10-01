@@ -1,7 +1,7 @@
 #ifndef PETSCTS_20201001_H
 #define PETSCTS_20201001_H
 
-#include "PetscUtil.h"
+#include "common/PetscUtil.h"
 #include "tensor/Tensor.h"
 
 #include <petscsys.h>
@@ -9,9 +9,7 @@
 #include <petscts.h>
 #include <petscvec.h>
 
-#include <cassert>
 #include <cstddef>
-#include <utility>
 
 namespace tndm {
 

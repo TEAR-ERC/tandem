@@ -2,6 +2,10 @@
 #include "config.h"
 #include "tandem/BP1.h"
 
+#include "basis/WarpAndBlend.h"
+
+#include <algorithm>
+
 namespace tndm {
 
 RateAndState::RateAndState(Curvilinear<DomainDimension> const& cl)
