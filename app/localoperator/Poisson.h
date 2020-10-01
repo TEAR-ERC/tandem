@@ -28,6 +28,7 @@ namespace tndm::tmp {
 class Poisson : public DGCurvilinearCommon<DomainDimension> {
 public:
     using base = DGCurvilinearCommon<DomainDimension>;
+    constexpr static std::size_t NumQuantities = 1;
 
     Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K);
 
@@ -51,7 +52,8 @@ public:
                       LinearAllocator& scratch) const;
 
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(space_.clone(), 1, numLocalElements);
+        return FiniteElementFunction<DomainDimension>(space_.clone(), NumQuantities,
+                                                      numLocalElements);
     }
 
     FiniteElementFunction<DomainDimension>
@@ -60,13 +62,16 @@ public:
     }
     void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const;
 
-    void set_force(functional_t<1> fun) { fun_force = make_volume_functional(std::move(fun)); }
+    void set_force(functional_t<NumQuantities> fun) {
+        fun_force = make_volume_functional(std::move(fun));
+    }
     void set_force(volume_functional_t fun) { fun_force = std::move(fun); }
-    void set_dirichlet(functional_t<1> fun) {
+    void set_dirichlet(functional_t<NumQuantities> fun) {
         fun_dirichlet = make_facet_functional(std::move(fun));
     }
     void set_dirichlet(facet_functional_t fun) { fun_dirichlet = std::move(fun); }
-    void set_slip(functional_t<1> fun, std::array<double, DomainDimension> const& refNormal) {
+    void set_slip(functional_t<NumQuantities> fun,
+                  std::array<double, DomainDimension> const& refNormal) {
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
