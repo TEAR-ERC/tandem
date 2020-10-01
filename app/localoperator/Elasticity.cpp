@@ -69,7 +69,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator& scratch) {
     fun_mu(elNo, mu_Q);
 
     kernel::project_material krnl;
-    krnl.Ematerial = matE_Q_T.data();
+    krnl.matE_Q_T = matE_Q_T.data();
     krnl.lam = material[elNo].get<lam>().data();
     krnl.lam_Q = lam_Q_raw;
     krnl.mu = material[elNo].get<mu>().data();
@@ -84,7 +84,7 @@ void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
 
     kernel::precomputeSurface krnl;
     for (unsigned side = 0; side < 2; ++side) {
-        krnl.ematerial(side) = matE_q_T[info.localNo[side]].data();
+        krnl.matE_q_T(side) = matE_q_T[info.localNo[side]].data();
     }
     krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
     krnl.lam_w(1) = fctPre[fctNo].get<lam_w_1>().data();
@@ -103,7 +103,7 @@ void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
     base::prepare_boundary(fctNo, info, scratch);
 
     kernel::precomputeSurface krnl;
-    krnl.ematerial(0) = matE_q_T[info.localNo[0]].data();
+    krnl.matE_q_T(0) = matE_q_T[info.localNo[0]].data();
     krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
     krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
     krnl.w = fctRule.weights().data();
@@ -119,7 +119,7 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator&
     auto mu_field = material[elNo].get<mu>().data();
 
     kernel::precomputeVolume krnl_pre;
-    krnl_pre.Ematerial = matE_Q_T.data();
+    krnl_pre.matE_Q_T = matE_Q_T.data();
     krnl_pre.J = vol[elNo].template get<AbsDetJ>().data();
     krnl_pre.W = volRule.weights().data();
     krnl_pre.lam = lam_field;
@@ -136,23 +136,23 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator&
 
 bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
                                  LinearAllocator& scratch) const {
-    double Dx_Q[tensor::D_x::size()];
+    double Dx_Q[tensor::Dx_Q::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
-    assert(Dxi_Q.shape(0) == tensor::D_xi::Shape[0]);
-    assert(Dxi_Q.shape(1) == tensor::D_xi::Shape[1]);
-    assert(Dxi_Q.shape(2) == tensor::D_xi::Shape[2]);
+    assert(Dxi_Q.shape(0) == tensor::Dxi_Q::Shape[0]);
+    assert(Dxi_Q.shape(1) == tensor::Dxi_Q::Shape[1]);
+    assert(Dxi_Q.shape(2) == tensor::Dxi_Q::Shape[2]);
 
-    kernel::D_x dxKrnl;
-    dxKrnl.D_x = Dx_Q;
-    dxKrnl.D_xi = Dxi_Q.data();
+    kernel::Dx_Q dxKrnl;
+    dxKrnl.Dx_Q = Dx_Q;
+    dxKrnl.Dxi_Q = Dxi_Q.data();
     dxKrnl.G = vol[elNo].get<JInv>().data()->data();
     dxKrnl.execute();
 
     kernel::assembleVolume krnl;
     krnl.A = A00.data();
     krnl.delta = init::delta::Values;
-    krnl.D_x = Dx_Q;
+    krnl.Dx_Q = Dx_Q;
     krnl.lam_W_J = volPre[elNo].get<lam_W_J>().data();
     krnl.mu_W_J = volPre[elNo].get<mu_W_J>().data();
     krnl.execute();
@@ -163,22 +163,22 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
                                    Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
                                    LinearAllocator& scratch) const {
     assert(fctRule.size() == tensor::w::Shape[0]);
-    assert(E_q[0].shape(0) == tensor::e::Shape[0][0]);
-    assert(E_q[0].shape(1) == tensor::e::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::d_xi::Shape[0][0]);
-    assert(Dxi_q[0].shape(1) == tensor::d_xi::Shape[0][1]);
-    assert(Dxi_q[0].shape(2) == tensor::d_xi::Shape[0][2]);
+    assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
+    assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
-    double Dx_q0[tensor::d_x::size(0)];
-    double Dx_q1[tensor::d_x::size(1)];
+    double Dx_q0[tensor::Dx_q::size(0)];
+    double Dx_q1[tensor::Dx_q::size(1)];
 
-    kernel::d_x dxKrnl;
-    dxKrnl.d_x(0) = Dx_q0;
-    dxKrnl.d_x(1) = Dx_q1;
+    kernel::Dx_q dxKrnl;
+    dxKrnl.Dx_q(0) = Dx_q0;
+    dxKrnl.Dx_q(1) = Dx_q1;
     dxKrnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
     dxKrnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
     for (unsigned side = 0; side < 2; ++side) {
-        dxKrnl.d_xi(side) = Dxi_q[info.localNo[side]].data();
+        dxKrnl.Dxi_q(side) = Dxi_q[info.localNo[side]].data();
         dxKrnl.execute(side);
     }
 
@@ -193,11 +193,11 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.a(0, 1) = A01.data();
     krnl.a(1, 0) = A10.data();
     krnl.a(1, 1) = A11.data();
-    krnl.d_x(0) = Dx_q0;
-    krnl.d_x(1) = Dx_q1;
+    krnl.Dx_q(0) = Dx_q0;
+    krnl.Dx_q(1) = Dx_q1;
     krnl.delta = init::delta::Values;
     for (unsigned side = 0; side < 2; ++side) {
-        krnl.e(side) = E_q[info.localNo[side]].data();
+        krnl.E_q(side) = E_q[info.localNo[side]].data();
     }
     krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
     krnl.lam_w(1) = fctPre[fctNo].get<lam_w_1>().data();
@@ -221,18 +221,18 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     }
 
     assert(fctRule.size() == tensor::w::Shape[0]);
-    assert(E_q[0].shape(0) == tensor::e::Shape[0][0]);
-    assert(E_q[0].shape(1) == tensor::e::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::d_xi::Shape[0][0]);
-    assert(Dxi_q[0].shape(1) == tensor::d_xi::Shape[0][1]);
-    assert(Dxi_q[0].shape(2) == tensor::d_xi::Shape[0][2]);
+    assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
+    assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
-    double Dx_q0[tensor::d_x::size(0)];
+    double Dx_q0[tensor::Dx_q::size(0)];
 
-    kernel::d_x dxKrnl;
-    dxKrnl.d_x(0) = Dx_q0;
+    kernel::Dx_q dxKrnl;
+    dxKrnl.Dx_q(0) = Dx_q0;
     dxKrnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    dxKrnl.d_xi(0) = Dxi_q[info.localNo[0]].data();
+    dxKrnl.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     dxKrnl.execute(0);
 
     kernel::assembleSurface krnl;
@@ -240,9 +240,9 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.c10 = epsilon;
     krnl.c20 = penalty(info);
     krnl.a(0, 0) = A00.data();
-    krnl.d_x(0) = Dx_q0;
+    krnl.Dx_q(0) = Dx_q0;
     krnl.delta = init::delta::Values;
-    krnl.e(0) = E_q[info.localNo[0]].data();
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
     krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
     krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
     krnl.n = fct[fctNo].get<Normal>().data()->data();
@@ -263,7 +263,7 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator
     fun_force(elNo, F_Q);
 
     kernel::rhsVolume rhs;
-    rhs.E = E_Q.data();
+    rhs.E_Q = E_Q.data();
     rhs.F = F_Q_raw;
     rhs.J = vol[elNo].get<AbsDetJ>().data();
     rhs.W = volRule.weights().data();
@@ -278,7 +278,7 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
         return false;
     }
 
-    double Dx_q[tensor::d_x::size(0)];
+    double Dx_q[tensor::Dx_q::size(0)];
     double f_q_raw[tensor::f::size()];
     assert(tensor::f::Shape[1] == fctRule.size());
 
@@ -289,9 +289,9 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
     rhs.c20 = penalty(info);
-    rhs.d_x(0) = Dx_q;
-    rhs.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    rhs.e(0) = E_q[info.localNo[0]].data();
+    rhs.Dx_q(0) = Dx_q;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.f = f_q_raw;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
     rhs.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
@@ -303,8 +303,8 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 
     rhs.b = B1.data();
     rhs.c20 *= -1.0;
-    rhs.d_xi(0) = Dxi_q[info.localNo[1]].data();
-    rhs.e(0) = E_q[info.localNo[1]].data();
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[1]].data();
+    rhs.E_q(0) = E_q[info.localNo[1]].data();
     rhs.g(0) = fct[fctNo].get<JInv1>().data()->data();
     rhs.lam_w(0) = fctPre[fctNo].get<lam_w_1>().data();
     rhs.mu_w(0) = fctPre[fctNo].get<mu_w_1>().data();
@@ -319,7 +319,7 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
         return false;
     }
 
-    double Dx_q[tensor::d_x::size(0)];
+    double Dx_q[tensor::Dx_q::size(0)];
     double f_q_raw[tensor::f::size()];
     assert(tensor::f::Shape[1] == fctRule.size());
 
@@ -330,9 +330,9 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.b = B0.data();
     rhs.c10 = epsilon;
     rhs.c20 = penalty(info);
-    rhs.d_x(0) = Dx_q;
-    rhs.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    rhs.e(0) = E_q[info.localNo[0]].data();
+    rhs.Dx_q(0) = Dx_q;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.f = f_q_raw;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
     rhs.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();

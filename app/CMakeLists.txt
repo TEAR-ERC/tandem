@@ -130,7 +130,6 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 add_executable(tandem
     poisson/Poisson.cpp
     tandem/BP1.cpp
-    tandem/Elasticity.cpp
     tandem/Fault.cpp
     tandem/SEAS.cpp
     tandem.cpp)
