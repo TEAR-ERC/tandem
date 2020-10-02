@@ -108,8 +108,9 @@ generate_code(elasticity)
 ## Common
 add_library(app-common
     common/MeshConfig.cpp
-    common/PetscSolver.cpp
-    common/PetscTS.cpp
+    common/PetscBlockMatrix.cpp
+    common/PetscBlockVector.cpp
+    common/PetscTimeSolver.cpp
     localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
 )

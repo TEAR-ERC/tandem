@@ -56,7 +56,7 @@ public:
 
     template <class LinearSolver, class TimeSolver>
     void setup_quasi_dynamic(LinearSolver& ls, TimeSolver& ts) {
-        base::assemble(ls, false);
+        // base::assemble(ls, false);
 
         auto fbs = fop_->block_size();
         ts.create_state(fbs, numFaultFaces(), false, base::comm());

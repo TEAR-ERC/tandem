@@ -22,6 +22,13 @@ public:
     std::size_t numLocalElements() const { return numLocalElems_; }
     std::size_t numLocalFacets() const { return numLocalFacets_; }
 
+    unsigned const* numLocalNeighbours() const {
+        return &volInfo[0].template get<NumLocalNeighbours>();
+    }
+    unsigned const* numGhostNeighbours() const {
+        return &volInfo[0].template get<NumGhostNeighbours>();
+    }
+
     MPI_Comm comm() const { return comm_; }
 
 protected:

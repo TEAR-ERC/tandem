@@ -71,52 +71,58 @@ public:
     }
 
     LocalOperator& lop() { return *lop_; }
+    std::size_t block_size() const { return lop_->block_size(); }
 
-    template <typename Solver> void assemble(Solver& solver, bool reuse_mat = true) {
+    template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {
         auto bs = lop_->block_size();
-        solver.create_mat(bs, base::numLocalElements(),
-                          &base::volInfo[0].template get<typename base::NumLocalNeighbours>(),
-                          &base::volInfo[0].template get<typename base::NumGhostNeighbours>(),
-                          reuse_mat, base::comm());
 
-        auto A00 = Managed<Matrix<double>>(bs, bs);
-        auto A01 = Managed<Matrix<double>>(bs, bs);
-        auto A10 = Managed<Matrix<double>>(bs, bs);
-        auto A11 = Managed<Matrix<double>>(bs, bs);
+        auto a_scratch_mem_size = 4 * matrix.scratch_mem_size();
+        auto a_scratch_mem = std::make_unique<char[]>(a_scratch_mem_size);
+        auto a_scratch =
+            LinearAllocator(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
 
-        auto scratch = make_scratch();
-        solver.begin_assembly();
+        auto l_scratch = make_scratch();
+        matrix.begin_assembly();
         if constexpr (std::experimental::is_detected_v<assemble_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
-                scratch.reset();
-                if (lop_->assemble_volume(elNo, A00, scratch)) {
-                    auto ib = base::volInfo[elNo].template get<typename base::GID>();
-                    solver.add_block(ib, ib, A00);
+                l_scratch.reset();
+                a_scratch.reset();
+                auto ib = base::volInfo[elNo].template get<typename base::GID>();
+                auto A00 = matrix.get_block(ib, ib, a_scratch);
+                if (lop_->assemble_volume(elNo, A00.values(), l_scratch)) {
+                    matrix.add_block(A00);
                 }
             }
         }
         if constexpr (std::experimental::is_detected_v<assemble_skeleton_t, LocalOperator> ||
                       std::experimental::is_detected_v<assemble_boundary_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < base::numLocalFacets(); ++fctNo) {
-                scratch.reset();
+                l_scratch.reset();
+                a_scratch.reset();
                 auto const& info = base::fctInfo[fctNo];
                 auto ib0 = info.g_up[0];
                 auto ib1 = info.g_up[1];
                 if (info.up[0] != info.up[1]) {
-                    if (lop_->assemble_skeleton(fctNo, info, A00, A01, A10, A11, scratch)) {
+                    auto A00 = matrix.get_block(ib0, ib0, a_scratch);
+                    auto A01 = matrix.get_block(ib0, ib1, a_scratch);
+                    auto A10 = matrix.get_block(ib1, ib0, a_scratch);
+                    auto A11 = matrix.get_block(ib1, ib1, a_scratch);
+                    if (lop_->assemble_skeleton(fctNo, info, A00.values(), A01.values(),
+                                                A10.values(), A11.values(), l_scratch)) {
                         if (info.inside[0]) {
-                            solver.add_block(ib0, ib0, A00);
-                            solver.add_block(ib0, ib1, A01);
+                            matrix.add_block(A00);
+                            matrix.add_block(A01);
                         }
                         if (info.inside[1]) {
-                            solver.add_block(ib1, ib0, A10);
-                            solver.add_block(ib1, ib1, A11);
+                            matrix.add_block(A10);
+                            matrix.add_block(A11);
                         }
                     }
                 } else {
                     if (info.inside[0]) {
-                        if (lop_->assemble_boundary(fctNo, info, A00, scratch)) {
-                            solver.add_block(ib0, ib0, A00);
+                        auto A00 = matrix.get_block(ib0, ib0, a_scratch);
+                        if (lop_->assemble_boundary(fctNo, info, A00.values(), l_scratch)) {
+                            matrix.add_block(A00);
                         }
                     }
                 }
@@ -125,54 +131,63 @@ public:
         if constexpr (std::experimental::is_detected_v<assemble_volume_post_skeleton_t,
                                                        LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
-                scratch.reset();
-                if (lop_->assemble_volume_post_skeleton(elNo, A00, scratch)) {
-                    auto ib = base::volInfo[elNo].template get<typename base::GID>();
-                    solver.add_block(ib, ib, A00);
+                l_scratch.reset();
+                a_scratch.reset();
+                auto ib = base::volInfo[elNo].template get<typename base::GID>();
+                auto A00 = matrix.get_block(ib, ib, a_scratch);
+                if (lop_->assemble_volume_post_skeleton(elNo, A00.values(), l_scratch)) {
+                    matrix.add_block(A00);
                 }
             }
         }
-        solver.end_assembly();
+        matrix.end_assembly();
     }
 
-    template <typename Solver> void rhs(Solver& solver, bool reuse_vec = true) {
+    template <typename BlockVector> void rhs(BlockVector& vector) {
         auto bs = lop_->block_size();
-        solver.create_vec(bs, base::numLocalElements(), reuse_vec, base::comm());
 
-        auto B0 = Managed<Vector<double>>(bs);
-        auto B1 = Managed<Vector<double>>(bs);
+        auto a_scratch_mem_size = 2 * vector.scratch_mem_size();
+        auto a_scratch_mem = std::make_unique<char[]>(a_scratch_mem_size);
+        auto a_scratch =
+            LinearAllocator(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
 
-        auto scratch = make_scratch();
-        solver.begin_rhs();
+        auto l_scratch = make_scratch();
+        vector.begin_assembly();
         if constexpr (std::experimental::is_detected_v<rhs_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
-                scratch.reset();
-                if (lop_->rhs_volume(elNo, B0, scratch)) {
-                    auto ib = base::volInfo[elNo].template get<typename base::GID>();
-                    solver.add_rhs(ib, B0);
+                l_scratch.reset();
+                a_scratch.reset();
+                auto ib = base::volInfo[elNo].template get<typename base::GID>();
+                auto B0 = vector.get_block(ib, a_scratch);
+                if (lop_->rhs_volume(elNo, B0.values(), l_scratch)) {
+                    vector.add_block(B0);
                 }
             }
         }
         if constexpr (std::experimental::is_detected_v<rhs_skeleton_t, LocalOperator> ||
                       std::experimental::is_detected_v<rhs_boundary_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < base::numLocalFacets(); ++fctNo) {
-                scratch.reset();
+                l_scratch.reset();
+                a_scratch.reset();
                 auto const& info = base::fctInfo[fctNo];
                 auto ib0 = info.g_up[0];
                 auto ib1 = info.g_up[1];
                 if (info.up[0] != info.up[1]) {
-                    if (lop_->rhs_skeleton(fctNo, info, B0, B1, scratch)) {
+                    auto B0 = vector.get_block(ib0, a_scratch);
+                    auto B1 = vector.get_block(ib1, a_scratch);
+                    if (lop_->rhs_skeleton(fctNo, info, B0.values(), B1.values(), l_scratch)) {
                         if (info.inside[0]) {
-                            solver.add_rhs(ib0, B0);
+                            vector.add_block(B0);
                         }
                         if (info.inside[1]) {
-                            solver.add_rhs(ib1, B1);
+                            vector.add_block(B1);
                         }
                     }
                 } else {
                     if (info.inside[0]) {
-                        if (lop_->rhs_boundary(fctNo, info, B0, scratch)) {
-                            solver.add_rhs(ib0, B0);
+                        auto B0 = vector.get_block(ib0, a_scratch);
+                        if (lop_->rhs_boundary(fctNo, info, B0.values(), l_scratch)) {
+                            vector.add_block(B0);
                         }
                     }
                 }
@@ -180,28 +195,30 @@ public:
         }
         if constexpr (std::experimental::is_detected_v<rhs_volume_post_skeleton_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
-                scratch.reset();
-                if (lop_->rhs_volume_post_skeleton(elNo, B0, scratch)) {
-                    auto ib = base::volInfo[elNo].template get<typename base::GID>();
-                    solver.add_rhs(ib, B0);
+                l_scratch.reset();
+                a_scratch.reset();
+                auto ib = base::volInfo[elNo].template get<typename base::GID>();
+                auto B0 = vector.get_block(ib, a_scratch);
+                if (lop_->rhs_volume_post_skeleton(elNo, B0.values(), l_scratch)) {
+                    vector.add_block(B0);
                 }
             }
         }
-        solver.end_rhs();
+        vector.end_assembly();
     }
 
-    template <typename Solver> auto solution(Solver& solver) const {
+    template <typename BlockVector> auto solution(BlockVector& vector) {
         auto soln = lop_->solution_prototype(base::numLocalElements());
         auto& values = soln.values();
         auto value_matrix = reshape(values, lop_->block_size(), base::numLocalElements());
 
-        solver.begin_solution();
+        vector.begin_read();
         for (std::size_t elNo = 0; elNo < base::numLocalElements(); ++elNo) {
             auto ib = base::volInfo[elNo].template get<typename base::GID>();
             auto block = value_matrix.subtensor(slice{}, elNo);
-            solver.get_solution(ib, block);
+            vector.copy(ib, block);
         }
-        solver.end_solution();
+        vector.end_read();
         return soln;
     }
 

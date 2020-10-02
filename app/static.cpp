@@ -1,7 +1,7 @@
 #include "common/CmdLine.h"
 #include "common/ElasticityScenario.h"
 #include "common/MeshConfig.h"
-#include "common/PetscSolver.h"
+#include "common/PetscLinearSolver.h"
 #include "common/PetscUtil.h"
 #include "common/PoissonScenario.h"
 #include "config.h"
@@ -64,9 +64,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         mesh, std::move(lop), PETSC_COMM_WORLD);
 
     sw.start();
-    PetscSolver solver;
-    dgop.assemble(solver);
-    dgop.rhs(solver);
+    auto solver = PetscLinearSolver(dgop);
     std::cout << "Assembled after " << sw.split() << std::endl;
 
     solver.solve();
@@ -81,7 +79,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Iterations: " << its << std::endl;
     }
 
-    auto numeric = dgop.solution(solver);
+    auto numeric = dgop.solution(solver.x());
     auto solution = scenario.solution();
     if (solution) {
         double error =

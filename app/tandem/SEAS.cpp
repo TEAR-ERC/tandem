@@ -1,6 +1,6 @@
 #include "SEAS.h"
-#include "common/PetscSolver.h"
-#include "common/PetscTS.h"
+#include "common/PetscLinearSolver.h"
+#include "common/PetscTimeSolver.h"
 #include "common/PoissonScenario.h"
 #include "config.h"
 #include "localoperator/Poisson.h"
@@ -27,8 +27,8 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     auto seasop = SeasOperator<DomainDimension, tmp::Poisson, RateAndState>(
         mesh, std::move(lop), std::make_unique<RateAndState>(cl), PETSC_COMM_WORLD);
 
-    PetscSolver ls;
-    PetscTS ts;
+    PetscLinearSolver ls(seasop);
+    PetscTimeSolver ts;
 
     seasop.setup_quasi_dynamic(ls, ts);
 }

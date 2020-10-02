@@ -1,9 +1,9 @@
-#include "PetscTS.h"
+#include "PetscTimeSolver.h"
 
 namespace tndm {
 
-void PetscTS::create_state(std::size_t blockSize, std::size_t numLocalElems, bool reuse,
-                           MPI_Comm comm) {
+void PetscTimeSolver::create_state(std::size_t blockSize, std::size_t numLocalElems, bool reuse,
+                                   MPI_Comm comm) {
     if (x_ != nullptr) {
         if (reuse) {
             VecZeroEntries(x_);

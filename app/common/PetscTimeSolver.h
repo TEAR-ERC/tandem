@@ -13,9 +13,9 @@
 
 namespace tndm {
 
-class PetscTS {
+class PetscTimeSolver {
 public:
-    ~PetscTS() {
+    ~PetscTimeSolver() {
         if (x_ != nullptr) {
             VecDestroy(&x_);
         }

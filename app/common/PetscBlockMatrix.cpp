@@ -1,25 +1,15 @@
-#include "PetscSolver.h"
-#include "common/PetscUtil.h"
+#include "PetscBlockMatrix.h"
 
+#include <petscsystypes.h>
 #include <vector>
 
 namespace tndm {
 
-void PetscSolver::create_mat(std::size_t blockSize, std::size_t numLocalElems,
-                             unsigned const* numLocal, unsigned const* numGhost, bool reuse,
-                             MPI_Comm comm) {
-    numLocalElems_ = numLocalElems;
-    blockSize_ = blockSize;
+PetscBlockMatrix::PetscBlockMatrix(std::size_t blockSize, std::size_t numLocalElems,
+                                   unsigned const* numLocal, unsigned const* numGhost,
+                                   MPI_Comm comm)
+    : block_size_(blockSize) {
     auto localSize = blockSize * numLocalElems;
-
-    if (A_ != nullptr) {
-        if (reuse) {
-            MatZeroEntries(A_);
-            return;
-        } else {
-            MatDestroy(&A_);
-        }
-    }
 
     CHKERRTHROW(MatCreate(comm, &A_));
     CHKERRTHROW(MatSetSizes(A_, localSize, localSize, PETSC_DETERMINE, PETSC_DETERMINE));
@@ -51,35 +41,6 @@ void PetscSolver::create_mat(std::size_t blockSize, std::size_t numLocalElems,
     // Options
     CHKERRTHROW(MatSetOption(A_, MAT_ROW_ORIENTED, PETSC_FALSE));
     CHKERRTHROW(MatSetOption(A_, MAT_SYMMETRIC, PETSC_TRUE));
-}
-
-void PetscSolver::create_vec(std::size_t blockSize, std::size_t numLocalElems, bool reuse,
-                             MPI_Comm comm) {
-    if (b_ != nullptr) {
-        if (reuse) {
-            VecZeroEntries(b_);
-            return;
-        } else {
-            VecDestroy(&b_);
-        }
-    }
-
-    PetscInt localRows = numLocalElems * blockSize;
-    CHKERRTHROW(VecCreate(comm, &b_));
-    CHKERRTHROW(VecSetSizes(b_, localRows, PETSC_DECIDE));
-    CHKERRTHROW(VecSetFromOptions(b_));
-    CHKERRTHROW(VecSetBlockSize(b_, blockSize));
-}
-
-void PetscSolver::setup_solve() {
-    if (ksp_ != nullptr) {
-        KSPDestroy(&ksp_);
-    }
-    CHKERRTHROW(KSPCreate(PETSC_COMM_WORLD, &ksp_));
-    CHKERRTHROW(KSPSetType(ksp_, KSPCG));
-    CHKERRTHROW(KSPSetOperators(ksp_, A_, A_));
-    CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
-    CHKERRTHROW(KSPSetFromOptions(ksp_));
 }
 
 } // namespace tndm
