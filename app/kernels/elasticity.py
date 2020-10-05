@@ -112,12 +112,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     b = Tensor('b', (Nbf, dim))
     F = Tensor('F', (dim, Nq))
-    generator.add('rhsVolume', b['kp'] <= J['q'] * W['q'] * E_Q['kq'] * F['pq'])
+    generator.add('rhsVolume', b['kp'] <= b['kp'] + J['q'] * W['q'] * E_Q['kq'] * F['pq'])
 
     f = Tensor('f', (dim, nq))
     generator.add('rhsFacet', [
         Dx_q[0]['kiq'] <= g[0]['eiq'] * Dxi_q[0]['keq'],
-        b['kp'] <= c1[0] * tractionTest(0, f) + \
+        b['kp'] <= b['kp'] + c1[0] * tractionTest(0, f) + \
             c2[0] * w['q'] * E_q[0]['kq'] * f['pq'] * nl['q']
     ])
 

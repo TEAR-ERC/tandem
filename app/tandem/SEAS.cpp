@@ -26,8 +26,7 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
 
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto lop = scenario.make_local_operator(cl);
-    auto seasop = SeasOperator<tmp::Poisson, RateAndState>(topo, std::move(lop),
-                                                           std::make_unique<RateAndState>(cl));
+    auto seasop = SeasOperator(topo, std::make_unique<RateAndState>(cl));
 
     // PetscLinearSolver ls(seasop);
     // PetscTimeSolver ts;

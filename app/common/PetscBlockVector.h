@@ -10,42 +10,26 @@
 #include <petscsystypes.h>
 #include <petscvec.h>
 
+#include <cassert>
 #include <cstddef>
+#include <type_traits>
 #include <utility>
 
 namespace tndm {
-namespace detail {
-
-class PetscVectorBlock {
-public:
-    PetscVectorBlock(std::size_t ib, Vector<double>&& values)
-        : ib_(ib), values_(std::move(values)) {}
-
-    Vector<double>& values() { return values_; }
-    Vector<double> const& values() const { return values_; }
-    std::size_t ib() const { return ib_; }
-
-private:
-    std::size_t ib_;
-    Vector<double> values_;
-};
-
-} // namespace detail
 
 class PetscBlockVector {
 public:
+    using handle = PetscScalar*;
+    using const_handle = PetscScalar const*;
+
     PetscBlockVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
     PetscBlockVector(PetscBlockVector const& prototype);
     ~PetscBlockVector() { VecDestroy(&x_); }
 
     std::size_t scratch_mem_size() const { return sizeof(double) * block_size_; }
-    detail::PetscVectorBlock get_block(std::size_t ib, LinearAllocator& scratch) {
-        double* buffer = scratch.allocate<double>(block_size_);
-        return detail::PetscVectorBlock(ib, Vector<double>(buffer, block_size_));
-    }
-    void add_block(detail::PetscVectorBlock const& block) {
-        PetscInt pib = block.ib();
-        VecSetValuesBlocked(x_, 1, &pib, block.values().data(), ADD_VALUES);
+    void add_block(std::size_t ib_global, Vector<double> const& values) {
+        PetscInt pib = ib_global;
+        VecSetValuesBlocked(x_, 1, &pib, values.data(), ADD_VALUES);
     }
     void begin_assembly() {}
     void end_assembly() {
@@ -53,9 +37,30 @@ public:
         CHKERRTHROW(VecAssemblyEnd(x_));
     }
 
-    void begin_read() { CHKERRTHROW(VecGetArrayRead(x_, &xv_)); }
-    void copy(std::size_t ib, Vector<double>& x);
-    void end_read() { CHKERRTHROW(VecRestoreArrayRead(x_, &xv_)); }
+    handle begin_access() {
+        handle xv;
+        CHKERRTHROW(VecGetArray(x_, &xv));
+        return xv;
+    }
+    void end_access(handle xv) { CHKERRTHROW(VecRestoreArray(x_, &xv)); }
+    const_handle begin_access_readonly() {
+        const_handle xv;
+        CHKERRTHROW(VecGetArrayRead(x_, &xv));
+        return xv;
+    }
+    void end_access_readonly(const_handle xv) { CHKERRTHROW(VecRestoreArrayRead(x_, &xv)); }
+
+    void copy(const_handle access, std::size_t ib_local, Vector<double>& to);
+    auto get_block(handle access, std::size_t ib_local) {
+        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
+        assert(access != nullptr);
+        return Vector<double>(&access[ib_local * block_size_], block_size_);
+    }
+    auto get_block(const_handle access, std::size_t ib_local) {
+        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
+        assert(access != nullptr);
+        return Vector<double const>(&access[ib_local * block_size_], block_size_);
+    }
 
     void set_zero() { VecZeroEntries(x_); }
     Vec vec() const { return x_; };
@@ -63,8 +68,6 @@ public:
 private:
     Vec x_;
     std::size_t block_size_;
-    PetscScalar const* xv_ = nullptr;
-    std::pair<PetscInt, PetscInt> irange_;
 };
 
 } // namespace tndm
