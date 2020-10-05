@@ -2,6 +2,7 @@
 #define VTUADAPTER_20200827_H
 
 #include "geometry/Curvilinear.h"
+#include "mesh/LocalSimplexMesh.h"
 #include "util/Range.h"
 
 #include <cstddef>
@@ -43,13 +44,23 @@ private:
 
 template <std::size_t D> class CurvilinearBoundaryVTUAdapter : public VTUAdapter<D - 1u> {
 public:
-    CurvilinearBoundaryVTUAdapter(Curvilinear<D> const& cl, std::vector<std::size_t> const& elNos,
-                                  std::vector<std::size_t> const& localFaceNos)
-        : cl_(&cl), elNos_(&elNos), localFaceNos_(&localFaceNos) {
-        assert(elNos_->size() == localFaceNos_->size());
+    CurvilinearBoundaryVTUAdapter(LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
+                                  std::vector<std::size_t> const& fctNos)
+        : cl_(&cl) {
+        bnds_.reserve(fctNos.size());
+        for (auto const& fctNo : fctNos) {
+            auto elNos = mesh.template upward<D - 1u>(fctNo);
+            assert(elNos.size() >= 1u);
+            auto elNo = elNos[0];
+            assert(elNo < cl_->numElements());
+            auto dws = mesh.template downward<D - 1u, D>(elNo);
+            int localFaceNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
+            assert(localFaceNo < D + 1u);
+            bnds_.emplace_back(std::make_pair(elNo, localFaceNo));
+        }
     }
 
-    std::size_t numElements() const override { return elNos_->size(); }
+    std::size_t numElements() const override { return bnds_.size(); }
     std::size_t pointDim() const override { return D; };
     void setRefNodes(std::vector<std::array<double, D - 1u>> const& points) override {
         E_.clear();
@@ -58,18 +69,14 @@ public:
         }
     }
     void map(std::size_t no, Tensor<double, 2u>& result) const override {
-        assert(no < elNos_->size());
-        auto elNo = (*elNos_)[no];
-        assert(elNo < cl_->numElements());
-        auto localFaceNo = (*localFaceNos_)[no];
-        assert(localFaceNo < D + 1u);
-        cl_->map(elNo, E_[localFaceNo], result);
+        assert(no < bnds_.size());
+        auto const& bnd = bnds_[no];
+        cl_->map(bnd.first, E_[bnd.second], result);
     }
 
 private:
     Curvilinear<D> const* cl_;
-    std::vector<std::size_t> const* elNos_;
-    std::vector<std::size_t> const* localFaceNos_;
+    std::vector<std::pair<std::size_t, int>> bnds_;
     std::vector<Managed<Matrix<double>>> E_;
 };
 

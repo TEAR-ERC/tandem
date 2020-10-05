@@ -1,49 +1,34 @@
 #ifndef PETSCTS_20201001_H
 #define PETSCTS_20201001_H
 
+#include "common/PetscBlockVector.h"
 #include "common/PetscUtil.h"
 #include "tensor/Tensor.h"
 
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscts.h>
-#include <petscvec.h>
 
 #include <cstddef>
+#include <memory>
 
 namespace tndm {
 
 class PetscTimeSolver {
 public:
-    ~PetscTimeSolver() {
-        if (x_ != nullptr) {
-            VecDestroy(&x_);
-        }
-        if (ts_ != nullptr) {
-            TSDestroy(&ts_);
-        }
+    template <typename TimeOp> PetscTimeSolver(TimeOp& timeop) {
+        state_ = std::make_unique<PetscBlockVector>(timeop.block_size(), timeop.numLocalElements(),
+                                                    timeop.comm());
+        timeop.initial_condition(*state_);
     }
+    ~PetscTimeSolver() { TSDestroy(&ts_); }
 
-    void create_state(std::size_t blockSize, std::size_t numLocalElems, bool reuse, MPI_Comm comm);
-
-    void begin_state() { CHKERRTHROW(VecGetArray(x_, &xv_)); }
-    Vector<double> get_state(std::size_t ib) {
-        PetscInt blockSize;
-        VecGetBlockSize(x_, &blockSize);
-        return Vector<double>(xv_ + ib * blockSize, blockSize);
-    }
-    void end_state() {
-        CHKERRTHROW(VecRestoreArray(x_, &xv_));
-        CHKERRTHROW(VecAssemblyBegin(x_));
-        CHKERRTHROW(VecAssemblyEnd(x_));
-    }
+    auto& state() { return *state_; }
+    auto const& state() const { return *state_; }
 
 private:
-    Vec x_ = nullptr;
+    std::unique_ptr<PetscBlockVector> state_;
     TS ts_ = nullptr;
-    std::size_t numLocalElems_ = 0;
-
-    PetscScalar* xv_;
 };
 
 } // namespace tndm
