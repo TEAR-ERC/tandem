@@ -17,16 +17,14 @@
 
 namespace tndm {
 
-class PetscBlockVector {
+class PetscBlockVectorView {
 public:
     using handle = PetscScalar*;
     using const_handle = PetscScalar const*;
 
-    PetscBlockVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
-    PetscBlockVector(PetscBlockVector const& prototype);
-    ~PetscBlockVector() { VecDestroy(&x_); }
+    PetscBlockVectorView() {}
+    PetscBlockVectorView(Vec x);
 
-    std::size_t scratch_mem_size() const { return sizeof(double) * block_size_; }
     void add_block(std::size_t ib_global, Vector<double> const& values) {
         PetscInt pib = ib_global;
         VecSetValuesBlocked(x_, 1, &pib, values.data(), ADD_VALUES);
@@ -43,12 +41,12 @@ public:
         return xv;
     }
     void end_access(handle xv) { CHKERRTHROW(VecRestoreArray(x_, &xv)); }
-    const_handle begin_access_readonly() {
+    const_handle begin_access_readonly() const {
         const_handle xv;
         CHKERRTHROW(VecGetArrayRead(x_, &xv));
         return xv;
     }
-    void end_access_readonly(const_handle xv) { CHKERRTHROW(VecRestoreArrayRead(x_, &xv)); }
+    void end_access_readonly(const_handle xv) const { CHKERRTHROW(VecRestoreArrayRead(x_, &xv)); }
 
     void copy(const_handle access, std::size_t ib_local, Vector<double>& to);
     auto get_block(handle access, std::size_t ib_local) {
@@ -56,7 +54,7 @@ public:
         assert(access != nullptr);
         return Vector<double>(&access[ib_local * block_size_], block_size_);
     }
-    auto get_block(const_handle access, std::size_t ib_local) {
+    auto get_block(const_handle access, std::size_t ib_local) const {
         static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
         assert(access != nullptr);
         return Vector<double const>(&access[ib_local * block_size_], block_size_);
@@ -65,9 +63,19 @@ public:
     void set_zero() { VecZeroEntries(x_); }
     Vec vec() const { return x_; };
 
-private:
-    Vec x_;
-    std::size_t block_size_;
+protected:
+    Vec x_ = nullptr;
+    std::size_t block_size_ = 0;
+};
+
+class PetscBlockVector : public PetscBlockVectorView {
+public:
+    using handle = PetscScalar*;
+    using const_handle = PetscScalar const*;
+
+    PetscBlockVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
+    PetscBlockVector(PetscBlockVector const& prototype);
+    ~PetscBlockVector() { VecDestroy(&x_); }
 };
 
 } // namespace tndm

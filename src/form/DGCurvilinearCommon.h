@@ -93,6 +93,9 @@ public:
 
     static void zero_function(std::size_t, Matrix<double>& x) { x.set_zero(); }
 
+    SimplexQuadratureRule<D - 1u> const& facetQuadratureRule() const { return fctRule; }
+    SimplexQuadratureRule<D> const& volQuadratureRule() const { return volRule; }
+
 protected:
     void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
                         LinearAllocator& scratch);

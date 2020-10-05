@@ -13,6 +13,7 @@ from yateto.gemm_configuration import GeneratorCollection, Eigen
 
 import poisson
 import elasticity
+import rate_and_state
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -42,6 +43,11 @@ elif cmdLineArgs.app == 'elasticity':
             options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
+elif cmdLineArgs.app == 'rate_and_state':
+    rate_and_state.add(g,
+            options['dim'],
+            options['numFacetBasisFunctions'],
+            options['numFacetQuadPoints'])
 
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,

@@ -104,6 +104,7 @@ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 ## Generate code
 generate_code(poisson)
 generate_code(elasticity)
+generate_code(rate_and_state)
 
 ## Common
 add_library(app-common
@@ -117,6 +118,7 @@ add_library(app-common
 target_link_libraries(app-common PUBLIC
     poisson-kernels-lib
     elasticity-kernels-lib
+    rate_and_state-kernels-lib
     tandem-lib
     PkgConfig::PETSC)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

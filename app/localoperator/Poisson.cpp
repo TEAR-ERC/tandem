@@ -23,6 +23,7 @@ namespace tndm::tmp {
 Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
+      boundarySpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_function),
       fun_dirichlet(zero_function), fun_slip(zero_function) {
 
@@ -35,8 +36,11 @@ Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
     }
 
-    matMinv = materialSpace_.inverseMassMatrix();
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
+    matMinv = materialSpace_.inverseMassMatrix();
+
+    e_q_T = boundarySpace_.evaluateBasisAt(fctRule.points(), {1, 0});
+    minv = boundarySpace_.inverseMassMatrix();
 }
 
 void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -182,15 +186,14 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
 bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const {
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
-    double F_Q_raw[tensor::F::size()];
-    assert(tensor::F::size() == volRule.size());
-
-    auto F_Q = Matrix<double>(F_Q_raw, 1, volRule.size());
+    double F_Q_raw[tensor::F_Q::size()];
+    assert(tensor::F_Q::size() == volRule.size());
+    auto F_Q = Matrix<double>(F_Q_raw, 1, tensor::F_Q::Shape[0]);
     fun_force(elNo, F_Q);
 
     kernel::rhsVolume rhs;
     rhs.E = E_Q.data();
-    rhs.F = F_Q_raw;
+    rhs.F_Q = F_Q_raw;
     rhs.J = vol[elNo].get<AbsDetJ>().data();
     rhs.W = volRule.weights().data();
     rhs.b = B.data();
@@ -204,17 +207,16 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
         return false;
     }
 
-    double f_q_raw[tensor::f::size()];
-    assert(tensor::f::size() == fctRule.size());
-
-    auto f_q = Matrix<double>(f_q_raw, 1, fctRule.size());
+    double f_q_raw[tensor::f_q::size()];
+    assert(tensor::f_q::size() == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
     fun_slip(fctNo, f_q);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
     rhs.c20 = penalty(info);
-    rhs.f = f_q_raw;
+    rhs.f_q = f_q_raw;
     rhs.n = fct[fctNo].get<Normal>().data()->data();
     rhs.nl = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
@@ -242,17 +244,16 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
         return false;
     }
 
-    double f_q_raw[tensor::f::size()];
-    assert(tensor::f::size() == fctRule.size());
-
-    auto f_q = Matrix<double>(f_q_raw, 1, fctRule.size());
+    double f_q_raw[tensor::f_q::size()];
+    assert(tensor::f_q::size() == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
     fun_dirichlet(fctNo, f_q);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = epsilon;
     rhs.c20 = penalty(info);
-    rhs.f = f_q_raw;
+    rhs.f_q = f_q_raw;
     rhs.n = fct[fctNo].get<Normal>().data()->data();
     rhs.nl = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
@@ -271,6 +272,37 @@ void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAll
     for (std::size_t i = 0; i < coeff_K.size(); ++i) {
         C(i, 0) = coeff_K[i];
     }
+}
+
+TensorBase<Matrix<double>> Poisson::tractionResultInfo() const {
+    return TensorBase<Matrix<double>>(tensor::grad_u::Shape[0], tensor::grad_u::Shape[1]);
+}
+
+void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                       Vector<double const>& u1, Matrix<double>& result) const {
+    assert(result.size() == tensor::grad_u::size());
+
+    double Dx_q0[tensor::d_x::size(0)];
+    double Dx_q1[tensor::d_x::size(1)];
+
+    kernel::grad_u krnl;
+    krnl.e_q_T = e_q_T.data();
+    krnl.minv = minv.data();
+    krnl.d_x(0) = Dx_q0;
+    krnl.d_x(1) = Dx_q1;
+    for (std::size_t side = 0; side < 2; ++side) {
+        krnl.d_xi(side) = Dxi_q[info.localNo[side]].data();
+        krnl.em(side) = matE_q_T[info.localNo[side]].data();
+    }
+    krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    krnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
+    krnl.grad_u = result.data();
+    krnl.k(0) = material[info.up[0]].get<K>().data();
+    krnl.k(1) = material[info.up[1]].get<K>().data();
+    krnl.u(0) = u0.data();
+    krnl.u(1) = u1.data();
+    krnl.w = fctRule.weights().data();
+    double const* w{};
 }
 
 } // namespace tndm::tmp
