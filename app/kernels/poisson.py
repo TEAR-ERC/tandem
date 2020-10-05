@@ -54,10 +54,10 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     b = Tensor('b', (Nbf,))
     F = Tensor('F', (Nq,))
-    generator.add('rhsVolume', b['k'] <= J['q'] * W['q'] * E['kq'] * F['q'])
+    generator.add('rhsVolume', b['k'] <= b['k'] + J['q'] * W['q'] * E['kq'] * F['q'])
 
     f = Tensor('f', (nq,))
-    generator.add('rhsFacet', b['k'] <= \
+    generator.add('rhsFacet', b['k'] <= b['k'] + \
             c1[0] * w['q'] * K['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'] * n['iq'] * f['q'] + \
             c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f['q'])
 
