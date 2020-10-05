@@ -18,11 +18,12 @@ namespace tndm {
 class PetscLinearSolver {
 public:
     template <typename DGOp> PetscLinearSolver(DGOp& dgop) {
-        A_ = std::make_unique<PetscBlockMatrix>(dgop.block_size(), dgop.numLocalElements(),
-                                                dgop.numLocalNeighbours(),
-                                                dgop.numGhostNeighbours(), dgop.comm());
-        b_ = std::make_unique<PetscBlockVector>(dgop.block_size(), dgop.numLocalElements(),
-                                                dgop.comm());
+        auto const& topo = dgop.topo();
+        A_ = std::make_unique<PetscBlockMatrix>(dgop.block_size(), topo.numLocalElements(),
+                                                topo.numLocalNeighbours(),
+                                                topo.numGhostNeighbours(), topo.comm());
+        b_ = std::make_unique<PetscBlockVector>(dgop.block_size(), topo.numLocalElements(),
+                                                topo.comm());
         x_ = std::make_unique<PetscBlockVector>(*b_);
         dgop.assemble(*A_);
         dgop.rhs(*b_);

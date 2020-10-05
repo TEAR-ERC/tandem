@@ -3,6 +3,7 @@
 #include "common/PetscTimeSolver.h"
 #include "common/PoissonScenario.h"
 #include "config.h"
+#include "form/DGOperatorTopo.h"
 #include "localoperator/Poisson.h"
 #include "tandem/Config.h"
 #include "tandem/RateAndState.h"
@@ -23,14 +24,15 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
 
     Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
 
+    auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto lop = scenario.make_local_operator(cl);
-    auto seasop = SeasOperator<DomainDimension, tmp::Poisson, RateAndState>(
-        mesh, std::move(lop), std::make_unique<RateAndState>(cl), PETSC_COMM_WORLD);
+    auto seasop = SeasOperator<tmp::Poisson, RateAndState>(topo, std::move(lop),
+                                                           std::make_unique<RateAndState>(cl));
 
-    PetscLinearSolver ls(seasop);
-    PetscTimeSolver ts;
+    // PetscLinearSolver ls(seasop);
+    // PetscTimeSolver ts;
 
-    seasop.setup_quasi_dynamic(ls, ts);
+    // seasop.setup_quasi_dynamic(ls, ts);
 }
 
 } // namespace tndm

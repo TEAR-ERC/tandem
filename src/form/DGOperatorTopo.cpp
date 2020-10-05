@@ -10,7 +10,7 @@
 namespace tndm {
 
 template <std::size_t D>
-DGOperatorTopo<D>::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
+DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
     : numElems_(mesh.numElements()), numLocalElems_(mesh.elements().localSize()),
       numLocalFacets_(mesh.facets().localSize()), elementScatter_(mesh.elements(), comm),
       comm_(comm), fctInfo(mesh.facets().localSize()), volInfo(mesh.numElements()) {
@@ -86,7 +86,7 @@ DGOperatorTopo<D>::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm
     }
 }
 
-template class DGOperatorTopo<2u>;
-template class DGOperatorTopo<3u>;
+template DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<2u> const&, MPI_Comm);
+template DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<3u> const&, MPI_Comm);
 
 } // namespace tndm
