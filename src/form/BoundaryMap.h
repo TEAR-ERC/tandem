@@ -14,6 +14,7 @@ public:
     BoundaryMap(DGOperatorTopo const& topo, BC bc);
 
     std::size_t fctNo(std::size_t bndNo) const { return fctNos_[bndNo]; }
+    std::vector<std::size_t> const& fctNos() const { return fctNos_; }
     std::size_t bndNo(std::size_t fctNo) const { return bndNos_[fctNo]; }
 
     std::size_t size() const { return fctNos_.size(); }

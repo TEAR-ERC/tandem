@@ -4,6 +4,7 @@
 #include "config.h"
 
 #include "form/FacetInfo.h"
+#include "form/FiniteElementFunction.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "tensor/Managed.h"
@@ -35,6 +36,11 @@ public:
 
     void initial(std::size_t faultNo, Vector<double>& B, LinearAllocator& scratch) const;
     void rhs(std::size_t faultNo, Vector<double>& B, LinearAllocator& scratch) const;
+
+    auto state_prototype(std::size_t numLocalElements) const {
+        return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumQuantities,
+                                                           numLocalElements);
+    }
 
 private:
     Curvilinear<DomainDimension> const* cl_;
