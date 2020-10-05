@@ -25,7 +25,8 @@ class RateAndState {
 public:
     constexpr static std::size_t NumQuantities = 2;
 
-    RateAndState(Curvilinear<DomainDimension> const& cl);
+    RateAndState(Curvilinear<DomainDimension> const& cl,
+                 std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints);
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
     std::size_t scratch_mem_size() const { return 1; }
@@ -34,8 +35,10 @@ public:
     void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator& scratch);
     void end_preparation() {}
 
-    void initial(std::size_t faultNo, Vector<double>& B, LinearAllocator& scratch) const;
-    void rhs(std::size_t faultNo, Vector<double>& B, LinearAllocator& scratch) const;
+    void initial(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
+    void rhs(std::size_t faultNo, Matrix<double> const& traction, Vector<double const>& state,
+             Vector<double>& result, LinearAllocator& scratch) const;
+    void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& result) const;
 
     auto state_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumQuantities,
@@ -47,6 +50,7 @@ private:
     NodalRefElement<DomainDimension - 1u> space_;
 
     // Basis
+    Managed<Matrix<double>> e_q_T;
     std::vector<Managed<Matrix<double>>> geoE_q;
     std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
 

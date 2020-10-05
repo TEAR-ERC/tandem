@@ -28,7 +28,7 @@ public:
         dgop.assemble(*A_);
         dgop.rhs(*b_);
 
-        CHKERRTHROW(KSPCreate(PETSC_COMM_WORLD, &ksp_));
+        CHKERRTHROW(KSPCreate(topo.comm(), &ksp_));
         CHKERRTHROW(KSPSetType(ksp_, KSPCG));
         CHKERRTHROW(KSPSetOperators(ksp_, A_->mat(), A_->mat()));
         CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
@@ -36,6 +36,7 @@ public:
     }
     ~PetscLinearSolver() { KSPDestroy(&ksp_); }
 
+    template <typename DGOp> void update_rhs(DGOp& dgop) { dgop.rhs(*b_); }
     void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
 
     auto& x() { return *x_; }

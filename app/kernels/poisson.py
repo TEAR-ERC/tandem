@@ -14,6 +14,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     D_x = Tensor('D_x', D_xi.shape())
     A = Tensor('A', (Nbf, Nbf))
     matMinv = Tensor('matMinv', (Nbf, Nbf))
+    e_q_T = Tensor('e_q_T', (nq, nbf))
+    minv = Tensor('minv', (nbf, nbf))
 
     generator.add('project_K', K['p'] <= matMinv['pk'] * K_Q['q'] * Em['qk'] * W['q'])
 
@@ -53,13 +55,14 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     generator.add('assembleFacetNeighbour', surfaceKernelsNeighbour)
 
     b = Tensor('b', (Nbf,))
-    F = Tensor('F', (Nq,))
-    generator.add('rhsVolume', b['k'] <= b['k'] + J['q'] * W['q'] * E['kq'] * F['q'])
+    F_Q = Tensor('F_Q', (Nq,))
+    generator.add('rhsVolume', b['k'] <= b['k'] + J['q'] * W['q'] * E['kq'] * F_Q['q'])
 
-    f = Tensor('f', (nq,))
-    generator.add('rhsFacet', b['k'] <= b['k'] + \
-            c1[0] * w['q'] * K['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'] * n['iq'] * f['q'] + \
-            c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f['q'])
+    f_q = Tensor('f_q', (nq,))
+    generator.add('rhsFacet',
+        b['k'] <= b['k'] + \
+            c1[0] * w['q'] * K['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'] * n['iq'] * f_q['q'] + \
+            c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f_q['q'])
 
     # traction
 
@@ -71,13 +74,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     k = [Tensor('k({})'.format(x), (Nbf,)) for x in range(2)]
     grad_u = Tensor('grad_u', (dim, nbf))
     slip_proj = Tensor('slip_proj', (nbf, ))
-    minv = Tensor('minv', (nbf, nbf))
-    enodal = Tensor('enodal', (nq, nbf))
-    enodalT = Tensor('enodalT', (nbf, nq))
     generator.add('grad_u', [
         d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
         d_x[1]['kiq'] <= k[1]['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],
         grad_u['pk'] <= 0.5 * (d_x[0]['lpq'] * u[0]['l'] + d_x[1]['lpq'] * u[1]['l']) * w['q'] * \
-                        enodal['qr'] * minv['rk']
+                        e_q_T['qr'] * minv['rk']
     ])
-    generator.add('evaluate_slip', f['q'] <= slip_proj['l'] * enodalT['lq'])

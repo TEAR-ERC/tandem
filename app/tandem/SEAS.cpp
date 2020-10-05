@@ -3,6 +3,7 @@
 #include "common/PetscTimeSolver.h"
 #include "common/PoissonScenario.h"
 #include "config.h"
+#include "form/DGOperator.h"
 #include "form/DGOperatorTopo.h"
 #include "localoperator/Poisson.h"
 #include "tandem/Config.h"
@@ -28,10 +29,14 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
 
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto lop = scenario.make_local_operator(cl);
-    auto seasop = SeasOperator(topo, std::make_unique<RateAndState>(cl));
+    auto quadPoints = lop->facetQuadratureRule().points();
+    auto dgop =
+        std::make_unique<DGOperator<typename decltype(lop)::element_type>>(topo, std::move(lop));
+    auto seasop =
+        SeasOperator(topo, std::make_unique<RateAndState>(cl, quadPoints), std::move(dgop));
 
-    // PetscLinearSolver ls(seasop);
     auto ts = PetscTimeSolver(seasop);
+    ts.solve(100.0);
 
     if (cfg.output) {
         auto fault_writer =
@@ -41,8 +46,6 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
         fault_piece.addPointData("state", seasop.state(ts.state()));
         fault_writer.write(*cfg.output);
     }
-
-    // seasop.setup_quasi_dynamic(ls, ts);
 }
 
 } // namespace tndm

@@ -51,6 +51,10 @@ public:
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator& scratch) const;
 
+    TensorBase<Matrix<double>> tractionResultInfo() const;
+    void traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                  Vector<double const>& u1, Matrix<double>& result) const;
+
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension>(space_.clone(), NumQuantities,
                                                       numLocalElements);
@@ -84,6 +88,7 @@ private:
     // Ref elements
     ModalRefElement<DomainDimension> space_;
     NodalRefElement<DomainDimension> materialSpace_;
+    NodalRefElement<DomainDimension - 1u> boundarySpace_;
 
     // Matrices
     Managed<Matrix<double>> E_Q;
@@ -94,6 +99,9 @@ private:
     Managed<Matrix<double>> matE_Q_T;
     Managed<Matrix<double>> matMinv;
     std::vector<Managed<Matrix<double>>> matE_q_T;
+
+    Managed<Matrix<double>> e_q_T;
+    Managed<Matrix<double>> minv;
 
     // Input
     volume_functional_t fun_K;
