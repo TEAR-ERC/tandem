@@ -60,8 +60,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
 
     auto lop = scenario.make_local_operator(cl);
-    auto dgop = DGOperator<DomainDimension, typename decltype(lop)::element_type>(
-        mesh, std::move(lop), PETSC_COMM_WORLD);
+    auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+    auto dgop = DGOperator(topo, std::move(lop));
 
     sw.start();
     auto solver = PetscLinearSolver(dgop);

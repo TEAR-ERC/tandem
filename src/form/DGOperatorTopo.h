@@ -13,17 +13,26 @@
 
 namespace tndm {
 
-template <std::size_t D> class DGOperatorTopo {
+class DGOperatorTopo {
 public:
-    DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm);
+    template <std::size_t D> DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm);
     virtual ~DGOperatorTopo() = default;
 
     std::size_t numElements() const { return numElems_; }
     std::size_t numLocalElements() const { return numLocalElems_; }
     std::size_t numLocalFacets() const { return numLocalFacets_; }
+    Scatter& elementScatter() { return elementScatter_; }
 
+    FacetInfo const& info(std::size_t fctNo) const { return fctInfo[fctNo]; }
+    std::size_t gid(std::size_t elNo) const { return volInfo[elNo].template get<GID>(); }
+    unsigned numLocalNeighbours(std::size_t elNo) const {
+        return volInfo[elNo].template get<NumLocalNeighbours>();
+    }
     unsigned const* numLocalNeighbours() const {
         return &volInfo[0].template get<NumLocalNeighbours>();
+    }
+    unsigned numGhostNeighbours(std::size_t elNo) const {
+        return volInfo[elNo].template get<NumGhostNeighbours>();
     }
     unsigned const* numGhostNeighbours() const {
         return &volInfo[0].template get<NumGhostNeighbours>();
