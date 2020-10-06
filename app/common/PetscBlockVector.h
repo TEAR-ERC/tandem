@@ -48,7 +48,7 @@ public:
     }
     void end_access_readonly(const_handle xv) const { CHKERRTHROW(VecRestoreArrayRead(x_, &xv)); }
 
-    void copy(const_handle access, std::size_t ib_local, Vector<double>& to);
+    void copy(const_handle access, std::size_t ib_local, Vector<double>& to) const;
     auto get_block(handle access, std::size_t ib_local) {
         static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
         assert(access != nullptr);

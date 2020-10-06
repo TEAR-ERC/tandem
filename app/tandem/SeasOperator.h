@@ -23,6 +23,11 @@ namespace tndm {
 
 template <typename LocalOperator, typename SpatialOperator> class SeasOperator {
 public:
+    constexpr static std::size_t Dim = SpatialOperator::local_operator_t::Dim;
+    constexpr static std::size_t NumQuantities = SpatialOperator::local_operator_t::NumQuantities;
+    using time_functional_t =
+        std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
+
     SeasOperator(std::shared_ptr<DGOperatorTopo> topo, std::unique_ptr<LocalOperator> localOperator,
                  std::unique_ptr<SpatialOperator> spatialOperator)
         : topo_(std::move(topo)), lop_(std::move(localOperator)), dgop_(std::move(spatialOperator)),
@@ -42,6 +47,8 @@ public:
     std::size_t numLocalElements() const { return faultMap_.size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& faultMap() const { return faultMap_; }
+    SpatialOperator const& spatialOperator() const { return *dgop_; }
+    auto displacement() const { return dgop_->solution(linear_solver_.x()); }
 
     template <class BlockVector> void initial_condition(BlockVector& vector) {
         auto bs = lop_->block_size();
@@ -54,12 +61,18 @@ public:
         vector.end_access(access_handle);
     }
 
-    template <typename BlockVector> void rhs(BlockVector& state, BlockVector& result) {
+    template <typename BlockVector> void rhs(double time, BlockVector& state, BlockVector& result) {
         auto in_handle = state.begin_access_readonly();
         dgop_->lop().set_slip([this, &state, &in_handle](std::size_t fctNo, Matrix<double>& f_q) {
             auto faultNo = this->faultMap_.bndNo(fctNo);
             auto state_block = state.get_block(in_handle, faultNo);
             this->lop_->slip(faultNo, state_block, f_q);
+        });
+        dgop_->lop().set_dirichlet([this, time](std::array<double, Dim> const& x) {
+            std::array<double, Dim + 1u> xt;
+            std::copy(x.begin(), x.end(), xt.begin());
+            xt.back() = time;
+            return this->fun_boundary(xt);
         });
         linear_solver_.update_rhs(*dgop_);
         linear_solver_.solve();
@@ -100,6 +113,8 @@ public:
         return soln;
     }
 
+    void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
+
 private:
     auto make_scratch() const {
         return LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
@@ -110,6 +125,10 @@ private:
     std::unique_ptr<char[]> scratch_mem_;
     BoundaryMap faultMap_;
     PetscLinearSolver linear_solver_;
+    time_functional_t fun_boundary =
+        [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {
+        return {};
+    };
 };
 
 } // namespace tndm

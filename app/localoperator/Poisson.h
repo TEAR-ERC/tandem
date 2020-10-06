@@ -28,6 +28,7 @@ namespace tndm::tmp {
 class Poisson : public DGCurvilinearCommon<DomainDimension> {
 public:
     using base = DGCurvilinearCommon<DomainDimension>;
+    constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = 1;
 
     Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K);

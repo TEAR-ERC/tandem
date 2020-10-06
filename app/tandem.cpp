@@ -1,9 +1,9 @@
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
-#include "common/PoissonScenario.h"
 #include "config.h"
 #include "tandem/Config.h"
 #include "tandem/SEAS.h"
+#include "tandem/SeasScenario.h"
 
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
-    auto& poissonSchema = schema.add_table("poisson", &Config::poisson);
-    PoissonScenarioConfig::setSchema(poissonSchema, makePathRelativeToConfig);
+    auto& seasSchema = schema.add_table("seas", &Config::seas);
+    SeasScenarioConfig::setSchema(seasSchema, makePathRelativeToConfig);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
