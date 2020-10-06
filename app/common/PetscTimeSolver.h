@@ -38,13 +38,25 @@ public:
     auto& state() { return *state_; }
     auto const& state() const { return *state_; }
 
+    template <class Monitor> void set_monitor(Monitor& monitor) {
+        CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, &monitor, nullptr));
+    }
+
 private:
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
         TimeOp* self = reinterpret_cast<TimeOp*>(ctx);
         auto u_view = PetscBlockVectorView(u);
         auto F_view = PetscBlockVectorView(F);
-        self->rhs(u_view, F_view);
+        self->rhs(t, u_view, F_view);
+        return 0;
+    }
+
+    template <class Monitor>
+    static PetscErrorCode MonitorFunction(TS ts, PetscInt steps, PetscReal time, Vec u, void* ctx) {
+        Monitor* self = reinterpret_cast<Monitor*>(ctx);
+        auto u_view = PetscBlockVectorView(u);
+        self->monitor(time, u_view);
         return 0;
     }
 

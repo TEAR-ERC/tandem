@@ -27,7 +27,7 @@ class PoissonScenario : public Scenario<tmp::Poisson> {
 public:
     PoissonScenario(PoissonScenarioConfig const& problem) : Scenario(problem) {
         if (problem.coefficient) {
-            coefficient_ = lib_.getFunction<DomainDimension, NumQuantities>(*problem.coefficient);
+            coefficient_ = lib_.getFunction<DomainDimension, 1>(*problem.coefficient);
         }
     }
 

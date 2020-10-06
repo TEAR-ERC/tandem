@@ -17,6 +17,8 @@ namespace tndm {
 
 template <typename LocalOperator> class DGOperator {
 public:
+    using local_operator_t = LocalOperator;
+
     template <class T> using prepare_volume_t = decltype(&T::prepare_volume);
     template <class T> using prepare_skeleton_t = decltype(&T::prepare_skeleton);
     template <class T> using prepare_boundary_t = decltype(&T::prepare_boundary);
@@ -200,7 +202,7 @@ public:
         vector.end_access(access_handle);
     }
 
-    template <typename BlockVector> auto solution(BlockVector& vector) {
+    template <typename BlockVector> auto solution(BlockVector& vector) const {
         auto soln = lop_->solution_prototype(topo_->numLocalElements());
         auto& values = soln.values();
         auto value_matrix = reshape(values, lop_->block_size(), topo_->numLocalElements());

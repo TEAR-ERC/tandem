@@ -56,16 +56,11 @@ void RateAndState::rhs(std::size_t faultNo, Matrix<double> const& traction,
     auto coords = fault_[faultNo].get<Coords>();
     for (std::size_t node = 0; node < nbf; ++node) {
         bp1.setX(coords[node]);
-        if (coords[node][1] <= -40000.0) {
-            result(node) = 0.0;
-            result(nbf + node) = 1e-9;
-        } else {
-            auto tau = traction(0, node);
-            auto psi = state(node);
-            double V = bp1.computeSlipRate(tau, psi);
-            result(node) = bp1.G(tau, V, psi);
-            result(nbf + node) = V;
-        }
+        auto tau = traction(0, node);
+        auto psi = state(node);
+        double V = bp1.computeSlipRate(tau, psi);
+        result(node) = bp1.G(tau, V, psi);
+        result(nbf + node) = V;
     }
 }
 

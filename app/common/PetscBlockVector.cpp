@@ -10,7 +10,8 @@ PetscBlockVectorView::PetscBlockVectorView(Vec x) : x_(x) {
     block_size_ = bs;
 }
 
-void PetscBlockVectorView::copy(const_handle access, std::size_t ib_local, Vector<double>& to) {
+void PetscBlockVectorView::copy(const_handle access, std::size_t ib_local,
+                                Vector<double>& to) const {
     assert(access != nullptr);
     assert(block_size_ == to.size());
     std::size_t i0 = ib_local * block_size_;

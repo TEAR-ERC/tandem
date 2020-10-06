@@ -28,6 +28,7 @@ namespace tndm::tmp {
 class Elasticity : public DGCurvilinearCommon<DomainDimension> {
 public:
     using base = DGCurvilinearCommon<DomainDimension>;
+    constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
 
     Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> lam, functional_t<1> mu);

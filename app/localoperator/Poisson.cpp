@@ -203,14 +203,16 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& s
 
 bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            Vector<double>& B1, LinearAllocator& scratch) const {
-    if (info.bc != BC::Fault) {
-        return false;
-    }
-
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    fun_slip(fctNo, f_q);
+    if (info.bc == BC::Fault) {
+        fun_slip(fctNo, f_q);
+    } else if (info.bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q);
+    } else {
+        return false;
+    }
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();

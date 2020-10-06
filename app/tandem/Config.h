@@ -2,7 +2,7 @@
 #define CONFIG_20200825_H
 
 #include "common/MeshConfig.h"
-#include "common/PoissonScenario.h"
+#include "tandem/SeasScenario.h"
 
 #include <optional>
 #include <string>
@@ -15,7 +15,7 @@ struct Config {
     std::optional<std::string> output;
     std::optional<double> output_interval;
     std::optional<std::string> mesh_file;
-    PoissonScenarioConfig poisson;
+    SeasScenarioConfig seas;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
