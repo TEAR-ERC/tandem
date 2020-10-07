@@ -74,6 +74,10 @@ public:
     void set_dirichlet(functional_t<NumQuantities> fun) {
         fun_dirichlet = make_facet_functional(std::move(fun));
     }
+    void set_dirichlet(functional_t<NumQuantities> fun,
+                       std::array<double, DomainDimension> const& refNormal) {
+        fun_dirichlet = make_facet_functional(std::move(fun), refNormal);
+    }
     void set_dirichlet(facet_functional_t fun) { fun_dirichlet = std::move(fun); }
     void set_slip(functional_t<NumQuantities> fun,
                   std::array<double, DomainDimension> const& refNormal) {

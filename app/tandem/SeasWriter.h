@@ -23,19 +23,35 @@ public:
         fault_base_ += "-fault";
     }
 
+    double output_interval(double VMax) const {
+        constexpr double V0 = 1e-9;
+        constexpr double V1 = 1;
+        constexpr double tmin = 0.01;
+        constexpr double tmax = 30 * 24 * 3600;
+        double falloff = log(tmin / tmax) * (V1 - V0);
+        VMax = std::min(V1, std::max(V0, VMax));
+        return tmax * exp(falloff * VMax);
+    }
+
     template <class BlockVector> void monitor(double time, BlockVector const& state) {
-        auto fault_writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
-        auto fault_piece = fault_writer.addPiece(fault_adapter_);
-        fault_piece.addPointData("state", seasop_->state(state));
-        fault_writer.write(name(fault_base_));
+        auto interval = output_interval(seasop_->VMax());
+        if (time - last_output_time_ >= interval) {
+            auto fault_writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
+            fault_writer.addFieldData("time", &time, 1);
+            auto fault_piece = fault_writer.addPiece(fault_adapter_);
+            fault_piece.addPointData("state", seasop_->state(state));
+            fault_writer.write(name(fault_base_));
 
-        auto displacement = seasop_->displacement();
-        auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
-        auto piece = writer.addPiece(adapter_);
-        piece.addPointData("u", displacement);
-        writer.write(name(base_));
+            auto displacement = seasop_->displacement();
+            auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
+            writer.addFieldData("time", &time, 1);
+            auto piece = writer.addPiece(adapter_);
+            piece.addPointData("u", displacement);
+            writer.write(name(base_));
 
-        ++output_step_;
+            ++output_step_;
+            last_output_time_ = time;
+        }
     }
 
 private:
@@ -53,6 +69,7 @@ private:
     std::string base_;
     unsigned degree_;
     std::size_t output_step_ = 0;
+    double last_output_time_ = std::numeric_limits<double>::lowest();
 };
 
 } // namespace tndm

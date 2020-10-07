@@ -6,12 +6,18 @@
 
 namespace tndm {
 
+double smoothstep(double x) {
+    return -20.0 * std::pow(x, 7.0) + 70.0 * std::pow(x, 6.0) - 84.0 * std::pow(x, 5.0) +
+           35.0 * std::pow(x, 4.0);
+}
+
 void BP1::setX(point_t x) {
     double const z = -x[1];
     if (z < H_) {
         a_ = a0_;
     } else if (z < H_ + h_) {
-        a_ = a0_ + (amax_ - a0_) * (z - H_) / h_;
+        // a_ = a0_ + (amax_ - a0_) * (z - H_) / h_;
+        a_ = a0_ + (amax_ - a0_) * smoothstep((z - H_) / h_);
     } else {
         a_ = amax_;
     }

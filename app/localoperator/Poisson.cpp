@@ -24,8 +24,8 @@ Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       boundarySpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()),
-      fun_K(make_volume_functional(std::move(K))), fun_force(zero_function),
-      fun_dirichlet(zero_function), fun_slip(zero_function) {
+      fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
+      fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
@@ -207,9 +207,9 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
     if (info.bc == BC::Fault) {
-        fun_slip(fctNo, f_q);
+        fun_slip(fctNo, f_q, false);
     } else if (info.bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q);
+        fun_dirichlet(fctNo, f_q, false);
     } else {
         return false;
     }
@@ -249,7 +249,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    fun_dirichlet(fctNo, f_q);
+    fun_dirichlet(fctNo, f_q, true);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -304,7 +304,7 @@ void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double c
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
     krnl.w = fctRule.weights().data();
-    double const* w{};
+    krnl.execute();
 }
 
 } // namespace tndm::tmp

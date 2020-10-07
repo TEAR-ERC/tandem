@@ -23,7 +23,7 @@ struct SeasScenarioConfig {
     std::optional<std::string> warp;
     std::optional<std::string> mu;
     std::optional<std::string> boundary;
-    std::optional<std::array<double, DomainDimension>> ref_normal;
+    std::array<double, DomainDimension> ref_normal;
 
     template <typename PathConverter>
     static void setSchema(TableSchema<SeasScenarioConfig>& schema, PathConverter path_converter) {
@@ -70,9 +70,10 @@ public:
     auto const& transform() const { return warp_; }
     auto const& mu() const { return mu_; }
     auto const& boundary() const { return boundary_; }
+    auto const& ref_normal() const { return ref_normal_; }
 
 protected:
-    std::optional<std::array<double, DomainDimension>> ref_normal_;
+    std::array<double, DomainDimension> ref_normal_;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {

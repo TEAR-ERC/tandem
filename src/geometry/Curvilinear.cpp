@@ -189,6 +189,13 @@ void Curvilinear<D>::normal(std::size_t faceNo, Tensor<double, 1u> const& detJ,
     }
 }
 
+template <std::size_t D> void Curvilinear<D>::normalize(Tensor<double, 2u>& normal) const {
+    for (std::ptrdiff_t i = 0; i < normal.shape(1); ++i) {
+        auto n = normal.subtensor(slice{}, i);
+        EigenMap<Vector<double>, D>(n).normalize();
+    }
+}
+
 template <std::size_t D>
 TensorBase<Tensor<double, 3u>> Curvilinear<D>::facetBasisResultInfo(std::size_t numPoints) const {
     return TensorBase<Tensor<double, 3u>>(D, D, numPoints);
