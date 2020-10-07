@@ -1,7 +1,5 @@
 #include "SEAS.h"
-#include "common/PetscLinearSolver.h"
 #include "common/PetscTimeSolver.h"
-#include "common/PoissonScenario.h"
 #include "config.h"
 #include "form/DGOperator.h"
 #include "form/DGOperatorTopo.h"
@@ -13,14 +11,17 @@
 #include "tandem/SeasWriter.h"
 
 #include "geometry/Curvilinear.h"
-#include "io/VTUAdapter.h"
-#include "io/VTUWriter.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
 
 #include <petscsys.h>
 
+#include <algorithm>
+#include <array>
 #include <memory>
+#include <optional>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 

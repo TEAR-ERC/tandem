@@ -4,14 +4,12 @@
 #include "common/PetscUtil.h"
 
 #include "tensor/Tensor.h"
-#include "util/LinearAllocator.h"
 
-#include <mpi.h>
 #include <petscmat.h>
+#include <petscsys.h>
 #include <petscsystypes.h>
 
 #include <cstddef>
-#include <utility>
 
 namespace tndm {
 

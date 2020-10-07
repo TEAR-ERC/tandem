@@ -1,5 +1,6 @@
 #include "BoundaryMap.h"
 #include "form/DGOperatorTopo.h"
+#include "form/FacetInfo.h"
 
 #include <limits>
 

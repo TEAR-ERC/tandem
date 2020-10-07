@@ -10,6 +10,7 @@
 #include "geometry/Curvilinear.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
+#include "tensor/TensorBase.h"
 #include "util/LinearAllocator.h"
 
 #include "mneme/storage.hpp"
