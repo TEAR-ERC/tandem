@@ -36,7 +36,10 @@ public:
     }
     ~PetscLinearSolver() { KSPDestroy(&ksp_); }
 
-    template <typename DGOp> void update_rhs(DGOp& dgop) { dgop.rhs(*b_); }
+    template <typename DGOp> void update_rhs(DGOp& dgop) {
+        b_->set_zero();
+        dgop.rhs(*b_);
+    }
     void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
 
     auto& x() { return *x_; }
