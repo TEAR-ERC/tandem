@@ -3,13 +3,11 @@
 
 #include "common/PetscBlockVector.h"
 #include "common/PetscUtil.h"
-#include "tensor/Tensor.h"
 
-#include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscts.h>
+#include <petscvec.h>
 
-#include <cstddef>
 #include <memory>
 
 namespace tndm {

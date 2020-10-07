@@ -1,7 +1,5 @@
 #include "PetscBlockVector.h"
 
-#include <vector>
-
 namespace tndm {
 
 PetscBlockVectorView::PetscBlockVectorView(Vec x) : x_(x) {
