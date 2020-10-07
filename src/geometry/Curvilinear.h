@@ -55,6 +55,7 @@ public:
     TensorBase<Matrix<double>> normalResultInfo(std::size_t numPoints) const;
     void normal(std::size_t faceNo, Tensor<double, 1u> const& detJ, Tensor<double, 3u> const& jInv,
                 Tensor<double, 2u>& result) const;
+    void normalize(Tensor<double, 2u>& normal) const;
 
     TensorBase<Tensor<double, 3u>> facetBasisResultInfo(std::size_t numPoints) const;
     void facetBasis(std::size_t faceNo, Tensor<double, 3u> const& jacobian,

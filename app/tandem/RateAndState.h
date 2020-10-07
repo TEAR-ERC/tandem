@@ -24,26 +24,34 @@ namespace tndm {
 class RateAndState {
 public:
     constexpr static std::size_t NumQuantities = 2;
+    constexpr static std::size_t NumInternalQuantities = 4;
 
     RateAndState(Curvilinear<DomainDimension> const& cl,
                  std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints);
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
-    std::size_t scratch_mem_size() const { return 1; }
+    std::size_t scratch_mem_size() const {
+        return space_.numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
+               sizeof(double);
+    }
 
     void begin_preparation(std::size_t numFaultFaces);
-    void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator& scratch);
+    void prepare(std::size_t faultNo, FacetInfo const& info,
+                 std::array<double, DomainDimension> const& ref_normal, LinearAllocator& scratch);
     void end_preparation() {}
 
     void initial(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
-    void rhs(std::size_t faultNo, Matrix<double> const& traction, Vector<double const>& state,
-             Vector<double>& result, LinearAllocator& scratch) const;
-    void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& result) const;
+    double rhs(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
+               Vector<double>& result, LinearAllocator& scratch) const;
+    void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& result,
+              LinearAllocator& scratch) const;
 
     auto state_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumQuantities,
+        return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumInternalQuantities,
                                                            numLocalElements);
     }
+    void state(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
+               Matrix<double>& result, LinearAllocator& scratch) const;
 
 private:
     Curvilinear<DomainDimension> const* cl_;
@@ -57,8 +65,14 @@ private:
     struct Coords {
         using type = std::array<double, DomainDimension>;
     };
+    struct UnitNormal {
+        using type = std::array<double, DomainDimension>;
+    };
+    struct SignFlipped {
+        using type = bool;
+    };
 
-    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords>;
+    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, UnitNormal, SignFlipped>;
     mneme::StridedView<fault_t> fault_;
 };
 

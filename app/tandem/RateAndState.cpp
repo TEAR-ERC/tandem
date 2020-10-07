@@ -4,6 +4,7 @@
 #include "tandem/BP1.h"
 
 #include "basis/WarpAndBlend.h"
+#include "geometry/Vector.h"
 
 #include <algorithm>
 
@@ -27,11 +28,40 @@ void RateAndState::begin_preparation(std::size_t numFaultFaces) {
     fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
 }
 
-void RateAndState::prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator& scratch) {
+void RateAndState::prepare(std::size_t faultNo, FacetInfo const& info,
+                           std::array<double, DomainDimension> const& ref_normal,
+                           LinearAllocator& scratch) {
     auto nbf = space_.numBasisFunctions();
     auto coords =
         Tensor(fault_[faultNo].template get<Coords>().data()->data(), cl_->mapResultInfo(nbf));
     cl_->map(info.up[0], geoE_q[info.localNo[0]], coords);
+
+    double* J_mem = scratch.allocate<double>(nbf * DomainDimension * DomainDimension);
+    double* JInv_mem = scratch.allocate<double>(nbf * DomainDimension * DomainDimension);
+    double* detJ_mem = scratch.allocate<double>(nbf);
+    auto J = Tensor(J_mem, cl_->jacobianResultInfo(nbf));
+    auto JInv = Tensor(JInv_mem, cl_->jacobianResultInfo(nbf));
+    auto detJ = Tensor(detJ_mem, cl_->detJResultInfo(nbf));
+    auto normal = Tensor(fault_[faultNo].template get<UnitNormal>().data()->data(),
+                         cl_->normalResultInfo(nbf));
+    cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
+    cl_->detJ(info.up[0], J, detJ);
+    cl_->jacobianInv(J, JInv);
+    cl_->normal(info.localNo[0], detJ, JInv, normal);
+    cl_->normalize(normal);
+    for (std::size_t i = 0; i < nbf; ++i) {
+        auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
+        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
+        sign_flipped = dot(ref_normal, normal_i) < 0;
+        if (sign_flipped) {
+            normal_i = -1.0 * normal_i;
+        }
+    }
+    for (std::size_t i = 0; i < nbf; ++i) {
+        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
+        auto& sf = fault_[faultNo].template get<SignFlipped>()[i];
+    }
+    scratch.reset();
 }
 
 void RateAndState::initial(std::size_t faultNo, Vector<double>& state,
@@ -47,31 +77,76 @@ void RateAndState::initial(std::size_t faultNo, Vector<double>& state,
     }
 }
 
-void RateAndState::rhs(std::size_t faultNo, Matrix<double> const& traction,
-                       Vector<double const>& state, Vector<double>& result,
-                       LinearAllocator& scratch) const {
+double RateAndState::rhs(std::size_t faultNo, Matrix<double> const& grad_u,
+                         Vector<double const>& state, Vector<double>& result,
+                         LinearAllocator& scratch) const {
     BP1 bp1;
 
     std::size_t nbf = space_.numBasisFunctions();
+    double* traction = scratch.allocate<double>(nbf);
+    rate_and_state::kernel::evaluate_traction krnl;
+    krnl.grad_u = grad_u.data();
+    krnl.traction = traction;
+    krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.execute();
+
+    double VMax;
     auto coords = fault_[faultNo].get<Coords>();
     for (std::size_t node = 0; node < nbf; ++node) {
         bp1.setX(coords[node]);
-        auto tau = traction(0, node);
+        auto tau = traction[node];
         auto psi = state(node);
         double V = bp1.computeSlipRate(tau, psi);
+        VMax = std::max(VMax, V);
         result(node) = bp1.G(tau, V, psi);
         result(nbf + node) = V;
     }
+    scratch.reset();
+    return VMax;
 }
 
-void RateAndState::slip(std::size_t faultNo, Vector<double const>& state,
-                        Matrix<double>& s_q) const {
+void RateAndState::slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& s_q,
+                        LinearAllocator& scratch) const {
     std::size_t nbf = space_.numBasisFunctions();
+    double const* slip = state.data() + nbf;
+    double* slip_flip = scratch.allocate<double>(nbf);
+    for (std::size_t i = 0; i < nbf; ++i) {
+        if (fault_[faultNo].template get<SignFlipped>()[i]) {
+            slip_flip[i] = -slip[i];
+        }
+    }
     rate_and_state::kernel::evaluate_slip krnl;
     krnl.e_q_T = e_q_T.data();
-    krnl.slip = state.data() + nbf;
+    krnl.slip = slip_flip;
     krnl.slip_q = s_q.data();
     krnl.execute();
+    scratch.reset();
+}
+
+void RateAndState::state(std::size_t faultNo, Matrix<double> const& grad_u,
+                         Vector<double const>& state, Matrix<double>& result,
+                         LinearAllocator& scratch) const {
+    BP1 bp1;
+
+    std::size_t nbf = space_.numBasisFunctions();
+    double* traction = scratch.allocate<double>(nbf);
+    rate_and_state::kernel::evaluate_traction krnl;
+    krnl.grad_u = grad_u.data();
+    krnl.traction = traction;
+    krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.execute();
+
+    auto coords = fault_[faultNo].get<Coords>();
+    for (std::size_t node = 0; node < nbf; ++node) {
+        bp1.setX(coords[node]);
+        auto tau = traction[node];
+        auto psi = state(node);
+        result(node, 0) = psi;
+        result(node, 1) = state(node + nbf);
+        result(node, 2) = tau;
+        result(node, 3) = bp1.computeSlipRate(tau, psi);
+    }
+    scratch.reset();
 }
 
 } // namespace tndm

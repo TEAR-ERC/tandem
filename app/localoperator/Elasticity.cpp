@@ -25,8 +25,8 @@ Elasticity::Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> l
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_lam(make_volume_functional(std::move(lam))),
-      fun_mu(make_volume_functional(std::move(mu))), fun_force(zero_function),
-      fun_dirichlet(zero_function), fun_slip(zero_function) {
+      fun_mu(make_volume_functional(std::move(mu))), fun_force(zero_volume_function),
+      fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
@@ -283,7 +283,7 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     assert(tensor::f::Shape[1] == fctRule.size());
 
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    fun_slip(fctNo, f_q);
+    fun_slip(fctNo, f_q, false);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -324,7 +324,7 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     assert(tensor::f::Shape[1] == fctRule.size());
 
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    fun_dirichlet(fctNo, f_q);
+    fun_dirichlet(fctNo, f_q, true);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();

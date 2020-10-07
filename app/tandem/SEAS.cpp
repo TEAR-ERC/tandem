@@ -35,8 +35,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     auto quadPoints = lop->facetQuadratureRule().points();
     auto dgop = std::make_unique<DGOperator<local_operator_t>>(topo, std::move(lop));
     using seas_operator_t = SeasOperator<RateAndState, DGOperator<local_operator_t>>;
-    auto seasop = std::make_shared<seas_operator_t>(
-        topo, std::make_unique<RateAndState>(cl, quadPoints), std::move(dgop));
+    auto seasop =
+        std::make_shared<seas_operator_t>(topo, std::make_unique<RateAndState>(cl, quadPoints),
+                                          std::move(dgop), scenario.ref_normal());
     if (scenario.boundary()) {
         seasop->set_boundary(*scenario.boundary());
     }

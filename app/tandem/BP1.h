@@ -27,15 +27,15 @@ private:
 
     constexpr static double a0_ = 0.010;
     constexpr static double amax_ = 0.025;
-    constexpr static double H_ = 15e3;
-    constexpr static double h_ = 3e3;
+    constexpr static double H_ = 15;
+    constexpr static double h_ = 3;
     constexpr static double b_ = 0.015;
     constexpr static double V0_ = 1.0e-6;
     constexpr static double Vinit_ = 1.0e-9;
     constexpr static double L_ = 0.008;
     constexpr static double f0_ = 0.6;
-    constexpr static double sn_ = 50e6;
-    constexpr static double eta_ = 2670.0 * 3464.0 / 2.0;
+    constexpr static double sn_ = 50;
+    constexpr static double eta_ = 2.670 * 3.464 / 2.0;
 };
 
 } // namespace tndm

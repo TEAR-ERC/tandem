@@ -26,7 +26,8 @@ public:
     template <std::size_t Q>
     using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
     using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
-    using facet_functional_t = std::function<void(std::size_t fctNo, Matrix<double>& f)>;
+    using facet_functional_t =
+        std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
 
     DGCurvilinearCommon(Curvilinear<D> const& cl, unsigned minQuadOrder);
 
@@ -61,7 +62,7 @@ public:
 
     template <std::size_t Q>
     auto make_facet_functional(functional_t<Q> fun) const -> facet_functional_t {
-        return [fun, this](std::size_t fctNo, Matrix<double>& f) {
+        return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
@@ -75,14 +76,16 @@ public:
     template <std::size_t Q>
     auto make_facet_functional(functional_t<Q> fun, std::array<double, D> const& refNormal) const
         -> facet_functional_t {
-        return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f) {
+        return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
-                auto normal = this->fct[fctNo].template get<Normal>()[q];
                 auto fx = fun(coords[q]);
-                if (dot(refNormal, normal) < 0) {
-                    fx = -1.0 * fx;
+                if (!is_boundary) {
+                    auto normal = this->fct[fctNo].template get<Normal>()[q];
+                    if (dot(refNormal, normal) < 0) {
+                        fx = -1.0 * fx;
+                    }
                 }
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
                     f(p, q) = fx[p];
@@ -91,7 +94,8 @@ public:
         };
     }
 
-    static void zero_function(std::size_t, Matrix<double>& x) { x.set_zero(); }
+    static void zero_volume_function(std::size_t, Matrix<double>& x) { x.set_zero(); }
+    static void zero_facet_function(std::size_t, Matrix<double>& x, bool) { x.set_zero(); }
 
     SimplexQuadratureRule<D - 1u> const& facetQuadratureRule() const { return fctRule; }
     SimplexQuadratureRule<D> const& volQuadratureRule() const { return volRule; }
