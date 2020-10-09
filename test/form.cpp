@@ -1,4 +1,7 @@
+#include "basis/WarpAndBlend.h"
 #include "form/RefElement.h"
+#include "quadrules/AutoRule.h"
+#include "tensor/EigenMap.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
@@ -49,5 +52,37 @@ TEST_CASE("Reference element") {
                 }
             }
         }
+    }
+}
+
+TEST_CASE("Projection") {
+    constexpr unsigned degree = 3;
+    const auto test_fun = [](double x) { return x * x * x - 4.0 * x * x + 5.0 * x - 1.0; };
+
+    auto rule = simplexQuadratureRule<1u>(2 * degree);
+    auto space = NodalRefElement(degree, WarpAndBlendFactory<1u>());
+    auto Minv = space.inverseMassMatrix();
+    auto E_Q = space.evaluateBasisAt(rule.points());
+
+    auto F_Q = Managed<Vector<double>>(rule.size());
+    auto F_Q_w = Managed<Vector<double>>(rule.size());
+    for (unsigned q = 0, Nq = rule.size(); q < Nq; ++q) {
+        F_Q(q) = test_fun(rule.points()[q][0]);
+        F_Q_w(q) = rule.weights()[q] * F_Q(q);
+    }
+
+    auto F = Managed<Vector<double>>(space.numBasisFunctions());
+    EigenMap(F) = EigenMap(Minv) * EigenMap(E_Q) * EigenMap(F_Q_w);
+
+    for (unsigned k = 0, Nbf = space.numBasisFunctions(); k < Nbf; ++k) {
+        CHECK(F(k) == doctest::Approx(test_fun(space.refNodes()[k][0])));
+    }
+
+    auto F_Q_test = Managed<Vector<double>>(rule.size());
+    auto E_Q_T = space.evaluateBasisAt(rule.points(), {1, 0});
+    EigenMap(F_Q_test) = EigenMap(E_Q_T) * EigenMap(F);
+
+    for (unsigned q = 0, Nq = rule.size(); q < Nq; ++q) {
+        CHECK(F_Q(q) == doctest::Approx(F_Q_test(q)));
     }
 }
