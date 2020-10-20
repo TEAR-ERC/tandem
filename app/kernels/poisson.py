@@ -2,7 +2,7 @@
 
 from yateto import *
 
-def add(generator, dim, nbf, Nbf, nq, Nq):
+def add(generator, dim, nbf, nbf_fault, Nbf, nq, Nq):
     J = Tensor('J', (Nq,))
     G = Tensor('G', (dim, dim, Nq))
     K = Tensor('K', (Nbf,))
@@ -14,8 +14,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     D_x = Tensor('D_x', D_xi.shape())
     A = Tensor('A', (Nbf, Nbf))
     matMinv = Tensor('matMinv', (Nbf, Nbf))
-    e_q_T = Tensor('e_q_T', (nq, nbf))
-    minv = Tensor('minv', (nbf, nbf))
+    e_q_T = Tensor('e_q_T', (nq, nbf_fault))
+    minv = Tensor('minv', (nbf_fault, nbf_fault))
 
     generator.add('project_K', K['p'] <= matMinv['pk'] * K_Q['q'] * Em['qk'] * W['q'])
 
@@ -72,8 +72,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     u = [Tensor('u({})'.format(x), (Nbf,)) for x in range(2)]
     k = [Tensor('k({})'.format(x), (Nbf,)) for x in range(2)]
-    grad_u = Tensor('grad_u', (dim, nbf))
-    slip_proj = Tensor('slip_proj', (nbf, ))
+    grad_u = Tensor('grad_u', (dim, nbf_fault))
     generator.add('grad_u', [
         d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
         d_x[1]['kiq'] <= k[1]['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],

@@ -10,6 +10,8 @@ double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
     double eps = std::numeric_limits<double>::epsilon();
     double Fa = F(a);
     double Fb = F(b);
+    assert(!std::isnan(Fa));
+    assert(!std::isnan(Fb));
     assert(std::copysign(Fa, Fb) != Fa); // Fa and Fb have different signs
     double c = a;
     double Fc = Fa;
@@ -76,6 +78,7 @@ double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
             b += std::copysign(tol1, xm);
         }
         Fb = F(b);
+        assert(!std::isnan(Fb));
     }
     return b;
 }

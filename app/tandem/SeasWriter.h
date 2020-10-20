@@ -24,13 +24,12 @@ public:
     }
 
     double output_interval(double VMax) const {
-        constexpr double V0 = 1e-9;
-        constexpr double V1 = 1;
-        constexpr double tmin = 0.01;
-        constexpr double tmax = 30 * 24 * 3600;
-        double falloff = log(tmin / tmax) * (V1 - V0);
-        VMax = std::min(V1, std::max(V0, VMax));
-        return tmax * exp(falloff * VMax);
+        constexpr double V1 = 0.01;
+        constexpr double tmin = 0.1;
+        constexpr double tmax = 365 * 24 * 3600;
+        double falloff = log(tmin / tmax);
+        VMax = std::min(V1, VMax);
+        return tmax * exp(falloff * VMax / V1);
     }
 
     template <class BlockVector> void monitor(double time, BlockVector const& state) {
