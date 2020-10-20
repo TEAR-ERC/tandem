@@ -4,6 +4,7 @@
 #include "kernels/poisson/kernel.h"
 #include "kernels/poisson/tensor.h"
 
+#include "basis/GaussLegendre.h"
 #include "basis/WarpAndBlend.h"
 #include "form/BC.h"
 #include "form/DGCurvilinearCommon.h"
@@ -23,7 +24,7 @@ namespace tndm::tmp {
 Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
-      boundarySpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()),
+      boundarySpace_(PolynomialDegree - 1, GaussLegendreFactory()),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
@@ -242,14 +243,19 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 
 bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            LinearAllocator& scratch) const {
-    if (info.bc != BC::Dirichlet) {
-        return false;
-    }
-
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    fun_dirichlet(fctNo, f_q, true);
+    if (info.bc == BC::Fault) {
+        fun_slip(fctNo, f_q, false);
+        for (std::size_t q = 0; q < tensor::f_q::Shape[0]; ++q) {
+            f_q(0, q) *= 0.5;
+        }
+    } else if (info.bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, false);
+    } else {
+        return false;
+    }
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();

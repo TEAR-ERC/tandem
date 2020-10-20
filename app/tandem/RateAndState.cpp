@@ -1,18 +1,21 @@
 #include "RateAndState.h"
 #include "config.h"
 #include "kernels/rate_and_state/kernel.h"
+#include "kernels/rate_and_state/tensor.h"
 #include "tandem/BP1.h"
 
-#include "basis/WarpAndBlend.h"
+#include "basis/GaussLegendre.h"
 #include "geometry/Vector.h"
 
 #include <algorithm>
+#include <cmath>
+#include <stdexcept>
 
 namespace tndm {
 
 RateAndState::RateAndState(Curvilinear<DomainDimension> const& cl,
                            std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints)
-    : cl_(&cl), space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()) {
+    : cl_(&cl), space_(PolynomialDegree - 1, GaussLegendreFactory()) {
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl.facetParam(f, space_.refNodes());
@@ -57,10 +60,6 @@ void RateAndState::prepare(std::size_t faultNo, FacetInfo const& info,
             normal_i = -1.0 * normal_i;
         }
     }
-    for (std::size_t i = 0; i < nbf; ++i) {
-        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
-        auto& sf = fault_[faultNo].template get<SignFlipped>()[i];
-    }
     scratch.reset();
 }
 
@@ -90,14 +89,15 @@ double RateAndState::rhs(std::size_t faultNo, Matrix<double> const& grad_u,
     krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
     krnl.execute();
 
-    double VMax;
+    double VMax = 0.0;
     auto coords = fault_[faultNo].get<Coords>();
     for (std::size_t node = 0; node < nbf; ++node) {
         bp1.setX(coords[node]);
         auto tau = traction[node];
         auto psi = state(node);
         double V = bp1.computeSlipRate(tau, psi);
-        VMax = std::max(VMax, V);
+        assert(std::fabs(bp1.F(tau, V, psi)) < 1e-13);
+        VMax = std::max(VMax, std::fabs(V));
         result(node) = bp1.G(tau, V, psi);
         result(nbf + node) = V;
     }
@@ -111,10 +111,14 @@ void RateAndState::slip(std::size_t faultNo, Vector<double const>& state, Matrix
     double const* slip = state.data() + nbf;
     double* slip_flip = scratch.allocate<double>(nbf);
     for (std::size_t i = 0; i < nbf; ++i) {
-        if (fault_[faultNo].template get<SignFlipped>()[i]) {
+        if (!fault_[faultNo].template get<SignFlipped>()[i]) {
             slip_flip[i] = -slip[i];
+        } else {
+            slip_flip[i] = slip[i];
         }
     }
+    assert(s_q.shape(0) == 1);
+    assert(s_q.shape(1) == rate_and_state::tensor::slip_q::size());
     rate_and_state::kernel::evaluate_slip krnl;
     krnl.e_q_T = e_q_T.data();
     krnl.slip = slip_flip;
@@ -141,10 +145,11 @@ void RateAndState::state(std::size_t faultNo, Matrix<double> const& grad_u,
         bp1.setX(coords[node]);
         auto tau = traction[node];
         auto psi = state(node);
+        auto V = bp1.computeSlipRate(tau, psi);
         result(node, 0) = psi;
         result(node, 1) = state(node + nbf);
         result(node, 2) = tau;
-        result(node, 3) = bp1.computeSlipRate(tau, psi);
+        result(node, 3) = V;
     }
     scratch.reset();
 }

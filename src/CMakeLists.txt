@@ -4,6 +4,7 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 add_library(tandem-fem-lib
     basis/Equidistant.cpp
     basis/Functions.cpp
+    basis/GaussLegendre.cpp
     basis/Nodal.cpp
     basis/WarpAndBlend.cpp
     form/FiniteElementFunction.cpp

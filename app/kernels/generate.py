@@ -33,6 +33,7 @@ if cmdLineArgs.app == 'poisson':
     poisson.add(g,
             options['dim'],
             options['numFacetBasisFunctions'],
+            options['numFaultBasisFunctions'],
             options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
@@ -46,7 +47,7 @@ elif cmdLineArgs.app == 'elasticity':
 elif cmdLineArgs.app == 'rate_and_state':
     rate_and_state.add(g,
             options['dim'],
-            options['numFacetBasisFunctions'],
+            options['numFaultBasisFunctions'],
             options['numFacetQuadPoints'])
 
 # Generate code
