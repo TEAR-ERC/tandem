@@ -2,9 +2,12 @@
 #define SEASWRITER_20201006_H
 
 #include "geometry/Curvilinear.h"
+#include "io/PVDWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/LocalSimplexMesh.h"
+
+#include <mpi.h>
 
 #include <cstddef>
 #include <memory>
@@ -21,6 +24,7 @@ public:
           adapter_(cl, seasop_->spatialOperator().numLocalElements()), degree_(degree),
           fault_base_(baseName), base_(baseName) {
         fault_base_ += "-fault";
+        MPI_Comm_rank(seasop_->comm(), &rank_);
     }
 
     double output_interval(double VMax) const {
@@ -39,14 +43,24 @@ public:
             fault_writer.addFieldData("time", &time, 1);
             auto fault_piece = fault_writer.addPiece(fault_adapter_);
             fault_piece.addPointData("state", seasop_->state(state));
-            fault_writer.write(name(fault_base_));
+            auto fault_base_step = name(fault_base_);
+            fault_writer.write(fault_base_step);
+            if (rank_ == 0) {
+                pvd_fault_.addTimestep(time, fault_writer.pvtuFileName(fault_base_step));
+                pvd_fault_.write(fault_base_);
+            }
 
             auto displacement = seasop_->displacement();
             auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
             writer.addFieldData("time", &time, 1);
             auto piece = writer.addPiece(adapter_);
             piece.addPointData("u", displacement);
-            writer.write(name(base_));
+            auto base_step = name(base_);
+            writer.write(base_step);
+            if (rank_ == 0) {
+                pvd_.addTimestep(time, writer.pvtuFileName(base_step));
+                pvd_fault_.write(base_);
+            }
 
             ++output_step_;
             last_output_time_ = time;
@@ -63,6 +77,9 @@ private:
     std::shared_ptr<SeasOperator> seasop_;
     CurvilinearBoundaryVTUAdapter<D> fault_adapter_;
     CurvilinearVTUAdapter<D> adapter_;
+    PVDWriter pvd_;
+    PVDWriter pvd_fault_;
+    int rank_;
 
     std::string fault_base_;
     std::string base_;

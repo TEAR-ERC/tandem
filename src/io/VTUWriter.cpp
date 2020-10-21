@@ -174,7 +174,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     std::fclose(fp);
 
     if (rank == 0) {
-        std::string pvtuName = baseName + ".pvtu";
+        std::string pvtuName = pvtuFileName(baseName);
         fp = std::fopen(pvtuName.c_str(), "w");
         if (!fp) {
             std::perror("Could not open file for writing");

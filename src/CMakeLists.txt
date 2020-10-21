@@ -32,6 +32,7 @@ add_library(tandem-lib
     form/Error.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
+    io/PVDWriter.cpp
     io/VTUWriter.cpp
     io/VTUWriter.cpp
     mesh/GenMesh.cpp
