@@ -59,7 +59,7 @@ public:
             writer.write(base_step);
             if (rank_ == 0) {
                 pvd_.addTimestep(time, writer.pvtuFileName(base_step));
-                pvd_fault_.write(base_);
+                pvd_.write(base_);
             }
 
             ++output_step_;
