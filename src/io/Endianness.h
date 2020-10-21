@@ -5,7 +5,7 @@
 
 namespace tndm {
 
-bool isBigEndian() {
+static bool isBigEndian() {
     union {
         uint32_t i;
         char c[4];

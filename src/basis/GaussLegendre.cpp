@@ -9,8 +9,6 @@
 namespace tndm {
 
 std::vector<std::array<double, 1u>> GaussLegendreFactory::operator()(unsigned degree) const {
-    assert(degree > 0);
-
     unsigned numNodes = degree + 1;
     auto gj = GaussJacobi(numNodes, 0, 0);
     std::vector<std::array<double, 1>> result(numNodes);

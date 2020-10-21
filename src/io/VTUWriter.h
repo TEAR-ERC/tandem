@@ -45,6 +45,7 @@ public:
      * @return True if write was successful.
      */
     bool write(std::string const& baseName);
+    std::string pvtuFileName(std::string const& baseName) const { return baseName + ".pvtu"; }
 
     std::vector<std::array<double, D>> const& refNodes() const { return refNodes_; }
 
