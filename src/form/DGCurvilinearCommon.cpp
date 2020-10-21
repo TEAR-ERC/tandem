@@ -69,13 +69,13 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
         area *= 0.5;
         penalty[info.up[0]] += area;
         penalty[info.up[1]] += area;
-
-        auto jInv1 = Tensor(fct[fctNo].template get<JInv1>().data()->data(),
-                            cl_->jacobianResultInfo(fctRule.size()));
-
-        cl_->jacobian(info.up[1], geoDxi_q[info.localNo[1]], J);
-        cl_->jacobianInv(J, jInv1);
     }
+
+    auto jInv1 = Tensor(fct[fctNo].template get<JInv1>().data()->data(),
+                        cl_->jacobianResultInfo(fctRule.size()));
+
+    cl_->jacobian(info.up[1], geoDxi_q[info.localNo[1]], J);
+    cl_->jacobianInv(J, jInv1);
 }
 
 template <std::size_t D>
