@@ -3,7 +3,6 @@
 #include "quadrules/GaussJacobi.h"
 #include "quadrules/IntervalQuadratureRule.h"
 
-#include <cassert>
 #include <cstddef>
 
 namespace tndm {

@@ -132,6 +132,7 @@ public:
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
     double VMax() const { return VMax_; }
+    LocalOperator& lop() { return *lop_; }
 
 private:
     auto make_scratch() const {
