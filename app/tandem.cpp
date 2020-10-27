@@ -56,10 +56,6 @@ int main(int argc, char** argv) {
     schema.add_value("final_time", &Config::final_time)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative final time of simulation");
-    schema.add_value("output", &Config::output).help("Output file name");
-    schema.add_value("output_interval", &Config::output_interval)
-        .validator([](auto&& x) { return x > 0; })
-        .help("Non-negative output interval");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
@@ -69,6 +65,20 @@ int main(int argc, char** argv) {
     DieterichRuinaAgeingConfig::setSchema(frictionSchema, makePathRelativeToConfig);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
+    auto& outputSchema = schema.add_table("output", &Config::output);
+    outputSchema.add_value("prefix", &OutputConfig::prefix).help("Output file name prefix");
+    outputSchema.add_value("V_ref", &OutputConfig::V_ref)
+        .validator([](auto&& x) { return x > 0; })
+        .default_value(0.1)
+        .help("Output is written every t_min if this slip-rate is reached");
+    outputSchema.add_value("t_min", &OutputConfig::t_min)
+        .validator([](auto&& x) { return x > 0; })
+        .default_value(0.1)
+        .help("Minimum output interval");
+    outputSchema.add_value("t_max", &OutputConfig::t_max)
+        .validator([](auto&& x) { return x > 0; })
+        .default_value(365 * 24 * 3600)
+        .help("Maximum output interval");
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {
