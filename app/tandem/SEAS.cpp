@@ -4,7 +4,6 @@
 #include "form/DGOperator.h"
 #include "form/DGOperatorTopo.h"
 #include "localoperator/Poisson.h"
-#include "tandem/BP1.h"
 #include "tandem/Config.h"
 #include "tandem/DieterichRuinaAgeing.h"
 #include "tandem/FrictionConfig.h"
@@ -56,7 +55,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
 
     std::unique_ptr<seas_writer_t> writer;
     if (cfg.output) {
-        writer = std::make_unique<seas_writer_t>(*cfg.output, mesh, cl, seasop, PolynomialDegree);
+        writer = std::make_unique<seas_writer_t>(cfg.output->prefix, mesh, cl, seasop,
+                                                 PolynomialDegree, cfg.output->V_ref,
+                                                 cfg.output->t_min, cfg.output->t_max);
         ts.set_monitor(*writer);
     }
 

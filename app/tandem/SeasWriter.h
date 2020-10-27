@@ -19,21 +19,19 @@ namespace tndm {
 template <std::size_t D, class SeasOperator> class SeasWriter {
 public:
     SeasWriter(std::string_view baseName, LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
-               std::shared_ptr<SeasOperator> seasop, unsigned degree)
+               std::shared_ptr<SeasOperator> seasop, unsigned degree, double V_ref, double t_min,
+               double t_max)
         : seasop_(std::move(seasop)), fault_adapter_(mesh, cl, seasop_->faultMap().fctNos()),
           adapter_(cl, seasop_->spatialOperator().numLocalElements()), degree_(degree),
-          fault_base_(baseName), base_(baseName) {
+          fault_base_(baseName), base_(baseName), V_ref_(V_ref), t_min_(t_min), t_max_(t_max) {
         fault_base_ += "-fault";
         MPI_Comm_rank(seasop_->comm(), &rank_);
     }
 
     double output_interval(double VMax) const {
-        constexpr double V1 = 0.01;
-        constexpr double tmin = 0.1;
-        constexpr double tmax = 365 * 24 * 3600;
-        double falloff = log(tmin / tmax);
-        VMax = std::min(V1, VMax);
-        return tmax * exp(falloff * VMax / V1);
+        double falloff = log(t_min_ / t_max_);
+        VMax = std::min(V_ref_, VMax);
+        return t_max_ * exp(falloff * VMax / V_ref_);
     }
 
     template <class BlockVector> void monitor(double time, BlockVector const& state) {
@@ -86,6 +84,10 @@ private:
     unsigned degree_;
     std::size_t output_step_ = 0;
     double last_output_time_ = std::numeric_limits<double>::lowest();
+
+    double V_ref_;
+    double t_min_;
+    double t_max_;
 };
 
 } // namespace tndm

@@ -10,15 +10,21 @@
 
 namespace tndm {
 
+struct OutputConfig {
+    std::string prefix;
+    double V_ref;
+    double t_min;
+    double t_max;
+};
+
 struct Config {
     std::optional<double> resolution;
     double final_time;
-    std::optional<std::string> output;
-    std::optional<double> output_interval;
     std::optional<std::string> mesh_file;
     SeasScenarioConfig seas;
     DieterichRuinaAgeingConfig friction;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
+    std::optional<OutputConfig> output;
 };
 
 } // namespace tndm
