@@ -2,6 +2,7 @@
 #include "common/MeshConfig.h"
 #include "config.h"
 #include "tandem/Config.h"
+#include "tandem/FrictionConfig.h"
 #include "tandem/SEAS.h"
 #include "tandem/SeasScenario.h"
 
@@ -64,6 +65,8 @@ int main(int argc, char** argv) {
         .validator(PathExists());
     auto& seasSchema = schema.add_table("seas", &Config::seas);
     SeasScenarioConfig::setSchema(seasSchema, makePathRelativeToConfig);
+    auto& frictionSchema = schema.add_table("friction", &Config::friction);
+    DieterichRuinaAgeingConfig::setSchema(frictionSchema, makePathRelativeToConfig);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 

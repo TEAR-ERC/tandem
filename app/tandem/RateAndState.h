@@ -1,81 +1,104 @@
-#ifndef RATEANDSTATE_20201001_H
-#define RATEANDSTATE_20201001_H
+#ifndef RATEANDSTATE_20201026_H
+#define RATEANDSTATE_20201026_H
 
 #include "config.h"
+#include "tandem/RateAndStateBase.h"
 
-#include "form/FacetInfo.h"
-#include "form/FiniteElementFunction.h"
-#include "form/RefElement.h"
-#include "geometry/Curvilinear.h"
-#include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
 
-#include "mneme/storage.hpp"
-#include "mneme/view.hpp"
-
 #include <array>
 #include <cstddef>
-#include <memory>
-#include <vector>
+#include <functional>
 
 namespace tndm {
 
-class RateAndState {
+template <class Law> class RateAndState : public RateAndStateBase {
 public:
-    constexpr static std::size_t NumQuantities = 2;
-    constexpr static std::size_t NumInternalQuantities = 4;
+    using RateAndStateBase::RateAndStateBase;
 
-    RateAndState(Curvilinear<DomainDimension> const& cl,
-                 std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints);
+    using param_fun_t =
+        std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
 
-    std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
-    std::size_t scratch_mem_size() const {
-        return space_.numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
-               sizeof(double);
+    void set_constant_params(typename Law::ConstantParams const& cps) {
+        law_.set_constant_params(cps);
     }
-
-    void begin_preparation(std::size_t numFaultFaces);
-    void prepare(std::size_t faultNo, FacetInfo const& info,
-                 std::array<double, DomainDimension> const& ref_normal, LinearAllocator& scratch);
-    void end_preparation() {}
+    void set_params(param_fun_t pfun) {
+        auto num_nodes = fault_.storage().size();
+        law_.set_num_nodes(num_nodes);
+        for (std::size_t index = 0; index < num_nodes; ++index) {
+            auto params = pfun(fault_.storage()[index].template get<Coords>());
+            law_.set_params(index, params);
+        }
+    }
 
     void initial(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
     double rhs(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
                Vector<double>& result, LinearAllocator& scratch) const;
-    void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& result,
-              LinearAllocator& scratch) const;
-
-    auto state_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumInternalQuantities,
-                                                           numLocalElements);
-    }
     void state(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
                Matrix<double>& result, LinearAllocator& scratch) const;
 
 private:
-    Curvilinear<DomainDimension> const* cl_;
-    NodalRefElement<DomainDimension - 1u> space_;
-
-    // Basis
-    Managed<Matrix<double>> e_q_T;
-    std::vector<Managed<Matrix<double>>> geoE_q;
-    std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
-
-    struct Coords {
-        using type = std::array<double, DomainDimension>;
-    };
-    struct UnitNormal {
-        using type = std::array<double, DomainDimension>;
-    };
-    struct SignFlipped {
-        using type = bool;
-    };
-
-    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, UnitNormal, SignFlipped>;
-    mneme::StridedView<fault_t> fault_;
+    Law law_;
 };
+
+template <class Law>
+void RateAndState<Law>::initial(std::size_t faultNo, Vector<double>& state,
+                                LinearAllocator& scratch) const {
+
+    std::size_t nbf = space_.numBasisFunctions();
+    std::size_t index = faultNo * nbf;
+    for (std::size_t node = 0; node < nbf; ++node) {
+        state(node) = law_.psi0(index + node);
+        state(nbf + node) = 0.0;
+    }
+}
+
+template <class Law>
+double RateAndState<Law>::rhs(std::size_t faultNo, Matrix<double> const& grad_u,
+                              Vector<double const>& state, Vector<double>& result,
+                              LinearAllocator& scratch) const {
+    std::size_t nbf = space_.numBasisFunctions();
+    double* traction_raw = scratch.allocate<double>(nbf);
+    auto traction = Vector<double>(traction_raw, nbf);
+    compute_traction(faultNo, grad_u, traction);
+
+    double VMax = 0.0;
+    std::size_t index = faultNo * nbf;
+    for (std::size_t node = 0; node < nbf; ++node) {
+        auto tau = traction(node);
+        auto psi = state(node);
+        double V = law_.slip_rate(index + node, tau, psi);
+        VMax = std::max(VMax, std::fabs(V));
+        result(node) = law_.state_rhs(index + node, V, psi);
+        result(nbf + node) = V;
+    }
+    scratch.reset();
+    return VMax;
+}
+
+template <class Law>
+void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& grad_u,
+                              Vector<double const>& state, Matrix<double>& result,
+                              LinearAllocator& scratch) const {
+    std::size_t nbf = space_.numBasisFunctions();
+    double* traction_raw = scratch.allocate<double>(nbf);
+    auto traction = Vector<double>(traction_raw, nbf);
+    compute_traction(faultNo, grad_u, traction);
+
+    std::size_t index = faultNo * nbf;
+    for (std::size_t node = 0; node < nbf; ++node) {
+        auto tau = traction(node);
+        auto psi = state(node);
+        double V = law_.slip_rate(index + node, tau, psi);
+        result(node, 0) = psi;
+        result(node, 1) = state(node + nbf);
+        result(node, 2) = tau;
+        result(node, 3) = V;
+    }
+    scratch.reset();
+}
 
 } // namespace tndm
 
-#endif // RATEANDSTATE_20201001_H
+#endif // RATEANDSTATE_20201026_H

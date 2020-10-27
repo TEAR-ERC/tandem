@@ -133,7 +133,7 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 
 add_executable(tandem
     tandem/BP1.cpp
-    tandem/RateAndState.cpp
+    tandem/RateAndStateBase.cpp
     tandem/SEAS.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE app-common)

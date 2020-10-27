@@ -2,6 +2,7 @@
 #define CONFIG_20200825_H
 
 #include "common/MeshConfig.h"
+#include "tandem/FrictionConfig.h"
 #include "tandem/SeasScenario.h"
 
 #include <optional>
@@ -16,6 +17,7 @@ struct Config {
     std::optional<double> output_interval;
     std::optional<std::string> mesh_file;
     SeasScenarioConfig seas;
+    DieterichRuinaAgeingConfig friction;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 

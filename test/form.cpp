@@ -4,7 +4,6 @@
 #include "tensor/EigenMap.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
-#include "tensor/TensorBase.h"
 
 #include "doctest.h"
 
