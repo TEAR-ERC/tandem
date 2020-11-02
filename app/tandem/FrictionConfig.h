@@ -16,16 +16,14 @@
 namespace tndm {
 
 struct DieterichRuinaAgeingConfig {
+    using Constant = DieterichRuinaAgeing::ConstantParams;
     std::string lib;
     std::string a;
     std::string tau0;
-    double eta;
-    double Vinit;
-    double sn;
-    double V0;
-    double b;
-    double L;
-    double f0;
+    std::string Vinit;
+    std::optional<std::string> Sinit;
+    std::optional<std::string> source;
+    Constant constant;
 
     template <typename PathConverter>
     static void setSchema(TableSchema<DieterichRuinaAgeingConfig>& schema,
@@ -35,34 +33,36 @@ struct DieterichRuinaAgeingConfig {
             .validator(PathExists());
         schema.add_value("a", &DieterichRuinaAgeingConfig::a);
         schema.add_value("tau0", &DieterichRuinaAgeingConfig::tau0);
-        schema.add_value("eta", &DieterichRuinaAgeingConfig::eta);
         schema.add_value("Vinit", &DieterichRuinaAgeingConfig::Vinit);
-        schema.add_value("sn", &DieterichRuinaAgeingConfig::sn);
-        schema.add_value("V0", &DieterichRuinaAgeingConfig::V0);
-        schema.add_value("b", &DieterichRuinaAgeingConfig::b);
-        schema.add_value("L", &DieterichRuinaAgeingConfig::L);
-        schema.add_value("f0", &DieterichRuinaAgeingConfig::f0);
+        schema.add_value("Sinit", &DieterichRuinaAgeingConfig::Sinit);
+        schema.add_value("source", &DieterichRuinaAgeingConfig::source);
+        auto& cs = schema.add_table("constant", &DieterichRuinaAgeingConfig::constant);
+        cs.add_value("eta", &Constant::eta);
+        cs.add_value("sn", &Constant::sn);
+        cs.add_value("V0", &Constant::V0);
+        cs.add_value("b", &Constant::b);
+        cs.add_value("L", &Constant::L);
+        cs.add_value("f0", &Constant::f0);
     }
 };
 
 class DieterichRuinaAgeingScenario {
 public:
-    using functional_t =
-        std::function<std::array<double, 1>(std::array<double, DomainDimension> const&)>;
+    template <std::size_t D>
+    using functional_t = std::function<std::array<double, 1>(std::array<double, D> const&)>;
 
-    DieterichRuinaAgeingScenario(DieterichRuinaAgeingConfig const& cfg) {
+    DieterichRuinaAgeingScenario(DieterichRuinaAgeingConfig const& cfg) : cp_(cfg.constant) {
         lib_.loadFile(cfg.lib);
 
         a_ = lib_.getFunction<DomainDimension, 1>(cfg.a);
         tau0_ = lib_.getFunction<DomainDimension, 1>(cfg.tau0);
-
-        cp_.eta = cfg.eta;
-        cp_.Vinit = cfg.Vinit;
-        cp_.sn = cfg.sn;
-        cp_.V0 = cfg.V0;
-        cp_.b = cfg.b;
-        cp_.L = cfg.L;
-        cp_.f0 = cfg.f0;
+        Vinit_ = lib_.getFunction<DomainDimension, 1>(cfg.Vinit);
+        if (cfg.Sinit) {
+            Sinit_ = lib_.getFunction<DomainDimension, 1>(*cfg.Sinit);
+        }
+        if (cfg.source) {
+            source_ = std::make_optional(lib_.getFunction<DomainDimension + 1, 1>(*cfg.source));
+        }
     }
 
     auto const& constant_params() const { return cp_; }
@@ -71,15 +71,22 @@ public:
             DieterichRuinaAgeing::Params p;
             p.a = this->a_(x)[0];
             p.tau0 = this->tau0_(x)[0];
+            p.Vinit = this->Vinit_(x)[0];
+            p.Sinit = this->Sinit_(x)[0];
             return p;
         };
     }
+    auto const& source_fun() const { return source_; }
 
 protected:
-    LuaLib lib_;
-    functional_t a_;
-    functional_t tau0_;
     DieterichRuinaAgeing::ConstantParams cp_;
+    LuaLib lib_;
+    functional_t<DomainDimension> a_;
+    functional_t<DomainDimension> tau0_;
+    functional_t<DomainDimension> Vinit_;
+    functional_t<DomainDimension> Sinit_ =
+        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
+    std::optional<functional_t<DomainDimension + 1>> source_;
 };
 
 } // namespace tndm
