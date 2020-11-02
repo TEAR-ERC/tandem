@@ -13,7 +13,7 @@ from yateto.gemm_configuration import GeneratorCollection, Eigen
 
 import poisson
 import elasticity
-import rate_and_state
+import poisson_adapter
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -33,7 +33,6 @@ if cmdLineArgs.app == 'poisson':
     poisson.add(g,
             options['dim'],
             options['numFacetBasisFunctions'],
-            options['numFaultBasisFunctions'],
             options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
@@ -44,8 +43,8 @@ elif cmdLineArgs.app == 'elasticity':
             options['numElementBasisFunctions'],
             options['numFacetQuadPoints'],
             options['numElementQuadPoints'])
-elif cmdLineArgs.app == 'rate_and_state':
-    rate_and_state.add(g,
+elif cmdLineArgs.app == 'poisson_adapter':
+    poisson_adapter.add(g,
             options['dim'],
             options['numFaultBasisFunctions'],
             options['numFacetQuadPoints'])

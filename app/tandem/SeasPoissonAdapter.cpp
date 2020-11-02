@@ -1,8 +1,8 @@
 #include "SeasPoissonAdapter.h"
 
 #include "kernels/poisson/tensor.h"
-#include "kernels/rate_and_state/kernel.h"
-#include "kernels/rate_and_state/tensor.h"
+#include "kernels/poisson_adapter/kernel.h"
+#include "kernels/poisson_adapter/tensor.h"
 
 #include "form/FacetInfo.h"
 #include "form/RefElement.h"
@@ -11,32 +11,39 @@
 #include <cassert>
 
 namespace tndm {
+SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
+                                       std::unique_ptr<RefElement<Dim - 1u>> space,
+                                       std::unique_ptr<tmp::Poisson> local_operator,
+                                       std::array<double, Dim> const& ref_normal)
+    : SeasAdapterBase(topo, std::move(space), local_operator->facetQuadratureRule().points(),
+                      ref_normal),
+      dgop_(std::make_unique<DGOperator<tmp::Poisson>>(std::move(topo), std::move(local_operator))),
+      linear_solver_(*dgop_) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
-                              Matrix<double>& s_q) const {
-    auto const nbf = space_.numBasisFunctions();
-    double slip_flip[rate_and_state::tensor::slip::Size];
-    double const* slip = state.data() + nbf;
-    assert(rate_and_state::tensor::slip::Size == nbf);
+                              Matrix<double>& slip_q) const {
+    auto const nbf = space_->numBasisFunctions();
+    double slip_flip[poisson_adapter::tensor::slip::Size];
+    assert(poisson_adapter::tensor::slip::Size == nbf);
 
     for (std::size_t i = 0; i < nbf; ++i) {
         if (!fault_[faultNo].template get<SignFlipped>()[i]) {
-            slip_flip[i] = -slip[i];
+            slip_flip[i] = -state(i);
         } else {
-            slip_flip[i] = slip[i];
+            slip_flip[i] = state(i);
         }
     }
-    assert(s_q.shape(0) == 1);
-    assert(s_q.shape(1) == rate_and_state::tensor::slip_q::size());
-    rate_and_state::kernel::evaluate_slip krnl;
+    assert(slip_q.shape(0) == 1);
+    assert(slip_q.shape(1) == poisson_adapter::tensor::slip_q::size());
+    poisson_adapter::kernel::evaluate_slip krnl;
     krnl.e_q_T = e_q_T.data();
     krnl.slip = slip_flip;
-    krnl.slip_q = s_q.data();
+    krnl.slip_q = slip_q.data();
     krnl.execute();
 }
 
 TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
-    return TensorBase<Matrix<double>>(rate_and_state::tensor::traction::Shape[0], 1);
+    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 1);
 }
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
@@ -50,10 +57,13 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     auto u0 = linear_solver_.x().get_block(handle_, info.up[0]);
     auto u1 = linear_solver_.x().get_block(handle_, info.up[1]);
     dgop_->lop().traction(fctNo, info, u0, u1, grad_u);
-    rate_and_state::kernel::evaluate_traction krnl;
+    poisson_adapter::kernel::evaluate_traction krnl;
+    krnl.e_q_T = e_q_T.data();
     krnl.grad_u = grad_u_raw;
+    krnl.minv = minv.data();
     krnl.traction = traction.data();
     krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
 }
 

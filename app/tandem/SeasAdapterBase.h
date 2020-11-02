@@ -24,11 +24,12 @@ namespace tndm {
 class SeasAdapterBase {
 public:
     SeasAdapterBase(std::shared_ptr<DGOperatorTopo> topo,
+                    std::unique_ptr<RefElement<DomainDimension - 1u>> space,
                     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
                     std::array<double, DomainDimension> const& ref_normal);
 
     std::size_t scratch_mem_size() const {
-        return space_.numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
+        return space_->numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
                sizeof(double);
     }
 
@@ -42,13 +43,14 @@ public:
 
 protected:
     std::shared_ptr<DGOperatorTopo> topo_;
-    NodalRefElement<DomainDimension - 1u> space_;
+    std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
     BoundaryMap faultMap_;
     std::array<double, DomainDimension> ref_normal_;
 
     // Basis
     std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
     Managed<Matrix<double>> e_q_T;
+    Managed<Matrix<double>> minv;
 
     struct UnitNormal {
         using type = std::array<double, DomainDimension>;

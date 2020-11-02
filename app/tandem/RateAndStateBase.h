@@ -41,6 +41,8 @@ public:
                                                            numLocalElements);
     }
 
+    auto const& space() const { return space_; }
+
 protected:
     // Basis
     NodalRefElement<DomainDimension - 1u> space_;
