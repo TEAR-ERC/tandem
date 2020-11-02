@@ -247,12 +247,12 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
     if (info.bc == BC::Fault) {
-        fun_slip(fctNo, f_q, false);
+        fun_slip(fctNo, f_q, true);
         for (std::size_t q = 0; q < tensor::f_q::Shape[0]; ++q) {
             f_q(0, q) *= 0.5;
         }
     } else if (info.bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, false);
+        fun_dirichlet(fctNo, f_q, true);
     } else {
         return false;
     }
