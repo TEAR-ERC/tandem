@@ -1,6 +1,8 @@
+#include "basis/Nodal.h"
 #include "basis/WarpAndBlend.h"
 #include "form/RefElement.h"
 #include "quadrules/AutoRule.h"
+#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
@@ -10,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 using namespace tndm;
 
