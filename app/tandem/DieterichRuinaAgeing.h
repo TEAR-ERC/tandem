@@ -13,7 +13,6 @@ namespace tndm {
 class DieterichRuinaAgeing {
 public:
     struct ConstantParams {
-        double eta;
         double sn;
         double V0;
         double b;
@@ -22,7 +21,8 @@ public:
     };
     struct Params {
         double a;
-        double tau0;
+        double eta;
+        double tau_pre;
         double Vinit;
         double Sinit;
     };
@@ -31,27 +31,30 @@ public:
     void set_constant_params(ConstantParams const& params) { cp_ = params; }
     void set_params(std::size_t index, Params const& params) {
         p_[index].get<A>() = params.a;
-        p_[index].get<Tau0>() = params.tau0;
+        p_[index].get<Eta>() = params.eta;
+        p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
     }
 
     double psi_init(std::size_t index, double tau) const {
-        auto tauAbs = tau + p_[index].get<Tau0>();
+        auto tauAbs = tau + p_[index].get<TauPre>();
         auto Vi = p_[index].get<Vinit>();
         auto a = p_[index].get<A>();
-        double s = sinh((tauAbs - cp_.eta * Vi) / (a * cp_.sn));
+        auto eta = p_[index].get<Eta>();
+        double s = sinh((tauAbs - eta * Vi) / (a * cp_.sn));
         double l = log((2.0 * cp_.V0 / Vi) * s);
         return a * l;
     }
 
-    double tau0(std::size_t index) const { return p_[index].get<Tau0>(); }
+    double tau_pre(std::size_t index) const { return p_[index].get<TauPre>(); }
     double S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     double slip_rate(std::size_t index, double tau, double psi) const {
-        double tauAbs = tau + p_[index].get<Tau0>();
-        double a = -tauAbs / cp_.eta;
-        double b = tauAbs / cp_.eta;
+        auto eta = p_[index].get<Eta>();
+        double tauAbs = tau + p_[index].get<TauPre>();
+        double a = -tauAbs / eta;
+        double b = tauAbs / eta;
         if (a > b) {
             std::swap(a, b);
         }
@@ -65,19 +68,23 @@ public:
 
 private:
     double F(std::size_t index, double tau, double V, double psi) const {
-        auto tau0 = p_[index].get<Tau0>();
+        double tauAbs = tau + p_[index].get<TauPre>();
         auto a = p_[index].get<A>();
+        auto eta = p_[index].get<Eta>();
         double e = exp(psi / a);
         double f = a * asinh((V / (2.0 * cp_.V0)) * e);
-        return tau + tau0 - cp_.sn * f - cp_.eta * V;
+        return tauAbs - cp_.sn * f - eta * V;
     }
 
     ConstantParams cp_;
 
-    struct Tau0 {
+    struct TauPre {
         using type = double;
     };
     struct A {
+        using type = double;
+    };
+    struct Eta {
         using type = double;
     };
     struct Vinit {
@@ -86,7 +93,7 @@ private:
     struct Sinit {
         using type = double;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, Tau0, A, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, TauPre, A, Eta, Vinit, Sinit> p_;
 };
 
 } // namespace tndm

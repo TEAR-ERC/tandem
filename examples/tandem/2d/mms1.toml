@@ -12,7 +12,7 @@ ref_normal = [1, 0]
 [friction]
 lib = "mms1.lua"
 a = "a"
-tau0 = "tau0"
+eta = "eta"
 Vinit = "Vinit"
 Sinit = "Sinit"
 source = "source"
@@ -22,7 +22,6 @@ source = "source"
     L = 0.2
     f0 = 0.6
     sn = 50
-    eta = 4.24264068711928514641
 
 [generate_mesh]
 intercepts = [

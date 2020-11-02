@@ -11,7 +11,8 @@ ref_normal = [1, 0]
 [friction]
 lib = "bp1_sym.lua"
 a = "a"
-tau0 = "tau0"
+eta = "eta"
+tau_pre = "tau_pre"
 Vinit = "Vinit"
     [friction.constant]
     b = 0.015
@@ -19,7 +20,6 @@ Vinit = "Vinit"
     L = 0.008
     f0 = 0.6
     sn = 50
-    eta = 4.62444
 
 [output]
 prefix = "seas"

@@ -6,7 +6,7 @@ V_min = 1e-12
 delta = (V_p / 2.0 - V_min) * t_e
 H = 8
 tau_inf = 31.73
-rho = 3
+rho = 3.0
 b = 0.02
 V0 = 1.0e-6
 L = 0.2
@@ -99,11 +99,6 @@ end
 
 function tanh(x)
     return sinh(x) / cosh(x)
-end
-
-function tau0(x, y)
-    --return tau_star(x, y, 0)
-    return 0.0
 end
 
 function Vinit(x, y)
