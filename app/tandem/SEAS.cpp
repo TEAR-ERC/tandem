@@ -30,19 +30,18 @@
 namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using spatial_lop_t = tmp::Poisson;
     using fault_lop_t = DieterichRuinaAgeing;
     using seas_op_t = SeasOperator<RateAndState<fault_lop_t>, SeasPoissonAdapter>;
     using seas_writer_t = SeasWriter<DomainDimension, seas_op_t>;
 
-    auto scenario = SeasScenario<tmp::Poisson>(cfg.seas);
+    auto scenario = SeasScenario<Poisson>(cfg.seas);
     auto friction_scenario = DieterichRuinaAgeingScenario(cfg.friction);
 
     Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
 
     auto fop = std::make_unique<RateAndState<fault_lop_t>>();
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
-    auto spatial_lop = std::make_unique<spatial_lop_t>(cl, scenario.mu());
+    auto spatial_lop = std::make_unique<Poisson>(cl, scenario.mu());
     auto adapter = std::make_unique<SeasPoissonAdapter>(
         topo, fop->space().clone(), std::move(spatial_lop), scenario.ref_normal());
 

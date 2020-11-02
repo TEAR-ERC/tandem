@@ -13,11 +13,11 @@
 namespace tndm {
 SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
-                                       std::unique_ptr<tmp::Poisson> local_operator,
+                                       std::unique_ptr<Poisson> local_operator,
                                        std::array<double, Dim> const& ref_normal)
     : SeasAdapterBase(topo, std::move(space), local_operator->facetQuadratureRule().points(),
                       ref_normal),
-      dgop_(std::make_unique<DGOperator<tmp::Poisson>>(std::move(topo), std::move(local_operator))),
+      dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
       linear_solver_(*dgop_) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,

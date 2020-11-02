@@ -23,7 +23,7 @@ struct PoissonScenarioConfig : ScenarioConfig {
     }
 };
 
-class PoissonScenario : public Scenario<tmp::Poisson> {
+class PoissonScenario : public Scenario<Poisson> {
 public:
     PoissonScenario(PoissonScenarioConfig const& problem) : Scenario(problem) {
         if (problem.coefficient) {
@@ -34,7 +34,7 @@ public:
     auto const& coefficient() const { return coefficient_; }
 
     auto make_local_operator(Curvilinear<DomainDimension> const& cl) const {
-        auto poisson = std::make_unique<tmp::Poisson>(cl, coefficient_);
+        auto poisson = std::make_unique<Poisson>(cl, coefficient_);
         set(*poisson);
         return poisson;
     }

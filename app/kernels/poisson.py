@@ -64,10 +64,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # traction
 
-    def traction(x):
-        return lam_w[x]['q'] * d_x[x]['lsq'] * u[x]['ls'] * n['pq'] + mu_w[x]['q'] * \
-                (d_x[x]['ljq'] * u[x]['lp'] * n['jq'] + d_x[x]['lpq'] * u[x]['lj'] * n['jq'])
-
     u = [Tensor('u({})'.format(x), (Nbf,)) for x in range(2)]
     k = [Tensor('k({})'.format(x), (Nbf,)) for x in range(2)]
     grad_u = Tensor('grad_u', (dim, nq))

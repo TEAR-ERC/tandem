@@ -6,7 +6,6 @@
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
 #include "script/LuaLib.h"
-#include "tandem/Elasticity.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 

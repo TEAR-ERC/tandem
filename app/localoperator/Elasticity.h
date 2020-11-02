@@ -23,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-namespace tndm::tmp {
+namespace tndm {
 
 class Elasticity : public DGCurvilinearCommon<DomainDimension> {
 public:
@@ -55,6 +55,10 @@ public:
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator& scratch) const;
 
+    TensorBase<Matrix<double>> tractionResultInfo() const;
+    void traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                  Vector<double const>& u1, Matrix<double>& result) const;
+
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension>(space_.clone(), NumQuantities,
                                                       numLocalElements);
@@ -72,6 +76,10 @@ public:
     void set_force(volume_functional_t fun) { fun_force = std::move(fun); }
     void set_dirichlet(functional_t<NumQuantities> fun) {
         fun_dirichlet = make_facet_functional(std::move(fun));
+    }
+    void set_dirichlet(functional_t<NumQuantities> fun,
+                       std::array<double, DomainDimension> const& refNormal) {
+        fun_dirichlet = make_facet_functional(std::move(fun), refNormal);
     }
     void set_dirichlet(facet_functional_t fun) { fun_dirichlet = std::move(fun); }
     void set_slip(functional_t<NumQuantities> fun,
@@ -119,16 +127,16 @@ private:
     struct mu_W_J {
         using type = double;
     };
-    struct lam_w_0 {
+    struct lam_q_0 {
         using type = double;
     };
-    struct mu_w_0 {
+    struct mu_q_0 {
         using type = double;
     };
-    struct lam_w_1 {
+    struct lam_q_1 {
         using type = double;
     };
-    struct mu_w_1 {
+    struct mu_q_1 {
         using type = double;
     };
 
@@ -138,7 +146,7 @@ private:
     using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J, mu_W_J>;
     mneme::StridedView<vol_pre_t> volPre;
 
-    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_w_0, mu_w_0, lam_w_1, mu_w_1>;
+    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;
     mneme::StridedView<fct_pre_t> fctPre;
 
     // Options

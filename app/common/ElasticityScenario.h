@@ -25,7 +25,7 @@ struct ElasticityScenarioConfig : ScenarioConfig {
     }
 };
 
-class ElasticityScenario : public Scenario<tmp::Elasticity> {
+class ElasticityScenario : public Scenario<Elasticity> {
 public:
     ElasticityScenario(ElasticityScenarioConfig const& problem) : Scenario(problem) {
         if (problem.lam) {
@@ -40,7 +40,7 @@ public:
     auto const& mu() const { return mu_; }
 
     auto make_local_operator(Curvilinear<DomainDimension> const& cl) const {
-        auto elasticity = std::make_unique<tmp::Elasticity>(cl, lam_, mu_);
+        auto elasticity = std::make_unique<Elasticity>(cl, lam_, mu_);
         set(*elasticity);
         return elasticity;
     }

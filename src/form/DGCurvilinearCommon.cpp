@@ -47,6 +47,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
                         cl_->jacobianResultInfo(fctRule.size()));
     auto normal = Tensor(fct[fctNo].template get<Normal>().data()->data(),
                          cl_->normalResultInfo(fctRule.size()));
+    auto unit_normal = Tensor(fct[fctNo].template get<UnitNormal>().data()->data(),
+                              cl_->normalResultInfo(fctRule.size()));
     auto coords = Tensor(fct[fctNo].template get<Coords>().data()->data(),
                          cl_->mapResultInfo(fctRule.size()));
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
@@ -57,6 +59,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     for (std::size_t i = 0; i < length.size(); ++i) {
         length[i] = norm(fct[fctNo].template get<Normal>()[i]);
     }
+    cl_->normal(info.localNo[0], detJ, jInv0, unit_normal);
+    cl_->normalize(unit_normal);
     cl_->map(info.up[0], geoE_q[info.localNo[0]], coords);
 
     double area = 0.0;
