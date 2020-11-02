@@ -113,7 +113,7 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& tractio
         double V = law_.slip_rate(index + node, tau, psi);
         result(node, 0) = psi;
         result(node, 1) = state(node);
-        result(node, 2) = law_.tau0(index) + tau;
+        result(node, 2) = law_.tau_pre(index + node) + tau;
         result(node, 3) = V;
     }
 }
