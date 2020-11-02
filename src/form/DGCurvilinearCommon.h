@@ -132,6 +132,9 @@ protected:
     struct Normal {
         using type = std::array<double, D>;
     };
+    struct UnitNormal {
+        using type = std::array<double, D>;
+    };
     struct NormalLength {
         using type = double;
     };
@@ -139,8 +142,8 @@ protected:
         using type = std::array<double, D>;
     };
 
-    using fct_t =
-        mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, NormalLength, Coords>;
+    using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
+                                      NormalLength, Coords>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
 
     mneme::StridedView<fct_t> fct;

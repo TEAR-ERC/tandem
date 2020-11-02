@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 
-namespace tndm::tmp {
+namespace tndm {
 
 class Poisson : public DGCurvilinearCommon<DomainDimension> {
 public:

@@ -25,14 +25,14 @@ namespace tndm {
 
 class SeasPoissonAdapter : public SeasAdapterBase {
 public:
-    constexpr static std::size_t Dim = tmp::Poisson::Dim;
-    constexpr static std::size_t NumQuantities = tmp::Poisson::NumQuantities;
+    constexpr static std::size_t Dim = Poisson::Dim;
+    constexpr static std::size_t NumQuantities = Poisson::NumQuantities;
     using time_functional_t =
         std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
 
     SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
                        std::unique_ptr<RefElement<Dim - 1u>> space,
-                       std::unique_ptr<tmp::Poisson> local_operator,
+                       std::unique_ptr<Poisson> local_operator,
                        std::array<double, Dim> const& ref_normal);
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
@@ -69,7 +69,7 @@ public:
 private:
     void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& s_q) const;
 
-    std::unique_ptr<DGOperator<tmp::Poisson>> dgop_;
+    std::unique_ptr<DGOperator<Poisson>> dgop_;
     PetscLinearSolver linear_solver_;
     time_functional_t fun_boundary =
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {

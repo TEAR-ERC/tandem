@@ -18,7 +18,7 @@ namespace tensor = tndm::elasticity::tensor;
 namespace init = tndm::elasticity::init;
 namespace kernel = tndm::elasticity::kernel;
 
-namespace tndm::tmp {
+namespace tndm {
 
 Elasticity::Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> lam,
                        functional_t<1> mu)
@@ -86,11 +86,10 @@ void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
     for (unsigned side = 0; side < 2; ++side) {
         krnl.matE_q_T(side) = matE_q_T[info.localNo[side]].data();
     }
-    krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    krnl.lam_w(1) = fctPre[fctNo].get<lam_w_1>().data();
-    krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    krnl.mu_w(1) = fctPre[fctNo].get<mu_w_1>().data();
-    krnl.w = fctRule.weights().data();
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
 
     for (unsigned side = 0; side < 2; ++side) {
         krnl.lam = material[info.up[side]].get<lam>().data();
@@ -104,9 +103,8 @@ void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 
     kernel::precomputeSurface krnl;
     krnl.matE_q_T(0) = matE_q_T[info.localNo[0]].data();
-    krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    krnl.w = fctRule.weights().data();
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
     krnl.lam = material[info.up[0]].get<lam>().data();
     krnl.mu = material[info.up[0]].get<mu>().data();
     krnl.execute(0);
@@ -199,12 +197,12 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     for (unsigned side = 0; side < 2; ++side) {
         krnl.E_q(side) = E_q[info.localNo[side]].data();
     }
-    krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    krnl.lam_w(1) = fctPre[fctNo].get<lam_w_1>().data();
-    krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    krnl.mu_w(1) = fctPre[fctNo].get<mu_w_1>().data();
-    krnl.n = fct[fctNo].get<Normal>().data()->data();
-    krnl.nl = fct[fctNo].get<NormalLength>().data();
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+    krnl.n_q = fct[fctNo].get<Normal>().data()->data();
+    krnl.nl_q = fct[fctNo].get<NormalLength>().data();
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
     krnl.execute(0, 1);
@@ -243,10 +241,10 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.Dx_q(0) = Dx_q0;
     krnl.delta = init::delta::Values;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
-    krnl.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    krnl.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    krnl.n = fct[fctNo].get<Normal>().data()->data();
-    krnl.nl = fct[fctNo].get<NormalLength>().data();
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.n_q = fct[fctNo].get<Normal>().data()->data();
+    krnl.nl_q = fct[fctNo].get<NormalLength>().data();
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
 
@@ -256,15 +254,15 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
 bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const {
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
-    double F_Q_raw[tensor::F::size()];
-    assert(tensor::F::Shape[1] == volRule.size());
+    double F_Q_raw[tensor::F_Q::size()];
+    assert(tensor::F_Q::Shape[1] == volRule.size());
 
     auto F_Q = Matrix<double>(F_Q_raw, NumQuantities, volRule.size());
     fun_force(elNo, F_Q);
 
     kernel::rhsVolume rhs;
     rhs.E_Q = E_Q.data();
-    rhs.F = F_Q_raw;
+    rhs.F_Q = F_Q_raw;
     rhs.J = vol[elNo].get<AbsDetJ>().data();
     rhs.W = volRule.weights().data();
     rhs.b = B.data();
@@ -274,16 +272,18 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator
 
 bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                               Vector<double>& B1, LinearAllocator& scratch) const {
-    if (info.bc != BC::Fault) {
+    double f_q_raw[tensor::f_q::size()];
+    assert(tensor::f_q::Shape[1] == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (info.bc == BC::Fault) {
+        fun_slip(fctNo, f_q, false);
+    } else if (info.bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, false);
+    } else {
         return false;
     }
 
     double Dx_q[tensor::Dx_q::size(0)];
-    double f_q_raw[tensor::f::size()];
-    assert(tensor::f::Shape[1] == fctRule.size());
-
-    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    fun_slip(fctNo, f_q, false);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -292,12 +292,12 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.Dx_q(0) = Dx_q;
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
-    rhs.f = f_q_raw;
+    rhs.f_q = f_q_raw;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    rhs.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    rhs.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    rhs.n = fct[fctNo].get<Normal>().data()->data();
-    rhs.nl = fct[fctNo].get<NormalLength>().data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
+    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
     rhs.execute();
 
@@ -306,8 +306,8 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.Dxi_q(0) = Dxi_q[info.localNo[1]].data();
     rhs.E_q(0) = E_q[info.localNo[1]].data();
     rhs.g(0) = fct[fctNo].get<JInv1>().data()->data();
-    rhs.lam_w(0) = fctPre[fctNo].get<lam_w_1>().data();
-    rhs.mu_w(0) = fctPre[fctNo].get<mu_w_1>().data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_1>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_1>().data();
     rhs.execute();
 
     return true;
@@ -315,16 +315,23 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 
 bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                               LinearAllocator& scratch) const {
-    if (info.bc != BC::Dirichlet) {
+    double f_q_raw[tensor::f_q::size()];
+    assert(tensor::f_q::Shape[1] == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (info.bc == BC::Fault) {
+        fun_slip(fctNo, f_q, true);
+        for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
+            for (std::size_t p = 0; p < NumQuantities; ++p) {
+                f_q(p, q) *= 0.5;
+            }
+        }
+    } else if (info.bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, true);
+    } else {
         return false;
     }
 
     double Dx_q[tensor::Dx_q::size(0)];
-    double f_q_raw[tensor::f::size()];
-    assert(tensor::f::Shape[1] == fctRule.size());
-
-    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    fun_dirichlet(fctNo, f_q, true);
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -333,12 +340,12 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.Dx_q(0) = Dx_q;
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
-    rhs.f = f_q_raw;
+    rhs.f_q = f_q_raw;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    rhs.lam_w(0) = fctPre[fctNo].get<lam_w_0>().data();
-    rhs.mu_w(0) = fctPre[fctNo].get<mu_w_0>().data();
-    rhs.n = fct[fctNo].get<Normal>().data()->data();
-    rhs.nl = fct[fctNo].get<NormalLength>().data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
+    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
     rhs.execute();
 
@@ -355,6 +362,44 @@ void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C, Linear
         C(i, 0) = coeff_lam[i];
         C(i, 1) = coeff_mu[i];
     }
+}
+
+TensorBase<Matrix<double>> Elasticity::tractionResultInfo() const {
+    return TensorBase<Matrix<double>>(tensor::traction_avg::Shape[0],
+                                      tensor::traction_avg::Shape[1]);
+}
+
+void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                          Vector<double const>& u1, Matrix<double>& result) const {
+    assert(result.size() == tensor::traction_avg::size());
+    assert(u0.size() == tensor::u::size(0));
+    assert(u1.size() == tensor::u::size(1));
+
+    double Dx_q0[tensor::Dx_q::size(0)];
+    double Dx_q1[tensor::Dx_q::size(1)];
+
+    kernel::Dx_q dxKrnl;
+    dxKrnl.Dx_q(0) = Dx_q0;
+    dxKrnl.Dx_q(1) = Dx_q1;
+    dxKrnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    dxKrnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
+    for (unsigned side = 0; side < 2; ++side) {
+        dxKrnl.Dxi_q(side) = Dxi_q[info.localNo[side]].data();
+        dxKrnl.execute(side);
+    }
+
+    kernel::traction_avg krnl;
+    krnl.Dx_q(0) = Dx_q0;
+    krnl.Dx_q(1) = Dx_q1;
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+    krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+    krnl.traction_avg = result.data();
+    krnl.u(0) = u0.data();
+    krnl.u(1) = u1.data();
+    krnl.execute();
 }
 
 } // namespace tndm::tmp

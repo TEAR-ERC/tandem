@@ -18,7 +18,7 @@ namespace tensor = tndm::poisson::tensor;
 namespace init = tndm::poisson::init;
 namespace kernel = tndm::poisson::kernel;
 
-namespace tndm::tmp {
+namespace tndm {
 
 Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
