@@ -94,7 +94,6 @@ private:
     // Ref elements
     ModalRefElement<DomainDimension> space_;
     NodalRefElement<DomainDimension> materialSpace_;
-    NodalRefElement<DomainDimension - 1u> boundarySpace_;
 
     // Matrices
     Managed<Matrix<double>> E_Q;
@@ -105,9 +104,6 @@ private:
     Managed<Matrix<double>> matE_Q_T;
     Managed<Matrix<double>> matMinv;
     std::vector<Managed<Matrix<double>>> matE_q_T;
-
-    Managed<Matrix<double>> e_q_T;
-    Managed<Matrix<double>> minv;
 
     // Input
     volume_functional_t fun_K;

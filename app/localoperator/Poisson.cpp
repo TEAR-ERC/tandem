@@ -4,7 +4,6 @@
 #include "kernels/poisson/kernel.h"
 #include "kernels/poisson/tensor.h"
 
-#include "basis/GaussLegendre.h"
 #include "basis/WarpAndBlend.h"
 #include "form/BC.h"
 #include "form/DGCurvilinearCommon.h"
@@ -24,7 +23,6 @@ namespace tndm::tmp {
 Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
-      boundarySpace_(PolynomialDegree - 1, GaussLegendreFactory()),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
@@ -39,9 +37,6 @@ Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
     matMinv = materialSpace_.inverseMassMatrix();
-
-    e_q_T = boundarySpace_.evaluateBasisAt(fctRule.points(), {1, 0});
-    minv = boundarySpace_.inverseMassMatrix();
 }
 
 void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -294,8 +289,6 @@ void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double c
     double Dx_q1[tensor::d_x::size(1)];
 
     kernel::grad_u krnl;
-    krnl.e_q_T = e_q_T.data();
-    krnl.minv = minv.data();
     krnl.d_x(0) = Dx_q0;
     krnl.d_x(1) = Dx_q1;
     for (std::size_t side = 0; side < 2; ++side) {
@@ -309,7 +302,6 @@ void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double c
     krnl.k(1) = material[info.up[1]].get<K>().data();
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
-    krnl.w = fctRule.weights().data();
     krnl.execute();
 }
 

@@ -1,39 +1,47 @@
 #include "SeasAdapterBase.h"
 
-#include "basis/GaussLegendre.h"
+#include "config.h"
 #include "form/BC.h"
 #include "form/FacetInfo.h"
+#include "form/RefElement.h"
 #include "geometry/Vector.h"
 
 #include <memory>
+#include <stdexcept>
 #include <utility>
 
 namespace tndm {
 
 SeasAdapterBase::SeasAdapterBase(
-    std::shared_ptr<DGOperatorTopo> topo,
+    std::shared_ptr<DGOperatorTopo> topo, std::unique_ptr<RefElement<DomainDimension - 1u>> space,
     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
     std::array<double, DomainDimension> const& ref_normal)
-    : topo_(std::move(topo)), space_(PolynomialDegree - 1, GaussLegendreFactory()),
-      faultMap_(*topo_, BC::Fault), ref_normal_(ref_normal) {
+    : topo_(std::move(topo)), space_(std::move(space)), faultMap_(*topo_, BC::Fault),
+      ref_normal_(ref_normal) {
 
-    e_q_T = space_.evaluateBasisAt(quadPoints, {1, 0});
+    e_q_T = space_->evaluateBasisAt(quadPoints, {1, 0});
+    minv = space_->inverseMassMatrix();
 }
 
 void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces,
                                         Curvilinear<DomainDimension> const& cl) {
-    auto nbf = space_.numBasisFunctions();
+    auto nbf = space_->numBasisFunctions();
     fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
 
+    auto const space = dynamic_cast<NodalRefElement<DomainDimension - 1u> const*>(space_.get());
+    if (space == nullptr) {
+        throw std::runtime_error("Nodal basis required for SeasAdapter.");
+    }
+
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        auto facetParam = cl.facetParam(f, space_.refNodes());
+        auto facetParam = cl.facetParam(f, space->refNodes());
         geoDxi_q.emplace_back(cl.evaluateGradientAt(facetParam));
     }
 }
 
 void SeasAdapterBase::prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl,
                               LinearAllocator& scratch) {
-    auto const nbf = space_.numBasisFunctions();
+    auto const nbf = space_->numBasisFunctions();
     auto const fctNo = faultMap_.fctNo(faultNo);
     auto const& info = topo_->info(fctNo);
 
