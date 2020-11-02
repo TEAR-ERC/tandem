@@ -22,7 +22,7 @@ public:
                std::shared_ptr<SeasOperator> seasop, unsigned degree, double V_ref, double t_min,
                double t_max)
         : seasop_(std::move(seasop)), fault_adapter_(mesh, cl, seasop_->faultMap().fctNos()),
-          adapter_(cl, seasop_->spatialOperator().numLocalElements()), degree_(degree),
+          adapter_(cl, seasop_->adapter().numLocalElements()), degree_(degree),
           fault_base_(baseName), base_(baseName), V_ref_(V_ref), t_min_(t_min), t_max_(t_max) {
         fault_base_ += "-fault";
         MPI_Comm_rank(seasop_->comm(), &rank_);
@@ -48,7 +48,7 @@ public:
                 pvd_fault_.write(fault_base_);
             }
 
-            auto displacement = seasop_->displacement();
+            auto displacement = seasop_->adapter().displacement();
             auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
             writer.addFieldData("time", &time, 1);
             auto piece = writer.addPiece(adapter_);

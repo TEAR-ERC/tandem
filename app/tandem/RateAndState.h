@@ -37,14 +37,14 @@ public:
 
     void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }
 
-    void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
-    void init(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double>& state,
-              LinearAllocator& scratch) const;
+    void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator&) const;
+    void init(std::size_t faultNo, Matrix<double> const& traction, Vector<double>& state,
+              LinearAllocator&) const;
 
-    double rhs(std::size_t faultNo, double time, Matrix<double> const& grad_u,
-               Vector<double const>& state, Vector<double>& result, LinearAllocator& scratch) const;
-    void state(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
-               Matrix<double>& result, LinearAllocator& scratch) const;
+    double rhs(std::size_t faultNo, double time, Matrix<double> const& traction,
+               Vector<double const>& state, Vector<double>& result, LinearAllocator&) const;
+    void state(std::size_t faultNo, Matrix<double> const& traction, Vector<double const>& state,
+               Matrix<double>& result, LinearAllocator&) const;
 
 private:
     Law law_;
@@ -53,7 +53,7 @@ private:
 
 template <class Law>
 void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
-                                 LinearAllocator& scratch) const {
+                                 LinearAllocator&) const {
 
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
@@ -63,34 +63,25 @@ void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
 }
 
 template <class Law>
-void RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& grad_u,
-                             Vector<double>& state, LinearAllocator& scratch) const {
+void RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& traction,
+                             Vector<double>& state, LinearAllocator&) const {
 
     std::size_t nbf = space_.numBasisFunctions();
-    double* traction_raw = scratch.allocate<double>(nbf);
-    auto traction = Vector<double>(traction_raw, nbf);
-    compute_traction(faultNo, grad_u, traction);
-
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        state(node) = law_.psi_init(index + node, traction(node));
+        state(node) = law_.psi_init(index + node, traction(node, 0));
     }
-    scratch.reset();
 }
 
 template <class Law>
-double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> const& grad_u,
+double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> const& traction,
                               Vector<double const>& state, Vector<double>& result,
-                              LinearAllocator& scratch) const {
-    std::size_t nbf = space_.numBasisFunctions();
-    double* traction_raw = scratch.allocate<double>(nbf);
-    auto traction = Vector<double>(traction_raw, nbf);
-    compute_traction(faultNo, grad_u, traction);
-
+                              LinearAllocator&) const {
     double VMax = 0.0;
+    std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto tau = traction(node);
+        auto tau = traction(node, 0);
         auto psi = state(node);
         double V = law_.slip_rate(index + node, tau, psi);
         VMax = std::max(VMax, std::fabs(V));
@@ -107,22 +98,17 @@ double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> c
             result(node) += (*source_)(xt)[0];
         }
     }
-    scratch.reset();
     return VMax;
 }
 
 template <class Law>
-void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& grad_u,
+void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& traction,
                               Vector<double const>& state, Matrix<double>& result,
-                              LinearAllocator& scratch) const {
+                              LinearAllocator&) const {
     std::size_t nbf = space_.numBasisFunctions();
-    double* traction_raw = scratch.allocate<double>(nbf);
-    auto traction = Vector<double>(traction_raw, nbf);
-    compute_traction(faultNo, grad_u, traction);
-
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto tau = traction(node);
+        auto tau = traction(node, 0);
         auto psi = state(node);
         double V = law_.slip_rate(index + node, tau, psi);
         result(node, 0) = psi;
@@ -130,7 +116,6 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& grad_u,
         result(node, 2) = law_.tau0(index) + tau;
         result(node, 3) = V;
     }
-    scratch.reset();
 }
 
 } // namespace tndm

@@ -26,22 +26,15 @@ public:
     constexpr static std::size_t NumQuantities = 2;
     constexpr static std::size_t NumInternalQuantities = 4;
 
-    RateAndStateBase(Curvilinear<DomainDimension> const& cl,
-                     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints);
+    RateAndStateBase();
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
-    std::size_t scratch_mem_size() const {
-        return space_.numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
-               sizeof(double);
-    }
+    std::size_t scratch_mem_size() const { return 1; }
 
-    void begin_preparation(std::size_t numFaultFaces);
-    void prepare(std::size_t faultNo, FacetInfo const& info,
-                 std::array<double, DomainDimension> const& ref_normal, LinearAllocator& scratch);
+    void begin_preparation(std::size_t numFaultFaces, Curvilinear<DomainDimension> const& cl);
+    void prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl, FacetInfo const& info,
+                 LinearAllocator&);
     void end_preparation() {}
-
-    void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& result,
-              LinearAllocator& scratch) const;
 
     auto state_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumInternalQuantities,
@@ -49,28 +42,14 @@ public:
     }
 
 protected:
-    void compute_traction(std::size_t faultNo, Matrix<double> const& grad_u,
-                          Vector<double>& traction) const;
-
-    Curvilinear<DomainDimension> const* cl_;
-    NodalRefElement<DomainDimension - 1u> space_;
-
     // Basis
-    Managed<Matrix<double>> e_q_T;
+    NodalRefElement<DomainDimension - 1u> space_;
     std::vector<Managed<Matrix<double>>> geoE_q;
-    std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
 
     struct Coords {
         using type = std::array<double, DomainDimension>;
     };
-    struct UnitNormal {
-        using type = std::array<double, DomainDimension>;
-    };
-    struct SignFlipped {
-        using type = bool;
-    };
-
-    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, UnitNormal, SignFlipped>;
+    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords>;
     mneme::StridedView<fault_t> fault_;
 };
 

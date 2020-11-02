@@ -1,25 +1,27 @@
 #include "SEAS.h"
 #include "common/PetscTimeSolver.h"
 #include "config.h"
-#include "form/DGOperator.h"
-#include "form/DGOperatorTopo.h"
 #include "localoperator/Poisson.h"
 #include "tandem/Config.h"
 #include "tandem/DieterichRuinaAgeing.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/RateAndState.h"
 #include "tandem/SeasOperator.h"
+#include "tandem/SeasPoissonAdapter.h"
 #include "tandem/SeasScenario.h"
 #include "tandem/SeasWriter.h"
 
+#include "form/DGOperatorTopo.h"
+#include "form/Error.h"
 #include "geometry/Curvilinear.h"
-#include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
 
+#include <mpi.h>
 #include <petscsys.h>
 
 #include <algorithm>
 #include <array>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -30,7 +32,7 @@ namespace tndm {
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     using spatial_lop_t = tmp::Poisson;
     using fault_lop_t = DieterichRuinaAgeing;
-    using seas_op_t = SeasOperator<RateAndState<fault_lop_t>, DGOperator<spatial_lop_t>>;
+    using seas_op_t = SeasOperator<RateAndState<fault_lop_t>, SeasPoissonAdapter>;
     using seas_writer_t = SeasWriter<DomainDimension, seas_op_t>;
 
     auto scenario = SeasScenario<tmp::Poisson>(cfg.seas);
@@ -40,11 +42,11 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
 
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto spatial_lop = std::make_unique<spatial_lop_t>(cl, scenario.mu());
-    auto quadPoints = spatial_lop->facetQuadratureRule().points();
-    auto dgop = std::make_unique<DGOperator<spatial_lop_t>>(topo, std::move(spatial_lop));
-    auto fop = std::make_unique<RateAndState<fault_lop_t>>(cl, quadPoints);
-    auto seasop =
-        std::make_shared<seas_op_t>(topo, std::move(fop), std::move(dgop), scenario.ref_normal());
+    auto adapter =
+        std::make_unique<SeasPoissonAdapter>(topo, std::move(spatial_lop), scenario.ref_normal());
+    auto fop = std::make_unique<RateAndState<fault_lop_t>>();
+
+    auto seasop = std::make_shared<seas_op_t>(cl, std::move(fop), std::move(adapter));
     seasop->lop().set_constant_params(friction_scenario.constant_params());
     seasop->lop().set_params(friction_scenario.param_fun());
     if (friction_scenario.source_fun()) {
@@ -70,7 +72,7 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     if (solution) {
         int rank;
         MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
-        auto numeric = seasop->displacement();
+        auto numeric = seasop->adapter().displacement();
         double error =
             tndm::Error<DomainDimension>::L2(cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
