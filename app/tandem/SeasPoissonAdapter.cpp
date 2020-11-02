@@ -14,11 +14,12 @@ namespace tndm {
 SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
                                        std::unique_ptr<Poisson> local_operator,
-                                       std::array<double, Dim> const& ref_normal)
+                                       std::array<double, Dim> const& ref_normal,
+                                       double normal_stress)
     : SeasAdapterBase(topo, std::move(space), local_operator->facetQuadratureRule().points(),
                       ref_normal),
       dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_) {}
+      linear_solver_(*dgop_), normal_stress_(normal_stress) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                               Matrix<double>& slip_q) const {
@@ -43,11 +44,13 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
-    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 1);
+    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 2);
 }
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
                                   LinearAllocator&) const {
+    auto const nbf = space_->numBasisFunctions();
+
     double grad_u_raw[poisson::tensor::grad_u::Size];
     auto grad_u = Matrix<double>(grad_u_raw, dgop_->lop().tractionResultInfo());
     assert(grad_u.size() == poisson::tensor::grad_u::Size);
@@ -61,10 +64,14 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     krnl.e_q_T = e_q_T.data();
     krnl.grad_u = grad_u_raw;
     krnl.minv = minv.data();
-    krnl.traction = traction.data();
+    krnl.traction = &traction(0, 1);
     krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
+
+    for (std::size_t i = 0; i < nbf; ++i) {
+        traction(i, 0) = normal_stress_;
+    }
 }
 
 } // namespace tndm

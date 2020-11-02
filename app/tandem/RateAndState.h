@@ -69,7 +69,7 @@ void RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& traction
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        state(nbf + node) = law_.psi_init(index + node, traction(node, 0));
+        state(nbf + node) = law_.psi_init(index + node, traction(node, 0), traction(node, 1));
     }
 }
 
@@ -81,9 +81,10 @@ double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> c
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto tau = traction(node, 0);
+        auto sn = traction(node, 0);
+        auto tau = traction(node, 1);
         auto psi = state(nbf + node);
-        double V = law_.slip_rate(index + node, tau, psi);
+        double V = law_.slip_rate(index + node, sn, tau, psi);
         VMax = std::max(VMax, std::fabs(V));
         result(node) = V;
         result(nbf + node) = law_.state_rhs(index + node, V, psi);
@@ -108,9 +109,10 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& tractio
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto tau = traction(node, 0);
+        auto sn = traction(node, 0);
+        auto tau = traction(node, 1);
         auto psi = state(nbf + node);
-        double V = law_.slip_rate(index + node, tau, psi);
+        double V = law_.slip_rate(index + node, sn, tau, psi);
         result(node, 0) = psi;
         result(node, 1) = state(node);
         result(node, 2) = law_.tau_pre(index + node) + tau;

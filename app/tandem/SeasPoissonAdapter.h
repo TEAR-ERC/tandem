@@ -33,7 +33,7 @@ public:
     SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
                        std::unique_ptr<RefElement<Dim - 1u>> space,
                        std::unique_ptr<Poisson> local_operator,
-                       std::array<double, Dim> const& ref_normal);
+                       std::array<double, Dim> const& ref_normal, double normal_stress);
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
@@ -71,11 +71,12 @@ private:
 
     std::unique_ptr<DGOperator<Poisson>> dgop_;
     PetscLinearSolver linear_solver_;
+    double normal_stress_;
+
     time_functional_t fun_boundary =
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {
         return {};
     };
-
     PetscBlockVector::const_handle handle_;
 };
 

@@ -8,6 +8,7 @@ boundary = "u_star"
 mu = "mu"
 solution = "u_star"
 ref_normal = [1, 0]
+normal_stress = 50
 
 [friction]
 lib = "mms1.lua"
@@ -21,7 +22,6 @@ source = "source"
     V0 = 1.0e-6
     L = 0.2
     f0 = 0.6
-    sn = 50
 
 [generate_mesh]
 intercepts = [

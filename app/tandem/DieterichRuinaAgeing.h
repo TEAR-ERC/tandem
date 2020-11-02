@@ -13,7 +13,6 @@ namespace tndm {
 class DieterichRuinaAgeing {
 public:
     struct ConstantParams {
-        double sn;
         double V0;
         double b;
         double L;
@@ -37,12 +36,12 @@ public:
         p_[index].get<Sinit>() = params.Sinit;
     }
 
-    double psi_init(std::size_t index, double tau) const {
+    double psi_init(std::size_t index, double sn, double tau) const {
         auto tauAbs = tau + p_[index].get<TauPre>();
         auto Vi = p_[index].get<Vinit>();
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
-        double s = sinh((tauAbs - eta * Vi) / (a * cp_.sn));
+        double s = sinh((tauAbs - eta * Vi) / (a * sn));
         double l = log((2.0 * cp_.V0 / Vi) * s);
         return a * l;
     }
@@ -50,7 +49,7 @@ public:
     double tau_pre(std::size_t index) const { return p_[index].get<TauPre>(); }
     double S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
-    double slip_rate(std::size_t index, double tau, double psi) const {
+    double slip_rate(std::size_t index, double sn, double tau, double psi) const {
         auto eta = p_[index].get<Eta>();
         double tauAbs = tau + p_[index].get<TauPre>();
         double a = -tauAbs / eta;
@@ -58,7 +57,9 @@ public:
         if (a > b) {
             std::swap(a, b);
         }
-        auto fF = [this, &index, &tau, &psi](double V) { return this->F(index, tau, V, psi); };
+        auto fF = [this, &index, &sn, &tau, &psi](double V) {
+            return this->F(index, sn, tau, V, psi);
+        };
         return zeroIn(a, b, fF);
     }
 
@@ -67,13 +68,13 @@ public:
     }
 
 private:
-    double F(std::size_t index, double tau, double V, double psi) const {
+    double F(std::size_t index, double sn, double tau, double V, double psi) const {
         double tauAbs = tau + p_[index].get<TauPre>();
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
         double e = exp(psi / a);
         double f = a * asinh((V / (2.0 * cp_.V0)) * e);
-        return tauAbs - cp_.sn * f - eta * V;
+        return tauAbs - sn * f - eta * V;
     }
 
     ConstantParams cp_;

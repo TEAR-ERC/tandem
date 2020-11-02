@@ -39,7 +39,6 @@ struct DieterichRuinaAgeingConfig {
         schema.add_value("Sinit", &DieterichRuinaAgeingConfig::Sinit);
         schema.add_value("source", &DieterichRuinaAgeingConfig::source);
         auto& cs = schema.add_table("constant", &DieterichRuinaAgeingConfig::constant);
-        cs.add_value("sn", &Constant::sn);
         cs.add_value("V0", &Constant::V0);
         cs.add_value("b", &Constant::b);
         cs.add_value("L", &Constant::L);

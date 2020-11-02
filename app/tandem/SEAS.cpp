@@ -42,8 +42,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     auto fop = std::make_unique<RateAndState<fault_lop_t>>();
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto spatial_lop = std::make_unique<Poisson>(cl, scenario.mu());
-    auto adapter = std::make_unique<SeasPoissonAdapter>(
-        topo, fop->space().clone(), std::move(spatial_lop), scenario.ref_normal());
+    auto adapter =
+        std::make_unique<SeasPoissonAdapter>(topo, fop->space().clone(), std::move(spatial_lop),
+                                             scenario.ref_normal(), cfg.seas.normal_stress);
 
     auto seasop = std::make_shared<seas_op_t>(cl, std::move(fop), std::move(adapter));
     seasop->lop().set_constant_params(friction_scenario.constant_params());
