@@ -47,6 +47,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
         std::make_shared<seas_op_t>(topo, std::move(fop), std::move(dgop), scenario.ref_normal());
     seasop->lop().set_constant_params(friction_scenario.constant_params());
     seasop->lop().set_params(friction_scenario.param_fun());
+    if (friction_scenario.source_fun()) {
+        seasop->lop().set_source_fun(*friction_scenario.source_fun());
+    }
     if (scenario.boundary()) {
         seasop->set_boundary(*scenario.boundary());
     }
@@ -62,6 +65,18 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     }
 
     ts.solve(cfg.final_time);
+
+    auto solution = scenario.solution(cfg.final_time);
+    if (solution) {
+        int rank;
+        MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+        auto numeric = seasop->displacement();
+        double error =
+            tndm::Error<DomainDimension>::L2(cl, numeric, *solution, 0, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "L2 error: " << error << std::endl;
+        }
+    }
 }
 
 } // namespace tndm

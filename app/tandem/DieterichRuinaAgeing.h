@@ -14,7 +14,6 @@ class DieterichRuinaAgeing {
 public:
     struct ConstantParams {
         double eta;
-        double Vinit;
         double sn;
         double V0;
         double b;
@@ -24,6 +23,8 @@ public:
     struct Params {
         double a;
         double tau0;
+        double Vinit;
+        double Sinit;
     };
 
     void set_num_nodes(std::size_t num_nodes) { p_.resize(num_nodes); }
@@ -31,15 +32,21 @@ public:
     void set_params(std::size_t index, Params const& params) {
         p_[index].get<A>() = params.a;
         p_[index].get<Tau0>() = params.tau0;
+        p_[index].get<Vinit>() = params.Vinit;
+        p_[index].get<Sinit>() = params.Sinit;
     }
 
-    double psi0(std::size_t index) const {
-        auto tau0 = p_[index].get<Tau0>();
+    double psi_init(std::size_t index, double tau) const {
+        auto tauAbs = tau + p_[index].get<Tau0>();
+        auto Vi = p_[index].get<Vinit>();
         auto a = p_[index].get<A>();
-        double s = sinh((tau0 - cp_.eta * cp_.Vinit) / (a * cp_.sn));
-        double l = log((2.0 * cp_.V0 / cp_.Vinit) * s);
+        double s = sinh((tauAbs - cp_.eta * Vi) / (a * cp_.sn));
+        double l = log((2.0 * cp_.V0 / Vi) * s);
         return a * l;
     }
+
+    double tau0(std::size_t index) const { return p_[index].get<Tau0>(); }
+    double S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     double slip_rate(std::size_t index, double tau, double psi) const {
         double tauAbs = tau + p_[index].get<Tau0>();
@@ -73,7 +80,13 @@ private:
     struct A {
         using type = double;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, Tau0, A> p_;
+    struct Vinit {
+        using type = double;
+    };
+    struct Sinit {
+        using type = double;
+    };
+    mneme::MultiStorage<mneme::DataLayout::SoA, Tau0, A, Vinit, Sinit> p_;
 };
 
 } // namespace tndm

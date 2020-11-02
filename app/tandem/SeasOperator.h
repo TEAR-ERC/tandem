@@ -58,33 +58,35 @@ public:
         auto access_handle = vector.begin_access();
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             auto B = vector.get_block(access_handle, faultNo);
-            lop_->initial(faultNo, B, scratch);
+            lop_->pre_init(faultNo, B, scratch);
         }
+
+        solve_spatial_problem(0.0, vector);
+
+        auto const& coupled_dofs = linear_solver_.x();
+        auto coupled_handle = coupled_dofs.begin_access_readonly();
+        auto traction = Managed<Matrix<double>>(dgop_->lop().tractionResultInfo());
+        for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
+            auto fctNo = faultMap_.fctNo(faultNo);
+            auto const& info = topo_->info(fctNo);
+            auto u0 = coupled_dofs.get_block(coupled_handle, info.up[0]);
+            auto u1 = coupled_dofs.get_block(coupled_handle, info.up[1]);
+
+            dgop_->lop().traction(fctNo, info, u0, u1, traction);
+            auto B = vector.get_block(access_handle, faultNo);
+            lop_->init(faultNo, traction, B, scratch);
+        }
+        coupled_dofs.end_access_readonly(coupled_handle);
         vector.end_access(access_handle);
     }
 
     template <typename BlockVector> void rhs(double time, BlockVector& state, BlockVector& result) {
-        auto scratch = make_scratch();
-        auto in_handle = state.begin_access_readonly();
-        dgop_->lop().set_slip(
-            [this, &state, &in_handle, &scratch](std::size_t fctNo, Matrix<double>& f_q, bool) {
-                auto faultNo = this->faultMap_.bndNo(fctNo);
-                auto state_block = state.get_block(in_handle, faultNo);
-                this->lop_->slip(faultNo, state_block, f_q, scratch);
-            });
-        dgop_->lop().set_dirichlet(
-            [this, time](std::array<double, Dim> const& x) {
-                std::array<double, Dim + 1u> xt;
-                std::copy(x.begin(), x.end(), xt.begin());
-                xt.back() = time;
-                return this->fun_boundary(xt);
-            },
-            ref_normal_);
-        linear_solver_.update_rhs(*dgop_);
-        linear_solver_.solve();
+        solve_spatial_problem(time, state);
 
+        auto scratch = make_scratch();
         auto traction = Managed<Matrix<double>>(dgop_->lop().tractionResultInfo());
         auto const& coupled_dofs = linear_solver_.x();
+        auto in_handle = state.begin_access_readonly();
         auto out_handle = result.begin_access();
         auto coupled_handle = coupled_dofs.begin_access_readonly();
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
@@ -96,7 +98,7 @@ public:
 
             auto state_block = state.get_block(in_handle, faultNo);
             auto result_block = result.get_block(out_handle, faultNo);
-            double VMax = lop_->rhs(faultNo, traction, state_block, result_block, scratch);
+            double VMax = lop_->rhs(faultNo, time, traction, state_block, result_block, scratch);
             VMax_ = std::max(VMax_, VMax);
         }
         coupled_dofs.end_access_readonly(coupled_handle);
@@ -135,6 +137,28 @@ public:
     LocalOperator& lop() { return *lop_; }
 
 private:
+    template <typename BlockVector> void solve_spatial_problem(double time, BlockVector& state) {
+        auto scratch = make_scratch();
+        auto in_handle = state.begin_access_readonly();
+        dgop_->lop().set_slip(
+            [this, &state, &in_handle, &scratch](std::size_t fctNo, Matrix<double>& f_q, bool) {
+                auto faultNo = this->faultMap_.bndNo(fctNo);
+                auto state_block = state.get_block(in_handle, faultNo);
+                this->lop_->slip(faultNo, state_block, f_q, scratch);
+            });
+        dgop_->lop().set_dirichlet(
+            [this, time](std::array<double, Dim> const& x) {
+                std::array<double, Dim + 1u> xt;
+                std::copy(x.begin(), x.end(), xt.begin());
+                xt.back() = time;
+                return this->fun_boundary(xt);
+            },
+            ref_normal_);
+        linear_solver_.update_rhs(*dgop_);
+        linear_solver_.solve();
+        state.end_access_readonly(in_handle);
+    }
+
     auto make_scratch() const {
         return LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
     }

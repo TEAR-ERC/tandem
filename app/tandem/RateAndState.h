@@ -10,6 +10,7 @@
 #include <array>
 #include <cstddef>
 #include <functional>
+#include <optional>
 
 namespace tndm {
 
@@ -19,6 +20,8 @@ public:
 
     using param_fun_t =
         std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
+    using source_fun_t =
+        std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -32,30 +35,51 @@ public:
         }
     }
 
-    void initial(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
-    double rhs(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
-               Vector<double>& result, LinearAllocator& scratch) const;
+    void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }
+
+    void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator& scratch) const;
+    void init(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double>& state,
+              LinearAllocator& scratch) const;
+
+    double rhs(std::size_t faultNo, double time, Matrix<double> const& grad_u,
+               Vector<double const>& state, Vector<double>& result, LinearAllocator& scratch) const;
     void state(std::size_t faultNo, Matrix<double> const& grad_u, Vector<double const>& state,
                Matrix<double>& result, LinearAllocator& scratch) const;
 
 private:
     Law law_;
+    std::optional<source_fun_t> source_;
 };
 
 template <class Law>
-void RateAndState<Law>::initial(std::size_t faultNo, Vector<double>& state,
-                                LinearAllocator& scratch) const {
+void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
+                                 LinearAllocator& scratch) const {
 
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        state(node) = law_.psi0(index + node);
-        state(nbf + node) = 0.0;
+        state(nbf + node) = law_.S_init(index + node);
     }
 }
 
 template <class Law>
-double RateAndState<Law>::rhs(std::size_t faultNo, Matrix<double> const& grad_u,
+void RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& grad_u,
+                             Vector<double>& state, LinearAllocator& scratch) const {
+
+    std::size_t nbf = space_.numBasisFunctions();
+    double* traction_raw = scratch.allocate<double>(nbf);
+    auto traction = Vector<double>(traction_raw, nbf);
+    compute_traction(faultNo, grad_u, traction);
+
+    std::size_t index = faultNo * nbf;
+    for (std::size_t node = 0; node < nbf; ++node) {
+        state(node) = law_.psi_init(index + node, traction(node));
+    }
+    scratch.reset();
+}
+
+template <class Law>
+double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> const& grad_u,
                               Vector<double const>& state, Vector<double>& result,
                               LinearAllocator& scratch) const {
     std::size_t nbf = space_.numBasisFunctions();
@@ -72,6 +96,16 @@ double RateAndState<Law>::rhs(std::size_t faultNo, Matrix<double> const& grad_u,
         VMax = std::max(VMax, std::fabs(V));
         result(node) = law_.state_rhs(index + node, V, psi);
         result(nbf + node) = V;
+    }
+    if (source_) {
+        auto coords = fault_[faultNo].template get<Coords>();
+        std::array<double, DomainDimension + 1> xt;
+        for (std::size_t node = 0; node < nbf; ++node) {
+            auto const& x = coords[node];
+            std::copy(x.begin(), x.end(), xt.begin());
+            xt.back() = time;
+            result(node) += (*source_)(xt)[0];
+        }
     }
     scratch.reset();
     return VMax;
@@ -93,7 +127,7 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& grad_u,
         double V = law_.slip_rate(index + node, tau, psi);
         result(node, 0) = psi;
         result(node, 1) = state(node + nbf);
-        result(node, 2) = tau;
+        result(node, 2) = law_.tau0(index) + tau;
         result(node, 3) = V;
     }
     scratch.reset();
