@@ -7,6 +7,7 @@ extern "C" {
 }
 
 #include <array>
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -16,6 +17,9 @@ namespace tndm {
 
 class LuaLib {
 public:
+    template <std::size_t Din, std::size_t Dout>
+    using functional_t = std::function<std::array<double, Dout>(std::array<double, Din> const& x)>;
+
     LuaLib();
     ~LuaLib();
 

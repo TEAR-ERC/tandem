@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative resolution parameter");
     schema.add_value("final_time", &Config::final_time)
-        .validator([](auto&& x) { return x > 0; })
+        .validator([](auto&& x) { return x >= 0; })
         .help("Non-negative final time of simulation");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)

@@ -9,10 +9,13 @@ namespace tndm {
 double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
     double eps = std::numeric_limits<double>::epsilon();
     double Fa = F(a);
+    if (Fa == 0.0) {
+        return a;
+    }
     double Fb = F(b);
     assert(!std::isnan(Fa));
     assert(!std::isnan(Fb));
-    assert(std::copysign(Fa, Fb) != Fa); // Fa and Fb have different signs
+    assert(Fb == 0.0 || std::copysign(Fa, Fb) != Fa); // Fa and Fb have different signs
     double c = a;
     double Fc = Fa;
     double d = b - a;

@@ -1,6 +1,7 @@
 #ifndef SCHEMAHELPER_20200930_H
 #define SCHEMAHELPER_20200930_H
 
+#include <algorithm>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -28,6 +29,11 @@ public:
 private:
     std::function<std::string(void)> otherPath_;
 };
+
+inline bool iEquals(std::string_view a, std::string_view b) {
+    return std::equal(a.begin(), a.end(), b.begin(),
+                      [](char a, char b) { return tolower(a) == tolower(b); });
+}
 
 } // namespace tndm
 
