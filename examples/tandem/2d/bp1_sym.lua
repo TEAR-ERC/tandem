@@ -17,6 +17,10 @@ function eta(x, y)
     return math.sqrt(mu(x, y) * rho) / 2.0
 end
 
+function sn_pre(x, y)
+    return 50.0
+end
+
 function Vinit(x, y)
     return 1.0e-9
 end
@@ -41,7 +45,7 @@ function tau_pre(x, y)
     local b = 0.015
     local V0 = 1e-6
     local Vi = Vinit(x, y)
-    local sn = 50.0
+    local sn = sn_pre(x, y)
     local e = math.exp((f0 + b * math.log(V0 / Vi)) / amax);
     return sn * amax * asinh((Vi / (2.0 * V0)) * e) + eta(x, y) * Vi;
 end

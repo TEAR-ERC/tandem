@@ -34,19 +34,19 @@ namespace tndm::detail {
 template <SeasType type> struct adapter;
 template <> struct adapter<SeasType::Poisson> {
     using type = SeasPoissonAdapter;
-    static auto make(Config const& cfg, SeasScenario<Poisson> const& scenario,
+    static auto make(SeasScenario<Poisson> const& scenario,
                      std::shared_ptr<Curvilinear<DomainDimension>> cl,
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
         auto lop = std::make_unique<Poisson>(cl, scenario.mu());
         return std::make_unique<SeasPoissonAdapter>(std::move(cl), std::move(topo),
                                                     std::move(space), std::move(lop),
-                                                    scenario.ref_normal(), cfg.seas.normal_stress);
+                                                    scenario.ref_normal());
     }
 };
 template <> struct adapter<SeasType::Elasticity> {
     using type = SeasElasticityAdapter;
-    static auto make(Config const& cfg, SeasScenario<Elasticity> const& scenario,
+    static auto make(SeasScenario<Elasticity> const& scenario,
                      std::shared_ptr<Curvilinear<DomainDimension>> cl,
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
@@ -73,7 +73,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto fop = std::make_unique<fault_op_t>(cl);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
-    auto adapt = adapter<type>::make(cfg, scenario, cl, topo, fop->space().clone());
+    auto adapt = adapter<type>::make(scenario, cl, topo, fop->space().clone());
 
     auto seasop = std::make_shared<seas_op_t>(std::move(fop), std::move(adapt));
     seasop->lop().set_constant_params(friction_scenario.constant_params());

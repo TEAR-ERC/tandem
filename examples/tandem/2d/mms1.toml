@@ -8,12 +8,12 @@ boundary = "u_star"
 mu = "mu"
 solution = "u_star"
 ref_normal = [1, 0]
-normal_stress = 50
 
 [friction]
 lib = "mms1.lua"
 a = "a"
 eta = "eta"
+sn_pre = "sn_pre"
 Vinit = "Vinit"
 Sinit = "Sinit"
 source = "source"

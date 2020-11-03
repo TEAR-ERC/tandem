@@ -117,6 +117,7 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& tractio
         result(node, 1) = state(node);
         result(node, 2) = law_.tau_pre(index + node) + tau;
         result(node, 3) = V;
+        result(node, 4) = law_.sn_pre(index + node) + sn;
     }
 }
 

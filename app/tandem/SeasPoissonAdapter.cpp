@@ -17,12 +17,11 @@ SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
                                        std::shared_ptr<DGOperatorTopo> topo,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
                                        std::unique_ptr<Poisson> local_operator,
-                                       std::array<double, Dim> const& ref_normal,
-                                       double normal_stress)
+                                       std::array<double, Dim> const& ref_normal)
     : SeasAdapterBase(std::move(cl), topo, std::move(space),
                       local_operator->facetQuadratureRule().points(), ref_normal),
       dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_), normal_stress_(normal_stress) {}
+      linear_solver_(*dgop_) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                               Matrix<double>& slip_q) const {
@@ -47,6 +46,8 @@ TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
                                   LinearAllocator<double>&) const {
+    std::fill(traction.data(), traction.data() + traction.size(), 0.0);
+
     double grad_u_raw[poisson::tensor::grad_u::Size];
     auto grad_u = Matrix<double>(grad_u_raw, dgop_->lop().tractionResultInfo());
     assert(grad_u.size() == poisson::tensor::grad_u::Size);
@@ -64,11 +65,6 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     krnl.n_unit_q = fault_[faultNo].template get<UnitNormal>().data()->data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
-
-    auto const nbf = space_->numBasisFunctions();
-    for (std::size_t i = 0; i < nbf; ++i) {
-        traction(i, 0) = normal_stress_;
-    }
 }
 
 } // namespace tndm

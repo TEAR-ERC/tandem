@@ -29,7 +29,6 @@ struct SeasScenarioConfig {
     std::optional<std::string> boundary;
     std::optional<std::string> solution;
     std::array<double, DomainDimension> ref_normal;
-    double normal_stress;
 
     template <typename PathConverter>
     static void setSchema(TableSchema<SeasScenarioConfig>& schema, PathConverter path_converter) {
@@ -53,7 +52,6 @@ struct SeasScenarioConfig {
         schema.add_value("boundary", &SeasScenarioConfig::boundary);
         schema.add_value("solution", &SeasScenarioConfig::solution);
         schema.add_array("ref_normal", &SeasScenarioConfig::ref_normal).of_values();
-        schema.add_value("normal_stress", &SeasScenarioConfig::normal_stress).default_value(50.0);
     }
 };
 
