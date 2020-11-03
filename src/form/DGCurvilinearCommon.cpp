@@ -37,9 +37,9 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
 
 template <std::size_t D>
 void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
-                                            LinearAllocator& scratch) {
-    double* Jmem = scratch.allocate<double>(fctRule.size() * D * D);
-    double* detJmem = scratch.allocate<double>(fctRule.size());
+                                            LinearAllocator<double>& scratch) {
+    double* Jmem = scratch.allocate(fctRule.size() * D * D);
+    double* detJmem = scratch.allocate(fctRule.size());
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(fctRule.size()));
     auto detJ = Tensor(detJmem, cl_->detJResultInfo(fctRule.size()));
 
@@ -84,8 +84,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 
 template <std::size_t D>
 void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
-                                                          LinearAllocator& scratch) {
-    double* Jmem = scratch.allocate<double>(volRule.size() * D * D);
+                                                          LinearAllocator<double>& scratch) {
+    double* Jmem = scratch.allocate(volRule.size() * D * D);
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(volRule.size()));
     auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),
                        cl_->jacobianResultInfo(volRule.size()));

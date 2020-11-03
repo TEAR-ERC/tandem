@@ -41,14 +41,14 @@ void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces,
 }
 
 void SeasAdapterBase::prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl,
-                              LinearAllocator& scratch) {
+                              LinearAllocator<double>& scratch) {
     auto const nbf = space_->numBasisFunctions();
     auto const fctNo = faultMap_.fctNo(faultNo);
     auto const& info = topo_->info(fctNo);
 
-    double* J_mem = scratch.allocate<double>(nbf * DomainDimension * DomainDimension);
-    double* JInv_mem = scratch.allocate<double>(nbf * DomainDimension * DomainDimension);
-    double* detJ_mem = scratch.allocate<double>(nbf);
+    double* J_mem = scratch.allocate(nbf * DomainDimension * DomainDimension);
+    double* JInv_mem = scratch.allocate(nbf * DomainDimension * DomainDimension);
+    double* detJ_mem = scratch.allocate(nbf);
     auto J = Tensor(J_mem, cl.jacobianResultInfo(nbf));
     auto JInv = Tensor(JInv_mem, cl.jacobianResultInfo(nbf));
     auto detJ = Tensor(detJ_mem, cl.detJResultInfo(nbf));

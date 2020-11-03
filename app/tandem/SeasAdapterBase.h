@@ -29,13 +29,12 @@ public:
                     std::array<double, DomainDimension> const& ref_normal);
 
     std::size_t scratch_mem_size() const {
-        return space_->numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1) *
-               sizeof(double);
+        return space_->numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1);
     }
 
     void begin_preparation(std::size_t numFaultFaces, Curvilinear<DomainDimension> const& cl);
     void prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl,
-                 LinearAllocator& scratch);
+                 LinearAllocator<double>& scratch);
     void end_preparation() {}
 
     auto const& topo() const { return *topo_; }

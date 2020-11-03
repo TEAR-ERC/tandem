@@ -42,7 +42,6 @@ add_library(tandem-lib
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
     script/LuaLib.cpp
-    util/LinearAllocator.cpp
     util/Zero.cpp
 )
 

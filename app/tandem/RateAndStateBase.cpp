@@ -21,7 +21,7 @@ void RateAndStateBase::begin_preparation(std::size_t numFaultFaces,
 }
 
 void RateAndStateBase::prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl,
-                               FacetInfo const& info, LinearAllocator&) {
+                               FacetInfo const& info, LinearAllocator<double>&) {
     auto nbf = space_.numBasisFunctions();
     auto coords =
         Tensor(fault_[faultNo].template get<Coords>().data()->data(), cl.mapResultInfo(nbf));

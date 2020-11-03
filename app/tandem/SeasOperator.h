@@ -27,7 +27,7 @@ public:
         : lop_(std::move(localOperator)), adapter_(std::move(seas_adapter)) {
         scratch_size_ = lop_->scratch_mem_size();
         scratch_size_ += adapter_->scratch_mem_size();
-        scratch_mem_ = std::make_unique<char[]>(scratch_size_);
+        scratch_mem_ = std::make_unique<double[]>(scratch_size_);
 
         auto scratch = make_scratch();
         adapter_->begin_preparation(numLocalElements(), cl);
@@ -120,12 +120,12 @@ public:
 
 private:
     auto make_scratch() const {
-        return LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + scratch_size_);
+        return LinearAllocator<double>(scratch_mem_.get(), scratch_mem_.get() + scratch_size_);
     }
 
     std::unique_ptr<LocalOperator> lop_;
     std::unique_ptr<SeasAdapter> adapter_;
-    std::unique_ptr<char[]> scratch_mem_;
+    std::unique_ptr<double[]> scratch_mem_;
     std::size_t scratch_size_;
     double VMax_ = 0.0;
 };

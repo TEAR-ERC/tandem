@@ -33,7 +33,7 @@ public:
 
     void begin_preparation(std::size_t numFaultFaces, Curvilinear<DomainDimension> const& cl);
     void prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl, FacetInfo const& info,
-                 LinearAllocator&);
+                 LinearAllocator<double>&);
     void end_preparation() {}
 
     auto state_prototype(std::size_t numLocalElements) const {

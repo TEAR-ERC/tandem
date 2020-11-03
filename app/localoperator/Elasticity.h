@@ -37,23 +37,26 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
-    void prepare_volume(std::size_t elNo, LinearAllocator& scratch);
-    void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch);
-    void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch);
-    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch);
+    void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch);
+    void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch);
+    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
 
-    bool assemble_volume(std::size_t elNo, Matrix<double>& A00, LinearAllocator& scratch) const;
+    bool assemble_volume(std::size_t elNo, Matrix<double>& A00,
+                         LinearAllocator<double>& scratch) const;
     bool assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                            Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
-                           LinearAllocator& scratch) const;
+                           LinearAllocator<double>& scratch) const;
     bool assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                           LinearAllocator& scratch) const;
+                           LinearAllocator<double>& scratch) const;
 
-    bool rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const;
+    bool rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator<double>& scratch) const;
     bool rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                      Vector<double>& B1, LinearAllocator& scratch) const;
+                      Vector<double>& B1, LinearAllocator<double>& scratch) const;
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                      LinearAllocator& scratch) const;
+                      LinearAllocator<double>& scratch) const;
 
     TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
@@ -68,7 +71,7 @@ public:
     coefficients_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), 2, numLocalElements);
     }
-    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const;
+    void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator<double>&) const;
 
     void set_force(functional_t<NumQuantities> fun) {
         fun_force = make_volume_functional(std::move(fun));
@@ -153,6 +156,6 @@ private:
     constexpr static double epsilon = -1.0;
 };
 
-} // namespace tndm::tmp
+} // namespace tndm
 
 #endif // ELASTICITY_20200929_H

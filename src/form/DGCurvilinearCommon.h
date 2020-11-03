@@ -32,18 +32,20 @@ public:
     DGCurvilinearCommon(Curvilinear<D> const& cl, unsigned minQuadOrder);
 
     std::size_t scratch_mem_size() const {
-        return std::max(volRule.size(), fctRule.size()) * sizeof(double) * (D * D + 1);
+        return std::max(volRule.size(), fctRule.size()) * (D * D + 1);
     }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
-    void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {
+    void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch) {
         prepare_bndskl(fctNo, info, false, scratch);
     }
-    void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {
+    void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch) {
         prepare_bndskl(fctNo, info, true, scratch);
     }
-    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch);
+    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
     void end_preparation(Scatter& elementScatter);
 
     template <std::size_t Q>
@@ -102,7 +104,7 @@ public:
 
 protected:
     void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
-                        LinearAllocator& scratch);
+                        LinearAllocator<double>& scratch);
 
     Curvilinear<D> const* cl_;
 
