@@ -48,7 +48,7 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
         numElements, materialSpace_.numBasisFunctions());
 }
 
-void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch) {
+void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume_post_skeleton(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
@@ -70,7 +70,7 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& sc
 }
 
 bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
-                              LinearAllocator& scratch) const {
+                              LinearAllocator<double>& scratch) const {
     double Dx_Q[tensor::D_x::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
@@ -93,7 +93,7 @@ bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
 
 bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                 Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
-                                LinearAllocator& scratch) const {
+                                LinearAllocator<double>& scratch) const {
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::e::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::e::Shape[0][1]);
@@ -147,7 +147,7 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
 }
 
 bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                                LinearAllocator& scratch) const {
+                                LinearAllocator<double>& scratch) const {
     if (info.bc == BC::Natural) {
         return false;
     }
@@ -179,7 +179,8 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     return true;
 }
 
-bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const {
+bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B,
+                         LinearAllocator<double>& scratch) const {
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
     double F_Q_raw[tensor::F_Q::size()];
@@ -198,7 +199,7 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& s
 }
 
 bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                           Vector<double>& B1, LinearAllocator& scratch) const {
+                           Vector<double>& B1, LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
@@ -237,7 +238,7 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 }
 
 bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                           LinearAllocator& scratch) const {
+                           LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
@@ -269,7 +270,8 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     return true;
 }
 
-void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const {
+void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,
+                                  LinearAllocator<double>&) const {
     auto const coeff_K = material[elNo].get<K>();
     assert(coeff_K.size() == C.shape(0));
     for (std::size_t i = 0; i < coeff_K.size(); ++i) {
@@ -305,4 +307,4 @@ void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double c
     krnl.execute();
 }
 
-} // namespace tndm::tmp
+} // namespace tndm

@@ -60,7 +60,7 @@ public:
 
     TensorBase<Matrix<double>> traction_info() const;
     void begin_traction() { handle_ = linear_solver_.x().begin_access_readonly(); }
-    void traction(std::size_t faultNo, Matrix<double>& traction, LinearAllocator&) const;
+    void traction(std::size_t faultNo, Matrix<double>& traction, LinearAllocator<double>&) const;
     void end_traction() { linear_solver_.x().end_access_readonly(handle_); }
 
     auto displacement() const { return dgop_->solution(linear_solver_.x()); }

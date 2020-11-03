@@ -153,17 +153,17 @@ TEST_CASE("Root finding") {
 }
 
 TEST_CASE("Allocator") {
-    alignas(32) char test[128];
-    auto allocator = LinearAllocator(test, test + 128);
+    alignas(32) double test[16];
+    auto allocator = LinearAllocator<double>(test, test + 16, 32);
 
-    void* mem = allocator.allocate(32);
-    CHECK(mem == reinterpret_cast<void*>(&test[0]));
+    double* mem = allocator.allocate(4);
+    CHECK(mem == &test[0]);
 
-    double* dmem = allocator.allocate<double>(2);
-    CHECK(reinterpret_cast<void*>(dmem) == reinterpret_cast<void*>(&test[32]));
+    mem = allocator.allocate(2);
+    CHECK(mem == &test[4]);
 
     mem = allocator.allocate(1);
-    CHECK(mem == reinterpret_cast<void*>(&test[48]));
+    CHECK(mem == reinterpret_cast<void*>(&test[8]));
 
     bool except = false;
     try {
@@ -173,10 +173,14 @@ TEST_CASE("Allocator") {
     }
     REQUIRE(except);
 
-    dmem = allocator.allocate<double>(4, 32);
-    CHECK(reinterpret_cast<void*>(dmem) == reinterpret_cast<void*>(&test[64]));
-
     allocator.reset();
-    mem = allocator.allocate(128);
-    CHECK(mem == reinterpret_cast<void*>(&test[0]));
+    mem = allocator.allocate(16);
+    CHECK(mem == &test[0]);
+
+    try {
+        mem = allocator.allocate(1);
+    } catch (std::bad_alloc const&) {
+        except = true;
+    }
+    REQUIRE(except);
 }

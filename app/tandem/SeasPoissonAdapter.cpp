@@ -48,7 +48,7 @@ TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
 }
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
-                                  LinearAllocator&) const {
+                                  LinearAllocator<double>&) const {
     auto const nbf = space_->numBasisFunctions();
 
     double grad_u_raw[poisson::tensor::grad_u::Size];

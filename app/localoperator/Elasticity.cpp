@@ -56,10 +56,10 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
                       numLocalFacets, fctRule.size());
 }
 
-void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {}
-void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator& scratch) {}
+void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
+void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
 
-void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator& scratch) {
+void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     double lam_Q_raw[tensor::lam_Q::size()];
     auto lam_Q = Matrix<double>(lam_Q_raw, 1, volRule.size());
     fun_lam(elNo, lam_Q);
@@ -79,7 +79,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator& scratch) {
     krnl.execute();
 }
 void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
-                                  LinearAllocator& scratch) {
+                                  LinearAllocator<double>& scratch) {
     base::prepare_skeleton(fctNo, info, scratch);
 
     kernel::precomputeSurface krnl;
@@ -98,7 +98,7 @@ void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
     }
 }
 void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
-                                  LinearAllocator& scratch) {
+                                  LinearAllocator<double>& scratch) {
     base::prepare_boundary(fctNo, info, scratch);
 
     kernel::precomputeSurface krnl;
@@ -110,7 +110,7 @@ void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
     krnl.execute(0);
 }
 
-void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator& scratch) {
+void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume_post_skeleton(elNo, scratch);
 
     auto lam_field = material[elNo].get<lam>().data();
@@ -133,7 +133,7 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator&
 }
 
 bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
-                                 LinearAllocator& scratch) const {
+                                 LinearAllocator<double>& scratch) const {
     double Dx_Q[tensor::Dx_Q::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
@@ -159,7 +159,7 @@ bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
 
 bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                    Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
-                                   LinearAllocator& scratch) const {
+                                   LinearAllocator<double>& scratch) const {
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
@@ -213,7 +213,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 }
 
 bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
-                                   LinearAllocator& scratch) const {
+                                   LinearAllocator<double>& scratch) const {
     if (info.bc == BC::Natural) {
         return false;
     }
@@ -251,7 +251,8 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     return true;
 }
 
-bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator& scratch) const {
+bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
+                            LinearAllocator<double>& scratch) const {
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
     double F_Q_raw[tensor::F_Q::size()];
@@ -271,7 +272,7 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator
 }
 
 bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                              Vector<double>& B1, LinearAllocator& scratch) const {
+                              Vector<double>& B1, LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
@@ -314,7 +315,7 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 }
 
 bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                              LinearAllocator& scratch) const {
+                              LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
@@ -352,7 +353,8 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     return true;
 }
 
-void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator&) const {
+void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C,
+                                     LinearAllocator<double>&) const {
     auto const coeff_lam = material[elNo].get<lam>();
     auto const coeff_mu = material[elNo].get<mu>();
     assert(coeff_lam.size() == C.shape(0));

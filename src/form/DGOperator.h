@@ -36,7 +36,7 @@ public:
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)) {
-        scratch_mem_ = std::make_unique<char[]>(lop_->scratch_mem_size());
+        scratch_mem_ = std::make_unique<double[]>(lop_->scratch_mem_size());
 
         auto scratch = make_scratch();
         lop_->begin_preparation(topo_->numElements(), topo_->numLocalElements(),
@@ -79,13 +79,13 @@ public:
     template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {
         auto bs = lop_->block_size();
 
-        auto a_scratch_mem_size = 4 * bs * bs * sizeof(double);
-        auto a_scratch_mem = std::make_unique<char[]>(a_scratch_mem_size);
+        auto a_scratch_mem_size = 4 * bs * bs;
+        auto a_scratch_mem = std::make_unique<double[]>(a_scratch_mem_size);
         auto a_scratch =
-            LinearAllocator(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
+            LinearAllocator<double>(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
 
-        auto scratch_matrix = [&bs](LinearAllocator& scratch) {
-            double* buffer = scratch.allocate<double>(bs * bs);
+        auto scratch_matrix = [&bs](LinearAllocator<double>& scratch) {
+            double* buffer = scratch.allocate(bs * bs);
             return Matrix<double>(buffer, bs, bs);
         };
 
@@ -153,13 +153,13 @@ public:
     template <typename BlockVector> void rhs(BlockVector& vector) {
         auto bs = lop_->block_size();
 
-        auto a_scratch_mem_size = 2 * bs * sizeof(double);
-        auto a_scratch_mem = std::make_unique<char[]>(a_scratch_mem_size);
+        auto a_scratch_mem_size = 2 * bs;
+        auto a_scratch_mem = std::make_unique<double[]>(a_scratch_mem_size);
         auto a_scratch =
-            LinearAllocator(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
+            LinearAllocator<double>(a_scratch_mem.get(), a_scratch_mem.get() + a_scratch_mem_size);
 
-        auto sv = [&bs](LinearAllocator& scratch) {
-            double* buffer = scratch.allocate<double>(bs);
+        auto sv = [&bs](LinearAllocator<double>& scratch) {
+            double* buffer = scratch.allocate(bs);
             return Vector<double>(buffer, bs);
         };
 
@@ -231,11 +231,12 @@ public:
 
 private:
     auto make_scratch() const {
-        return LinearAllocator(scratch_mem_.get(), scratch_mem_.get() + lop_->scratch_mem_size());
+        return LinearAllocator<double>(scratch_mem_.get(),
+                                       scratch_mem_.get() + lop_->scratch_mem_size());
     }
     std::shared_ptr<DGOperatorTopo> topo_;
     std::unique_ptr<LocalOperator> lop_;
-    std::unique_ptr<char[]> scratch_mem_;
+    std::unique_ptr<double[]> scratch_mem_;
 };
 
 } // namespace tndm

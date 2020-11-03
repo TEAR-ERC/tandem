@@ -49,7 +49,7 @@ TensorBase<Matrix<double>> SeasElasticityAdapter::traction_info() const {
 }
 
 void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
-                                     LinearAllocator&) const {
+                                     LinearAllocator<double>&) const {
     auto const nbf = space_->numBasisFunctions();
 
     double traction_q_raw[elasticity::tensor::traction_q::Size];
@@ -66,7 +66,7 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     krnl.traction_q = traction_q_raw;
     krnl.minv = minv.data();
     krnl.traction = &traction(0, 1);
-    //krnl.unit_normal = sign_[faultNo].template get<UnitNormal>().data()->data();
+    // krnl.unit_normal = sign_[faultNo].template get<UnitNormal>().data()->data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
 
