@@ -7,6 +7,7 @@
 
 #include "util/Schema.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -39,8 +40,8 @@ public:
     auto const& lam() const { return lam_; }
     auto const& mu() const { return mu_; }
 
-    auto make_local_operator(Curvilinear<DomainDimension> const& cl) const {
-        auto elasticity = std::make_unique<Elasticity>(cl, lam_, mu_);
+    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl) const {
+        auto elasticity = std::make_unique<Elasticity>(std::move(cl), lam_, mu_);
         set(*elasticity);
         return elasticity;
     }

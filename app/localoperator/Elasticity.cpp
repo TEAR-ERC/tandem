@@ -20,9 +20,9 @@ namespace kernel = tndm::elasticity::kernel;
 
 namespace tndm {
 
-Elasticity::Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> lam,
+Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                        functional_t<1> mu)
-    : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_lam(make_volume_functional(std::move(lam))),
       fun_mu(make_volume_functional(std::move(mu))), fun_force(zero_volume_function),
@@ -31,7 +31,7 @@ Elasticity::Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> l
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        auto points = cl.facetParam(f, fctRule.points());
+        auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));

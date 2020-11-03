@@ -11,13 +11,14 @@
 #include <cassert>
 
 namespace tndm {
-SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
+SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
+                                       std::shared_ptr<DGOperatorTopo> topo,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
                                        std::unique_ptr<Poisson> local_operator,
                                        std::array<double, Dim> const& ref_normal,
                                        double normal_stress)
-    : SeasAdapterBase(topo, std::move(space), local_operator->facetQuadratureRule().points(),
-                      ref_normal),
+    : SeasAdapterBase(std::move(cl), topo, std::move(space),
+                      local_operator->facetQuadratureRule().points(), ref_normal),
       dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
       linear_solver_(*dgop_), normal_stress_(normal_stress) {}
 

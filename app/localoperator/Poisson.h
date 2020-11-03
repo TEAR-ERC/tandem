@@ -32,7 +32,7 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = 1;
 
-    Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K);
+    Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K);
 
     std::size_t block_size() const { return space_.numBasisFunctions(); }
 

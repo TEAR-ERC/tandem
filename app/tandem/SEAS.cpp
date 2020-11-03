@@ -37,16 +37,17 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     auto scenario = SeasScenario<Poisson>(cfg.seas);
     auto friction_scenario = DieterichRuinaAgeingScenario(cfg.friction);
 
-    Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
+    auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
+                                                             PolynomialDegree);
 
-    auto fop = std::make_unique<RateAndState<fault_lop_t>>();
+    auto fop = std::make_unique<RateAndState<fault_lop_t>>(cl);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto spatial_lop = std::make_unique<Poisson>(cl, scenario.mu());
     auto adapter =
-        std::make_unique<SeasPoissonAdapter>(topo, fop->space().clone(), std::move(spatial_lop),
+        std::make_unique<SeasPoissonAdapter>(cl, topo, fop->space().clone(), std::move(spatial_lop),
                                              scenario.ref_normal(), cfg.seas.normal_stress);
 
-    auto seasop = std::make_shared<seas_op_t>(cl, std::move(fop), std::move(adapter));
+    auto seasop = std::make_shared<seas_op_t>(std::move(fop), std::move(adapter));
     seasop->lop().set_constant_params(friction_scenario.constant_params());
     seasop->lop().set_params(friction_scenario.param_fun());
     if (friction_scenario.source_fun()) {
@@ -74,7 +75,7 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
         MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
         auto numeric = seasop->adapter().displacement();
         double error =
-            tndm::Error<DomainDimension>::L2(cl, numeric, *solution, 0, PETSC_COMM_WORLD);
+            tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
             std::cout << "L2 error: " << error << std::endl;
         }

@@ -18,11 +18,11 @@ namespace tndm {
 
 template <std::size_t D, class SeasOperator> class SeasWriter {
 public:
-    SeasWriter(std::string_view baseName, LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
-               std::shared_ptr<SeasOperator> seasop, unsigned degree, double V_ref, double t_min,
-               double t_max)
+    SeasWriter(std::string_view baseName, LocalSimplexMesh<D> const& mesh,
+               std::shared_ptr<Curvilinear<D>> cl, std::shared_ptr<SeasOperator> seasop,
+               unsigned degree, double V_ref, double t_min, double t_max)
         : seasop_(std::move(seasop)), fault_adapter_(mesh, cl, seasop_->faultMap().fctNos()),
-          adapter_(cl, seasop_->adapter().numLocalElements()), degree_(degree),
+          adapter_(std::move(cl), seasop_->adapter().numLocalElements()), degree_(degree),
           fault_base_(baseName), base_(baseName), V_ref_(V_ref), t_min_(t_min), t_max_(t_max) {
         fault_base_ += "-fault";
         MPI_Comm_rank(seasop_->comm(), &rank_);

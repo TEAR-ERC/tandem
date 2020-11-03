@@ -57,7 +57,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
-    Curvilinear<DomainDimension> cl(mesh, scenario.transform(), PolynomialDegree);
+    auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
+                                                             PolynomialDegree);
 
     auto lop = scenario.make_local_operator(cl);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
@@ -83,7 +84,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto solution = scenario.solution();
     if (solution) {
         double error =
-            tndm::Error<DomainDimension>::L2(cl, numeric, *solution, 0, PETSC_COMM_WORLD);
+            tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
             std::cout << "L2 error: " << error << std::endl;
         }

@@ -31,7 +31,8 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
 
-    Elasticity(Curvilinear<DomainDimension> const& cl, functional_t<1> lam, functional_t<1> mu);
+    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
+               functional_t<1> mu);
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
 
