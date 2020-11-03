@@ -48,7 +48,8 @@ protected:
     std::array<double, DomainDimension> ref_normal_;
 
     // Basis
-    std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
+    std::vector<Managed<Tensor<double, 3u>>> geoDxi;
+    Managed<Matrix<double>> e_q;
     Managed<Matrix<double>> e_q_T;
     Managed<Matrix<double>> minv;
 
@@ -59,8 +60,8 @@ protected:
         using type = bool;
     };
 
-    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, UnitNormal, SignFlipped>;
-    mneme::StridedView<fault_t> fault_;
+    using sign_t = mneme::MultiStorage<mneme::DataLayout::SoA, UnitNormal, SignFlipped>;
+    mneme::StridedView<sign_t> sign_;
 };
 
 } // namespace tndm

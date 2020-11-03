@@ -61,7 +61,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     u = [Tensor('u({})'.format(x), (Nbf, dim)) for x in range(2)]
     unew = [Tensor('unew({})'.format(x), (Nbf, dim)) for x in range(2)]
     u_jump = Tensor('u_jump', (dim, nq)) 
-    traction_avg = Tensor('traction_avg', (dim, nq)) 
+    traction_q = Tensor('traction_q', (dim, nq))
     a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
 
     generator.addFamily('precomputeSurface', simpleParameterSpace(2), lambda x: [
@@ -78,7 +78,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
                 (Dx_q[x]['kjq'] * utilde['pq'] * n_q['jq'] + Dx_q[x]['kiq'] * utilde['iq'] * n_q['pq'])
 
     def surface(x):
-        return unew[x]['kp'] <= unew[x]['kp'] + c0[x] * traction_avg['pq'] * E_q[x]['kq'] * w['q'] + \
+        return unew[x]['kp'] <= unew[x]['kp'] + c0[x] * traction_q['pq'] * E_q[x]['kq'] * w['q'] + \
                                 c1[x] * tractionTest(x, u_jump) * w['q'] + \
                                 c2[x] * w['q'] * E_q[x]['kq'] * u_jump['pq'] * nl_q['q']
 
@@ -86,14 +86,14 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         Dx_q[x]['kiq'] <= g[x]['eiq'] * Dxi_q[x]['keq'])
 
     generator.add('surfaceOp', [
-        traction_avg['pq'] <= 0.5 * (traction(0, n_q) + traction(1, n_q)),
+        traction_q['pq'] <= 0.5 * (traction(0, n_q) + traction(1, n_q)),
         u_jump['pq'] <= E_q[0]['lq'] * u[0]['lp'] - E_q[1]['lq'] * u[1]['lp'],
         surface(0),
         surface(1)
     ])
 
     generator.add('surfaceOpBnd', [
-        traction_avg['pq'] <= traction(0, n_q),
+        traction_q['pq'] <= traction(0, n_q),
         u_jump['pq'] <= E_q[0]['lq'] * u[0]['lp'],
         surface(0)
     ])
@@ -124,7 +124,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     # traction
 
     n_unit_q = Tensor('n_unit_q', (dim, nq))
-    generator.add('traction_avg', [
-        traction_avg['pq'] <= 0.5 * (traction(0, n_unit_q) + traction(1, n_unit_q)),
+    generator.add('traction_q', [
+        traction_q['pq'] <= 0.5 * (traction(0, n_unit_q) + traction(1, n_unit_q)),
     ])
 

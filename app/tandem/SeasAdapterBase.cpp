@@ -19,6 +19,7 @@ SeasAdapterBase::SeasAdapterBase(
     : topo_(std::move(topo)), space_(std::move(space)), faultMap_(*topo_, BC::Fault),
       ref_normal_(ref_normal) {
 
+    e_q = space_->evaluateBasisAt(quadPoints);
     e_q_T = space_->evaluateBasisAt(quadPoints, {1, 0});
     minv = space_->inverseMassMatrix();
 }
@@ -26,7 +27,7 @@ SeasAdapterBase::SeasAdapterBase(
 void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces,
                                         Curvilinear<DomainDimension> const& cl) {
     auto nbf = space_->numBasisFunctions();
-    fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
+    sign_.setStorage(std::make_shared<sign_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
 
     auto const space = dynamic_cast<NodalRefElement<DomainDimension - 1u> const*>(space_.get());
     if (space == nullptr) {
@@ -35,7 +36,7 @@ void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces,
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl.facetParam(f, space->refNodes());
-        geoDxi_q.emplace_back(cl.evaluateGradientAt(facetParam));
+        geoDxi.emplace_back(cl.evaluateGradientAt(facetParam));
     }
 }
 
@@ -52,15 +53,15 @@ void SeasAdapterBase::prepare(std::size_t faultNo, Curvilinear<DomainDimension> 
     auto JInv = Tensor(JInv_mem, cl.jacobianResultInfo(nbf));
     auto detJ = Tensor(detJ_mem, cl.detJResultInfo(nbf));
     auto normal =
-        Tensor(fault_[faultNo].template get<UnitNormal>().data()->data(), cl.normalResultInfo(nbf));
-    cl.jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
+        Tensor(sign_[faultNo].template get<UnitNormal>().data()->data(), cl.normalResultInfo(nbf));
+    cl.jacobian(info.up[0], geoDxi[info.localNo[0]], J);
     cl.detJ(info.up[0], J, detJ);
     cl.jacobianInv(J, JInv);
     cl.normal(info.localNo[0], detJ, JInv, normal);
     cl.normalize(normal);
     for (std::size_t i = 0; i < nbf; ++i) {
-        auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
-        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
+        auto& sign_flipped = sign_[faultNo].template get<SignFlipped>()[i];
+        auto& normal_i = sign_[faultNo].template get<UnitNormal>()[i];
         sign_flipped = dot(ref_normal_, normal_i) < 0;
         if (sign_flipped) {
             normal_i = -1.0 * normal_i;

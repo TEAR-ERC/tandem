@@ -28,7 +28,7 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
     assert(poisson_adapter::tensor::slip::Size == nbf);
 
     for (std::size_t i = 0; i < nbf; ++i) {
-        if (!fault_[faultNo].template get<SignFlipped>()[i]) {
+        if (!sign_[faultNo].template get<SignFlipped>()[i]) {
             slip_flip[i] = -state(i);
         } else {
             slip_flip[i] = state(i);
@@ -65,7 +65,7 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     krnl.grad_u = grad_u_raw;
     krnl.minv = minv.data();
     krnl.traction = &traction(0, 1);
-    krnl.unit_normal = fault_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.unit_normal = sign_[faultNo].template get<UnitNormal>().data()->data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
 
