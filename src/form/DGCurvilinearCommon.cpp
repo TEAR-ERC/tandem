@@ -10,8 +10,9 @@
 namespace tndm {
 
 template <std::size_t D>
-DGCurvilinearCommon<D>::DGCurvilinearCommon(Curvilinear<D> const& cl, unsigned minQuadOrder)
-    : cl_(&cl) {
+DGCurvilinearCommon<D>::DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl,
+                                            unsigned minQuadOrder)
+    : cl_(std::move(cl)) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -19,8 +20,8 @@ DGCurvilinearCommon<D>::DGCurvilinearCommon(Curvilinear<D> const& cl, unsigned m
     geoDxi_Q = cl_->evaluateGradientAt(volRule.points());
     for (std::size_t f = 0; f < D + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, fctRule.points());
-        geoE_q.emplace_back(cl.evaluateBasisAt(facetParam));
-        geoDxi_q.emplace_back(cl.evaluateGradientAt(facetParam));
+        geoE_q.emplace_back(cl_->evaluateBasisAt(facetParam));
+        geoDxi_q.emplace_back(cl_->evaluateGradientAt(facetParam));
     }
 }
 

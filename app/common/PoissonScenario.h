@@ -7,6 +7,7 @@
 
 #include "util/Schema.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -33,8 +34,8 @@ public:
 
     auto const& coefficient() const { return coefficient_; }
 
-    auto make_local_operator(Curvilinear<DomainDimension> const& cl) const {
-        auto poisson = std::make_unique<Poisson>(cl, coefficient_);
+    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl) const {
+        auto poisson = std::make_unique<Poisson>(std::move(cl), coefficient_);
         set(*poisson);
         return poisson;
     }

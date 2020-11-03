@@ -6,6 +6,7 @@
 #include "util/Range.h"
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 namespace tndm {
@@ -22,8 +23,8 @@ public:
 
 template <std::size_t D> class CurvilinearVTUAdapter : public VTUAdapter<D> {
 public:
-    CurvilinearVTUAdapter(Curvilinear<D> const& cl, Range<std::size_t> elementRange)
-        : cl_(&cl), range_(std::move(elementRange)) {
+    CurvilinearVTUAdapter(std::shared_ptr<Curvilinear<D>> cl, Range<std::size_t> elementRange)
+        : cl_(std::move(cl)), range_(std::move(elementRange)) {
         assert(range_.from <= cl_->numElements() && range_.to <= cl_->numElements());
     }
 
@@ -37,16 +38,17 @@ public:
     }
 
 private:
-    Curvilinear<D> const* cl_;
+    std::shared_ptr<Curvilinear<D>> cl_;
     Range<std::size_t> range_;
     Managed<Matrix<double>> E_;
 };
 
 template <std::size_t D> class CurvilinearBoundaryVTUAdapter : public VTUAdapter<D - 1u> {
 public:
-    CurvilinearBoundaryVTUAdapter(LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
+    CurvilinearBoundaryVTUAdapter(LocalSimplexMesh<D> const& mesh,
+                                  std::shared_ptr<Curvilinear<D>> cl,
                                   std::vector<std::size_t> const& fctNos)
-        : cl_(&cl) {
+        : cl_(std::move(cl)) {
         bnds_.reserve(fctNos.size());
         for (auto const& fctNo : fctNos) {
             auto elNos = mesh.template upward<D - 1u>(fctNo);
@@ -75,7 +77,7 @@ public:
     }
 
 private:
-    Curvilinear<D> const* cl_;
+    std::shared_ptr<Curvilinear<D>> cl_;
     std::vector<std::pair<std::size_t, int>> bnds_;
     std::vector<Managed<Matrix<double>>> E_;
 };

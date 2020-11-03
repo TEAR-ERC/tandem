@@ -17,6 +17,7 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <vector>
 
 namespace tndm {
@@ -29,7 +30,7 @@ public:
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
 
-    DGCurvilinearCommon(Curvilinear<D> const& cl, unsigned minQuadOrder);
+    DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
 
     std::size_t scratch_mem_size() const {
         return std::max(volRule.size(), fctRule.size()) * (D * D + 1);
@@ -106,7 +107,7 @@ protected:
     void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
                         LinearAllocator<double>& scratch);
 
-    Curvilinear<D> const* cl_;
+    std::shared_ptr<Curvilinear<D>> cl_;
 
     // Rules
     SimplexQuadratureRule<D - 1u> fctRule;

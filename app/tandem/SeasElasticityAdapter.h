@@ -3,6 +3,7 @@
 
 #include "common/PetscBlockVector.h"
 #include "common/PetscLinearSolver.h"
+#include "geometry/Curvilinear.h"
 #include "localoperator/Elasticity.h"
 #include "tandem/SeasAdapterBase.h"
 
@@ -30,10 +31,11 @@ public:
     using time_functional_t =
         std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
 
-    SeasElasticityAdapter(std::shared_ptr<DGOperatorTopo> topo,
+    SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
+                          std::shared_ptr<DGOperatorTopo> topo,
                           std::unique_ptr<RefElement<Dim - 1u>> space,
                           std::unique_ptr<Elasticity> local_operator,
-                          std::array<double, Dim> const& ref_normal, double normal_stress);
+                          std::array<double, Dim> const& ref_normal);
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
@@ -71,7 +73,6 @@ private:
 
     std::unique_ptr<DGOperator<Elasticity>> dgop_;
     PetscLinearSolver linear_solver_;
-    double normal_stress_;
 
     time_functional_t fun_boundary =
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {

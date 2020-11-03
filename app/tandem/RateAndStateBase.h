@@ -26,14 +26,13 @@ public:
     constexpr static std::size_t NumQuantities = 2;
     constexpr static std::size_t NumInternalQuantities = 4;
 
-    RateAndStateBase();
+    RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl);
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
     std::size_t scratch_mem_size() const { return 1; }
 
-    void begin_preparation(std::size_t numFaultFaces, Curvilinear<DomainDimension> const& cl);
-    void prepare(std::size_t faultNo, Curvilinear<DomainDimension> const& cl, FacetInfo const& info,
-                 LinearAllocator<double>&);
+    void begin_preparation(std::size_t numFaultFaces);
+    void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator<double>&);
     void end_preparation() {}
 
     auto state_prototype(std::size_t numLocalElements) const {
@@ -44,6 +43,8 @@ public:
     auto const& space() const { return space_; }
 
 protected:
+    std::shared_ptr<Curvilinear<DomainDimension>> cl_;
+
     // Basis
     NodalRefElement<DomainDimension - 1u> space_;
     std::vector<Managed<Matrix<double>>> geoE_q;

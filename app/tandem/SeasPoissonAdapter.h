@@ -3,6 +3,7 @@
 
 #include "common/PetscBlockVector.h"
 #include "common/PetscLinearSolver.h"
+#include "geometry/Curvilinear.h"
 #include "localoperator/Poisson.h"
 #include "tandem/SeasAdapterBase.h"
 
@@ -30,7 +31,7 @@ public:
     using time_functional_t =
         std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
 
-    SeasPoissonAdapter(std::shared_ptr<DGOperatorTopo> topo,
+    SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl, std::shared_ptr<DGOperatorTopo> topo,
                        std::unique_ptr<RefElement<Dim - 1u>> space,
                        std::unique_ptr<Poisson> local_operator,
                        std::array<double, Dim> const& ref_normal, double normal_stress);

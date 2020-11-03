@@ -22,7 +22,7 @@ public:
     constexpr static std::size_t NumQuantities = SeasAdapter::NumQuantities;
     using time_functional_t = typename SeasAdapter::time_functional_t;
 
-    SeasOperator(Curvilinear<Dim> const& cl, std::unique_ptr<LocalOperator> localOperator,
+    SeasOperator(std::unique_ptr<LocalOperator> localOperator,
                  std::unique_ptr<SeasAdapter> seas_adapter)
         : lop_(std::move(localOperator)), adapter_(std::move(seas_adapter)) {
         scratch_size_ = lop_->scratch_mem_size();
@@ -30,16 +30,16 @@ public:
         scratch_mem_ = std::make_unique<double[]>(scratch_size_);
 
         auto scratch = make_scratch();
-        adapter_->begin_preparation(numLocalElements(), cl);
+        adapter_->begin_preparation(numLocalElements());
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
-            adapter_->prepare(faultNo, cl, scratch);
+            adapter_->prepare(faultNo, scratch);
         }
         adapter_->end_preparation();
 
-        lop_->begin_preparation(numLocalElements(), cl);
+        lop_->begin_preparation(numLocalElements());
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             auto fctNo = adapter_->faultMap().fctNo(faultNo);
-            lop_->prepare(faultNo, cl, adapter_->topo().info(fctNo), scratch);
+            lop_->prepare(faultNo, adapter_->topo().info(fctNo), scratch);
         }
         lop_->end_preparation();
     }

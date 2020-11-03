@@ -1,5 +1,6 @@
 #include "SeasElasticityAdapter.h"
 
+#include "geometry/Curvilinear.h"
 #include "kernels/elasticity/tensor.h"
 #include "kernels/elasticity_adapter/kernel.h"
 #include "kernels/elasticity_adapter/tensor.h"
@@ -12,15 +13,15 @@
 #include <cassert>
 
 namespace tndm {
-SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<DGOperatorTopo> topo,
+SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
+                                             std::shared_ptr<DGOperatorTopo> topo,
                                              std::unique_ptr<RefElement<Dim - 1u>> space,
                                              std::unique_ptr<Elasticity> local_operator,
-                                             std::array<double, Dim> const& ref_normal,
-                                             double normal_stress)
-    : SeasAdapterBase(topo, std::move(space), local_operator->facetQuadratureRule().points(),
-                      ref_normal),
+                                             std::array<double, Dim> const& ref_normal)
+    : SeasAdapterBase(std::move(cl), topo, std::move(space),
+                      local_operator->facetQuadratureRule().points(), ref_normal),
       dgop_(std::make_unique<DGOperator<Elasticity>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_), normal_stress_(normal_stress) {}
+      linear_solver_(*dgop_) {}
 
 void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                                  Matrix<double>& slip_q) const {
@@ -69,10 +70,6 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     // krnl.unit_normal = sign_[faultNo].template get<UnitNormal>().data()->data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
-
-    for (std::size_t i = 0; i < nbf; ++i) {
-        traction(i, 0) = normal_stress_;
-    }
 }
 
 } // namespace tndm

@@ -20,8 +20,8 @@ namespace kernel = tndm::poisson::kernel;
 
 namespace tndm {
 
-Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
-    : DGCurvilinearCommon<DomainDimension>(cl, MinQuadOrder()), space_(PolynomialDegree),
+Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K)
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
@@ -29,7 +29,7 @@ Poisson::Poisson(Curvilinear<DomainDimension> const& cl, functional_t<1> K)
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        auto points = cl.facetParam(f, fctRule.points());
+        auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
