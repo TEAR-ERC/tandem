@@ -365,13 +365,12 @@ void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C, Linear
 }
 
 TensorBase<Matrix<double>> Elasticity::tractionResultInfo() const {
-    return TensorBase<Matrix<double>>(tensor::traction_avg::Shape[0],
-                                      tensor::traction_avg::Shape[1]);
+    return TensorBase<Matrix<double>>(tensor::traction_q::Shape[0], tensor::traction_q::Shape[1]);
 }
 
 void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
                           Vector<double const>& u1, Matrix<double>& result) const {
-    assert(result.size() == tensor::traction_avg::size());
+    assert(result.size() == tensor::traction_q::size());
     assert(u0.size() == tensor::u::size(0));
     assert(u1.size() == tensor::u::size(1));
 
@@ -388,7 +387,7 @@ void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<doubl
         dxKrnl.execute(side);
     }
 
-    kernel::traction_avg krnl;
+    kernel::traction_q krnl;
     krnl.Dx_q(0) = Dx_q0;
     krnl.Dx_q(1) = Dx_q1;
     krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
@@ -396,10 +395,10 @@ void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<doubl
     krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
     krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
     krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
-    krnl.traction_avg = result.data();
+    krnl.traction_q = result.data();
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
     krnl.execute();
 }
 
-} // namespace tndm::tmp
+} // namespace tndm

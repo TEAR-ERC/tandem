@@ -14,6 +14,7 @@ from yateto.gemm_configuration import GeneratorCollection, Eigen
 import poisson
 import elasticity
 import poisson_adapter
+import elasticity_adapter
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -45,6 +46,11 @@ elif cmdLineArgs.app == 'elasticity':
             options['numElementQuadPoints'])
 elif cmdLineArgs.app == 'poisson_adapter':
     poisson_adapter.add(g,
+            options['dim'],
+            options['numFaultBasisFunctions'],
+            options['numFacetQuadPoints'])
+elif cmdLineArgs.app == 'elasticity_adapter':
+    elasticity_adapter.add(g,
             options['dim'],
             options['numFaultBasisFunctions'],
             options['numFacetQuadPoints'])
