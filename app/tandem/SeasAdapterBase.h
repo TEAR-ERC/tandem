@@ -14,6 +14,7 @@
 #include "mneme/storage.hpp"
 #include "mneme/view.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <memory>
@@ -30,7 +31,7 @@ public:
                     std::array<double, DomainDimension> const& ref_normal);
 
     std::size_t scratch_mem_size() const {
-        return space_->numBasisFunctions() * (2 * DomainDimension * DomainDimension + 1);
+        return nq_ * (2 * DomainDimension * DomainDimension + DomainDimension + 1);
     }
 
     void begin_preparation(std::size_t numFaultFaces);
@@ -46,23 +47,27 @@ protected:
     std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
     BoundaryMap faultMap_;
     std::array<double, DomainDimension> ref_normal_;
+    std::size_t nq_;
 
     // Basis
-    std::vector<Managed<Tensor<double, 3u>>> geoDxi;
     std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
     Managed<Matrix<double>> e_q;
     Managed<Matrix<double>> e_q_T;
     Managed<Matrix<double>> minv;
 
-    struct UnitNormal {
-        using type = std::array<double, DomainDimension>;
-    };
     struct SignFlipped {
         using type = bool;
     };
+    struct UnitNormal {
+        using type = std::array<double, DomainDimension>;
+    };
+    struct FaultBasis {
+        using type = std::array<double, DomainDimension * DomainDimension>;
+    };
 
-    using sign_t = mneme::MultiStorage<mneme::DataLayout::SoA, UnitNormal, SignFlipped>;
-    mneme::StridedView<sign_t> sign_;
+    using fault_t =
+        mneme::MultiStorage<mneme::DataLayout::SoA, SignFlipped, UnitNormal, FaultBasis>;
+    mneme::StridedView<fault_t> fault_;
 };
 
 } // namespace tndm

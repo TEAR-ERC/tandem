@@ -18,9 +18,10 @@
 
 namespace tndm {
 
+enum class SeasType { Unknown = 0, Poisson = 1, Elasticity = 2 };
+
 struct SeasScenarioConfig {
-    enum class Type { Unknown = 0, Poisson = 1, Elasticity = 2 };
-    Type type;
+    SeasType type;
     std::string lib;
     std::optional<std::string> warp;
     std::optional<std::string> mu;
@@ -35,23 +36,24 @@ struct SeasScenarioConfig {
         schema.add_value("type", &SeasScenarioConfig::type)
             .converter([](std::string_view value) {
                 if (iEquals(value, "poisson")) {
-                    return Type::Poisson;
+                    return SeasType::Poisson;
                 } else if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
-                    return Type::Elasticity;
+                    return SeasType::Elasticity;
                 } else {
-                    return Type::Unknown;
+                    return SeasType::Unknown;
                 }
             })
-            .validator([](Type const& type) { return type != Type::Unknown; });
+            .validator([](SeasType const& type) { return type != SeasType::Unknown; });
         schema.add_value("lib", &SeasScenarioConfig::lib)
             .converter(path_converter)
             .validator(PathExists());
         schema.add_value("warp", &SeasScenarioConfig::warp);
         schema.add_value("mu", &SeasScenarioConfig::mu);
+        schema.add_value("lam", &SeasScenarioConfig::lam);
         schema.add_value("boundary", &SeasScenarioConfig::boundary);
         schema.add_value("solution", &SeasScenarioConfig::solution);
         schema.add_array("ref_normal", &SeasScenarioConfig::ref_normal).of_values();
-        schema.add_value("normal_stress", &SeasScenarioConfig::normal_stress);
+        schema.add_value("normal_stress", &SeasScenarioConfig::normal_stress).default_value(50.0);
     }
 };
 
@@ -93,6 +95,9 @@ public:
         if (problem.mu) {
             mu_ = lib_.getFunction<DomainDimension, 1>(*problem.mu);
         }
+        if (problem.lam) {
+            lam_ = lib_.getFunction<DomainDimension, 1>(*problem.lam);
+        }
 
         auto time_functional = [](LuaLib& lib, std::optional<std::string> const& opt,
                                   std::optional<time_functional_t>& target) {
@@ -111,6 +116,7 @@ public:
 
     auto const& transform() const { return warp_; }
     auto const& mu() const { return mu_; }
+    auto const& lam() const { return lam_; }
     auto const& boundary() const { return boundary_; }
     auto const& ref_normal() const { return ref_normal_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
@@ -128,6 +134,9 @@ protected:
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
         return {1.0};
+    };
+    functional_t lam_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
+        return {0.0};
     };
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;

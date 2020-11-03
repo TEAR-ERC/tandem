@@ -19,7 +19,7 @@ SeasAdapterBase::SeasAdapterBase(
     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
     std::array<double, DomainDimension> const& ref_normal)
     : cl_(std::move(cl)), topo_(std::move(topo)), space_(std::move(space)),
-      faultMap_(*topo_, BC::Fault), ref_normal_(ref_normal) {
+      faultMap_(*topo_, BC::Fault), ref_normal_(ref_normal), nq_(quadPoints.size()) {
 
     e_q = space_->evaluateBasisAt(quadPoints);
     e_q_T = space_->evaluateBasisAt(quadPoints, {1, 0});
@@ -29,47 +29,37 @@ SeasAdapterBase::SeasAdapterBase(
         auto facetParam = cl_->facetParam(f, quadPoints);
         geoDxi_q.emplace_back(cl_->evaluateGradientAt(facetParam));
     }
-
-    auto const nodal_space =
-        dynamic_cast<NodalRefElement<DomainDimension - 1u> const*>(space_.get());
-    if (space == nullptr) {
-        throw std::runtime_error("Nodal basis required for SeasAdapter.");
-    }
-
-    for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        auto facetParam = cl_->facetParam(f, nodal_space->refNodes());
-        geoDxi.emplace_back(cl_->evaluateGradientAt(facetParam));
-    }
 }
 
 void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces) {
-    auto nbf = space_->numBasisFunctions();
-    sign_.setStorage(std::make_shared<sign_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
+    fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nq_), 0u, numFaultFaces, nq_);
 }
 
 void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scratch) {
-    auto const nbf = space_->numBasisFunctions();
     auto const fctNo = faultMap_.fctNo(faultNo);
     auto const& info = topo_->info(fctNo);
 
-    auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nbf));
-    auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nbf));
-    auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nbf));
-    auto normal = Tensor(sign_[faultNo].template get<UnitNormal>().data()->data(),
-                         cl_->normalResultInfo(nbf));
-    cl_->jacobian(info.up[0], geoDxi[info.localNo[0]], J);
+    auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq_));
+    auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq_));
+    auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nq_));
+    auto normal = Tensor(fault_[faultNo].template get<UnitNormal>().data()->data(),
+                         cl_->normalResultInfo(nq_));
+    auto fault_basis_q = Tensor(fault_[faultNo].template get<FaultBasis>().data()->data(),
+                                cl_->facetBasisResultInfo(nq_));
+    cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, JInv);
     cl_->normal(info.localNo[0], detJ, JInv, normal);
     cl_->normalize(normal);
-    for (std::size_t i = 0; i < nbf; ++i) {
-        auto& sign_flipped = sign_[faultNo].template get<SignFlipped>()[i];
-        auto& normal_i = sign_[faultNo].template get<UnitNormal>()[i];
+    for (std::size_t i = 0; i < nq_; ++i) {
+        auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
+        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
         sign_flipped = dot(ref_normal_, normal_i) < 0;
         if (sign_flipped) {
             normal_i = -1.0 * normal_i;
         }
     }
+    cl_->facetBasis(info.localNo[0], J, normal, fault_basis_q);
     scratch.reset();
 }
 

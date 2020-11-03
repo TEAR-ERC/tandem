@@ -11,7 +11,7 @@ def add(generator, dim, nbf_fault, nq):
     generator.add('evaluate_slip', slip_q['q'] <= e_q_T['qp'] * slip['p'])
 
     grad_u = Tensor('grad_u', (dim, nq))
-    unit_normal = Tensor('unit_normal', (dim, nbf_fault))
+    n_unit_q = Tensor('n_unit_q', (dim, nq))
     traction = Tensor('traction', (nbf_fault,))
     generator.add('evaluate_traction', traction['p'] <= minv['rp'] * e_q_T['qr'] * w['q'] * \
-                                                        grad_u['kq'] * unit_normal['kp'])
+                                                        grad_u['kq'] * n_unit_q['kq'])

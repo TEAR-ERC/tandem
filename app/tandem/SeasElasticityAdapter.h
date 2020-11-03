@@ -26,15 +26,16 @@ namespace tndm {
 
 class SeasElasticityAdapter : public SeasAdapterBase {
 public:
-    constexpr static std::size_t Dim = Elasticity::Dim;
-    constexpr static std::size_t NumQuantities = Elasticity::NumQuantities;
+    using local_operator_t = Elasticity;
+    constexpr static std::size_t Dim = local_operator_t::Dim;
+    constexpr static std::size_t NumQuantities = local_operator_t::NumQuantities;
     using time_functional_t =
         std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
 
     SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
                           std::shared_ptr<DGOperatorTopo> topo,
                           std::unique_ptr<RefElement<Dim - 1u>> space,
-                          std::unique_ptr<Elasticity> local_operator,
+                          std::unique_ptr<local_operator_t> local_operator,
                           std::array<double, Dim> const& ref_normal);
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
@@ -71,7 +72,7 @@ public:
 private:
     void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& s_q) const;
 
-    std::unique_ptr<DGOperator<Elasticity>> dgop_;
+    std::unique_ptr<DGOperator<local_operator_t>> dgop_;
     PetscLinearSolver linear_solver_;
 
     time_functional_t fun_boundary =
