@@ -11,7 +11,6 @@ b = 0.02
 V0 = 1.0e-6
 L = 0.2
 f0 = 0.6
-sn = 50
 
 function mu(x, y)
     return 24
@@ -19,6 +18,10 @@ end
 
 function eta(x, y)
     return math.sqrt(mu(x, y) * rho) / 2.0
+end
+
+function sn_pre(s, y)
+    return 50.0
 end
 
 function a(x, y)
@@ -33,13 +36,14 @@ end
 function psi_star(x, y, t)
     local axy = a(x, y)
     local Vs = V_star(x, y, t)
-    local s = sinh((tau_star(x, y, t) - eta(x, y) * Vs) / (axy * sn))
+    local s = sinh((tau_star(x, y, t) - eta(x, y) * Vs) / (axy * sn_pre(x, y)))
     return axy * math.log(2.0 * s * V0 / Vs)
 end
 
 function dpsi_stardt(x, y, t)
     local axy = a(x, y)
     local e = eta(x, y)
+    local sn = sn_pre(x, y)
     local Vs = V_star(x, y, t)
     local dVsdt = dV_stardt(x, y, t)
     local dtsdt = dtau_stardt(x, y, t)

@@ -24,7 +24,7 @@ namespace tndm {
 class RateAndStateBase {
 public:
     constexpr static std::size_t NumQuantities = 2;
-    constexpr static std::size_t NumInternalQuantities = 4;
+    constexpr static std::size_t NumInternalQuantities = 5;
 
     RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl);
 

@@ -20,6 +20,7 @@ struct DieterichRuinaAgeingConfig {
     std::string lib;
     std::string a;
     std::string eta;
+    std::optional<std::string> sn_pre;
     std::optional<std::string> tau_pre;
     std::string Vinit;
     std::optional<std::string> Sinit;
@@ -34,6 +35,7 @@ struct DieterichRuinaAgeingConfig {
             .validator(PathExists());
         schema.add_value("a", &DieterichRuinaAgeingConfig::a);
         schema.add_value("eta", &DieterichRuinaAgeingConfig::eta);
+        schema.add_value("sn_pre", &DieterichRuinaAgeingConfig::sn_pre);
         schema.add_value("tau_pre", &DieterichRuinaAgeingConfig::tau_pre);
         schema.add_value("Vinit", &DieterichRuinaAgeingConfig::Vinit);
         schema.add_value("Sinit", &DieterichRuinaAgeingConfig::Sinit);
@@ -56,6 +58,9 @@ public:
 
         a_ = lib_.getFunction<DomainDimension, 1>(cfg.a);
         eta_ = lib_.getFunction<DomainDimension, 1>(cfg.eta);
+        if (cfg.sn_pre) {
+            sn_pre_ = lib_.getFunction<DomainDimension, 1>(*cfg.sn_pre);
+        }
         if (cfg.tau_pre) {
             tau_pre_ = lib_.getFunction<DomainDimension, 1>(*cfg.tau_pre);
         }
@@ -74,6 +79,7 @@ public:
             DieterichRuinaAgeing::Params p;
             p.a = this->a_(x)[0];
             p.eta = this->eta_(x)[0];
+            p.sn_pre = this->sn_pre_(x)[0];
             p.tau_pre = this->tau_pre_(x)[0];
             p.Vinit = this->Vinit_(x)[0];
             p.Sinit = this->Sinit_(x)[0];
@@ -86,6 +92,8 @@ protected:
     DieterichRuinaAgeing::ConstantParams cp_;
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_;
+    functional_t<DomainDimension> sn_pre_ =
+        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     functional_t<DomainDimension> tau_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     functional_t<DomainDimension> Vinit_;

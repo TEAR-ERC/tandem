@@ -35,7 +35,7 @@ public:
     SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl, std::shared_ptr<DGOperatorTopo> topo,
                        std::unique_ptr<RefElement<Dim - 1u>> space,
                        std::unique_ptr<local_operator_t> local_operator,
-                       std::array<double, Dim> const& ref_normal, double normal_stress);
+                       std::array<double, Dim> const& ref_normal);
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
@@ -73,7 +73,6 @@ private:
 
     std::unique_ptr<DGOperator<local_operator_t>> dgop_;
     PetscLinearSolver linear_solver_;
-    double normal_stress_;
 
     time_functional_t fun_boundary =
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {

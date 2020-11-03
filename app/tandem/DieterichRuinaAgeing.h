@@ -21,6 +21,7 @@ public:
     struct Params {
         double a;
         double eta;
+        double sn_pre;
         double tau_pre;
         double Vinit;
         double Sinit;
@@ -31,21 +32,24 @@ public:
     void set_params(std::size_t index, Params const& params) {
         p_[index].get<A>() = params.a;
         p_[index].get<Eta>() = params.eta;
+        p_[index].get<SnPre>() = params.sn_pre;
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
     }
 
     double psi_init(std::size_t index, double sn, double tau) const {
+        double snAbs = sn + p_[index].get<SnPre>();
         auto tauAbs = tau + p_[index].get<TauPre>();
         auto Vi = p_[index].get<Vinit>();
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
-        double s = sinh((tauAbs - eta * Vi) / (a * sn));
+        double s = sinh((tauAbs - eta * Vi) / (a * snAbs));
         double l = log((2.0 * cp_.V0 / Vi) * s);
         return a * l;
     }
 
+    double sn_pre(std::size_t index) const { return p_[index].get<SnPre>(); }
     double tau_pre(std::size_t index) const { return p_[index].get<TauPre>(); }
     double S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
@@ -69,16 +73,20 @@ public:
 
 private:
     double F(std::size_t index, double sn, double tau, double V, double psi) const {
+        double snAbs = sn + p_[index].get<SnPre>();
         double tauAbs = tau + p_[index].get<TauPre>();
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
         double e = exp(psi / a);
         double f = a * asinh((V / (2.0 * cp_.V0)) * e);
-        return tauAbs - sn * f - eta * V;
+        return tauAbs - snAbs * f - eta * V;
     }
 
     ConstantParams cp_;
 
+    struct SnPre {
+        using type = double;
+    };
     struct TauPre {
         using type = double;
     };
@@ -94,7 +102,7 @@ private:
     struct Sinit {
         using type = double;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, TauPre, A, Eta, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, Vinit, Sinit> p_;
 };
 
 } // namespace tndm
