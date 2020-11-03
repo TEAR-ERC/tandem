@@ -1,5 +1,6 @@
 #include "SeasElasticityAdapter.h"
 
+#include "config.h"
 #include "geometry/Curvilinear.h"
 #include "kernels/elasticity/tensor.h"
 #include "kernels/elasticity_adapter/kernel.h"
@@ -25,33 +26,34 @@ SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> c
 
 void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                                  Matrix<double>& slip_q) const {
-    auto const nbf = space_->numBasisFunctions();
-    double slip_flip[elasticity_adapter::tensor::slip::Size];
-    assert(elasticity_adapter::tensor::slip::Size == nbf);
-
-    for (std::size_t i = 0; i < nbf; ++i) {
-        if (!sign_[faultNo].template get<SignFlipped>()[i]) {
-            slip_flip[i] = -state(i);
-        } else {
-            slip_flip[i] = state(i);
-        }
-    }
-    assert(slip_q.shape(0) == 1);
-    assert(slip_q.shape(1) == elasticity_adapter::tensor::slip_q::size());
+    assert(slip_q.shape(0) == DomainDimension);
+    assert(slip_q.shape(1) == elasticity_adapter::tensor::slip_q::Shape[1]);
     elasticity_adapter::kernel::evaluate_slip krnl;
     krnl.e_q = e_q.data();
-    krnl.slip = slip_flip;
+    krnl.fault_basis_q = fault_[faultNo].template get<FaultBasis>().data()->data();
+    krnl.slip = state.data();
     krnl.slip_q = slip_q.data();
     krnl.execute();
+
+    for (std::size_t i = 0; i < nq_; ++i) {
+        if (!fault_[faultNo].template get<SignFlipped>()[i]) {
+            for (std::size_t d = 0; d < DomainDimension; ++d) {
+                slip_q(d, i) = -slip_q(d, i);
+            }
+        }
+    }
 }
 
 TensorBase<Matrix<double>> SeasElasticityAdapter::traction_info() const {
-    return TensorBase<Matrix<double>>(elasticity_adapter::tensor::traction::Shape[0], 2);
+    return TensorBase<Matrix<double>>(elasticity_adapter::tensor::traction::Shape[0],
+                                      elasticity_adapter::tensor::traction::Shape[1]);
 }
 
 void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
                                      LinearAllocator<double>&) const {
     auto const nbf = space_->numBasisFunctions();
+    assert(traction.shape(0) == nbf);
+    assert(traction.shape(1) == DomainDimension);
 
     double traction_q_raw[elasticity::tensor::traction_q::Size];
     auto traction_q = Matrix<double>(traction_q_raw, dgop_->lop().tractionResultInfo());
@@ -64,10 +66,10 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     dgop_->lop().traction(fctNo, info, u0, u1, traction_q);
     elasticity_adapter::kernel::evaluate_traction krnl;
     krnl.e_q_T = e_q_T.data();
+    krnl.fault_basis_q = fault_[faultNo].template get<FaultBasis>().data()->data();
     krnl.traction_q = traction_q_raw;
     krnl.minv = minv.data();
-    krnl.traction = &traction(0, 1);
-    // krnl.unit_normal = sign_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.traction = traction.data();
     krnl.w = dgop_->lop().facetQuadratureRule().weights().data();
     krnl.execute();
 }

@@ -7,6 +7,7 @@ lib = "bp1_sym.lua"
 boundary = "boundary"
 mu = "mu"
 ref_normal = [1, 0]
+normal_stress = 50
 
 [friction]
 lib = "bp1_sym.lua"
@@ -19,7 +20,6 @@ Vinit = "Vinit"
     V0 = 1.0e-6
     L = 0.008
     f0 = 0.6
-    sn = 50
 
 [output]
-prefix = "seas"
+prefix = "bp1"
