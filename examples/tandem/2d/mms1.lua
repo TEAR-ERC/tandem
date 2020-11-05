@@ -36,7 +36,7 @@ end
 function psi_star(x, y, t)
     local axy = a(x, y)
     local Vs = V_star(x, y, t)
-    local s = sinh((tau_star(x, y, t) - eta(x, y) * Vs) / (axy * sn_pre(x, y)))
+    local s = math.sinh((tau_star(x, y, t) - eta(x, y) * Vs) / (axy * sn_pre(x, y)))
     return axy * math.log(2.0 * s * V0 / Vs)
 end
 
@@ -47,7 +47,7 @@ function dpsi_stardt(x, y, t)
     local Vs = V_star(x, y, t)
     local dVsdt = dV_stardt(x, y, t)
     local dtsdt = dtau_stardt(x, y, t)
-    local th = tanh((e * Vs - tau_star(x, y, t)) / (axy * sn))
+    local th = math.tanh((e * Vs - tau_star(x, y, t)) / (axy * sn))
     return - (axy * sn * dVsdt + (Vs * dtsdt - e * Vs * dVsdt) / th) / (sn * Vs)
 end
 
@@ -91,18 +91,6 @@ end
 
 function dphidx(x, y)
     return H * (y^2 - (H + x)^2) / ((H + x)^2 + y^2)^2
-end
-
-function sinh(x)
-    return 0.5 * (math.exp(x) - math.exp(-x))
-end
-
-function cosh(x)
-    return 0.5 * (math.exp(x) + math.exp(-x))
-end
-
-function tanh(x)
-    return sinh(x) / cosh(x)
 end
 
 function Vinit(x, y)
