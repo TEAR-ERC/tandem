@@ -17,9 +17,10 @@ SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
                                        std::shared_ptr<DGOperatorTopo> topo,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
                                        std::unique_ptr<Poisson> local_operator,
+                                       std::array<double, Dim> const& up,
                                        std::array<double, Dim> const& ref_normal)
     : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                      local_operator->facetQuadratureRule().points(), ref_normal),
+                      local_operator->facetQuadratureRule().points(), up, ref_normal),
       dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
       linear_solver_(*dgop_) {}
 
@@ -33,6 +34,9 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
     krnl.slip_q = slip_q.data();
     krnl.execute();
 
+    /* Slip in the Poisson solver is defined as [[u]] := u^- - u^+.
+     * In the friction solver the sign of slip S is flipped, that is, S = -[[u]].
+     */
     for (std::size_t i = 0; i < nq_; ++i) {
         if (!fault_[faultNo].template get<SignFlipped>()[i]) {
             slip_q(0, i) = -slip_q(0, i);

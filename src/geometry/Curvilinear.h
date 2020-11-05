@@ -58,8 +58,10 @@ public:
     void normalize(Tensor<double, 2u>& normal) const;
 
     TensorBase<Tensor<double, 3u>> facetBasisResultInfo(std::size_t numPoints) const;
-    void facetBasis(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
-                    Matrix<double> const& normal, Tensor<double, 3u>& result) const;
+    void facetBasis(std::array<double, D> const& up, Matrix<double> const& normal,
+                    Tensor<double, 3u>& result) const;
+    void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
+                                    Matrix<double> const& normal, Tensor<double, 3u>& result) const;
 
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;

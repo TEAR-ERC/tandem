@@ -3,6 +3,7 @@
 #include "config.h"
 #include "geometry/Curvilinear.h"
 #include "kernels/elasticity/tensor.h"
+#include "kernels/elasticity_adapter/init.h"
 #include "kernels/elasticity_adapter/kernel.h"
 #include "kernels/elasticity_adapter/tensor.h"
 
@@ -18,9 +19,10 @@ SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> c
                                              std::shared_ptr<DGOperatorTopo> topo,
                                              std::unique_ptr<RefElement<Dim - 1u>> space,
                                              std::unique_ptr<Elasticity> local_operator,
+                                             std::array<double, Dim> const& up,
                                              std::array<double, Dim> const& ref_normal)
     : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                      local_operator->facetQuadratureRule().points(), ref_normal),
+                      local_operator->facetQuadratureRule().points(), up, ref_normal),
       dgop_(std::make_unique<DGOperator<Elasticity>>(std::move(topo), std::move(local_operator))),
       linear_solver_(*dgop_) {}
 
@@ -28,7 +30,9 @@ void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& stat
                                  Matrix<double>& slip_q) const {
     assert(slip_q.shape(0) == DomainDimension);
     assert(slip_q.shape(1) == elasticity_adapter::tensor::slip_q::Shape[1]);
+
     elasticity_adapter::kernel::evaluate_slip krnl;
+    krnl.copy_slip = elasticity_adapter::init::copy_slip::Values;
     krnl.e_q = e_q.data();
     krnl.fault_basis_q = fault_[faultNo].template get<FaultBasis>().data()->data();
     krnl.slip = state.data();
@@ -36,6 +40,9 @@ void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& stat
     krnl.execute();
 
     for (std::size_t i = 0; i < nq_; ++i) {
+        /* Slip in the Elasticity solver is defined as [[u]] := u^- - u^+.
+         * In the friction solver the sign of slip S is flipped, that is, S = -[[u]].
+         */
         if (!fault_[faultNo].template get<SignFlipped>()[i]) {
             for (std::size_t d = 0; d < DomainDimension; ++d) {
                 slip_q(d, i) = -slip_q(d, i);

@@ -28,6 +28,7 @@ struct SeasScenarioConfig {
     std::optional<std::string> lam;
     std::optional<std::string> boundary;
     std::optional<std::string> solution;
+    std::array<double, DomainDimension> up;
     std::array<double, DomainDimension> ref_normal;
 
     template <typename PathConverter>
@@ -51,7 +52,16 @@ struct SeasScenarioConfig {
         schema.add_value("lam", &SeasScenarioConfig::lam);
         schema.add_value("boundary", &SeasScenarioConfig::boundary);
         schema.add_value("solution", &SeasScenarioConfig::solution);
-        schema.add_array("ref_normal", &SeasScenarioConfig::ref_normal).of_values();
+        auto default_up = std::array<double, DomainDimension>{};
+        default_up.back() = 1.0;
+        schema.add_array("up", &SeasScenarioConfig::up)
+            .default_value(std::move(default_up))
+            .of_values();
+        auto default_ref_normal = std::array<double, DomainDimension>{};
+        default_ref_normal[0] = 1.0;
+        schema.add_array("ref_normal", &SeasScenarioConfig::ref_normal)
+            .default_value(std::move(default_ref_normal))
+            .of_values();
     }
 };
 
@@ -84,7 +94,7 @@ public:
     using functional_t = LuaLib::functional_t<DomainDimension, 1>;
     using time_functional_t = LuaLib::functional_t<DomainDimension + 1, NumQuantities>;
 
-    SeasScenario(SeasScenarioConfig const& problem) : ref_normal_(problem.ref_normal) {
+    SeasScenario(SeasScenarioConfig const& problem) {
         lib_.loadFile(problem.lib);
 
         if (problem.warp) {
@@ -116,7 +126,6 @@ public:
     auto const& mu() const { return mu_; }
     auto const& lam() const { return lam_; }
     auto const& boundary() const { return boundary_; }
-    auto const& ref_normal() const { return ref_normal_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
             auto sol = *solution_;
@@ -127,7 +136,6 @@ public:
     }
 
 protected:
-    std::array<double, DomainDimension> ref_normal_;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
