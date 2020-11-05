@@ -28,6 +28,7 @@ public:
                     std::shared_ptr<DGOperatorTopo> topo,
                     std::unique_ptr<RefElement<DomainDimension - 1u>> space,
                     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
+                    std::array<double, DomainDimension> const& up,
                     std::array<double, DomainDimension> const& ref_normal);
 
     std::size_t scratch_mem_size() const {
@@ -46,6 +47,7 @@ protected:
     std::shared_ptr<DGOperatorTopo> topo_;
     std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
     BoundaryMap faultMap_;
+    std::array<double, DomainDimension> up_;
     std::array<double, DomainDimension> ref_normal_;
     std::size_t nq_;
 

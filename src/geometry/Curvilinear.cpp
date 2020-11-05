@@ -6,6 +6,7 @@
 #include "tensor/EigenMap.h"
 #include "tensor/Managed.h"
 #include "tensor/Reshape.h"
+#include "util/Math.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -202,8 +203,45 @@ TensorBase<Tensor<double, 3u>> Curvilinear<D>::facetBasisResultInfo(std::size_t 
 }
 
 template <std::size_t D>
-void Curvilinear<D>::facetBasis(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
-                                Matrix<double> const& normal, Tensor<double, 3u>& result) const {
+void Curvilinear<D>::facetBasis(std::array<double, D> const& up, Matrix<double> const& normal,
+                                Tensor<double, 3u>& result) const {
+    assert(result.shape(2) == normal.shape(1));
+
+    for (std::ptrdiff_t i = 0; i < result.shape(2); ++i) {
+        auto n_in = normal.subtensor(slice{}, i);
+        auto n_in_eigen = EigenMap<Vector<double>, D>(n_in);
+        auto n = result.subtensor(slice{}, 0, i);
+        auto n_eigen = EigenMap<Vector<double>, D>(n);
+        n_eigen = n_in_eigen.normalized();
+
+        if constexpr (D == 2u) {
+            double s = sgn(up[0] * n(1) - up[1] * n(0));
+            if (s == 0.0) {
+                throw std::logic_error("Up vector and normal are colinear.");
+            }
+            auto d = result.subtensor(slice{}, 1, i);
+            d(0) = -s * n(1);
+            d(1) = s * n(0);
+        } else if constexpr (D == 3u) {
+            auto u = Eigen::Vector3d(up.data());
+            auto d = result.subtensor(slice{}, 1, i);
+            auto d_eigen = EigenMap<Vector<double>, D>(d);
+            auto s = result.subtensor(slice{}, 2, i);
+            auto s_eigen = EigenMap<Vector<double>, D>(s);
+            s_eigen = u.cross(n_eigen).normalized();
+            if (s_eigen.norm() == 0.0) {
+                throw std::logic_error("Up vector and normal are colinear.");
+            }
+            d_eigen = s_eigen.cross(n_eigen).normalized();
+        }
+    }
+}
+
+template <std::size_t D>
+void Curvilinear<D>::facetBasisFromPlexTangents(std::size_t faceNo,
+                                                Tensor<double, 3u> const& jacobian,
+                                                Matrix<double> const& normal,
+                                                Tensor<double, 3u>& result) const {
     assert(result.shape(2) == normal.shape(1));
     assert(result.shape(2) == jacobian.shape(2));
 
