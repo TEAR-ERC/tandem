@@ -56,7 +56,7 @@ public:
     double slip_rate(std::size_t index, double sn, double tau, double psi) const {
         auto eta = p_[index].get<Eta>();
         double tauAbs = tau + p_[index].get<TauPre>();
-        double a = -tauAbs / eta;
+        double a = 0.0;
         double b = tauAbs / eta;
         if (a > b) {
             std::swap(a, b);
