@@ -180,6 +180,24 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
         dxKrnl.execute(side);
     }
 
+    double traction_op_q0[tensor::traction_op_q::size(0)];
+    double traction_op_q1[tensor::traction_op_q::size(1)];
+
+    kernel::assembleTractionOp tOpKrnl;
+    tOpKrnl.delta = init::delta::Values;
+    tOpKrnl.Dx_q(0) = Dx_q0;
+    tOpKrnl.Dx_q(1) = Dx_q1;
+    tOpKrnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    tOpKrnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+    tOpKrnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    tOpKrnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+    tOpKrnl.n_q = fct[fctNo].get<Normal>().data()->data();
+    tOpKrnl.traction_op_q(0) = traction_op_q0;
+    tOpKrnl.traction_op_q(1) = traction_op_q1;
+    tOpKrnl.execute(0);
+    tOpKrnl.execute(1);
+
+
     kernel::assembleSurface krnl;
     krnl.c00 = -0.5;
     krnl.c01 = -krnl.c00;
@@ -191,18 +209,13 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.a(0, 1) = A01.data();
     krnl.a(1, 0) = A10.data();
     krnl.a(1, 1) = A11.data();
-    krnl.Dx_q(0) = Dx_q0;
-    krnl.Dx_q(1) = Dx_q1;
     krnl.delta = init::delta::Values;
     for (unsigned side = 0; side < 2; ++side) {
         krnl.E_q(side) = E_q[info.localNo[side]].data();
     }
-    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
-    krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
-    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
-    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
-    krnl.n_q = fct[fctNo].get<Normal>().data()->data();
     krnl.nl_q = fct[fctNo].get<NormalLength>().data();
+    krnl.traction_op_q(0) = traction_op_q0;
+    krnl.traction_op_q(1) = traction_op_q1;
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
     krnl.execute(0, 1);
@@ -233,18 +246,26 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     dxKrnl.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     dxKrnl.execute(0);
 
+    double traction_op_q0[tensor::traction_op_q::size(0)];
+
+    kernel::assembleTractionOp tOpKrnl;
+    tOpKrnl.delta = init::delta::Values;
+    tOpKrnl.Dx_q(0) = Dx_q0;
+    tOpKrnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    tOpKrnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    tOpKrnl.n_q = fct[fctNo].get<Normal>().data()->data();
+    tOpKrnl.traction_op_q(0) = traction_op_q0;
+    tOpKrnl.execute(0);
+
     kernel::assembleSurface krnl;
     krnl.c00 = -1.0;
     krnl.c10 = epsilon;
     krnl.c20 = penalty(info);
     krnl.a(0, 0) = A00.data();
-    krnl.Dx_q(0) = Dx_q0;
     krnl.delta = init::delta::Values;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
-    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
-    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
-    krnl.n_q = fct[fctNo].get<Normal>().data()->data();
     krnl.nl_q = fct[fctNo].get<NormalLength>().data();
+    krnl.traction_op_q(0) = traction_op_q0;
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
 
@@ -389,7 +410,7 @@ void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<doubl
         dxKrnl.execute(side);
     }
 
-    kernel::traction_q krnl;
+    kernel::average_traction krnl;
     krnl.Dx_q(0) = Dx_q0;
     krnl.Dx_q(1) = Dx_q1;
     krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
