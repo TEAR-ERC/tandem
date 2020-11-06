@@ -113,23 +113,27 @@ void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume_post_skeleton(elNo, scratch);
 
-    auto lam_field = material[elNo].get<lam>().data();
-    auto mu_field = material[elNo].get<mu>().data();
+    auto lam_field = material[elNo].get<lam>();
+    auto mu_field = material[elNo].get<mu>();
 
     kernel::precomputeVolume krnl_pre;
     krnl_pre.matE_Q_T = matE_Q_T.data();
     krnl_pre.J = vol[elNo].template get<AbsDetJ>().data();
     krnl_pre.W = volRule.weights().data();
-    krnl_pre.lam = lam_field;
+    krnl_pre.lam = lam_field.data();
     krnl_pre.lam_W_J = volPre[elNo].template get<lam_W_J>().data();
-    krnl_pre.mu = mu_field;
+    krnl_pre.mu = mu_field.data();
     krnl_pre.mu_W_J = volPre[elNo].template get<mu_W_J>().data();
     krnl_pre.execute();
 
-    auto lam_max = *std::max_element(lam_field, lam_field + materialSpace_.numBasisFunctions());
-    auto mu_max = *std::max_element(mu_field, mu_field + materialSpace_.numBasisFunctions());
-    base::penalty[elNo] *= std::max(lam_max, mu_max) * (PolynomialDegree + 1) *
-                           (PolynomialDegree + DomainDimension) / DomainDimension;
+    assert(lam_field.size() == mu_field.size());
+    double max_mat = std::numeric_limits<double>::lowest();
+    for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
+        max_mat = std::max(max_mat, lam_field[i] + 2.0 * mu_field[i]);
+    }
+
+    base::penalty[elNo] *=
+        max_mat * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
 }
 
 bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
@@ -196,7 +200,6 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     tOpKrnl.traction_op_q(1) = traction_op_q1;
     tOpKrnl.execute(0);
     tOpKrnl.execute(1);
-
 
     kernel::assembleSurface krnl;
     krnl.c00 = -0.5;
