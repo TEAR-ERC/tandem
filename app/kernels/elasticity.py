@@ -58,10 +58,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     c0 = [Scalar('c0{}'.format(x)) for x in range(2)]
     c1 = [Scalar('c1{}'.format(x)) for x in range(2)]
     c2 = [Scalar('c2{}'.format(x)) for x in range(2)]
+    c3 = [Scalar('c3{}'.format(x)) for x in range(2)]
     u = [Tensor('u({})'.format(x), (Nbf, dim)) for x in range(2)]
     unew = [Tensor('unew({})'.format(x), (Nbf, dim)) for x in range(2)]
     u_jump = Tensor('u_jump', (dim, nq)) 
     traction_q = Tensor('traction_q', (dim, nq))
+    traction_op_q = [Tensor('traction_op_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
     a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
 
     generator.addFamily('precomputeSurface', simpleParameterSpace(2), lambda x: [
@@ -98,14 +100,17 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         surface(0)
     ])
 
+    def assembleTractionOp(x):
+        return traction_op_q[x]['kpuq'] <= lam_q[x]['q'] * Dx_q[x]['kpq'] * n_q['uq'] + \
+            mu_q[x]['q'] * (n_q['jq'] * Dx_q[x]['kjq'] * delta['pu'] + Dx_q[x]['kuq'] * n_q['pq'])
+
     def assembleSurface(x, y):
         return a[x][y]['kplu'] <= \
-            c0[x] * E_q[x]['kq'] * w['q'] * (lam_q[y]['q'] * Dx_q[y]['luq'] * n_q['pq'] + \
-            mu_q[y]['q'] * n_q['jq'] * (Dx_q[y]['ljq'] * delta['pu'] + Dx_q[y]['lpq'] * delta['ju'])) + \
-            c1[y] * E_q[y]['lq'] * w['q'] * (lam_q[x]['q'] * Dx_q[x]['kpq'] * n_q['uq'] + \
-            mu_q[x]['q'] * n_q['jq'] * (Dx_q[x]['kjq'] * delta['pu'] + Dx_q[x]['kuq'] * delta['jp'])) + \
+            c0[x] * E_q[x]['kq'] * w['q'] * traction_op_q[y]['lupq'] + \
+            c1[y] * E_q[y]['lq'] * w['q'] * traction_op_q[x]['kpuq'] + \
             c2[abs(y-x)] * delta['pu'] * E_q[y]['lq'] * E_q[x]['kq'] * w['q'] * nl_q['q']
 
+    generator.addFamily('assembleTractionOp', simpleParameterSpace(2), assembleTractionOp)
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), assembleSurface)
 
     # Right-hand side
@@ -124,7 +129,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     # traction
 
     n_unit_q = Tensor('n_unit_q', (dim, nq))
-    generator.add('traction_q', [
+    generator.add('average_traction', [
         traction_q['pq'] <= 0.5 * (traction(0, n_unit_q) + traction(1, n_unit_q)),
     ])
 
