@@ -6,7 +6,13 @@ Vp = 1e-9
 rho = 2.670
 
 function boundary(x, y, t)
-    return Vp/2.0 * t
+    if x > 1.0 then
+        return Vp/2.0 * t
+    elseif x < -1.0 then
+        return -Vp/2.0 * t
+    else
+        return -Vp * t
+    end
 end
 
 function mu(x, y)

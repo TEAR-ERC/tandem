@@ -47,6 +47,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     g = [Tensor('g({})'.format(x), (dim, dim, nq)) for x in range(2)]
     n_q = Tensor('n_q', (dim, nq))
+    n_unit_q = Tensor('n_unit_q', (dim, nq))
     nl_q = Tensor('nl_q', (nq,))
     w = Tensor('w', (nq,))
     lam_q = [Tensor('lam_q({})'.format(x), (nq,)) for x in range(2)]
@@ -58,7 +59,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     c0 = [Scalar('c0{}'.format(x)) for x in range(2)]
     c1 = [Scalar('c1{}'.format(x)) for x in range(2)]
     c2 = [Scalar('c2{}'.format(x)) for x in range(2)]
-    c3 = [Scalar('c3{}'.format(x)) for x in range(2)]
     u = [Tensor('u({})'.format(x), (Nbf, dim)) for x in range(2)]
     unew = [Tensor('unew({})'.format(x), (Nbf, dim)) for x in range(2)]
     u_jump = Tensor('u_jump', (dim, nq)) 
@@ -128,7 +128,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # traction
 
-    n_unit_q = Tensor('n_unit_q', (dim, nq))
     generator.add('average_traction', [
         traction_q['pq'] <= 0.5 * (traction(0, n_unit_q) + traction(1, n_unit_q)),
     ])
