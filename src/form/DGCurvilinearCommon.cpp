@@ -37,6 +37,22 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
 }
 
 template <std::size_t D>
+void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
+    double* Jmem = scratch.allocate(volRule.size() * D * D);
+    auto J = Tensor(Jmem, cl_->jacobianResultInfo(volRule.size()));
+    auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),
+                       cl_->jacobianResultInfo(volRule.size()));
+    auto coords =
+        Tensor(vol[elNo].template get<Coords>().data()->data(), cl_->mapResultInfo(volRule.size()));
+    auto absDetJ =
+        Tensor(vol[elNo].template get<AbsDetJ>().data(), cl_->detJResultInfo(volRule.size()));
+    cl_->jacobian(elNo, geoDxi_Q, J);
+    cl_->absDetJ(elNo, J, absDetJ);
+    cl_->jacobianInv(J, jInv);
+    cl_->map(elNo, geoE_Q, coords);
+}
+
+template <std::size_t D>
 void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
                                             LinearAllocator<double>& scratch) {
     double* Jmem = scratch.allocate(fctRule.size() * D * D);
@@ -86,25 +102,14 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 template <std::size_t D>
 void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
                                                           LinearAllocator<double>& scratch) {
-    double* Jmem = scratch.allocate(volRule.size() * D * D);
-    auto J = Tensor(Jmem, cl_->jacobianResultInfo(volRule.size()));
-    auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),
-                       cl_->jacobianResultInfo(volRule.size()));
-    auto coords =
-        Tensor(vol[elNo].template get<Coords>().data()->data(), cl_->mapResultInfo(volRule.size()));
-    auto absDetJ =
-        Tensor(vol[elNo].template get<AbsDetJ>().data(), cl_->detJResultInfo(volRule.size()));
-    cl_->jacobian(elNo, geoDxi_Q, J);
-    cl_->absDetJ(elNo, J, absDetJ);
-    cl_->jacobianInv(J, jInv);
-    cl_->map(elNo, geoE_Q, coords);
+    auto const& absDetJ = vol[elNo].template get<AbsDetJ>();
 
     // Compute shape measure for interior penalty method
     // See Shahbazi, "An explicit expression for the penalty parameter of the
     //                interior penalty method"
     double volume = 0.0;
     for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
-        volume += volRule.weights()[i] * absDetJ(i);
+        volume += volRule.weights()[i] * absDetJ[i];
     }
     penalty[elNo] /= volume;
 }

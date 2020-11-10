@@ -38,6 +38,7 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
+    void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
         prepare_bndskl(fctNo, info, false, scratch);
