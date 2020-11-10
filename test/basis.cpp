@@ -1,5 +1,6 @@
 #include "basis/Equidistant.h"
 #include "basis/Functions.h"
+#include "basis/GaussLegendre.h"
 #include "basis/Nodal.h"
 #include "basis/WarpAndBlend.h"
 
@@ -235,6 +236,30 @@ TEST_CASE("Nodes") {
         CHECK(glPoints5[2] == doctest::Approx(0.0));
         CHECK(glPoints5[3] == doctest::Approx(sqrt(3.0 / 7.0)));
         CHECK(glPoints5[4] == doctest::Approx(1.0));
+    }
+
+    SUBCASE("Gauss-Legendre nodes") {
+        auto factory = GaussLegendreFactory();
+
+        auto points0 = factory(0);
+        CHECK(points0.size() == 1);
+        CHECK(points0[0][0] == doctest::Approx(0.5));
+
+        auto points1 = factory(1);
+        CHECK(points1.size() == 2);
+        CHECK(points1[0][0] == doctest::Approx(0.5 * sqrt(1.0 / 3.0) + 0.5));
+        CHECK(points1[1][0] == doctest::Approx(-0.5 * sqrt(1.0 / 3.0) + 0.5));
+
+        auto points3 = factory(3);
+        CHECK(points3.size() == 4);
+        CHECK(points3[0][0] ==
+              doctest::Approx(0.5 * sqrt(3.0 / 7.0 + 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[1][0] ==
+              doctest::Approx(0.5 * sqrt(3.0 / 7.0 - 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[2][0] ==
+              doctest::Approx(-0.5 * sqrt(3.0 / 7.0 - 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[3][0] ==
+              doctest::Approx(-0.5 * sqrt(3.0 / 7.0 + 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
     }
 
     auto checkNodes = [](auto const& nodes, auto const& refNodes) {
