@@ -60,6 +60,8 @@ void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator<
 void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
 
 void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
+    base::prepare_volume(elNo, scratch);
+
     double lam_Q_raw[tensor::lam_Q::size()];
     auto lam_Q = Matrix<double>(lam_Q_raw, 1, volRule.size());
     fun_lam(elNo, lam_Q);
