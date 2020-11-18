@@ -1,6 +1,6 @@
 #include "RateAndStateBase.h"
 
-#include "basis/GaussLegendre.h"
+#include "basis/WarpAndBlend.h"
 
 #include <algorithm>
 #include <memory>
@@ -8,7 +8,7 @@
 namespace tndm {
 
 RateAndStateBase::RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl)
-    : cl_(std::move(cl)), space_(PolynomialDegree - 1, GaussLegendreFactory()) {
+    : cl_(std::move(cl)), space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()) {
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, space_.refNodes());

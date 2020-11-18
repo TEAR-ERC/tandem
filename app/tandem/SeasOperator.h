@@ -4,6 +4,7 @@
 #include "form/BoundaryMap.h"
 #include "geometry/Curvilinear.h"
 
+#include "tandem/RateAndStateBase.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
@@ -57,11 +58,16 @@ public:
             auto B = vector.get_block(access_handle, faultNo);
             lop_->pre_init(faultNo, B, scratch);
         }
+        vector.end_access(access_handle);
 
         adapter_->solve(0.0, vector);
 
+        access_handle = vector.begin_access();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction();
+        adapter_->begin_traction([&vector, &access_handle](std::size_t faultNo) {
+            return vector.get_block(const_cast<typename BlockVector::const_handle>(access_handle),
+                                    faultNo);
+        });
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch);
 
@@ -79,13 +85,16 @@ public:
         auto in_handle = state.begin_access_readonly();
         auto out_handle = result.begin_access();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction();
+        adapter_->begin_traction([&state, &in_handle](std::size_t faultNo) {
+            return state.get_block(in_handle, faultNo);
+        });
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch);
 
             auto state_block = state.get_block(in_handle, faultNo);
             auto result_block = result.get_block(out_handle, faultNo);
             double VMax = lop_->rhs(faultNo, time, traction, state_block, result_block, scratch);
+
             VMax_ = std::max(VMax_, VMax);
         }
         adapter_->end_traction();
@@ -100,7 +109,9 @@ public:
         auto scratch = make_scratch();
         auto in_handle = vector.begin_access_readonly();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction();
+        adapter_->begin_traction([&vector, &in_handle](std::size_t faultNo) {
+            return vector.get_block(in_handle, faultNo);
+        });
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch);
 

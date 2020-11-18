@@ -198,16 +198,38 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B,
     return true;
 }
 
+bool Poisson::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+    assert(tensor::f_q::size() == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
+    if (bc == BC::Fault) {
+        fun_slip(fctNo, f_q, false);
+    } else if (bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, false);
+    } else {
+        return false;
+    }
+    return true;
+}
+bool Poisson::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+    assert(tensor::f_q::size() == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
+    if (bc == BC::Fault) {
+        fun_slip(fctNo, f_q, true);
+        for (std::size_t q = 0; q < tensor::f_q::Shape[0]; ++q) {
+            f_q(0, q) *= 0.5;
+        }
+    } else if (bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, true);
+    } else {
+        return false;
+    }
+    return true;
+}
+
 bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            Vector<double>& B1, LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
-    assert(tensor::f_q::size() == fctRule.size());
-    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    if (info.bc == BC::Fault) {
-        fun_slip(fctNo, f_q, false);
-    } else if (info.bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, false);
-    } else {
+    if (!bc_skeleton(fctNo, info.bc, f_q_raw)) {
         return false;
     }
 
@@ -240,16 +262,7 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            LinearAllocator<double>& scratch) const {
     double f_q_raw[tensor::f_q::size()];
-    assert(tensor::f_q::size() == fctRule.size());
-    auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    if (info.bc == BC::Fault) {
-        fun_slip(fctNo, f_q, true);
-        for (std::size_t q = 0; q < tensor::f_q::Shape[0]; ++q) {
-            f_q(0, q) *= 0.5;
-        }
-    } else if (info.bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, true);
-    } else {
+    if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
         return false;
     }
 
@@ -283,27 +296,56 @@ TensorBase<Matrix<double>> Poisson::tractionResultInfo() const {
     return TensorBase<Matrix<double>>(tensor::grad_u::Shape[0], tensor::grad_u::Shape[1]);
 }
 
-void Poisson::traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
-                       Vector<double const>& u1, Matrix<double>& result) const {
+void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                                Vector<double const>& u1, Matrix<double>& result) const {
     assert(result.size() == tensor::grad_u::size());
 
     double Dx_q0[tensor::d_x::size(0)];
     double Dx_q1[tensor::d_x::size(1)];
+    double f_q_raw[tensor::f_q::size()];
+    bc_skeleton(fctNo, info.bc, f_q_raw);
 
     kernel::grad_u krnl;
+    krnl.c00 = -penalty(info);
     krnl.d_x(0) = Dx_q0;
     krnl.d_x(1) = Dx_q1;
     for (std::size_t side = 0; side < 2; ++side) {
         krnl.d_xi(side) = Dxi_q[info.localNo[side]].data();
         krnl.em(side) = matE_q_T[info.localNo[side]].data();
     }
+    krnl.e(0) = E_q[info.localNo[0]].data();
+    krnl.f_q = f_q_raw;
     krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
     krnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
     krnl.grad_u = result.data();
     krnl.k(0) = material[info.up[0]].get<K>().data();
     krnl.k(1) = material[info.up[1]].get<K>().data();
+    krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
+    krnl.execute();
+}
+
+void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                                Matrix<double>& result) const {
+    assert(result.size() == tensor::grad_u::size());
+
+    double Dx_q0[tensor::d_x::size(0)];
+    double f_q_raw[tensor::f_q::size()];
+    bc_boundary(fctNo, info.bc, f_q_raw);
+
+    kernel::grad_u_bnd krnl;
+    krnl.c00 = -penalty(info);
+    krnl.d_x(0) = Dx_q0;
+    krnl.d_xi(0) = Dxi_q[info.localNo[0]].data();
+    krnl.em(0) = matE_q_T[info.localNo[0]].data();
+    krnl.e(0) = E_q[info.localNo[0]].data();
+    krnl.f_q = f_q_raw;
+    krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    krnl.grad_u = result.data();
+    krnl.k(0) = material[info.up[0]].get<K>().data();
+    krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+    krnl.u(0) = u0.data();
     krnl.execute();
 }
 
