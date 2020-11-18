@@ -1,4 +1,4 @@
-Lf = 0.200;
+DefineConstant[ Lf = {0.200, Min 0, Max 10, Name "Fault resolution" } ];
 
 h = 20;
 w = 400;
