@@ -24,6 +24,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     g = [Tensor('g({})'.format(x), (dim, dim, nq)) for x in range(2)]
     n = Tensor('n', (dim, nq))
+    n_unit_q = Tensor('n_unit_q', (dim, nq))
     nl = Tensor('nl', (nq,))
     w = Tensor('w', (nq,))
     e = [Tensor('e({})'.format(x), (Nbf, nq)) for x in range(2)]
@@ -70,5 +71,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     generator.add('grad_u', [
         d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
         d_x[1]['kiq'] <= k[1]['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],
-        grad_u['pq'] <= 0.5 * (d_x[0]['lpq'] * u[0]['l'] + d_x[1]['lpq'] * u[1]['l'])
+        grad_u['pq'] <= 0.5 * (d_x[0]['lpq'] * u[0]['l'] + d_x[1]['lpq'] * u[1]['l']) +
+                        c0[0] * (e[0]['lq'] * (u[0]['l'] - u[1]['l']) - f_q['q']) * n_unit_q['pq']
+    ])
+
+    generator.add('grad_u_bnd', [
+        d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
+        grad_u['pq'] <= d_x[0]['lpq'] * u[0]['l'] +
+                        c0[0] * (e[0]['lq'] * u[0]['l'] - f_q['q']) * n_unit_q['pq']
     ])

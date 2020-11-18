@@ -70,7 +70,11 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     auto const& info = dgop_->topo().info(fctNo);
     auto u0 = linear_solver_.x().get_block(handle_, info.up[0]);
     auto u1 = linear_solver_.x().get_block(handle_, info.up[1]);
-    dgop_->lop().traction(fctNo, info, u0, u1, traction_q);
+    if (info.up[0] == info.up[1]) {
+        dgop_->lop().traction_boundary(fctNo, info, u0, traction_q);
+    } else {
+        dgop_->lop().traction_skeleton(fctNo, info, u0, u1, traction_q);
+    }
     elasticity_adapter::kernel::evaluate_traction krnl;
     krnl.e_q_T = e_q_T.data();
     krnl.fault_basis_q = fault_[faultNo].template get<FaultBasis>().data()->data();

@@ -63,7 +63,14 @@ public:
     }
 
     TensorBase<Matrix<double>> traction_info() const;
-    void begin_traction() { handle_ = linear_solver_.x().begin_access_readonly(); }
+    template <class Func> void begin_traction(Func state_access) {
+        handle_ = linear_solver_.x().begin_access_readonly();
+        dgop_->lop().set_slip([this, state_access](std::size_t fctNo, Matrix<double>& f_q, bool) {
+            auto faultNo = this->faultMap_.bndNo(fctNo);
+            auto state_block = state_access(faultNo);
+            this->slip(faultNo, state_block, f_q);
+        });
+    }
     void traction(std::size_t faultNo, Matrix<double>& traction, LinearAllocator<double>&) const;
     void end_traction() { linear_solver_.x().end_access_readonly(handle_); }
 

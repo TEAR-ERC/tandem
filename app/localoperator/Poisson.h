@@ -55,8 +55,10 @@ public:
                       LinearAllocator<double>& scratch) const;
 
     TensorBase<Matrix<double>> tractionResultInfo() const;
-    void traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
-                  Vector<double const>& u1, Matrix<double>& result) const;
+    void traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                           Vector<double const>& u1, Matrix<double>& result) const;
+    void traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
+                           Matrix<double>& result) const;
 
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         return FiniteElementFunction<DomainDimension>(space_.clone(), NumQuantities,
@@ -91,6 +93,8 @@ private:
     double penalty(FacetInfo const& info) const {
         return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
     }
+    bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+    bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
     // Ref elements
     ModalRefElement<DomainDimension> space_;

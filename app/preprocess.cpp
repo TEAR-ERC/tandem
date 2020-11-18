@@ -18,7 +18,7 @@ void preprocess(unsigned N, unsigned minQuadOrder, std::string const& outputFile
     file << "{\n"
          << "  \"dim\": " << D << ",\n"
          << "  \"degree\": " << N << ",\n"
-         << "  \"numFaultBasisFunctions\": " << tndm::binom((N - 1u) + D - 1u, D - 1u) << ",\n"
+         << "  \"numFaultBasisFunctions\": " << tndm::binom(N + D - 1u, D - 1u) << ",\n"
          << "  \"numFacetBasisFunctions\": " << tndm::binom(N + D - 1u, D - 1u) << ",\n"
          << "  \"numElementBasisFunctions\": " << tndm::binom(N + D, D) << ",\n"
          << "  \"numFacetQuadPoints\": " << fctRule.size() << ",\n"

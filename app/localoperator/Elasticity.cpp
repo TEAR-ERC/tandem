@@ -297,20 +297,43 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
     return true;
 }
 
-bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                              Vector<double>& B1, LinearAllocator<double>& scratch) const {
-    double f_q_raw[tensor::f_q::size()];
+bool Elasticity::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (info.bc == BC::Fault) {
+    if (bc == BC::Fault) {
         fun_slip(fctNo, f_q, false);
-    } else if (info.bc == BC::Dirichlet) {
+    } else if (bc == BC::Dirichlet) {
         fun_dirichlet(fctNo, f_q, false);
     } else {
         return false;
     }
+    return true;
+}
+bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+    assert(tensor::f_q::Shape[1] == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (bc == BC::Fault) {
+        fun_slip(fctNo, f_q, true);
+        for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
+            for (std::size_t p = 0; p < NumQuantities; ++p) {
+                f_q(p, q) *= 0.5;
+            }
+        }
+    } else if (bc == BC::Dirichlet) {
+        fun_dirichlet(fctNo, f_q, true);
+    } else {
+        return false;
+    }
+    return true;
+}
 
+bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                              Vector<double>& B1, LinearAllocator<double>& scratch) const {
     double Dx_q[tensor::Dx_q::size(0)];
+    double f_q_raw[tensor::f_q::size()];
+    if (!bc_skeleton(fctNo, info.bc, f_q_raw)) {
+        return false;
+    }
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -342,23 +365,11 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 
 bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                               LinearAllocator<double>& scratch) const {
+    double Dx_q[tensor::Dx_q::size(0)];
     double f_q_raw[tensor::f_q::size()];
-    assert(tensor::f_q::Shape[1] == fctRule.size());
-    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (info.bc == BC::Fault) {
-        fun_slip(fctNo, f_q, true);
-        for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
-            for (std::size_t p = 0; p < NumQuantities; ++p) {
-                f_q(p, q) *= 0.5;
-            }
-        }
-    } else if (info.bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, true);
-    } else {
+    if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
         return false;
     }
-
-    double Dx_q[tensor::Dx_q::size(0)];
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
@@ -396,8 +407,9 @@ TensorBase<Matrix<double>> Elasticity::tractionResultInfo() const {
     return TensorBase<Matrix<double>>(tensor::traction_q::Shape[0], tensor::traction_q::Shape[1]);
 }
 
-void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
-                          Vector<double const>& u1, Matrix<double>& result) const {
+void Elasticity::traction_skeleton(std::size_t fctNo, FacetInfo const& info,
+                                   Vector<double const>& u0, Vector<double const>& u1,
+                                   Matrix<double>& result) const {
     assert(result.size() == tensor::traction_q::size());
     assert(u0.size() == tensor::u::size(0));
     assert(u1.size() == tensor::u::size(1));
@@ -415,9 +427,15 @@ void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<doubl
         dxKrnl.execute(side);
     }
 
-    kernel::average_traction krnl;
+    double f_q_raw[tensor::f_q::size()];
+    bc_skeleton(fctNo, info.bc, f_q_raw);
+
+    kernel::compute_traction krnl;
+    krnl.c00 = -penalty(info);
     krnl.Dx_q(0) = Dx_q0;
     krnl.Dx_q(1) = Dx_q1;
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
+    krnl.f_q = f_q_raw;
     krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
     krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
     krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
@@ -426,6 +444,36 @@ void Elasticity::traction(std::size_t fctNo, FacetInfo const& info, Vector<doubl
     krnl.traction_q = result.data();
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
+    krnl.execute();
+}
+
+void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
+                                   Vector<double const>& u0, Matrix<double>& result) const {
+
+    assert(result.size() == tensor::traction_q::size());
+    assert(u0.size() == tensor::u::size(0));
+
+    double Dx_q0[tensor::Dx_q::size(0)];
+
+    kernel::Dx_q dxKrnl;
+    dxKrnl.Dx_q(0) = Dx_q0;
+    dxKrnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    dxKrnl.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    dxKrnl.execute(0);
+
+    double f_q_raw[tensor::f_q::size()];
+    bc_boundary(fctNo, info.bc, f_q_raw);
+
+    kernel::compute_traction_bnd krnl;
+    krnl.c00 = -penalty(info);
+    krnl.Dx_q(0) = Dx_q0;
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
+    krnl.f_q = f_q_raw;
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+    krnl.traction_q = result.data();
+    krnl.u(0) = u0.data();
     krnl.execute();
 }
 
