@@ -1,6 +1,8 @@
 #ifndef SEASWRITER_20201006_H
 #define SEASWRITER_20201006_H
 
+#include "tandem/AdaptiveOutputStrategy.h"
+
 #include "geometry/Curvilinear.h"
 #include "io/PVDWriter.h"
 #include "io/VTUAdapter.h"
@@ -20,18 +22,32 @@ template <std::size_t D, class SeasOperator> class SeasWriter {
 public:
     SeasWriter(std::string_view baseName, LocalSimplexMesh<D> const& mesh,
                std::shared_ptr<Curvilinear<D>> cl, std::shared_ptr<SeasOperator> seasop,
-               unsigned degree, double V_ref, double t_min, double t_max)
+               unsigned degree, double V_ref, double t_min, double t_max,
+               AdaptiveOutputStrategy strategy = AdaptiveOutputStrategy::Threshold)
         : seasop_(std::move(seasop)), fault_adapter_(mesh, cl, seasop_->faultMap().fctNos()),
           adapter_(std::move(cl), seasop_->adapter().numLocalElements()), degree_(degree),
-          fault_base_(baseName), base_(baseName), V_ref_(V_ref), t_min_(t_min), t_max_(t_max) {
+          fault_base_(baseName), base_(baseName), V_ref_(V_ref), t_min_(t_min), t_max_(t_max),
+          strategy_(strategy) {
         fault_base_ += "-fault";
         MPI_Comm_rank(seasop_->comm(), &rank_);
     }
 
     double output_interval(double VMax) const {
-        double falloff = log(t_min_ / t_max_);
-        VMax = std::min(V_ref_, VMax);
-        return t_max_ * exp(falloff * VMax / V_ref_);
+        double interval = 0.0;
+        switch (strategy_) {
+        case AdaptiveOutputStrategy::Threshold:
+            interval = VMax >= V_ref_ ? t_min_ : t_max_;
+            break;
+        case AdaptiveOutputStrategy::Exponential: {
+            double falloff = log(t_min_ / t_max_);
+            VMax = std::min(V_ref_, VMax);
+            interval = t_max_ * exp(falloff * VMax / V_ref_);
+            break;
+        }
+        default:
+            break;
+        }
+        return interval;
     }
 
     template <class BlockVector> void monitor(double time, BlockVector const& state) {
@@ -88,6 +104,7 @@ private:
     double V_ref_;
     double t_min_;
     double t_max_;
+    AdaptiveOutputStrategy strategy_;
 };
 
 } // namespace tndm

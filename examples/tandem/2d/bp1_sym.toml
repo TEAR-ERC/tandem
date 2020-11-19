@@ -23,3 +23,6 @@ Vinit = "Vinit"
 
 [output]
 prefix = "bp1_sym"
+V_ref = 0.001
+t_min = 0.1
+t_max = 9460800

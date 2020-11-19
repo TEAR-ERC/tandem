@@ -2,6 +2,7 @@
 #define CONFIG_20200825_H
 
 #include "common/MeshConfig.h"
+#include "tandem/AdaptiveOutputStrategy.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/SeasScenario.h"
 
@@ -15,6 +16,7 @@ struct OutputConfig {
     double V_ref;
     double t_min;
     double t_max;
+    AdaptiveOutputStrategy strategy;
 };
 
 struct Config {

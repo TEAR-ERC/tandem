@@ -88,6 +88,7 @@ public:
         adapter_->begin_traction([&state, &in_handle](std::size_t faultNo) {
             return state.get_block(in_handle, faultNo);
         });
+        VMax_ = 0.0;
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch);
 
