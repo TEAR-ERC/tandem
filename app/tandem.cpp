@@ -1,6 +1,7 @@
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
 #include "config.h"
+#include "tandem/AdaptiveOutputStrategy.h"
 #include "tandem/Config.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/SEAS.h"
@@ -79,6 +80,21 @@ int main(int argc, char** argv) {
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
         .help("Maximum output interval");
+    outputSchema.add_value("strategy", &OutputConfig::strategy)
+        .default_value(AdaptiveOutputStrategy::Threshold)
+        .help("Adaptive output strategy")
+        .converter([](std::string_view value) {
+            if (iEquals(value, "threshold")) {
+                return AdaptiveOutputStrategy::Threshold;
+            } else if (iEquals(value, "exponential")) {
+                return AdaptiveOutputStrategy::Exponential;
+            } else {
+                return AdaptiveOutputStrategy::Unknown;
+            }
+        })
+        .validator([](AdaptiveOutputStrategy const& type) {
+            return type != AdaptiveOutputStrategy::Unknown;
+        });
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {
