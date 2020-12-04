@@ -72,7 +72,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         d_x[0]['kiq'] <= k[0]['m'] * em[0]['qm'] * g[0]['eiq'] * d_xi[0]['keq'],
         d_x[1]['kiq'] <= k[1]['m'] * em[1]['qm'] * g[1]['eiq'] * d_xi[1]['keq'],
         grad_u['pq'] <= 0.5 * (d_x[0]['lpq'] * u[0]['l'] + d_x[1]['lpq'] * u[1]['l']) +
-                        c0[0] * (e[0]['lq'] * (u[0]['l'] - u[1]['l']) - f_q['q']) * n_unit_q['pq']
+                        c0[0] * (e[0]['lq'] * u[0]['l'] - e[1]['lq'] * u[1]['l'] - f_q['q']) * n_unit_q['pq']
     ])
 
     generator.add('grad_u_bnd', [

@@ -130,7 +130,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.add('compute_traction',
         traction_q['pq'] <= 0.5 * (traction(0, n_unit_q) + traction(1, n_unit_q)) +
-                            c0[0] * (E_q[0]['lq'] * (u[0]['lp'] - u[1]['lp']) - f_q['pq']))
+                            c0[0] * (E_q[0]['lq'] * u[0]['lp'] - E_q[1]['lq'] * u[1]['lp'] - f_q['pq']))
 
     generator.add('compute_traction_bnd',
         traction_q['pq'] <= traction(0, n_unit_q) +
