@@ -435,6 +435,7 @@ void Elasticity::traction_skeleton(std::size_t fctNo, FacetInfo const& info,
     krnl.Dx_q(0) = Dx_q0;
     krnl.Dx_q(1) = Dx_q1;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
+    krnl.E_q(1) = E_q[info.localNo[1]].data();
     krnl.f_q = f_q_raw;
     krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
     krnl.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();

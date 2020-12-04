@@ -314,6 +314,7 @@ void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector
         krnl.em(side) = matE_q_T[info.localNo[side]].data();
     }
     krnl.e(0) = E_q[info.localNo[0]].data();
+    krnl.e(1) = E_q[info.localNo[1]].data();
     krnl.f_q = f_q_raw;
     krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
     krnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
