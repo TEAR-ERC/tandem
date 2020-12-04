@@ -66,6 +66,15 @@ void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scra
         }
     }
     cl_->facetBasis(up_, normal, fault_basis_q);
+    for (std::size_t q = 0; q < nq_; ++q) {
+        if (fault_[faultNo].template get<SignFlipped>()[q]) {
+            for (std::size_t i = 0; i < fault_basis_q.shape(1); ++i) {
+                for (std::size_t j = 0; j < fault_basis_q.shape(0); ++j) {
+                    fault_basis_q(i, j, q) *= -1.0;
+                }
+            }
+        }
+    }
     scratch.reset();
 }
 

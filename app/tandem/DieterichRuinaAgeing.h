@@ -39,7 +39,7 @@ public:
     }
 
     double psi_init(std::size_t index, double sn, double tau) const {
-        double snAbs = sn + p_[index].get<SnPre>();
+        double snAbs = -sn + p_[index].get<SnPre>();
         auto tauAbs = tau + p_[index].get<TauPre>();
         auto Vi = p_[index].get<Vinit>();
         auto a = p_[index].get<A>();
@@ -73,7 +73,7 @@ public:
 
 private:
     double F(std::size_t index, double sn, double tau, double V, double psi) const {
-        double snAbs = sn + p_[index].get<SnPre>();
+        double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = tau + p_[index].get<TauPre>();
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
