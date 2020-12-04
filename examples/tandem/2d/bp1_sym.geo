@@ -1,6 +1,6 @@
 DefineConstant[ Lf = {0.200, Min 0, Max 10, Name "Fault resolution" } ];
 
-h = 20;
+h = 50;
 w = 400;
 d = 400;
 d1 = 15;
