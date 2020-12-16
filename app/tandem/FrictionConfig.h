@@ -52,6 +52,10 @@ class DieterichRuinaAgeingScenario {
 public:
     template <std::size_t D>
     using functional_t = std::function<std::array<double, 1>(std::array<double, D> const&)>;
+    template <std::size_t D>
+    using vector_functional_t =
+        std::function<std::array<double, DieterichRuinaAgeing::TangentialComponents>(
+            std::array<double, D> const&)>;
 
     DieterichRuinaAgeingScenario(DieterichRuinaAgeingConfig const& cfg) : cp_(cfg.constant) {
         lib_.loadFile(cfg.lib);
@@ -62,11 +66,15 @@ public:
             sn_pre_ = lib_.getFunction<DomainDimension, 1>(*cfg.sn_pre);
         }
         if (cfg.tau_pre) {
-            tau_pre_ = lib_.getFunction<DomainDimension, 1>(*cfg.tau_pre);
+            tau_pre_ =
+                lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                    *cfg.tau_pre);
         }
-        Vinit_ = lib_.getFunction<DomainDimension, 1>(cfg.Vinit);
+        Vinit_ = lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+            cfg.Vinit);
         if (cfg.Sinit) {
-            Sinit_ = lib_.getFunction<DomainDimension, 1>(*cfg.Sinit);
+            Sinit_ = lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                *cfg.Sinit);
         }
         if (cfg.source) {
             source_ = std::make_optional(lib_.getFunction<DomainDimension + 1, 1>(*cfg.source));
@@ -80,9 +88,9 @@ public:
             p.a = this->a_(x)[0];
             p.eta = this->eta_(x)[0];
             p.sn_pre = this->sn_pre_(x)[0];
-            p.tau_pre = this->tau_pre_(x)[0];
-            p.Vinit = this->Vinit_(x)[0];
-            p.Sinit = this->Sinit_(x)[0];
+            p.tau_pre = this->tau_pre_(x);
+            p.Vinit = this->Vinit_(x);
+            p.Sinit = this->Sinit_(x);
             return p;
         };
     }
@@ -94,11 +102,11 @@ protected:
     functional_t<DomainDimension> a_, eta_;
     functional_t<DomainDimension> sn_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
-    functional_t<DomainDimension> tau_pre_ =
-        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
-    functional_t<DomainDimension> Vinit_;
-    functional_t<DomainDimension> Sinit_ =
-        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
+    vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)
+        -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
+    vector_functional_t<DomainDimension> Vinit_;
+    vector_functional_t<DomainDimension> Sinit_ = [](std::array<double, DomainDimension> const& x)
+        -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_;
 };
 

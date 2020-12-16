@@ -49,7 +49,11 @@ RealT dot(std::array<RealT, D> const& lhs, std::array<RealT, D> const& rhs) {
 }
 
 template <typename RealT, std::size_t D> RealT norm(std::array<RealT, D> const& x) {
-    return sqrt(dot(x, x));
+    if constexpr (D == 1u) {
+        return fabs(x[0]);
+    } else {
+        return sqrt(dot(x, x));
+    }
 }
 
 template <typename RealT, std::size_t D>
