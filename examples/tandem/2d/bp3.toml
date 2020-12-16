@@ -1,0 +1,29 @@
+final_time = 47304000000
+mesh_file = "bp3.msh"
+
+[seas]
+type = "elasticity"
+lib = "bp3.lua"
+boundary = "boundary"
+lam = "lam"
+mu = "mu"
+
+[friction]
+lib = "bp3.lua"
+a = "a"
+eta = "eta"
+sn_pre = "sn_pre"
+tau_pre = "tau_pre"
+Vinit = "Vinit"
+Sinit = "Sinit"
+    [friction.constant]
+    b = 0.015
+    V0 = 1.0e-6
+    L = 0.008
+    f0 = 0.6
+
+[output]
+prefix = "bp3"
+V_ref = 0.001
+t_min = 0.05
+t_max = 9460800
