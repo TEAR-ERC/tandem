@@ -1,7 +1,7 @@
 #ifndef SEASELASTICITYADAPTER_20201103_H
 #define SEASELASTICITYADAPTER_20201103_H
 
-#include "common/PetscBlockVector.h"
+#include "common/PetscVector.h"
 #include "common/PetscLinearSolver.h"
 #include "geometry/Curvilinear.h"
 #include "localoperator/Elasticity.h"
@@ -87,7 +87,7 @@ private:
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {
         return {};
     };
-    PetscBlockVector::const_handle handle_;
+    PetscVector::const_handle handle_;
 };
 
 } // namespace tndm

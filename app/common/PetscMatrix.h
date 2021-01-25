@@ -1,5 +1,5 @@
-#ifndef PETSCBLOCKMATRIX_20201002_H
-#define PETSCBLOCKMATRIX_20201002_H
+#ifndef PETSCMATRIX_20210125_H
+#define PETSCMATRIX_20210125_H
 
 #include "common/PetscUtil.h"
 
@@ -13,11 +13,11 @@
 
 namespace tndm {
 
-class PetscBlockMatrix {
+class PetscMatrix {
 public:
-    PetscBlockMatrix(std::size_t blockSize, std::size_t numLocalElems, unsigned const* numLocal,
-                     unsigned const* numGhost, MPI_Comm comm);
-    ~PetscBlockMatrix() { MatDestroy(&A_); }
+    PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, unsigned const* numLocal,
+                unsigned const* numGhost, MPI_Comm comm);
+    ~PetscMatrix() { MatDestroy(&A_); }
 
     void add_block(std::size_t ib_global, std::size_t jb_global, Matrix<double> const& values) {
         PetscInt pib = ib_global, pjb = jb_global;
@@ -39,4 +39,4 @@ private:
 
 } // namespace tndm
 
-#endif // PETSCBLOCKMATRIX_20201002_H
+#endif // PETSCMATRIX_20210125_H

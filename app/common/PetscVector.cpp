@@ -1,15 +1,14 @@
-#include "PetscBlockVector.h"
+#include "PetscVector.h"
 
 namespace tndm {
 
-PetscBlockVectorView::PetscBlockVectorView(Vec x) : x_(x) {
+PetscVectorView::PetscVectorView(Vec x) : x_(x) {
     PetscInt bs;
     CHKERRTHROW(VecGetBlockSize(x_, &bs));
     block_size_ = bs;
 }
 
-void PetscBlockVectorView::copy(const_handle access, std::size_t ib_local,
-                                Vector<double>& to) const {
+void PetscVectorView::copy(const_handle access, std::size_t ib_local, Vector<double>& to) const {
     assert(access != nullptr);
     assert(block_size_ == to.size());
     std::size_t i0 = ib_local * block_size_;
@@ -18,8 +17,7 @@ void PetscBlockVectorView::copy(const_handle access, std::size_t ib_local,
     }
 }
 
-PetscBlockVector::PetscBlockVector(std::size_t blockSize, std::size_t numLocalElems,
-                                   MPI_Comm comm) {
+PetscVector::PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm) {
     PetscInt localRows = numLocalElems * blockSize;
     CHKERRTHROW(VecCreate(comm, &x_));
     CHKERRTHROW(VecSetSizes(x_, localRows, PETSC_DECIDE));
@@ -28,7 +26,7 @@ PetscBlockVector::PetscBlockVector(std::size_t blockSize, std::size_t numLocalEl
     block_size_ = blockSize;
 }
 
-PetscBlockVector::PetscBlockVector(PetscBlockVector const& prototype) {
+PetscVector::PetscVector(PetscVector const& prototype) {
     VecDuplicate(prototype.vec(), &x_);
     block_size_ = prototype.block_size_;
 }

@@ -1,5 +1,5 @@
-#ifndef PETSCBLOCKVECTOR_20201002_H
-#define PETSCBLOCKVECTOR_20201002_H
+#ifndef PETSCVECTOR_20210125_H
+#define PETSCVECTOR_20210125_H
 
 #include "common/PetscUtil.h"
 
@@ -15,13 +15,13 @@
 
 namespace tndm {
 
-class PetscBlockVectorView {
+class PetscVectorView {
 public:
     using handle = PetscScalar*;
     using const_handle = PetscScalar const*;
 
-    PetscBlockVectorView() {}
-    PetscBlockVectorView(Vec x);
+    PetscVectorView() {}
+    PetscVectorView(Vec x);
 
     void add_block(std::size_t ib_global, Vector<double> const& values) {
         PetscInt pib = ib_global;
@@ -66,16 +66,16 @@ protected:
     std::size_t block_size_ = 0;
 };
 
-class PetscBlockVector : public PetscBlockVectorView {
+class PetscVector : public PetscVectorView {
 public:
     using handle = PetscScalar*;
     using const_handle = PetscScalar const*;
 
-    PetscBlockVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
-    PetscBlockVector(PetscBlockVector const& prototype);
-    ~PetscBlockVector() { VecDestroy(&x_); }
+    PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
+    PetscVector(PetscVector const& prototype);
+    ~PetscVector() { VecDestroy(&x_); }
 };
 
 } // namespace tndm
 
-#endif // PETSCBLOCKVECTOR_20201002_H
+#endif // PETSCVECTOR_20210125_H

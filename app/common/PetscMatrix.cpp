@@ -1,13 +1,12 @@
-#include "PetscBlockMatrix.h"
+#include "PetscMatrix.h"
 
 #include <petscsystypes.h>
 #include <vector>
 
 namespace tndm {
 
-PetscBlockMatrix::PetscBlockMatrix(std::size_t blockSize, std::size_t numLocalElems,
-                                   unsigned const* numLocal, unsigned const* numGhost,
-                                   MPI_Comm comm)
+PetscMatrix::PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, unsigned const* numLocal,
+                         unsigned const* numGhost, MPI_Comm comm)
     : block_size_(blockSize) {
     auto localSize = blockSize * numLocalElems;
 

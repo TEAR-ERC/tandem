@@ -1,7 +1,7 @@
 #ifndef SEASPOISSONADAPTER_20201102_H
 #define SEASPOISSONADAPTER_20201102_H
 
-#include "common/PetscBlockVector.h"
+#include "common/PetscVector.h"
 #include "common/PetscLinearSolver.h"
 #include "geometry/Curvilinear.h"
 #include "localoperator/Poisson.h"
@@ -86,7 +86,7 @@ private:
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {
         return {};
     };
-    PetscBlockVector::const_handle handle_;
+    PetscVector::const_handle handle_;
 };
 
 } // namespace tndm

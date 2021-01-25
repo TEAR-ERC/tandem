@@ -1,8 +1,8 @@
 #ifndef PETSCTS_20201001_H
 #define PETSCTS_20201001_H
 
-#include "common/PetscBlockVector.h"
 #include "common/PetscUtil.h"
+#include "common/PetscVector.h"
 
 #include <petscsystypes.h>
 #include <petscts.h>
@@ -15,8 +15,8 @@ namespace tndm {
 class PetscTimeSolver {
 public:
     template <typename TimeOp> PetscTimeSolver(TimeOp& timeop) {
-        state_ = std::make_unique<PetscBlockVector>(timeop.block_size(), timeop.numLocalElements(),
-                                                    timeop.comm());
+        state_ = std::make_unique<PetscVector>(timeop.block_size(), timeop.numLocalElements(),
+                                               timeop.comm());
         timeop.initial_condition(*state_);
 
         CHKERRTHROW(TSCreate(timeop.comm(), &ts_));
@@ -44,8 +44,8 @@ private:
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
         TimeOp* self = reinterpret_cast<TimeOp*>(ctx);
-        auto u_view = PetscBlockVectorView(u);
-        auto F_view = PetscBlockVectorView(F);
+        auto u_view = PetscVectorView(u);
+        auto F_view = PetscVectorView(F);
         self->rhs(t, u_view, F_view);
         return 0;
     }
@@ -53,12 +53,12 @@ private:
     template <class Monitor>
     static PetscErrorCode MonitorFunction(TS ts, PetscInt steps, PetscReal time, Vec u, void* ctx) {
         Monitor* self = reinterpret_cast<Monitor*>(ctx);
-        auto u_view = PetscBlockVectorView(u);
+        auto u_view = PetscVectorView(u);
         self->monitor(time, u_view);
         return 0;
     }
 
-    std::unique_ptr<PetscBlockVector> state_;
+    std::unique_ptr<PetscVector> state_;
     TS ts_ = nullptr;
 };
 
