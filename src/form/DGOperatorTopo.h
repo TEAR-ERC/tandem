@@ -25,6 +25,7 @@ public:
 
     FacetInfo const& info(std::size_t fctNo) const { return fctInfo[fctNo]; }
     std::size_t gid(std::size_t elNo) const { return volInfo[elNo].template get<GID>(); }
+    std::size_t const* gids() const { return &volInfo[0].template get<GID>(); }
     unsigned numLocalNeighbours(std::size_t elNo) const {
         return volInfo[elNo].template get<NumLocalNeighbours>();
     }

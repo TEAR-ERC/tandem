@@ -95,10 +95,9 @@ public:
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
                 l_scratch.reset();
                 a_scratch.reset();
-                auto ib = topo_->gid(elNo);
                 auto A00 = scratch_matrix(a_scratch);
                 if (lop_->assemble_volume(elNo, A00, l_scratch)) {
-                    matrix.add_block(ib, ib, A00);
+                    matrix.add_block(elNo, elNo, A00);
                 }
             }
         }
@@ -108,8 +107,8 @@ public:
                 l_scratch.reset();
                 a_scratch.reset();
                 auto const& info = topo_->info(fctNo);
-                auto ib0 = info.g_up[0];
-                auto ib1 = info.g_up[1];
+                auto ib0 = info.up[0];
+                auto ib1 = info.up[1];
                 if (info.up[0] != info.up[1]) {
                     auto A00 = scratch_matrix(a_scratch);
                     auto A01 = scratch_matrix(a_scratch);
@@ -140,10 +139,9 @@ public:
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
                 l_scratch.reset();
                 a_scratch.reset();
-                auto ib = topo_->gid(elNo);
                 auto A00 = scratch_matrix(a_scratch);
                 if (lop_->assemble_volume_post_skeleton(elNo, A00, l_scratch)) {
-                    matrix.add_block(ib, ib, A00);
+                    matrix.add_block(elNo, elNo, A00);
                 }
             }
         }

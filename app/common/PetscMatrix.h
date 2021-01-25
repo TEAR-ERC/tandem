@@ -15,13 +15,14 @@ namespace tndm {
 
 class PetscMatrix {
 public:
-    PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, unsigned const* numLocal,
-                unsigned const* numGhost, MPI_Comm comm);
+    PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, std::size_t numElems,
+                std::size_t const* gids, unsigned const* numLocal, unsigned const* numGhost,
+                MPI_Comm comm);
     ~PetscMatrix() { MatDestroy(&A_); }
 
-    void add_block(std::size_t ib_global, std::size_t jb_global, Matrix<double> const& values) {
-        PetscInt pib = ib_global, pjb = jb_global;
-        MatSetValuesBlocked(A_, 1, &pib, 1, &pjb, values.data(), ADD_VALUES);
+    void add_block(std::size_t ib_local, std::size_t jb_local, Matrix<double> const& values) {
+        PetscInt pib = ib_local, pjb = jb_local;
+        MatSetValuesBlockedLocal(A_, 1, &pib, 1, &pjb, values.data(), ADD_VALUES);
     }
     void begin_assembly() {}
     void end_assembly() {

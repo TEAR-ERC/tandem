@@ -23,9 +23,9 @@ public:
     PetscVectorView() {}
     PetscVectorView(Vec x);
 
-    void add_block(std::size_t ib_global, Vector<double> const& values) {
-        PetscInt pib = ib_global;
-        VecSetValuesBlocked(x_, 1, &pib, values.data(), ADD_VALUES);
+    void add_block(std::size_t ib_local, Vector<double> const& values) {
+        PetscInt pib = ib_local;
+        VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), ADD_VALUES);
     }
     void begin_assembly() {}
     void end_assembly() {
