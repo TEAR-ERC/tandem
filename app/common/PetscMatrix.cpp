@@ -19,6 +19,18 @@ PetscMatrix::PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, std::
     CHKERRTHROW(MatSetBlockSize(A_, blockSize));
     CHKERRTHROW(MatSetFromOptions(A_));
 
+    // Local to global mapping
+    PetscInt* l2g;
+    CHKERRTHROW(PetscMalloc(numElems * sizeof(PetscInt), &l2g));
+    for (std::size_t elNo = 0; elNo < numElems; ++elNo) {
+        l2g[elNo] = gids[elNo];
+    }
+    ISLocalToGlobalMapping is_l2g;
+    CHKERRTHROW(
+        ISLocalToGlobalMappingCreate(comm, block_size_, numElems, l2g, PETSC_OWN_POINTER, &is_l2g));
+    CHKERRTHROW(MatSetLocalToGlobalMapping(A_, is_l2g, is_l2g));
+    CHKERRTHROW(ISLocalToGlobalMappingDestroy(&is_l2g));
+
     // Preallocation
     auto d_nnz_aij = std::vector<PetscInt>(localSize);
     auto o_nnz_aij = std::vector<PetscInt>(localSize);
@@ -37,21 +49,10 @@ PetscMatrix::PetscMatrix(std::size_t blockSize, std::size_t numLocalElems, std::
 
     CHKERRTHROW(MatSeqAIJSetPreallocation(A_, 0, d_nnz_aij.data()));
     CHKERRTHROW(MatMPIAIJSetPreallocation(A_, 0, d_nnz_aij.data(), 0, o_nnz_aij.data()));
+    CHKERRTHROW(MatISSetPreallocation(A_, 0, d_nnz_aij.data(), 0, o_nnz_aij.data()));
     CHKERRTHROW(MatSeqBAIJSetPreallocation(A_, blockSize, 0, d_nnz_baij.data()));
     CHKERRTHROW(
         MatMPIBAIJSetPreallocation(A_, blockSize, 0, d_nnz_baij.data(), 0, o_nnz_baij.data()));
-
-    // Local to global mapping
-    PetscInt* l2g;
-    CHKERRTHROW(PetscMalloc(numElems * sizeof(PetscInt), &l2g));
-    for (std::size_t elNo = 0; elNo < numElems; ++elNo) {
-        l2g[elNo] = gids[elNo];
-    }
-    ISLocalToGlobalMapping is_l2g;
-    CHKERRTHROW(
-        ISLocalToGlobalMappingCreate(comm, block_size_, numElems, l2g, PETSC_OWN_POINTER, &is_l2g));
-    CHKERRTHROW(MatSetLocalToGlobalMapping(A_, is_l2g, is_l2g));
-    CHKERRTHROW(ISLocalToGlobalMappingDestroy(&is_l2g));
 
     // Options
     CHKERRTHROW(MatSetOption(A_, MAT_ROW_ORIENTED, PETSC_FALSE));
