@@ -10,6 +10,7 @@
 #include <petscsystypes.h>
 
 #include <cstddef>
+#include <vector>
 
 namespace tndm {
 
@@ -34,6 +35,17 @@ public:
     Mat mat() const { return A_; };
 
 private:
+    std::vector<PetscInt> nnz_aij(std::size_t numLocalElems, unsigned const* nnz);
+    std::vector<PetscInt> nnz_baij(std::size_t numLocalElems, unsigned const* nnz);
+    void preallocate_SeqAIJ(std::size_t numLocalElems, unsigned const* numLocal, unsigned const*);
+    void preallocate_MPIAIJ(std::size_t numLocalElems, unsigned const* numLocal,
+                            unsigned const* numGhost);
+    void preallocate_SeqBAIJ(std::size_t numLocalElems, unsigned const* numLocal, unsigned const*);
+    void preallocate_MPIBAIJ(std::size_t numLocalElems, unsigned const* numLocal,
+                             unsigned const* numGhost);
+    void preallocate_IS(std::size_t numLocalElems, std::size_t numElems, unsigned const* numLocal,
+                        unsigned const* numGhost);
+
     Mat A_;
     std::size_t block_size_;
 };

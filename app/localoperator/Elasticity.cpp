@@ -22,7 +22,8 @@ namespace tndm {
 
 Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                        functional_t<1> mu)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), space_(PolynomialDegree),
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()),
+      space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_lam(make_volume_functional(std::move(lam))),
       fun_mu(make_volume_functional(std::move(mu))), fun_force(zero_volume_function),

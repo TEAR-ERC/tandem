@@ -11,7 +11,7 @@ constexpr uint64_t fnv1a_step(uint64_t hash, char c) { return (hash ^ c) * 0x000
 constexpr uint64_t fnv1a(char const* s, std::size_t len) {
     return len > 0 ? fnv1a_step(fnv1a(s, len - 1), s[len - 1]) : fnv1a0();
 }
-uint64_t fnv1a(std::string const& s) { return fnv1a(s.data(), s.size()); }
+inline uint64_t fnv1a(std::string const& s) { return fnv1a(s.data(), s.size()); }
 constexpr uint64_t operator""_fnv1a(char const* s, std::size_t len) { return tndm::fnv1a(s, len); }
 
 } // namespace tndm

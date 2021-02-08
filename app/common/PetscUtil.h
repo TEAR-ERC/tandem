@@ -1,6 +1,8 @@
 #ifndef PETSCUTIL_20200910_H
 #define PETSCUTIL_20200910_H
 
+#include "util/Hash.h"
+
 #include <exception>
 #include <petscsys.h>
 
@@ -15,6 +17,8 @@
             throw ::tndm::petsc_error(what, ierr_);                                                \
         }                                                                                          \
     } while (false)
+
+#define HASH_DEF(def) ::tndm::fnv1a((def), sizeof(def)-1)
 
 namespace tndm {
 

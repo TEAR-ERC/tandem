@@ -102,7 +102,7 @@ private:
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
     // Ref elements
-    ModalRefElement<DomainDimension> space_;
+    NodalRefElement<DomainDimension> space_;
     NodalRefElement<DomainDimension> materialSpace_;
 
     // Matrices
