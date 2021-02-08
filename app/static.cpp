@@ -6,6 +6,7 @@
 #include "common/PoissonScenario.h"
 #include "config.h"
 #include "mesh/LocalSimplexMesh.h"
+#include "pc/register.h"
 
 #include "form/DGOperator.h"
 #include "form/Error.h"
@@ -141,8 +142,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
+    CHKERRQ(register_PCs());
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
@@ -192,7 +193,7 @@ int main(int argc, char** argv) {
         std::cerr << "Please specify either [poisson] or [elasticity] (but not both)." << std::endl;
     }
 
-    ierr = PetscFinalize();
+    PetscErrorCode ierr = PetscFinalize();
 
     return ierr;
 }

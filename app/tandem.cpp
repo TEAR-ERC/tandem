@@ -1,6 +1,7 @@
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
 #include "config.h"
+#include "pc/register.h"
 #include "tandem/AdaptiveOutputStrategy.h"
 #include "tandem/Config.h"
 #include "tandem/FrictionConfig.h"
@@ -101,8 +102,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    PetscErrorCode ierr;
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
+    CHKERRQ(register_PCs());
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
@@ -144,7 +145,7 @@ int main(int argc, char** argv) {
 
     solveSEASProblem(*mesh, *cfg);
 
-    ierr = PetscFinalize();
+    PetscErrorCode ierr = PetscFinalize();
 
     return ierr;
 }
