@@ -1,0 +1,9 @@
+# IDE
+.clangd
+compile_commands.json
+
+# Build folders
+build*
+
+# Python stuff
+app/kernels/__pycache__/
