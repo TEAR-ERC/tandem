@@ -2,7 +2,7 @@
 #define PETSCSOLVER_20200910_H
 
 #include "PetscUtil.h"
-#include "common/PetscMatrix.h"
+#include "common/PetscDGMatrix.h"
 #include "common/PetscVector.h"
 
 #include <petscksp.h>
@@ -19,9 +19,7 @@ class PetscLinearSolver {
 public:
     template <typename DGOp> PetscLinearSolver(DGOp& dgop) {
         auto const& topo = dgop.topo();
-        A_ = std::make_unique<PetscMatrix>(
-            dgop.block_size(), topo.numLocalElements(), topo.numElements(), topo.gids(),
-            topo.numLocalNeighbours(), topo.numGhostNeighbours(), topo.comm());
+        A_ = std::make_unique<PetscDGMatrix>(dgop.block_size(), topo);
         b_ = std::make_unique<PetscVector>(dgop.block_size(), topo.numLocalElements(), topo.comm());
         x_ = std::make_unique<PetscVector>(*b_);
         dgop.assemble(*A_);
@@ -62,7 +60,7 @@ public:
     }
 
 private:
-    std::unique_ptr<PetscMatrix> A_;
+    std::unique_ptr<PetscDGMatrix> A_;
     std::unique_ptr<PetscVector> b_;
     std::unique_ptr<PetscVector> x_;
     KSP ksp_ = nullptr;
