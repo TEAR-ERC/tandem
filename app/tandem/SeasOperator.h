@@ -19,8 +19,6 @@ namespace tndm {
 
 template <typename LocalOperator, typename SeasAdapter> class SeasOperator {
 public:
-    constexpr static std::size_t Dim = SeasAdapter::Dim;
-    constexpr static std::size_t NumQuantities = SeasAdapter::NumQuantities;
     using time_functional_t = typename SeasAdapter::time_functional_t;
 
     SeasOperator(std::unique_ptr<LocalOperator> localOperator,
