@@ -80,6 +80,7 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
 PetscErrorCode PCReset_eigdeflate(PC pc) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
+    CHKERRQ(KSPReset(ctx->reig));
     CHKERRQ(MatDestroy(&ctx->Q));
     CHKERRQ(VecDestroy(&ctx->r));
     CHKERRQ(VecDestroy(&ctx->e));
