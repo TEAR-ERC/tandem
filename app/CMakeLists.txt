@@ -134,8 +134,9 @@ set(APP_COMMON_SRCS
 )
 if(${LAPACK_FOUND})
     list(APPEND APP_COMMON_SRCS
-         pc/reig.cpp
-         pc/reig_impl.c
+         #pc/amgeig.c
+         pc/eigdeflate.c
+         pc/reig_aux.c
     )
 endif()
 add_library(app-common ${APP_COMMON_SRCS})
