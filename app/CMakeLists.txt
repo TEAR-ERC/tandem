@@ -109,11 +109,11 @@ generate_code(elasticity_adapter)
 
 ## LAPACK interface
 include(CheckLanguage)
-include(FortranCInterface)
 
 check_language(Fortran)
 if(CMAKE_Fortran_COMPILER)
     enable_language(Fortran)
+    include(FortranCInterface)
     FortranCInterface_HEADER(FC.h MACRO_NAMESPACE "FC_")
 
     find_package(LAPACK)
