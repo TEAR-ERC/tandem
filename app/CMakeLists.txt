@@ -108,23 +108,37 @@ generate_code(elasticity)
 generate_code(elasticity_adapter)
 
 ## LAPACK interface
-enable_language(Fortran)
-find_package(LAPACK REQUIRED)
-include(FortranCInterface)
-FortranCInterface_HEADER(FC.h MACRO_NAMESPACE "FC_")
+include(CheckLanguage)
+
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran)
+    include(FortranCInterface)
+    FortranCInterface_HEADER(FC.h MACRO_NAMESPACE "FC_")
+
+    find_package(LAPACK)
+    if(${LAPACK_FOUND})
+        add_definitions(-DHAVE_LAPACK)
+    endif()
+endif()
 
 ## Common
-add_library(app-common
+set(APP_COMMON_SRCS
     common/MeshConfig.cpp
     common/PetscDGMatrix.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
     localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
-    pc/reig.cpp
-    pc/reig_impl.c
     pc/register.cpp
 )
+if(${LAPACK_FOUND})
+    list(APPEND APP_COMMON_SRCS
+         pc/reig.cpp
+         pc/reig_impl.c
+    )
+endif()
+add_library(app-common ${APP_COMMON_SRCS})
 target_link_libraries(app-common PUBLIC
     ${LAPACK_LIBRARIES}
     poisson-kernels-lib
