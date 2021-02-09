@@ -108,12 +108,16 @@ generate_code(elasticity)
 generate_code(elasticity_adapter)
 
 ## LAPACK interface
-find_package(LAPACK)
-if(${LAPACK_FOUND})
-    add_definitions(-DHAVE_LAPACK)
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
     enable_language(Fortran)
     include(FortranCInterface)
     FortranCInterface_HEADER(FC.h MACRO_NAMESPACE "FC_")
+
+    find_package(LAPACK)
+    if(${LAPACK_FOUND})
+        add_definitions(-DHAVE_LAPACK)
+    endif()
 endif()
 
 ## Common
