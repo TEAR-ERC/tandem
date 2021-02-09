@@ -33,14 +33,11 @@ PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
 
 PetscErrorCode PCSetUp_eigdeflate(PC pc) {
     PC_eigdeflate* ctx;
-    PetscInt M;
     Mat A;
     const char* prefix;
 
     ctx = (PC_eigdeflate*)pc->data;
     A = pc->pmat;
-
-    CHKERRQ(MatGetSize(A, &M, NULL));
 
     if (!ctx->reig) {
         CHKERRQ(KSPCreate(PetscObjectComm((PetscObject)A), &ctx->reig));
