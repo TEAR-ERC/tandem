@@ -44,7 +44,7 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
 
     if (!ctx->reig) {
         CHKERRQ(KSPCreate(PetscObjectComm((PetscObject)A), &ctx->reig));
-        PCGetOptionsPrefix(pc, &prefix);
+        CHKERRQ(PCGetOptionsPrefix(pc, &prefix));
         CHKERRQ(KSPSetOptionsPrefix(ctx->reig, prefix));
         CHKERRQ(KSPAppendOptionsPrefix(ctx->reig, "eigdeflate_"));
         CHKERRQ(KSPSetOperators(ctx->reig, A, A));
