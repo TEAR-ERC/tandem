@@ -238,14 +238,14 @@ PetscErrorCode lapackeigs(Mat R,Vec eigs)
   
   /* Query and allocate the optimal workspace */
   lwork = -1;
-  dsyev_( "Vectors", "Upper", &n, a, &lda, w, &wkopt, &lwork, &info );
+  FC_dsyev( "Vectors", "Upper", &n, a, &lda, w, &wkopt, &lwork, &info );
   
   lwork = (int)wkopt;
   work = (double*)malloc(lwork*sizeof(double));
   memset(work,0,lwork*sizeof(double));
   
   /* Solve eigenproblem */
-  dsyev_( "Vectors", "Upper", &n, a, &lda, w, work, &lwork, &info );
+  FC_dsyev( "Vectors", "Upper", &n, a, &lda, w, work, &lwork, &info );
   
   ierr = MatDenseRestoreArray(R,&_array);CHKERRQ(ierr);
   ierr = VecRestoreArray(eigs,&_w);CHKERRQ(ierr);
