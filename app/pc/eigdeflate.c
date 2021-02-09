@@ -131,6 +131,7 @@ PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PetscViewerASCIIPrintf(viewer, "emin: %+1.4e\n", ctx->e_min);
     PetscViewerASCIIPrintf(viewer, "Randomized eigenvalue calculation\n", ctx->nev_oversample);
     PetscViewerASCIIPrintf(viewer, "over sampling: %D\n", ctx->nev_oversample);
+    PetscViewerASCIIPrintf(viewer, "power iterations: %D\n", ctx->power_its);
     CHKERRQ(KSPView(ctx->reig, viewer));
     PetscViewerASCIIPopTab(viewer);
 
