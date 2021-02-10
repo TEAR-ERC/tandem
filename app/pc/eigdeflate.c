@@ -73,19 +73,6 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
         CHKERRQ(KSPSetFromOptions(ctx->reig));
     }
 
-    if (ctx->npre > 0 || ctx->npost > 0) {
-        if (!ctx->smooth) {
-            CHKERRQ(KSPCreate(PetscObjectComm((PetscObject)A), &ctx->smooth));
-            CHKERRQ(PCGetOptionsPrefix(pc, &prefix));
-            CHKERRQ(KSPSetOptionsPrefix(ctx->smooth, prefix));
-            CHKERRQ(KSPAppendOptionsPrefix(ctx->smooth, "eigdeflate_smooth_"));
-        }
-        CHKERRQ(KSPSetOperators(ctx->smooth, A, A));
-        if (pc->setfromoptionscalled && !pc->setupcalled) {
-            CHKERRQ(KSPSetFromOptions(ctx->smooth));
-        }
-    }
-
     CHKERRQ(RandEigsMin(ctx->reig, ctx->nev, ctx->nev_oversample, ctx->power_its, NULL, &ctx->eigs,
                         &ctx->Q));
     {
@@ -116,6 +103,20 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
     }
     if (!ctx->scatter && !ctx->rc_red) {
         CHKERRQ(VecScatterCreateToAll(ctx->rc, &ctx->scatter, &ctx->rc_red));
+    }
+
+    if (ctx->npre > 0 || ctx->npost > 0) {
+        if (!ctx->smooth) {
+            CHKERRQ(KSPCreate(PetscObjectComm((PetscObject)A), &ctx->smooth));
+            CHKERRQ(PCGetOptionsPrefix(pc, &prefix));
+            CHKERRQ(KSPSetOptionsPrefix(ctx->smooth, prefix));
+            CHKERRQ(KSPAppendOptionsPrefix(ctx->smooth, "eigdeflate_smooth_"));
+        }
+        CHKERRQ(KSPSetOperators(ctx->smooth, A, A));
+        if (pc->setfromoptionscalled && !pc->setupcalled) {
+            CHKERRQ(KSPSetFromOptions(ctx->smooth));
+        }
+        CHKERRQ(KSPRichardsonSetScale(ctx->smooth, ctx->alpha));
     }
 
     PetscFunctionReturn(0);
@@ -187,7 +188,7 @@ PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PetscViewerASCIIPrintf(viewer, "pre-smooth iterations:  %D\n", ctx->npre);
     PetscViewerASCIIPrintf(viewer, "post-smooth iterations: %D\n", ctx->npost);
     if (ctx->npre > 0 || ctx->npost > 0) {
-        PetscViewerASCIIPrintf(viewer, "optimal relaxation: %D\n", ctx->alpha);
+        PetscViewerASCIIPrintf(viewer, "optimal relaxation: %+1.4e\n", ctx->alpha);
     }
     PetscViewerASCIIPushTab(viewer);
     CHKERRQ(KSPView(ctx->reig, viewer));
@@ -209,6 +210,8 @@ PetscErrorCode PCCreate_eigdeflate(PC pc) {
     edef->smooth = NULL;
     edef->e_min = 0.0;
     edef->e_max = 0.0;
+    edef->factor = 1.0;
+    edef->alpha = 0.0;
     edef->nev = 2;
     edef->nev_oversample = 2;
     edef->power_its = 1;
