@@ -134,7 +134,6 @@ set(APP_COMMON_SRCS
 )
 if(${LAPACK_FOUND})
     list(APPEND APP_COMMON_SRCS
-         #pc/amgeig.c
          pc/eigdeflate.c
          pc/reig_aux.c
     )

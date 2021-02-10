@@ -2,13 +2,15 @@
 #include "reig_aux.h"
 
 #include <petsc/private/pcimpl.h>
+#include <petscksp.h>
 #include <petscpc.h>
 #include <petscpctypes.h>
+#include <petscsystypes.h>
 
 typedef struct {
-    KSP reig;
-    PetscReal e_min, e_max;
-    PetscInt nev, nev_oversample, power_its;
+    KSP reig, smooth;
+    PetscReal e_min, e_max, factor, alpha;
+    PetscInt nev, nev_oversample, power_its, npre, npost;
     Vec eigs;
     Mat Q;
 
@@ -17,14 +19,37 @@ typedef struct {
 } PC_eigdeflate;
 
 PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
-    PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
+    PC_eigdeflate* ctx;
+    Mat A;
+
+    ctx = (PC_eigdeflate*)pc->data;
+    A = pc->pmat;
 
     CHKERRQ(VecZeroEntries(y));
-    CHKERRQ(MatMultTranspose(ctx->Q, x, ctx->rc));
+
+    if (ctx->npre > 0) {
+        CHKERRQ(
+            KSPSetTolerances(ctx->smooth, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, ctx->npre));
+        CHKERRQ(KSPSetInitialGuessNonzero(ctx->smooth, PETSC_TRUE));
+        CHKERRQ(KSPSolve(ctx->smooth, x, y));
+        CHKERRQ(MatMult(A, y, ctx->r));
+        CHKERRQ(VecAYPX(ctx->r, -1.0, x));
+        CHKERRQ(MatMultTranspose(ctx->Q, ctx->r, ctx->rc));
+    } else {
+        CHKERRQ(MatMultTranspose(ctx->Q, x, ctx->rc));
+    }
+
     CHKERRQ(VecScatterBegin(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
     CHKERRQ(VecScatterEnd(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
     CHKERRQ(VecPointwiseDivide(ctx->rc_red, ctx->rc_red, ctx->eigs));
     CHKERRQ(MatMultRedundant_MatDenseVecSeq(ctx->Q, ctx->rc_red, y));
+
+    if (ctx->npost > 0) {
+        CHKERRQ(
+            KSPSetTolerances(ctx->smooth, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, ctx->npost));
+        CHKERRQ(KSPSetInitialGuessNonzero(ctx->smooth, PETSC_TRUE));
+        CHKERRQ(KSPSolve(ctx->smooth, x, y));
+    }
 
     PetscFunctionReturn(0);
 }
@@ -46,6 +71,19 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
     CHKERRQ(KSPSetOperators(ctx->reig, A, A));
     if (pc->setfromoptionscalled && !pc->setupcalled) {
         CHKERRQ(KSPSetFromOptions(ctx->reig));
+    }
+
+    if (ctx->npre > 0 || ctx->npost > 0) {
+        if (!ctx->smooth) {
+            CHKERRQ(KSPCreate(PetscObjectComm((PetscObject)A), &ctx->smooth));
+            CHKERRQ(PCGetOptionsPrefix(pc, &prefix));
+            CHKERRQ(KSPSetOptionsPrefix(ctx->smooth, prefix));
+            CHKERRQ(KSPAppendOptionsPrefix(ctx->smooth, "eigdeflate_smooth_"));
+        }
+        CHKERRQ(KSPSetOperators(ctx->smooth, A, A));
+        if (pc->setfromoptionscalled && !pc->setupcalled) {
+            CHKERRQ(KSPSetFromOptions(ctx->smooth));
+        }
     }
 
     CHKERRQ(RandEigsMin(ctx->reig, ctx->nev, ctx->nev_oversample, ctx->power_its, NULL, &ctx->eigs,
@@ -70,6 +108,8 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
         CHKERRQ(VecDestroy(&eigs_max));
         CHKERRQ(MatDestroy(&Q_max));
     }
+
+    ctx->alpha = 2.0 * ctx->factor / (ctx->e_min + ctx->e_max);
 
     if (!ctx->rc && !ctx->r) {
         CHKERRQ(MatCreateVecs(ctx->Q, &ctx->rc, &ctx->r));
@@ -97,6 +137,9 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     PCReset_eigdeflate(pc);
 
     CHKERRQ(KSPDestroy(&ctx->reig));
+    if (ctx->npre > 0 || ctx->npost > 0) {
+        CHKERRQ(KSPDestroy(&ctx->smooth));
+    }
     CHKERRQ(VecDestroy(&ctx->eigs));
     CHKERRQ(VecDestroy(&ctx->rc));
     CHKERRQ(VecDestroy(&ctx->rc_red));
@@ -122,6 +165,12 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
                            &ctx->nev_oversample, &flg, 0);
     PetscOptionsBoundedInt("-pc_eigdeflate_power_its", "Number of power iterations", "",
                            ctx->power_its, &ctx->power_its, &flg, 0);
+    PetscOptionsBoundedInt("-pc_eigdeflate_npre", "Number of pre-smoothing iterations", "",
+                           ctx->npre, &ctx->npre, &flg, 0);
+    PetscOptionsBoundedInt("-pc_eigdeflate_npost", "Number of post-smoothing iterations", "",
+                           ctx->npost, &ctx->npost, &flg, 0);
+    PetscOptionsReal("-pc_eigdeflate_relax_factor", "Relaxation factor", "", ctx->factor,
+                     &ctx->factor, &flg);
     PetscOptionsTail();
     PetscFunctionReturn(0);
 }
@@ -129,14 +178,22 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
 PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
-    PetscViewerASCIIPushTab(viewer);
     PetscViewerASCIIPrintf(viewer, "num. eigenvectors: %D\n", ctx->nev);
     PetscViewerASCIIPrintf(viewer, "emin: %+1.4e\n", ctx->e_min);
     PetscViewerASCIIPrintf(viewer, "emax: %+1.4e\n", ctx->e_max);
     PetscViewerASCIIPrintf(viewer, "Randomized eigenvalue calculation\n", ctx->nev_oversample);
     PetscViewerASCIIPrintf(viewer, "over sampling: %D\n", ctx->nev_oversample);
     PetscViewerASCIIPrintf(viewer, "power iterations: %D\n", ctx->power_its);
+    PetscViewerASCIIPrintf(viewer, "pre-smooth iterations:  %D\n", ctx->npre);
+    PetscViewerASCIIPrintf(viewer, "post-smooth iterations: %D\n", ctx->npost);
+    if (ctx->npre > 0 || ctx->npost > 0) {
+        PetscViewerASCIIPrintf(viewer, "optimal relaxation: %D\n", ctx->alpha);
+    }
+    PetscViewerASCIIPushTab(viewer);
     CHKERRQ(KSPView(ctx->reig, viewer));
+    if (ctx->npre > 0 || ctx->npost > 0) {
+        CHKERRQ(KSPView(ctx->smooth, viewer));
+    }
     PetscViewerASCIIPopTab(viewer);
 
     PetscFunctionReturn(0);
@@ -149,11 +206,14 @@ PetscErrorCode PCCreate_eigdeflate(PC pc) {
     pc->data = (void*)edef;
 
     edef->reig = NULL;
+    edef->smooth = NULL;
     edef->e_min = 0.0;
     edef->e_max = 0.0;
     edef->nev = 2;
     edef->nev_oversample = 2;
     edef->power_its = 1;
+    edef->npre = 0;
+    edef->npost = 0;
     edef->eigs = NULL;
     edef->Q = NULL;
     edef->r = NULL;
