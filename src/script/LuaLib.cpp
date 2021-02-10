@@ -58,7 +58,11 @@ void LuaLib::loadFile(std::string const& fileName) {
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "path");
     std::string curPath = lua_tostring(L, -1);
-    auto fileNamePath = fs::canonical(fs::absolute(fs::path(fileName).parent_path())).string();
+    auto parent = fs::path(fileName).parent_path();
+    if (parent.empty()) {
+        parent = fs::current_path();
+    }
+    auto fileNamePath = fs::canonical(fs::absolute(parent)).string();
     curPath.append(";");
     curPath.append(fileNamePath);
     curPath.append("/?.lua");
