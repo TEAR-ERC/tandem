@@ -67,6 +67,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     sw.start();
     auto solver = PetscLinearSolver(dgop);
+    solver.setup();
     std::cout << "Setup after " << sw.stop() << std::endl;
 
     sw.start();

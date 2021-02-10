@@ -37,6 +37,10 @@ public:
         b_->set_zero();
         dgop.rhs(*b_);
     }
+    void setup() {
+        CHKERRTHROW(KSPSetUp(ksp_));
+        CHKERRTHROW(KSPSetUpOnBlocks(ksp_));
+    }
     void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
 
     auto& x() { return *x_; }
