@@ -7,12 +7,12 @@
 
 typedef struct {
     KSP reig;
-    PetscReal e_min;
+    PetscReal e_min, e_max;
     PetscInt nev, nev_oversample, power_its;
     Vec eigs;
     Mat Q;
 
-    Vec r, e, rc, rc_red, ec_red;
+    Vec r, rc, rc_red;
     VecScatter scatter;
 } PC_eigdeflate;
 
@@ -23,10 +23,8 @@ PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
     CHKERRQ(MatMultTranspose(ctx->Q, x, ctx->rc));
     CHKERRQ(VecScatterBegin(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
     CHKERRQ(VecScatterEnd(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
-    CHKERRQ(VecCopy(ctx->rc_red, ctx->ec_red));
-    CHKERRQ(VecPointwiseDivide(ctx->ec_red, ctx->ec_red, ctx->eigs));
-    CHKERRQ(MatMultRedundant_MatDenseVecSeq(ctx->Q, ctx->ec_red, ctx->e));
-    CHKERRQ(VecAXPY(y, 1.0, ctx->e));
+    CHKERRQ(VecPointwiseDivide(ctx->rc_red, ctx->rc_red, ctx->eigs));
+    CHKERRQ(MatMultRedundant_MatDenseVecSeq(ctx->Q, ctx->rc_red, y));
 
     PetscFunctionReturn(0);
 }
@@ -50,27 +48,34 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
         CHKERRQ(KSPSetFromOptions(ctx->reig));
     }
 
-    CHKERRQ(RandEigsMin_MPI_2(ctx->reig, ctx->nev, ctx->nev_oversample, ctx->power_its, NULL,
-                              &ctx->eigs, &ctx->Q));
-
+    CHKERRQ(RandEigsMin(ctx->reig, ctx->nev, ctx->nev_oversample, ctx->power_its, NULL, &ctx->eigs,
+                        &ctx->Q));
     {
         PetscReal* _e;
         CHKERRQ(VecGetArray(ctx->eigs, &_e));
         ctx->e_min = _e[0];
         CHKERRQ(VecRestoreArray(ctx->eigs, &_e));
     }
+    {
+        Vec eigs_max = NULL;
+        Mat Q_max = NULL;
+        PetscReal* _e;
+        PetscInt len;
+
+        CHKERRQ(RandEigsMax(A, 1, 5, ctx->power_its, NULL, &eigs_max, &Q_max));
+        CHKERRQ(VecGetSize(eigs_max, &len));
+        CHKERRQ(VecGetArray(eigs_max, &_e));
+        ctx->e_max = _e[len - 1];
+        CHKERRQ(VecRestoreArray(eigs_max, &_e));
+        CHKERRQ(VecDestroy(&eigs_max));
+        CHKERRQ(MatDestroy(&Q_max));
+    }
 
     if (!ctx->rc && !ctx->r) {
         CHKERRQ(MatCreateVecs(ctx->Q, &ctx->rc, &ctx->r));
     }
-    if (!ctx->e) {
-        CHKERRQ(MatCreateVecs(ctx->Q, NULL, &ctx->e));
-    }
     if (!ctx->scatter && !ctx->rc_red) {
         CHKERRQ(VecScatterCreateToAll(ctx->rc, &ctx->scatter, &ctx->rc_red));
-    }
-    if (!ctx->ec_red) {
-        CHKERRQ(VecDuplicate(ctx->eigs, &ctx->ec_red));
     }
 
     PetscFunctionReturn(0);
@@ -82,7 +87,6 @@ PetscErrorCode PCReset_eigdeflate(PC pc) {
     CHKERRQ(KSPReset(ctx->reig));
     CHKERRQ(MatDestroy(&ctx->Q));
     CHKERRQ(VecDestroy(&ctx->r));
-    CHKERRQ(VecDestroy(&ctx->e));
 
     PetscFunctionReturn(0);
 }
@@ -96,7 +100,6 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     CHKERRQ(VecDestroy(&ctx->eigs));
     CHKERRQ(VecDestroy(&ctx->rc));
     CHKERRQ(VecDestroy(&ctx->rc_red));
-    CHKERRQ(VecDestroy(&ctx->ec_red));
     CHKERRQ(VecScatterDestroy(&ctx->scatter));
 
     CHKERRQ(PetscFree(ctx));
@@ -129,6 +132,7 @@ PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PetscViewerASCIIPushTab(viewer);
     PetscViewerASCIIPrintf(viewer, "num. eigenvectors: %D\n", ctx->nev);
     PetscViewerASCIIPrintf(viewer, "emin: %+1.4e\n", ctx->e_min);
+    PetscViewerASCIIPrintf(viewer, "emax: %+1.4e\n", ctx->e_max);
     PetscViewerASCIIPrintf(viewer, "Randomized eigenvalue calculation\n", ctx->nev_oversample);
     PetscViewerASCIIPrintf(viewer, "over sampling: %D\n", ctx->nev_oversample);
     PetscViewerASCIIPrintf(viewer, "power iterations: %D\n", ctx->power_its);
@@ -146,16 +150,15 @@ PetscErrorCode PCCreate_eigdeflate(PC pc) {
 
     edef->reig = NULL;
     edef->e_min = 0.0;
+    edef->e_max = 0.0;
     edef->nev = 2;
     edef->nev_oversample = 2;
     edef->power_its = 1;
     edef->eigs = NULL;
     edef->Q = NULL;
     edef->r = NULL;
-    edef->e = NULL;
     edef->rc = NULL;
     edef->rc_red = NULL;
-    edef->ec_red = NULL;
     edef->scatter = NULL;
 
     pc->ops->apply = PCApply_eigdeflate;
