@@ -3,8 +3,10 @@
 
 #include <petsc/private/pcimpl.h>
 #include <petscksp.h>
+#include <petscmat.h>
 #include <petscpc.h>
 #include <petscpctypes.h>
+#include <petscsys.h>
 #include <petscsystypes.h>
 
 typedef struct {
@@ -12,21 +14,24 @@ typedef struct {
     PetscReal e_min, e_max, factor, alpha;
     PetscInt nev, nev_oversample, power_its, npre, npost;
     Vec eigs;
-    Mat Q;
+    Mat Q, Q_local;
 
-    Vec r, rc, rc_red;
-    VecScatter scatter;
+    Vec r, rc;
 } PC_eigdeflate;
 
 PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
     PC_eigdeflate* ctx;
     Mat A;
+    Vec r, r_local;
+    PetscScalar *r_local_, *rc_;
+    PetscInt m, k, bs;
 
     ctx = (PC_eigdeflate*)pc->data;
     A = pc->pmat;
 
     CHKERRQ(VecZeroEntries(y));
 
+    // Pre-smoothing
     if (ctx->npre > 0) {
         CHKERRQ(
             KSPSetTolerances(ctx->smooth, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, ctx->npre));
@@ -35,15 +40,32 @@ PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
         CHKERRQ(MatMult(A, y, ctx->r));
         CHKERRQ(VecAYPX(ctx->r, -1.0, x));
         CHKERRQ(MatMultTranspose(ctx->Q, ctx->r, ctx->rc));
+        r = ctx->r;
     } else {
-        CHKERRQ(MatMultTranspose(ctx->Q, x, ctx->rc));
+        r = x;
     }
 
-    CHKERRQ(VecScatterBegin(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
-    CHKERRQ(VecScatterEnd(ctx->scatter, ctx->rc, ctx->rc_red, INSERT_VALUES, SCATTER_FORWARD));
-    CHKERRQ(VecPointwiseDivide(ctx->rc_red, ctx->rc_red, ctx->eigs));
-    CHKERRQ(MatMultRedundant_MatDenseVecSeq(ctx->Q, ctx->rc_red, y));
+    // Create local view into r
+    CHKERRQ(MatGetLocalSize(ctx->Q, &m, NULL));
+    CHKERRQ(MatGetBlockSize(ctx->Q, &bs));
+    CHKERRQ(VecGetArray(r, &r_local_));
+    CHKERRQ(VecCreateSeqWithArray(PETSC_COMM_SELF, bs, m, (const PetscScalar*)r_local_, &r_local));
+    CHKERRQ(VecRestoreArray(r, &r_local_));
 
+    // Compute [Q_1^T ... Q_p^T] [r_1
+    //                            ...
+    //                            r_p] = sum_i Q_i^T r_i = Allreduce(Q_i^T r_i)
+    CHKERRQ(MatMultTranspose(ctx->Q_local, r_local, ctx->rc));
+    CHKERRQ(VecGetLocalSize(ctx->rc, &k));
+    CHKERRQ(VecGetArray(ctx->rc, &rc_));
+    MPI_Allreduce(MPI_IN_PLACE, rc_, k, MPIU_REAL, MPIU_SUM, PetscObjectComm((PetscObject)ctx->Q));
+    CHKERRQ(VecRestoreArray(ctx->rc, &rc_));
+    CHKERRQ(VecDestroy(&r_local));
+
+    CHKERRQ(VecPointwiseDivide(ctx->rc, ctx->rc, ctx->eigs));
+    CHKERRQ(MatMultRedundant_MatDenseVecSeq(ctx->Q, ctx->rc, y));
+
+    // Post-smoothing
     if (ctx->npost > 0) {
         CHKERRQ(
             KSPSetTolerances(ctx->smooth, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, ctx->npost));
@@ -75,6 +97,7 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
 
     CHKERRQ(RandEigsMin(ctx->reig, ctx->nev, ctx->nev_oversample, ctx->power_its, NULL, &ctx->eigs,
                         &ctx->Q));
+    CHKERRQ(MatDenseGetLocalMatrix(ctx->Q, &ctx->Q_local));
     {
         PetscReal* _e;
         CHKERRQ(VecGetArray(ctx->eigs, &_e));
@@ -99,10 +122,8 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
     ctx->alpha = 2.0 * ctx->factor / (ctx->e_min + ctx->e_max);
 
     if (!ctx->rc && !ctx->r) {
-        CHKERRQ(MatCreateVecs(ctx->Q, &ctx->rc, &ctx->r));
-    }
-    if (!ctx->scatter && !ctx->rc_red) {
-        CHKERRQ(VecScatterCreateToAll(ctx->rc, &ctx->scatter, &ctx->rc_red));
+        CHKERRQ(MatCreateVecs(ctx->Q, NULL, &ctx->r));
+        CHKERRQ(MatCreateVecs(ctx->Q_local, &ctx->rc, NULL));
     }
 
     if (ctx->npre > 0 || ctx->npost > 0) {
@@ -143,8 +164,6 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     }
     CHKERRQ(VecDestroy(&ctx->eigs));
     CHKERRQ(VecDestroy(&ctx->rc));
-    CHKERRQ(VecDestroy(&ctx->rc_red));
-    CHKERRQ(VecScatterDestroy(&ctx->scatter));
 
     CHKERRQ(PetscFree(ctx));
 
@@ -219,10 +238,9 @@ PetscErrorCode PCCreate_eigdeflate(PC pc) {
     edef->npost = 0;
     edef->eigs = NULL;
     edef->Q = NULL;
+    edef->Q_local = NULL;
     edef->r = NULL;
     edef->rc = NULL;
-    edef->rc_red = NULL;
-    edef->scatter = NULL;
 
     pc->ops->apply = PCApply_eigdeflate;
     pc->ops->applytranspose = PCApply_eigdeflate;
