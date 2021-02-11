@@ -126,6 +126,7 @@ endif()
 set(APP_COMMON_SRCS
     common/MeshConfig.cpp
     common/PetscDGMatrix.cpp
+    common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
     localoperator/Elasticity.cpp

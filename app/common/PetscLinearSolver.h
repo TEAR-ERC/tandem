@@ -6,6 +6,7 @@
 #include "common/PetscVector.h"
 
 #include <petscksp.h>
+#include <petscpc.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
 
@@ -37,10 +38,7 @@ public:
         b_->set_zero();
         dgop.rhs(*b_);
     }
-    void setup() {
-        CHKERRTHROW(KSPSetUp(ksp_));
-        CHKERRTHROW(KSPSetUpOnBlocks(ksp_));
-    }
+    void warmup();
     void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
 
     auto& x() { return *x_; }
@@ -48,22 +46,11 @@ public:
 
     KSP ksp() { return ksp_; }
 
-    void dump() const {
-        PetscViewer viewer;
-        CHKERRTHROW(PetscViewerCreate(PETSC_COMM_WORLD, &viewer));
-        CHKERRTHROW(PetscViewerSetType(viewer, PETSCVIEWERBINARY));
-        CHKERRTHROW(PetscViewerFileSetMode(viewer, FILE_MODE_WRITE));
-
-        CHKERRTHROW(PetscViewerFileSetName(viewer, "A.bin"));
-        CHKERRTHROW(MatView(A_->mat(), viewer));
-
-        CHKERRTHROW(PetscViewerFileSetName(viewer, "b.bin"));
-        CHKERRTHROW(VecView(b_->vec(), viewer));
-
-        CHKERRTHROW(PetscViewerDestroy(&viewer));
-    }
+    void dump() const;
 
 private:
+    void warmup_composite(PC pc);
+
     std::unique_ptr<PetscDGMatrix> A_;
     std::unique_ptr<PetscVector> b_;
     std::unique_ptr<PetscVector> x_;

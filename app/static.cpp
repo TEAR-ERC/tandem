@@ -54,6 +54,7 @@ template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     std::optional<std::string> const& output) {
     tndm::Stopwatch sw;
+    double time;
 
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
@@ -67,12 +68,24 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     sw.start();
     auto solver = PetscLinearSolver(dgop);
-    solver.setup();
-    std::cout << "Setup after " << sw.stop() << std::endl;
+    time = sw.stop();
+    if (rank == 0) {
+        std::cout << "Assembly: " << time << " s" << std::endl;
+    }
+
+    sw.start();
+    solver.warmup();
+    time = sw.stop();
+    if (rank == 0) {
+        std::cout << "Solver warmup: " << time << " s" << std::endl;
+    }
 
     sw.start();
     solver.solve();
-    std::cout << "Solved after " << sw.split() << std::endl;
+    time = sw.stop();
+    if (rank == 0) {
+        std::cout << "Solve: " << time << " s" << std::endl;
+    }
 
     PetscReal rnorm;
     PetscInt its;
