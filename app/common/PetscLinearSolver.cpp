@@ -9,6 +9,10 @@ void PetscLinearSolver::warmup() {
     CHKERRTHROW(KSPSetUp(ksp_));
     CHKERRTHROW(KSPSetUpOnBlocks(ksp_));
     CHKERRTHROW(KSPGetPC(ksp_, &pc));
+    warmup_sub_pcs(pc);
+}
+
+void PetscLinearSolver::warmup_sub_pcs(PC pc) {
     PCType type;
     PCGetType(pc, &type);
     switch (fnv1a(type)) {
@@ -27,6 +31,8 @@ void PetscLinearSolver::warmup_composite(PC pc) {
         PC sub;
         CHKERRTHROW(PCCompositeGetPC(pc, n, &sub));
         CHKERRTHROW(PCSetUp(sub));
+        CHKERRTHROW(PCSetUpOnBlocks(sub));
+        warmup_sub_pcs(sub);
     }
 }
 

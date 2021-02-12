@@ -49,6 +49,7 @@ public:
     void dump() const;
 
 private:
+    void warmup_sub_pcs(PC pc);
     void warmup_composite(PC pc);
 
     std::unique_ptr<PetscDGMatrix> A_;
