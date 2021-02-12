@@ -39,7 +39,6 @@ PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
         CHKERRQ(KSPSolve(ctx->smooth, x, y));
         CHKERRQ(MatMult(A, y, ctx->r));
         CHKERRQ(VecAYPX(ctx->r, -1.0, x));
-        CHKERRQ(MatMultTranspose(ctx->Q, ctx->r, ctx->rc));
         r = ctx->r;
     } else {
         r = x;
