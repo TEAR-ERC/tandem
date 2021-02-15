@@ -13,9 +13,10 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     D_xi = Tensor('D_xi', (Nbf, dim, Nq))
     D_x = Tensor('D_x', D_xi.shape())
     A = Tensor('A', (Nbf, Nbf))
-    matMinv = Tensor('matMinv', (Nbf, Nbf))
+    matM = Tensor('matM', (Nbf, Nbf))
 
-    generator.add('project_K', K['p'] <= matMinv['pk'] * K_Q['q'] * Em['qk'] * W['q'])
+    generator.add('project_K_lhs', matM['kl'] <= Em['qk'] * W['q'] * J['q'] * Em['ql'])
+    generator.add('project_K_rhs', K['k'] <= K_Q['q'] * Em['qk'] * W['q'] * J['q'])
 
     generator.add('assembleVolume', [
         D_x['kiq'] <= G['eiq'] * D_xi['keq'],

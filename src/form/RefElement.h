@@ -29,6 +29,8 @@ public:
 
     /**
      * @brief Computes int phi_i phi_j dV
+     *
+     * Only for linear elements!
      */
     virtual Managed<Matrix<double>> massMatrix() const = 0;
     virtual Managed<Matrix<double>> inverseMassMatrix() const = 0;

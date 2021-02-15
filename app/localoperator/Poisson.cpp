@@ -12,6 +12,7 @@
 #include "quadrules/SimplexQuadratureRule.h"
 #include "util/LinearAllocator.h"
 
+#include <Eigen/LU>
 #include <cassert>
 
 namespace tensor = tndm::poisson::tensor;
@@ -36,7 +37,6 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
-    matMinv = materialSpace_.inverseMassMatrix();
 }
 
 void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -56,13 +56,31 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     auto K_Q = Matrix<double>(K_Q_raw, 1, volRule.size());
     fun_K(elNo, K_Q);
 
-    kernel::project_K krnl;
-    krnl.Em = matE_Q_T.data();
-    krnl.K = Kfield;
-    krnl.K_Q = K_Q_raw;
-    krnl.W = volRule.weights().data();
-    krnl.matMinv = matMinv.data();
-    krnl.execute();
+    auto nbf = materialSpace_.numBasisFunctions();
+    double* Mmem = scratch.allocate(nbf * nbf);
+    kernel::project_K_lhs krnl_lhs;
+    krnl_lhs.Em = matE_Q_T.data();
+    krnl_lhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_lhs.matM = Mmem;
+    krnl_lhs.W = volRule.weights().data();
+    krnl_lhs.execute();
+
+    kernel::project_K_rhs krnl_rhs;
+    krnl_rhs.Em = matE_Q_T.data();
+    krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_rhs.K = Kfield;
+    krnl_rhs.K_Q = K_Q_raw;
+    krnl_rhs.W = volRule.weights().data();
+    krnl_rhs.execute();
+
+    using MMap =
+        Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
+                   Eigen::Unaligned, Eigen::OuterStride<init::K::Stop[0] - init::K::Start[0]>>;
+    using KMap = Eigen::Map<Eigen::Matrix<double, tensor::K::Shape[0], 1>, Eigen::Unaligned,
+                            Eigen::InnerStride<1>>;
+
+    auto K_eigen = KMap(Kfield);
+    K_eigen = MMap(Mmem).partialPivLu().solve(K_eigen);
 
     auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
     base::penalty[elNo] *=
