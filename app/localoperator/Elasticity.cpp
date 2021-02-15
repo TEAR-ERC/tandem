@@ -12,6 +12,7 @@
 #include "quadrules/SimplexQuadratureRule.h"
 #include "util/LinearAllocator.h"
 
+#include <Eigen/LU>
 #include <cassert>
 
 namespace tensor = tndm::elasticity::tensor;
@@ -38,7 +39,6 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
     }
 
-    matMinv = materialSpace_.inverseMassMatrix();
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
 }
 
@@ -71,15 +71,42 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
     fun_mu(elNo, mu_Q);
 
-    kernel::project_material krnl;
-    krnl.matE_Q_T = matE_Q_T.data();
-    krnl.lam = material[elNo].get<lam>().data();
-    krnl.lam_Q = lam_Q_raw;
-    krnl.mu = material[elNo].get<mu>().data();
-    krnl.mu_Q = mu_Q_raw;
-    krnl.W = volRule.weights().data();
-    krnl.matMinv = matMinv.data();
-    krnl.execute();
+    auto nbf = materialSpace_.numBasisFunctions();
+    double* Mmem = scratch.allocate(nbf * nbf);
+    kernel::project_material_lhs krnl_lhs;
+    krnl_lhs.matE_Q_T = matE_Q_T.data();
+    krnl_lhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_lhs.matM = Mmem;
+    krnl_lhs.W = volRule.weights().data();
+    krnl_lhs.execute();
+
+    auto lam_field = material[elNo].get<lam>().data();
+    auto mu_field = material[elNo].get<mu>().data();
+    kernel::project_material_rhs krnl_rhs;
+    krnl_rhs.matE_Q_T = matE_Q_T.data();
+    krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_rhs.lam = lam_field;
+    krnl_rhs.lam_Q = lam_Q_raw;
+    krnl_rhs.mu = mu_field;
+    krnl_rhs.mu_Q = mu_Q_raw;
+    krnl_rhs.W = volRule.weights().data();
+    krnl_rhs.execute();
+
+    using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
+                            Eigen::Unaligned,
+                            Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
+    using LamMap = Eigen::Map<Eigen::Matrix<double, tensor::lam::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
+    using MuMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
+                             Eigen::InnerStride<1>>;
+
+    auto proj = MMap(Mmem).partialPivLu();
+
+    auto lam_eigen = LamMap(lam_field);
+    lam_eigen = proj.solve(lam_eigen);
+
+    auto mu_eigen = MuMap(mu_field);
+    mu_eigen = proj.solve(mu_eigen);
 }
 void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                                   LinearAllocator<double>& scratch) {

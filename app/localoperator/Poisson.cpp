@@ -73,9 +73,9 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     krnl_rhs.W = volRule.weights().data();
     krnl_rhs.execute();
 
-    using MMap =
-        Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
-                   Eigen::Unaligned, Eigen::OuterStride<init::K::Stop[0] - init::K::Start[0]>>;
+    using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
+                            Eigen::Unaligned,
+                            Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
     using KMap = Eigen::Map<Eigen::Matrix<double, tensor::K::Shape[0], 1>, Eigen::Unaligned,
                             Eigen::InnerStride<1>>;
 

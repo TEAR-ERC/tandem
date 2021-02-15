@@ -34,6 +34,11 @@ public:
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                functional_t<1> mu);
 
+    std::size_t scratch_mem_size() const {
+        auto matNbf = materialSpace_.numBasisFunctions();
+        return base::scratch_mem_size() + matNbf * matNbf;
+    }
+
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -112,7 +117,6 @@ private:
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
 
     Managed<Matrix<double>> matE_Q_T;
-    Managed<Matrix<double>> matMinv;
     std::vector<Managed<Matrix<double>>> matE_q_T;
 
     // Input

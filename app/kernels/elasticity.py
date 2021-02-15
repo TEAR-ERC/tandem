@@ -23,11 +23,13 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     Unew = Tensor('Unew', (Nbf, dim))
     A = Tensor('A', (Nbf, dim, Nbf, dim))
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
-    matMinv = Tensor('matMinv', (Nbf, Nbf))
+    matM = Tensor('matM', (Nbf, Nbf))
 
-    generator.add('project_material', [
-        lam['p'] <= matMinv['pk'] * lam_Q['q'] * matE_Q_T['qk'] * W['q'],
-        mu['p'] <= matMinv['pk'] * mu_Q['q'] * matE_Q_T['qk'] * W['q']
+    generator.add('project_material_lhs', matM['kl'] <= \
+                matE_Q_T['qk'] * W['q'] * J['q'] * matE_Q_T['ql'])
+    generator.add('project_material_rhs', [
+        lam['k'] <= lam_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
+        mu['k'] <= mu_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q']
     ])
 
     generator.add('precomputeVolume', [
