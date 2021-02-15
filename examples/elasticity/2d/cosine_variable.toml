@@ -1,7 +1,7 @@
 resolution = 0.125
 
 [elasticity]
-lib = "cosine.lua"
+lib = "cosine_variable.lua"
 force = "force"
 boundary = "solution"
 solution = "solution"
