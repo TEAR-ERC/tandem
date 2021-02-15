@@ -1,7 +1,8 @@
 require "warp"
 
 function warp(x, y)
-    return partialAnnulus(x, y)
+    xp, yp = partialAnnulus(x, y)
+    return math.exp(xp) * math.sin(xp) * xp, math.exp(yp) * yp
 end
 
 function solution(x, y)
