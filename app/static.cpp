@@ -56,6 +56,9 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     tndm::Stopwatch sw;
     double time;
 
+    PetscLogStage solve;
+    PetscLogStageRegister("solve", &solve);
+
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
@@ -80,11 +83,17 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
 
+    PetscLogStagePush(solve);
     sw.start();
     solver.solve();
     time = sw.stop();
     if (rank == 0) {
         std::cout << "Solve: " << time << " s" << std::endl;
+    }
+    PetscLogStagePop();
+    if (!solver.is_converged()) {
+        std::cout << "Solver did not converge." << std::endl;
+        return;
     }
 
     PetscReal rnorm;

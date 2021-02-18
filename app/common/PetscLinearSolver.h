@@ -40,6 +40,11 @@ public:
     }
     void warmup();
     void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
+    bool is_converged() const {
+        KSPConvergedReason reason;
+        KSPGetConvergedReason(ksp_, &reason);
+        return reason > 0;
+    }
 
     auto& x() { return *x_; }
     auto const& x() const { return *x_; }
