@@ -34,11 +34,6 @@ public:
 
     Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K);
 
-    std::size_t scratch_mem_size() const {
-        auto matNbf = materialSpace_.numBasisFunctions();
-        return base::scratch_mem_size() + matNbf * matNbf;
-    }
-
     std::size_t block_size() const { return space_.numBasisFunctions(); }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -96,8 +91,11 @@ public:
 
 private:
     double penalty(FacetInfo const& info) const {
-        return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
+        // return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
+        return -3;
     }
+    void compute_mass_matrix(std::size_t elNo, double* M) const;
+    void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
