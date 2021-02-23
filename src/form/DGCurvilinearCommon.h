@@ -22,6 +22,8 @@
 
 namespace tndm {
 
+enum class DGMethod { IP, BR2, Unknown };
+
 template <std::size_t D> class DGCurvilinearCommon {
 public:
     template <std::size_t Q>

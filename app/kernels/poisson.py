@@ -46,8 +46,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     generator.add('K_Dx_q', K_Dx_q[0]['kiq'] <= K['m'] * matE_q_T['qm'] * G_q['eiq'] * Dxi_q['keq'])
     generator.add('K_w_q', K_w_q[0]['q'] <= K['m'] * matE_q_T['qm'] * w['q'])
 
+    generator.addFamily('lift_ip', simpleParameterSpace(2), \
+        lambda x: L_q[x]['lq'] <= E_q[x]['lq'] * nl_q['q'])
+
     generator.addFamily('lift_skeleton', simpleParameterSpace(2), \
-        lambda x: L_q[x]['lq'] <= 0.5 * ( \
+        lambda x: L_q[x]['lq'] <= 0.25 * ( \
             n_q['iq'] * E_q[0]['uq'] * \
                 Minv[0]['us'] * E_q[0]['sp'] * E_q[x]['lp'] * n_q['ip'] * K_w_q[0]['p'] + \
             n_q['iq'] * E_q[1]['vq'] * \
@@ -60,7 +63,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         return a[x][y]['kl'] <= c0[y] * w['q'] * K_Dx_q[x]['kiq'] * n_q['iq'] * E_q[y]['lq'] + \
                                 c1[x] * w['q'] * K_Dx_q[y]['liq'] * n_q['iq'] * E_q[x]['kq'] + \
                                 c2[abs(y-x)] * w['q'] * E_q[x]['kq'] * L_q[y]['lq']
-                                # c2[abs(y-x)] * w['q'] * e[x]['kq'] * e[y]['lq'] * nl['q']
 
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), surface)
 
@@ -71,7 +73,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     f_q = Tensor('f_q', (nq,))
     f_lifted_q = Tensor('f_lifted_q', (nq,))
 
-    # generator.add('rhs_lift_ip', f_lifted_q['q'] <= nl['q'] * f_q['q'])
+    generator.add('rhs_lift_ip', f_lifted_q['q'] <= nl_q['q'] * f_q['q'])
 
     generator.add('rhs_lift_boundary', f_lifted_q['q'] <= \
         E_q[0]['lq'] * n_q['iq'] * Minv[0]['lm'] * E_q[0]['mp'] * f_q['p'] * K_w_q[0]['p'] * n_q['ip'])
@@ -84,7 +86,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     generator.add('rhsFacet', b['k'] <= b['k'] + \
             c1[0] * w['q'] * K_Dx_q[0]['kiq'] * n_q['iq'] * f_q['q'] + \
             c2[0] * w['q'] * E_q[0]['kq'] * f_lifted_q['q'])
-            # c2[0] * w['q'] * e[0]['kq'] * nl['q'] * f_q['q'])
 
     # traction
 

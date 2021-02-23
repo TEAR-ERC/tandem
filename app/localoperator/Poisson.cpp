@@ -21,8 +21,10 @@ namespace kernel = tndm::poisson::kernel;
 
 namespace tndm {
 
-Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), space_(PolynomialDegree),
+Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
+                 DGMethod method)
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
+      space_(PolynomialDegree),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
@@ -177,34 +179,46 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
     auto K_Dx_q = std::array<double*, 2>{K_Dx_q0, K_Dx_q1};
     compute_K_Dx_q(fctNo, info, K_Dx_q);
 
-    double Minv[2][tensor::M::size()];
-    for (int i = 0; i < 2; ++i) {
-        compute_inverse_mass_matrix(info.up[i], Minv[i]);
-    }
-
-    double K_w_q0[tensor::K_w_q::size(0)];
-    double K_w_q1[tensor::K_w_q::size(1)];
-    auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
-    compute_K_w_q(fctNo, info, K_w_q);
-
     double L_q[2][std::max(tensor::L_q::size(0), tensor::L_q::size(1))];
-    kernel::lift_skeleton lift;
-    lift.n_q = fct[fctNo].get<Normal>().data()->data();
-    for (int i = 0; i < 2; ++i) {
-        lift.K_w_q(i) = K_w_q[i];
-        lift.L_q(i) = L_q[i];
-        lift.Minv(i) = Minv[i];
-        lift.E_q(i) = E_q[info.localNo[i]].data();
+
+    if (method_ == DGMethod::BR2) {
+        double Minv[2][tensor::M::size()];
+        for (int i = 0; i < 2; ++i) {
+            compute_inverse_mass_matrix(info.up[i], Minv[i]);
+        }
+
+        double K_w_q0[tensor::K_w_q::size(0)];
+        double K_w_q1[tensor::K_w_q::size(1)];
+        auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
+        compute_K_w_q(fctNo, info, K_w_q);
+
+        kernel::lift_skeleton lift;
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        for (int i = 0; i < 2; ++i) {
+            lift.K_w_q(i) = K_w_q[i];
+            lift.L_q(i) = L_q[i];
+            lift.Minv(i) = Minv[i];
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+        }
+        lift.execute(0);
+        lift.execute(1);
+    } else { // IP
+        kernel::lift_ip lift;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        for (int i = 0; i < 2; ++i) {
+            lift.L_q(i) = L_q[i];
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+        }
+        lift.execute(0);
+        lift.execute(1);
     }
-    lift.execute(0);
-    lift.execute(1);
 
     kernel::assembleSurface assemble;
     assemble.c00 = -0.5;
     assemble.c01 = -assemble.c00;
     assemble.c10 = epsilon * 0.5;
     assemble.c11 = -assemble.c10;
-    assemble.c20 = penalty(info) * 0.5;
+    assemble.c20 = penalty(info);
     assemble.c21 = -assemble.c20;
     assemble.a(0, 0) = A00.data();
     assemble.a(0, 1) = A01.data();
@@ -238,20 +252,28 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
     assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
 
-    double Minv0[tensor::M::size()];
-    compute_inverse_mass_matrix(info.up[0], Minv0);
-
-    double K_w_q[tensor::K_w_q::size(0)];
-    compute_K_w_q(fctNo, info, {K_w_q, nullptr});
-
     double L0[tensor::L_q::size(0)];
-    kernel::lift_boundary lift;
-    lift.K_w_q(0) = K_w_q;
-    lift.L_q(0) = L0;
-    lift.Minv(0) = Minv0;
-    lift.E_q(0) = E_q[info.localNo[0]].data();
-    lift.n_q = fct[fctNo].get<Normal>().data()->data();
-    lift.execute();
+    if (method_ == DGMethod::BR2) {
+        double Minv0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv0);
+
+        double K_w_q[tensor::K_w_q::size(0)];
+        compute_K_w_q(fctNo, info, {K_w_q, nullptr});
+
+        kernel::lift_boundary lift;
+        lift.K_w_q(0) = K_w_q;
+        lift.L_q(0) = L0;
+        lift.Minv(0) = Minv0;
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.execute();
+    } else { // IP
+        kernel::lift_ip lift;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.L_q(0) = L0;
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.execute(0);
+    }
 
     double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
@@ -324,26 +346,34 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
         return false;
     }
 
-    double Minv[2][tensor::M::size()];
-    compute_inverse_mass_matrix(info.up[0], Minv[0]);
-    compute_inverse_mass_matrix(info.up[1], Minv[1]);
-
-    double K_w_q0[tensor::K_w_q::size(0)];
-    double K_w_q1[tensor::K_w_q::size(1)];
-    auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
-    compute_K_w_q(fctNo, info, K_w_q);
-
     double f_lifted_q[tensor::f_lifted_q::size()];
-    kernel::rhs_lift_skeleton lift;
-    for (int i = 0; i < 2; ++i) {
-        lift.E_q(i) = E_q[info.localNo[i]].data();
-        lift.K_w_q(i) = K_w_q[i];
-        lift.Minv(i) = Minv[i];
+    if (method_ == DGMethod::BR2) {
+        double Minv[2][tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv[0]);
+        compute_inverse_mass_matrix(info.up[1], Minv[1]);
+
+        double K_w_q0[tensor::K_w_q::size(0)];
+        double K_w_q1[tensor::K_w_q::size(1)];
+        auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
+        compute_K_w_q(fctNo, info, K_w_q);
+
+        kernel::rhs_lift_skeleton lift;
+        for (int i = 0; i < 2; ++i) {
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+            lift.K_w_q(i) = K_w_q[i];
+            lift.Minv(i) = Minv[i];
+        }
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.execute();
     }
-    lift.n_q = fct[fctNo].get<Normal>().data()->data();
-    lift.f_q = f_q_raw;
-    lift.f_lifted_q = f_lifted_q;
-    lift.execute();
 
     double K_Dx_q0[tensor::K_Dx_q::size(0)];
     double K_Dx_q1[tensor::K_Dx_q::size(1)];
@@ -377,21 +407,29 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
         return false;
     }
 
-    double M0[tensor::M::size()];
-    compute_inverse_mass_matrix(info.up[0], M0);
-
-    double K_w_q[tensor::K_w_q::size(0)];
-    compute_K_w_q(fctNo, info, {K_w_q, nullptr});
-
     double f_lifted_q[tensor::f_lifted_q::size()];
-    kernel::rhs_lift_boundary lift;
-    lift.E_q(0) = E_q[info.localNo[0]].data();
-    lift.n_q = fct[fctNo].get<Normal>().data()->data();
-    lift.K_w_q(0) = K_w_q;
-    lift.Minv(0) = M0;
-    lift.f_q = f_q_raw;
-    lift.f_lifted_q = f_lifted_q;
-    lift.execute();
+    if (method_ == DGMethod::BR2) {
+        double M0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], M0);
+
+        double K_w_q[tensor::K_w_q::size(0)];
+        compute_K_w_q(fctNo, info, {K_w_q, nullptr});
+
+        kernel::rhs_lift_boundary lift;
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.K_w_q(0) = K_w_q;
+        lift.Minv(0) = M0;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.execute();
+    }
 
     double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});

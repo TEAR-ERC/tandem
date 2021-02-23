@@ -5,6 +5,7 @@
 #include "common/PetscUtil.h"
 #include "common/PoissonScenario.h"
 #include "config.h"
+#include "form/DGCurvilinearCommon.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "pc/register.h"
 
@@ -43,6 +44,7 @@ using namespace tndm;
 
 struct Config {
     std::optional<double> resolution;
+    DGMethod method;
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<PoissonScenarioConfig> poisson;
@@ -52,7 +54,7 @@ struct Config {
 
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
-                    std::optional<std::string> const& output) {
+                    DGMethod method, std::optional<std::string> const& output) {
     tndm::Stopwatch sw;
     double time;
 
@@ -65,7 +67,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
                                                              PolynomialDegree);
 
-    auto lop = scenario.make_local_operator(cl);
+    auto lop = scenario.make_local_operator(cl, method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto dgop = DGOperator(topo, std::move(lop));
 
@@ -149,6 +151,18 @@ int main(int argc, char** argv) {
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
         .help("Non-negative resolution parameter");
+    schema.add_value("method", &Config::method)
+        .converter([](std::string_view value) {
+            if (iEquals(value, "ip")) {
+                return DGMethod::IP;
+            } else if (iEquals(value, "br2")) {
+                return DGMethod::BR2;
+            } else {
+                return DGMethod::Unknown;
+            }
+        })
+        .default_value(DGMethod::IP)
+        .validator([](DGMethod const& type) { return type != DGMethod::Unknown; });
     schema.add_value("output", &Config::output).help("Output file name");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
@@ -208,10 +222,10 @@ int main(int argc, char** argv) {
 
     if (cfg->poisson && !cfg->elasticity) {
         auto scenario = PoissonScenario(*cfg->poisson);
-        static_problem(*mesh, scenario, cfg->output);
+        static_problem(*mesh, scenario, cfg->method, cfg->output);
     } else if (!cfg->poisson && cfg->elasticity) {
         auto scenario = ElasticityScenario(*cfg->elasticity);
-        static_problem(*mesh, scenario, cfg->output);
+        static_problem(*mesh, scenario, cfg->method, cfg->output);
     } else {
         std::cerr << "Please specify either [poisson] or [elasticity] (but not both)." << std::endl;
     }

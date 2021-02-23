@@ -3,12 +3,14 @@
 
 #include "common/Scenario.h"
 #include "config.h"
+#include "form/DGCurvilinearCommon.h"
 #include "localoperator/Elasticity.h"
 
 #include "util/Schema.h"
 
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 namespace tndm {
@@ -40,7 +42,12 @@ public:
     auto const& lam() const { return lam_; }
     auto const& mu() const { return mu_; }
 
-    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl) const {
+    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                             DGMethod method) const {
+        if (method != DGMethod::IP) {
+            throw std::logic_error(
+                "Only the interior penalty method is implemented for elasticity");
+        }
         auto elasticity = std::make_unique<Elasticity>(std::move(cl), lam_, mu_);
         set(*elasticity);
         return elasticity;

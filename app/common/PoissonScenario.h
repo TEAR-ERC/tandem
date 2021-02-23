@@ -3,6 +3,7 @@
 
 #include "common/Scenario.h"
 #include "config.h"
+#include "form/DGCurvilinearCommon.h"
 #include "localoperator/Poisson.h"
 
 #include "util/Schema.h"
@@ -34,8 +35,9 @@ public:
 
     auto const& coefficient() const { return coefficient_; }
 
-    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl) const {
-        auto poisson = std::make_unique<Poisson>(std::move(cl), coefficient_);
+    auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                             DGMethod method) const {
+        auto poisson = std::make_unique<Poisson>(std::move(cl), coefficient_, method);
         set(*poisson);
         return poisson;
     }
