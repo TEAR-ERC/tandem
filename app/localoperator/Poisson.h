@@ -92,7 +92,7 @@ public:
 private:
     double penalty(FacetInfo const& info) const {
         // return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
-        return -3;
+        return 3;
     }
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
