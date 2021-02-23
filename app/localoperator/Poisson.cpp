@@ -41,8 +41,8 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
 
 void Poisson::compute_mass_matrix(std::size_t elNo, double* M) const {
     kernel::massMatrix mm;
-    mm.E = E_Q.data();
-    mm.J = vol[elNo].get<AbsDetJ>().data();
+    mm.E_Q = E_Q.data();
+    mm.J_Q = vol[elNo].get<AbsDetJ>().data();
     mm.M = M;
     mm.W = volRule.weights().data();
     mm.execute();
@@ -57,6 +57,36 @@ void Poisson::compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const 
     auto Minv_eigen = MMap(Minv);
     auto Minv_lu = Eigen::FullPivLU<MMat>(Minv_eigen);
     Minv_eigen = Minv_lu.inverse();
+}
+
+void Poisson::compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
+                             std::array<double*, 2> K_Dx_q) const {
+    kernel::K_Dx_q dx;
+    for (int i = 0; i < 2; ++i) {
+        if (K_Dx_q[i]) {
+            auto JInv = (i == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
+            dx.G_q = JInv.data()->data();
+            dx.matE_q_T = matE_q_T[info.localNo[i]].data();
+            dx.K = material[info.up[i]].get<K>().data();
+            dx.K_Dx_q(0) = K_Dx_q[i];
+            dx.Dxi_q = Dxi_q[info.localNo[i]].data();
+            dx.execute();
+        }
+    }
+}
+
+void Poisson::compute_K_w_q(std::size_t fctNo, FacetInfo const& info,
+                            std::array<double*, 2> K_w_q) const {
+    kernel::K_w_q kw;
+    for (int i = 0; i < 2; ++i) {
+        if (K_w_q[i]) {
+            kw.matE_q_T = matE_q_T[info.localNo[i]].data();
+            kw.K = material[info.up[i]].get<K>().data();
+            kw.K_w_q(0) = K_w_q[i];
+            kw.w = fctRule.weights().data();
+            kw.execute();
+        }
+    }
 }
 
 void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -78,15 +108,15 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
 
     double Mmem[tensor::matM::size()];
     kernel::project_K_lhs krnl_lhs;
-    krnl_lhs.Em = matE_Q_T.data();
-    krnl_lhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_lhs.matE_Q_T = matE_Q_T.data();
+    krnl_lhs.J_Q = vol[elNo].get<AbsDetJ>().data();
     krnl_lhs.matM = Mmem;
     krnl_lhs.W = volRule.weights().data();
     krnl_lhs.execute();
 
     kernel::project_K_rhs krnl_rhs;
-    krnl_rhs.Em = matE_Q_T.data();
-    krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_rhs.matE_Q_T = matE_Q_T.data();
+    krnl_rhs.J_Q = vol[elNo].get<AbsDetJ>().data();
     krnl_rhs.K = Kfield;
     krnl_rhs.K_Q = K_Q_raw;
     krnl_rhs.W = volRule.weights().data();
@@ -108,21 +138,25 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
 
 bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
                               LinearAllocator<double>& scratch) const {
-    double Dx_Q[tensor::D_x::size()];
+    double Dx_Q[tensor::Dx_Q::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
-    assert(Dxi_Q.shape(0) == tensor::D_xi::Shape[0]);
-    assert(Dxi_Q.shape(1) == tensor::D_xi::Shape[1]);
-    assert(Dxi_Q.shape(2) == tensor::D_xi::Shape[2]);
+    assert(Dxi_Q.shape(0) == tensor::Dxi_Q::Shape[0]);
+    assert(Dxi_Q.shape(1) == tensor::Dxi_Q::Shape[1]);
+    assert(Dxi_Q.shape(2) == tensor::Dxi_Q::Shape[2]);
+
+    kernel::Dx_Q dx;
+    dx.Dx_Q = Dx_Q;
+    dx.Dxi_Q = Dxi_Q.data();
+    dx.G_Q = vol[elNo].get<JInv>().data()->data();
+    dx.execute();
 
     kernel::assembleVolume krnl;
     krnl.A = A00.data();
-    krnl.D_x = Dx_Q;
-    krnl.D_xi = Dxi_Q.data();
-    krnl.G = vol[elNo].get<JInv>().data()->data();
+    krnl.Dx_Q = Dx_Q;
     krnl.K = material[elNo].get<K>().data();
-    krnl.Em = matE_Q_T.data();
-    krnl.J = vol[elNo].get<AbsDetJ>().data();
+    krnl.matE_Q_T = matE_Q_T.data();
+    krnl.J_Q = vol[elNo].get<AbsDetJ>().data();
     krnl.W = volRule.weights().data();
     krnl.execute();
     return true;
@@ -132,84 +166,62 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
                                 Matrix<double>& A01, Matrix<double>& A10, Matrix<double>& A11,
                                 LinearAllocator<double>& scratch) const {
     assert(fctRule.size() == tensor::w::Shape[0]);
-    assert(E_q[0].shape(0) == tensor::e::Shape[0][0]);
-    assert(E_q[0].shape(1) == tensor::e::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::d_xi::Shape[0][0]);
-    assert(Dxi_q[0].shape(1) == tensor::d_xi::Shape[0][1]);
-    assert(Dxi_q[0].shape(2) == tensor::d_xi::Shape[0][2]);
+    assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
+    assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
 
-    double Dx_q0[tensor::d_x::size(0)];
-    double Dx_q1[tensor::d_x::size(1)];
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    auto K_Dx_q = std::array<double*, 2>{K_Dx_q0, K_Dx_q1};
+    compute_K_Dx_q(fctNo, info, K_Dx_q);
 
     double Minv[2][tensor::M::size()];
     for (int i = 0; i < 2; ++i) {
         compute_inverse_mass_matrix(info.up[i], Minv[i]);
     }
 
-    double K_w_q[2][tensor::K_w_q::size(0)];
-    kernel::Kw kw;
-    kw.w = fctRule.weights().data();
-    for (int i = 0; i < 2; ++i) {
-        kw.K = material[info.up[i]].get<K>().data();
-        kw.K_w_q(i) = K_w_q[i];
-        kw.em(i) = matE_q_T[info.localNo[i]].data();
-        kw.execute(i);
-    }
+    double K_w_q0[tensor::K_w_q::size(0)];
+    double K_w_q1[tensor::K_w_q::size(1)];
+    auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
+    compute_K_w_q(fctNo, info, K_w_q);
 
     double L_q[2][std::max(tensor::L_q::size(0), tensor::L_q::size(1))];
     kernel::lift_skeleton lift;
-    lift.n = fct[fctNo].get<Normal>().data()->data();
+    lift.n_q = fct[fctNo].get<Normal>().data()->data();
     for (int i = 0; i < 2; ++i) {
         lift.K_w_q(i) = K_w_q[i];
         lift.L_q(i) = L_q[i];
         lift.Minv(i) = Minv[i];
-        lift.e(i) = E_q[info.localNo[i]].data();
+        lift.E_q(i) = E_q[info.localNo[i]].data();
     }
     lift.execute(0);
     lift.execute(1);
 
-    kernel::assembleFacetLocal local;
-    local.c00 = -0.5;
-    local.c10 = epsilon * 0.5;
-    local.c20 = penalty(info) * 0.5;
-    local.a(0, 0) = A00.data();
-    local.d_x(0) = Dx_q0;
-    local.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    local.e(0) = E_q[info.localNo[0]].data();
-    local.em(0) = matE_q_T[info.localNo[0]].data();
-    local.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    local.K = material[info.up[0]].get<K>().data();
-    local.L_q(0) = L_q[0];
-    local.n = fct[fctNo].get<Normal>().data()->data();
-    // local.nl = fct[fctNo].get<NormalLength>().data();
-    local.w = fctRule.weights().data();
-    local.execute();
+    kernel::assembleSurface assemble;
+    assemble.c00 = -0.5;
+    assemble.c01 = -assemble.c00;
+    assemble.c10 = epsilon * 0.5;
+    assemble.c11 = -assemble.c10;
+    assemble.c20 = penalty(info) * 0.5;
+    assemble.c21 = -assemble.c20;
+    assemble.a(0, 0) = A00.data();
+    assemble.a(0, 1) = A01.data();
+    assemble.a(1, 0) = A10.data();
+    assemble.a(1, 1) = A11.data();
+    for (int i = 0; i < 2; ++i) {
+        assemble.K_Dx_q(i) = K_Dx_q[i];
+        assemble.E_q(i) = E_q[info.localNo[i]].data();
+        assemble.L_q(i) = L_q[i];
+    }
+    assemble.n_q = fct[fctNo].get<Normal>().data()->data();
+    assemble.w = fctRule.weights().data();
+    assemble.execute(0, 0);
+    assemble.execute(0, 1);
+    assemble.execute(1, 0);
+    assemble.execute(1, 1);
 
-    kernel::assembleFacetNeighbour neighbour;
-    neighbour.c00 = local.c00;
-    neighbour.c01 = -local.c00;
-    neighbour.c10 = local.c10;
-    neighbour.c11 = -local.c10;
-    neighbour.c20 = local.c20;
-    neighbour.c21 = -local.c20;
-    neighbour.a(0, 1) = A01.data();
-    neighbour.a(1, 0) = A10.data();
-    neighbour.a(1, 1) = A11.data();
-    neighbour.d_x(0) = Dx_q0;
-    neighbour.d_x(1) = Dx_q1;
-    neighbour.d_xi(1) = Dxi_q[info.localNo[1]].data();
-    neighbour.e(0) = local.e(0);
-    neighbour.em(0) = local.em(0);
-    neighbour.e(1) = E_q[info.localNo[1]].data();
-    neighbour.em(1) = matE_q_T[info.localNo[1]].data();
-    neighbour.g(1) = fct[fctNo].get<JInv1>().data()->data();
-    neighbour.K = material[info.up[1]].get<K>().data();
-    neighbour.L_q(0) = L_q[0];
-    neighbour.L_q(1) = L_q[1];
-    neighbour.n = local.n;
-    // neighbour.nl = local.nl;
-    neighbour.w = local.w;
-    neighbour.execute();
     return true;
 }
 
@@ -220,50 +232,41 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     }
 
     assert(fctRule.size() == tensor::w::Shape[0]);
-    assert(E_q[0].shape(0) == tensor::e::Shape[0][0]);
-    assert(E_q[0].shape(1) == tensor::e::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::d_xi::Shape[0][0]);
-    assert(Dxi_q[0].shape(1) == tensor::d_xi::Shape[0][1]);
-    assert(Dxi_q[0].shape(2) == tensor::d_xi::Shape[0][2]);
+    assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
+    assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
 
     double Minv0[tensor::M::size()];
     compute_inverse_mass_matrix(info.up[0], Minv0);
 
     double K_w_q[tensor::K_w_q::size(0)];
-    kernel::Kw kw;
-    kw.w = fctRule.weights().data();
-    kw.K = material[info.up[0]].get<K>().data();
-    kw.K_w_q(0) = K_w_q;
-    kw.em(0) = matE_q_T[info.localNo[0]].data();
-    kw.execute(0);
+    compute_K_w_q(fctNo, info, {K_w_q, nullptr});
 
     double L0[tensor::L_q::size(0)];
     kernel::lift_boundary lift;
     lift.K_w_q(0) = K_w_q;
     lift.L_q(0) = L0;
     lift.Minv(0) = Minv0;
-    lift.e(0) = E_q[info.localNo[0]].data();
-    lift.n = fct[fctNo].get<Normal>().data()->data();
+    lift.E_q(0) = E_q[info.localNo[0]].data();
+    lift.n_q = fct[fctNo].get<Normal>().data()->data();
     lift.execute();
 
-    double Dx_q0[tensor::d_x::size(0)];
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
-    kernel::assembleFacetLocal local;
-    local.c00 = -1.0;
-    local.c10 = epsilon;
-    local.c20 = penalty(info);
-    local.a(0, 0) = A00.data();
-    local.d_x(0) = Dx_q0;
-    local.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    local.e(0) = E_q[info.localNo[0]].data();
-    local.em(0) = matE_q_T[info.localNo[0]].data();
-    local.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    local.K = material[info.up[0]].get<K>().data();
-    local.L_q(0) = L0;
-    local.n = fct[fctNo].get<Normal>().data()->data();
-    // local.nl = fct[fctNo].get<NormalLength>().data();
-    local.w = fctRule.weights().data();
-    local.execute();
+    kernel::assembleSurface assemble;
+    assemble.c00 = -1.0;
+    assemble.c10 = epsilon;
+    assemble.c20 = penalty(info);
+    assemble.a(0, 0) = A00.data();
+    assemble.K_Dx_q(0) = K_Dx_q0;
+    assemble.E_q(0) = E_q[info.localNo[0]].data();
+    assemble.L_q(0) = L0;
+    assemble.n_q = fct[fctNo].get<Normal>().data()->data();
+    assemble.w = fctRule.weights().data();
+    assemble.execute(0, 0);
     return true;
 }
 
@@ -277,9 +280,9 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B,
     fun_force(elNo, F_Q);
 
     kernel::rhsVolume rhs;
-    rhs.E = E_Q.data();
+    rhs.E_Q = E_Q.data();
     rhs.F_Q = F_Q_raw;
-    rhs.J = vol[elNo].get<AbsDetJ>().data();
+    rhs.J_Q = vol[elNo].get<AbsDetJ>().data();
     rhs.W = volRule.weights().data();
     rhs.b = B.data();
     rhs.execute();
@@ -325,49 +328,43 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
     compute_inverse_mass_matrix(info.up[0], Minv[0]);
     compute_inverse_mass_matrix(info.up[1], Minv[1]);
 
-    double K_w_q[2][tensor::K_w_q::size(0)];
-    kernel::Kw kw;
-    kw.w = fctRule.weights().data();
-    for (int i = 0; i < 2; ++i) {
-        kw.K = material[info.up[i]].get<K>().data();
-        kw.K_w_q(i) = K_w_q[i];
-        kw.em(i) = matE_q_T[info.localNo[i]].data();
-        kw.execute(i);
-    }
+    double K_w_q0[tensor::K_w_q::size(0)];
+    double K_w_q1[tensor::K_w_q::size(1)];
+    auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
+    compute_K_w_q(fctNo, info, K_w_q);
 
-    double f_lifted[tensor::f_lifted::size()];
+    double f_lifted_q[tensor::f_lifted_q::size()];
     kernel::rhs_lift_skeleton lift;
     for (int i = 0; i < 2; ++i) {
-        lift.e(i) = E_q[info.localNo[i]].data();
+        lift.E_q(i) = E_q[info.localNo[i]].data();
         lift.K_w_q(i) = K_w_q[i];
         lift.Minv(i) = Minv[i];
     }
-    lift.n = fct[fctNo].get<Normal>().data()->data();
+    lift.n_q = fct[fctNo].get<Normal>().data()->data();
     lift.f_q = f_q_raw;
-    lift.f_lifted = f_lifted;
+    lift.f_lifted_q = f_lifted_q;
     lift.execute();
+
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    compute_K_Dx_q(fctNo, info, {K_Dx_q0, K_Dx_q1});
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
     rhs.c20 = penalty(info);
     rhs.f_q = f_q_raw;
-    rhs.f_lifted = f_lifted;
-    rhs.n = fct[fctNo].get<Normal>().data()->data();
-    // rhs.nl = fct[fctNo].get<NormalLength>().data();
+    rhs.f_lifted_q = f_lifted_q;
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
     rhs.w = fctRule.weights().data();
-    rhs.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    rhs.e(0) = E_q[info.localNo[0]].data();
-    rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    rhs.K_w_q(0) = K_w_q[0];
+    rhs.K_Dx_q(0) = K_Dx_q0;
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.execute();
 
     rhs.b = B1.data();
     rhs.c20 *= -1.0;
-    rhs.d_xi(0) = Dxi_q[info.localNo[1]].data();
-    rhs.e(0) = E_q[info.localNo[1]].data();
-    rhs.g(0) = fct[fctNo].get<JInv1>().data()->data();
-    rhs.K_w_q(0) = K_w_q[1];
+    rhs.K_Dx_q(0) = K_Dx_q1;
+    rhs.E_q(0) = E_q[info.localNo[1]].data();
     rhs.execute();
 
     return true;
@@ -384,36 +381,31 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     compute_inverse_mass_matrix(info.up[0], M0);
 
     double K_w_q[tensor::K_w_q::size(0)];
-    kernel::Kw kw;
-    kw.w = fctRule.weights().data();
-    kw.K = material[info.up[0]].get<K>().data();
-    kw.K_w_q(0) = K_w_q;
-    kw.em(0) = matE_q_T[info.localNo[0]].data();
-    kw.execute(0);
+    compute_K_w_q(fctNo, info, {K_w_q, nullptr});
 
-    double f_lifted[tensor::f_lifted::size()];
+    double f_lifted_q[tensor::f_lifted_q::size()];
     kernel::rhs_lift_boundary lift;
-    lift.e(0) = E_q[info.localNo[0]].data();
-    lift.n = fct[fctNo].get<Normal>().data()->data();
+    lift.E_q(0) = E_q[info.localNo[0]].data();
+    lift.n_q = fct[fctNo].get<Normal>().data()->data();
     lift.K_w_q(0) = K_w_q;
     lift.Minv(0) = M0;
     lift.f_q = f_q_raw;
-    lift.f_lifted = f_lifted;
+    lift.f_lifted_q = f_lifted_q;
     lift.execute();
+
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = epsilon;
     rhs.c20 = penalty(info);
     rhs.f_q = f_q_raw;
-    rhs.f_lifted = f_lifted;
-    rhs.n = fct[fctNo].get<Normal>().data()->data();
-    // rhs.nl = fct[fctNo].get<NormalLength>().data();
+    rhs.f_lifted_q = f_lifted_q;
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
     rhs.w = fctRule.weights().data();
-    rhs.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    rhs.e(0) = E_q[info.localNo[0]].data();
-    rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    rhs.K_w_q(0) = K_w_q;
+    rhs.K_Dx_q(0) = K_Dx_q0;
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.execute();
     return true;
 }
@@ -435,27 +427,21 @@ void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector
                                 Vector<double const>& u1, Matrix<double>& result) const {
     assert(result.size() == tensor::grad_u::size());
 
-    double Dx_q0[tensor::d_x::size(0)];
-    double Dx_q1[tensor::d_x::size(1)];
     double f_q_raw[tensor::f_q::size()];
     bc_skeleton(fctNo, info.bc, f_q_raw);
 
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    compute_K_Dx_q(fctNo, info, {K_Dx_q0, K_Dx_q1});
+
     kernel::grad_u krnl;
     krnl.c00 = -penalty(info);
-    krnl.d_x(0) = Dx_q0;
-    krnl.d_x(1) = Dx_q1;
-    for (std::size_t side = 0; side < 2; ++side) {
-        krnl.d_xi(side) = Dxi_q[info.localNo[side]].data();
-        krnl.em(side) = matE_q_T[info.localNo[side]].data();
-    }
-    krnl.e(0) = E_q[info.localNo[0]].data();
-    krnl.e(1) = E_q[info.localNo[1]].data();
+    krnl.K_Dx_q(0) = K_Dx_q0;
+    krnl.K_Dx_q(1) = K_Dx_q1;
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
+    krnl.E_q(1) = E_q[info.localNo[1]].data();
     krnl.f_q = f_q_raw;
-    krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
-    krnl.g(1) = fct[fctNo].get<JInv1>().data()->data();
     krnl.grad_u = result.data();
-    krnl.k(0) = material[info.up[0]].get<K>().data();
-    krnl.k(1) = material[info.up[1]].get<K>().data();
     krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
     krnl.u(0) = u0.data();
     krnl.u(1) = u1.data();
@@ -466,20 +452,18 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
                                 Matrix<double>& result) const {
     assert(result.size() == tensor::grad_u::size());
 
-    double Dx_q0[tensor::d_x::size(0)];
     double f_q_raw[tensor::f_q::size()];
     bc_boundary(fctNo, info.bc, f_q_raw);
 
+    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
+
     kernel::grad_u_bnd krnl;
     krnl.c00 = -penalty(info);
-    krnl.d_x(0) = Dx_q0;
-    krnl.d_xi(0) = Dxi_q[info.localNo[0]].data();
-    krnl.em(0) = matE_q_T[info.localNo[0]].data();
-    krnl.e(0) = E_q[info.localNo[0]].data();
+    krnl.K_Dx_q(0) = K_Dx_q0;
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
     krnl.f_q = f_q_raw;
-    krnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
     krnl.grad_u = result.data();
-    krnl.k(0) = material[info.up[0]].get<K>().data();
     krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
     krnl.u(0) = u0.data();
     krnl.execute();
