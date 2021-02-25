@@ -1,5 +1,10 @@
 require "cosine"
 
+function warp(x, y)
+    xp, yp = partialAnnulus(x, y)
+    return math.exp(xp) * math.sin(xp) * xp, math.exp(yp) * yp
+end
+
 function mu(x, y)
     return (x+y)^3
 end
