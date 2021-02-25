@@ -23,7 +23,10 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     Unew = Tensor('Unew', (Nbf, dim))
     A = Tensor('A', (Nbf, dim, Nbf, dim))
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
+    M = Tensor('M', (Nbf, Nbf))
     matM = Tensor('matM', (Nbf, Nbf))
+
+    generator.add('massMatrix', M['kl'] <= E_Q['kq'] * W['q'] * J['q'] * E_Q['lq'])
 
     generator.add('project_material_lhs', matM['kl'] <= \
                 matE_Q_T['qk'] * W['q'] * J['q'] * matE_Q_T['ql'])
@@ -66,6 +69,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     u_jump = Tensor('u_jump', (dim, nq)) 
     traction_q = Tensor('traction_q', (dim, nq))
     traction_op_q = [Tensor('traction_op_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
+    L_q = [Tensor('L_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
+    Minv = [Tensor('Minv({})'.format(x), (Nbf, Nbf)) for x in range(2)]
     a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
 
     generator.addFamily('precomputeSurface', simpleParameterSpace(2), lambda x: [
@@ -102,6 +107,22 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         surface(0)
     ])
 
+    def test_normal(x):
+        return lam_q[x]['p'] * delta['ij'] * n_q['up'] + mu_q[x]['p'] * \
+            (delta['ui'] * n_q['jp'] + delta['uj'] * n_q['ip'])
+
+    generator.addFamily('lift_ip', simpleParameterSpace(2),
+        lambda x: L_q[x]['lpuq'] <= E_q[x]['lq'] * delta['pu'] * nl_q['q'])
+    generator.addFamily('lift_skeleton', simpleParameterSpace(2), \
+        lambda x: L_q[x]['liuq'] <= 0.25 * ( \
+            n_q['jq'] * E_q[0]['mq'] * \
+                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[x]['lp'] * test_normal(0) + \
+            n_q['jq'] * E_q[1]['nq'] * \
+                Minv[1]['no'] * w['p'] * E_q[1]['op'] * E_q[x]['lp'] * test_normal(1) \
+        ))
+    generator.add('lift_boundary', L_q[0]['liuq'] <= n_q['jq'] * E_q[0]['mq'] * \
+                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[0]['lp'] * test_normal(0))
+
     def assembleTractionOp(x):
         return traction_op_q[x]['kpuq'] <= lam_q[x]['q'] * Dx_q[x]['kpq'] * n_q['uq'] + \
             mu_q[x]['q'] * (n_q['jq'] * Dx_q[x]['kjq'] * delta['pu'] + Dx_q[x]['kuq'] * n_q['pq'])
@@ -110,22 +131,32 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         return a[x][y]['kplu'] <= \
             c0[x] * E_q[x]['kq'] * w['q'] * traction_op_q[y]['lupq'] + \
             c1[y] * E_q[y]['lq'] * w['q'] * traction_op_q[x]['kpuq'] + \
-            c2[abs(y-x)] * delta['pu'] * E_q[y]['lq'] * E_q[x]['kq'] * w['q'] * nl_q['q']
+            c2[abs(y-x)] * w['q'] * E_q[x]['kq'] * L_q[y]['lpuq']
 
     generator.addFamily('assembleTractionOp', simpleParameterSpace(2), assembleTractionOp)
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), assembleSurface)
 
     # Right-hand side
 
+
+    f_q = Tensor('f_q', (dim, nq))
+    f_lifted_q = Tensor('f_lifted_q', (dim, nq))
+    generator.add('rhs_lift_ip', f_lifted_q['iq'] <= f_q['iq'] * nl_q['q'])
+    generator.add('rhs_lift_boundary', f_lifted_q['iq'] <= \
+        n_q['jq'] * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * test_normal(0))
+
+    generator.add('rhs_lift_skeleton', f_lifted_q['iq'] <= 0.25 * ( \
+        n_q['jq'] * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * test_normal(0) + \
+        n_q['jq'] * E_q[1]['mq'] * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * test_normal(1)))
+
     b = Tensor('b', (Nbf, dim))
     F_Q = Tensor('F_Q', (dim, Nq))
     generator.add('rhsVolume', b['kp'] <= b['kp'] + J['q'] * W['q'] * E_Q['kq'] * F_Q['pq'])
 
-    f_q = Tensor('f_q', (dim, nq))
     generator.add('rhsFacet', [
         Dx_q[0]['kiq'] <= g[0]['eiq'] * Dxi_q[0]['keq'],
         b['kp'] <= b['kp'] + c1[0] * tractionTest(0, f_q) * w['q'] + \
-            c2[0] * w['q'] * E_q[0]['kq'] * f_q['pq'] * nl_q['q']
+            c2[0] * w['q'] * E_q[0]['kq'] * f_lifted_q['pq']
     ])
 
     # traction

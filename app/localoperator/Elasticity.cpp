@@ -22,8 +22,8 @@ namespace kernel = tndm::elasticity::kernel;
 namespace tndm {
 
 Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                       functional_t<1> mu)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()),
+                       functional_t<1> mu, DGMethod method)
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
       fun_lam(make_volume_functional(std::move(lam))),
@@ -40,6 +40,26 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
+}
+
+void Elasticity::compute_mass_matrix(std::size_t elNo, double* M) const {
+    kernel::massMatrix mm;
+    mm.E_Q = E_Q.data();
+    mm.J = vol[elNo].get<AbsDetJ>().data();
+    mm.M = M;
+    mm.W = volRule.weights().data();
+    mm.execute();
+}
+
+void Elasticity::compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const {
+    compute_mass_matrix(elNo, Minv);
+
+    using MMat = Eigen::Matrix<double, tensor::M::Shape[0], tensor::M::Shape[1]>;
+    using MMap = Eigen::Map<MMat, Eigen::Unaligned,
+                            Eigen::OuterStride<init::M::Stop[0] - init::M::Start[0]>>;
+    auto Minv_eigen = MMap(Minv);
+    auto Minv_lu = Eigen::FullPivLU<MMat>(Minv_eigen);
+    Minv_eigen = Minv_lu.inverse();
 }
 
 void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -100,7 +120,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     using MuMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
                              Eigen::InnerStride<1>>;
 
-    auto proj = MMap(Mmem).partialPivLu();
+    auto proj = MMap(Mmem).fullPivLu();
 
     auto lam_eigen = LamMap(lam_field);
     lam_eigen = proj.solve(lam_eigen);
@@ -231,6 +251,43 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     tOpKrnl.execute(0);
     tOpKrnl.execute(1);
 
+    double L_q0[tensor::L_q::size(0)];
+    double L_q1[tensor::L_q::size(1)];
+    auto L_q = std::array<double*, 2>{L_q0, L_q1};
+
+    if (method_ == DGMethod::BR2) {
+        double Minv[2][tensor::M::size()];
+        for (int i = 0; i < 2; ++i) {
+            compute_inverse_mass_matrix(info.up[i], Minv[i]);
+        }
+
+        kernel::lift_skeleton lift;
+        lift.delta = init::delta::Values;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        for (int i = 0; i < 2; ++i) {
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+            lift.L_q(i) = L_q[i];
+            lift.Minv(i) = Minv[i];
+        }
+        lift.execute(0);
+        lift.execute(1);
+    } else { // IP
+        kernel::lift_ip lift;
+        lift.delta = init::delta::Values;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        for (int i = 0; i < 2; ++i) {
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+            lift.L_q(i) = L_q[i];
+        }
+        lift.execute(0);
+        lift.execute(1);
+    }
+
     kernel::assembleSurface krnl;
     krnl.c00 = -0.5;
     krnl.c01 = -krnl.c00;
@@ -242,11 +299,10 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.a(0, 1) = A01.data();
     krnl.a(1, 0) = A10.data();
     krnl.a(1, 1) = A11.data();
-    krnl.delta = init::delta::Values;
     for (unsigned side = 0; side < 2; ++side) {
         krnl.E_q(side) = E_q[info.localNo[side]].data();
+        krnl.L_q(side) = L_q[side];
     }
-    krnl.nl_q = fct[fctNo].get<NormalLength>().data();
     krnl.traction_op_q(0) = traction_op_q0;
     krnl.traction_op_q(1) = traction_op_q1;
     krnl.w = fctRule.weights().data();
@@ -290,14 +346,37 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     tOpKrnl.traction_op_q(0) = traction_op_q0;
     tOpKrnl.execute(0);
 
+    double L_q0[tensor::L_q::size(0)];
+    if (method_ == DGMethod::BR2) {
+        double Minv0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv0);
+
+        kernel::lift_boundary lift;
+        lift.delta = init::delta::Values;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.L_q(0) = L_q0;
+        lift.Minv(0) = Minv0;
+        lift.execute();
+    } else { // IP
+        kernel::lift_ip lift;
+        lift.delta = init::delta::Values;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.L_q(0) = L_q0;
+        lift.execute(0);
+    }
+
     kernel::assembleSurface krnl;
     krnl.c00 = -1.0;
     krnl.c10 = epsilon;
     krnl.c20 = penalty(info);
     krnl.a(0, 0) = A00.data();
-    krnl.delta = init::delta::Values;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
-    krnl.nl_q = fct[fctNo].get<NormalLength>().data();
+    krnl.L_q(0) = L_q0;
     krnl.traction_op_q(0) = traction_op_q0;
     krnl.w = fctRule.weights().data();
     krnl.execute(0, 0);
@@ -363,6 +442,36 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
         return false;
     }
 
+    double f_lifted_q[tensor::f_lifted_q::size()];
+    if (method_ == DGMethod::BR2) {
+        double Minv[2][tensor::M::size()];
+        for (int i = 0; i < 2; ++i) {
+            compute_inverse_mass_matrix(info.up[i], Minv[i]);
+        }
+
+        kernel::rhs_lift_skeleton lift;
+        lift.delta = init::delta::Values;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        for (int i = 0; i < 2; ++i) {
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+            lift.Minv(i) = Minv[i];
+        }
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.execute();
+    }
+
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
@@ -371,11 +480,11 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.f_q = f_q_raw;
+    rhs.f_lifted_q = f_lifted_q;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
     rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
     rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
     rhs.n_q = fct[fctNo].get<Normal>().data()->data();
-    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
     rhs.execute();
 
@@ -399,6 +508,30 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
         return false;
     }
 
+    double f_lifted_q[tensor::f_lifted_q::size()];
+    if (method_ == DGMethod::BR2) {
+        double Minv0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv0);
+
+        kernel::rhs_lift_boundary lift;
+        lift.delta = init::delta::Values;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.Minv(0) = Minv0;
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.execute();
+    }
+
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = epsilon;
@@ -407,11 +540,11 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.f_q = f_q_raw;
+    rhs.f_lifted_q = f_lifted_q;
     rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
     rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
     rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
     rhs.n_q = fct[fctNo].get<Normal>().data()->data();
-    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.w = fctRule.weights().data();
     rhs.execute();
 

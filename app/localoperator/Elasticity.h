@@ -32,7 +32,7 @@ public:
     constexpr static std::size_t NumQuantities = DomainDimension;
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu);
+               functional_t<1> mu, DGMethod method = DGMethod::BR2);
 
     std::size_t scratch_mem_size() const {
         auto matNbf = materialSpace_.numBasisFunctions();
@@ -101,10 +101,17 @@ public:
 
 private:
     double penalty(FacetInfo const& info) const {
+        if (method_ == DGMethod::BR2) {
+            return 3;
+        }
         return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
     }
+    void compute_mass_matrix(std::size_t elNo, double* M) const;
+    void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+
+    DGMethod method_;
 
     // Ref elements
     NodalRefElement<DomainDimension> space_;

@@ -44,11 +44,7 @@ public:
 
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
-        if (method != DGMethod::IP) {
-            throw std::logic_error(
-                "Only the interior penalty method is implemented for elasticity");
-        }
-        auto elasticity = std::make_unique<Elasticity>(std::move(cl), lam_, mu_);
+        auto elasticity = std::make_unique<Elasticity>(std::move(cl), lam_, mu_, method);
         set(*elasticity);
         return elasticity;
     }
