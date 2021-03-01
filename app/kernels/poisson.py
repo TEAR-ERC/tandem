@@ -4,6 +4,7 @@ from yateto import *
 
 def add(generator, dim, nbf, Nbf, nq, Nq):
     J_Q = Tensor('J_Q', (Nq,))
+    Jinv_Q = Tensor('Jinv_Q', (Nq,))
     G_Q = Tensor('G_Q', (dim, dim, Nq))
     K = Tensor('K', (Nbf,))
     K_Q = Tensor('K_Q', (Nq,))
@@ -14,9 +15,13 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
     A = Tensor('A', (Nbf, Nbf))
     M = Tensor('M', (Nbf, Nbf))
+    MinvRef = Tensor('MinvRef', (Nbf, Nbf))
+    MinvWA = Tensor('MinvWA', (Nbf, Nbf))
     matM = Tensor('matM', (Nbf, Nbf))
 
     generator.add('massMatrix', M['kl'] <= E_Q['kq'] * W['q'] * J_Q['q'] * E_Q['lq'])
+    generator.add('MinvWA', MinvWA['kl'] <=
+        MinvRef['kr'] * W['q'] * Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'])
 
     generator.add('project_K_lhs', matM['kl'] <= matE_Q_T['qk'] * W['q'] * J_Q['q'] * matE_Q_T['ql'])
     generator.add('project_K_rhs', K['k'] <= K_Q['q'] * matE_Q_T['qk'] * W['q'] * J_Q['q'])

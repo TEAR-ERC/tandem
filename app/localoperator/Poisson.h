@@ -112,6 +112,7 @@ private:
     NodalRefElement<DomainDimension> materialSpace_;
 
     // Matrices
+    Managed<Matrix<double>> Minv_;
     Managed<Matrix<double>> E_Q;
     Managed<Tensor<double, 3u>> Dxi_Q;
     std::vector<Managed<Matrix<double>>> E_q;

@@ -29,6 +29,7 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
+    Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
@@ -53,12 +54,19 @@ void Poisson::compute_mass_matrix(std::size_t elNo, double* M) const {
 void Poisson::compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const {
     compute_mass_matrix(elNo, Minv);
 
-    using MMat = Eigen::Matrix<double, tensor::M::Shape[0], tensor::M::Shape[1]>;
-    using MMap = Eigen::Map<MMat, Eigen::Unaligned,
-                            Eigen::OuterStride<init::M::Stop[0] - init::M::Start[0]>>;
-    auto Minv_eigen = MMap(Minv);
-    auto Minv_lu = Eigen::FullPivLU<MMat>(Minv_eigen);
-    Minv_eigen = Minv_lu.inverse();
+    auto J_Q = vol[elNo].get<AbsDetJ>();
+    double Jinv_Q[tensor::Jinv_Q::size()] = {};
+    for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
+        Jinv_Q[q] = 1.0 / J_Q[q];
+    }
+
+    kernel::MinvWA wa;
+    wa.E_Q = E_Q.data();
+    wa.Jinv_Q = Jinv_Q;
+    wa.MinvRef = Minv_.data();
+    wa.MinvWA = Minv;
+    wa.W = volRule.weights().data();
+    wa.execute();
 }
 
 void Poisson::compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
