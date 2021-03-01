@@ -15,6 +15,7 @@ struct FacetInfo {
     std::array<std::size_t, 2> localNo;
     BC bc;
 };
+
 } // namespace tndm
 
 #endif // FACETINFO_20200910_H

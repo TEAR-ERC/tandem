@@ -31,6 +31,7 @@ public:
     using base = DGCurvilinearCommon<DomainDimension>;
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = 1;
+    constexpr static std::size_t NumFacets = Dim + 1;
 
     Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
             DGMethod method = DGMethod::BR2);
@@ -54,6 +55,10 @@ public:
                       Vector<double>& B1, LinearAllocator<double>& scratch) const;
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator<double>& scratch) const;
+
+    void apply(std::size_t elNo, mneme::span<std::size_t> lids, mneme::span<std::size_t> localNos,
+               Vector<double const> const& x_0,
+               std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
 
     TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
@@ -119,6 +124,7 @@ private:
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
 
     Managed<Matrix<double>> matE_Q_T;
+    Managed<Tensor<double, 3u>> matDxi_Q;
     std::vector<Managed<Matrix<double>>> matE_q_T;
 
     // Input

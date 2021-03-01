@@ -33,6 +33,7 @@ public:
     template <class T> using rhs_skeleton_t = decltype(&T::rhs_skeleton);
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
+    template <class T> using apply_t = decltype(&T::apply);
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)) {
@@ -198,6 +199,27 @@ public:
             }
         }
         vector.end_access(access_handle);
+    }
+
+    template <typename BlockVector> void apply(BlockVector const& x, BlockVector& y) {
+        constexpr std::size_t NumFacets = LocalOperator::Dim + 1;
+        auto y_handle = y.begin_access();
+        auto x_handle = x.begin_access_readonly();
+        if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                auto y_0 = y.get_block(y_handle, elNo);
+                auto x_0 = x.get_block(x_handle, elNo);
+                auto lids = topo_->neighbour_lids(elNo);
+                assert(lids.size() == NumFacets);
+                std::array<decltype(x_0), NumFacets> x_n;
+                for (std::size_t d = 0; d < NumFacets; ++d) {
+                    x_n[d] = x.get_block(x_handle, lids[d]);
+                }
+                lop_->apply(elNo, lids, topo_->neighbour_localNos(elNo), x_0, x_n, y_0);
+            }
+        }
+        x.end_access_readonly(x_handle);
+        y.end_access(y_handle);
     }
 
     template <typename BlockVector> auto solution(BlockVector& vector) const {

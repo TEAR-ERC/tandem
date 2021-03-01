@@ -39,6 +39,7 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
+    matDxi_Q = materialSpace_.evaluateGradientAt(volRule.points());
 }
 
 void Poisson::compute_mass_matrix(std::size_t elNo, double* M) const {
@@ -446,6 +447,84 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.execute();
     return true;
+}
+
+void Poisson::apply(std::size_t elNo, mneme::span<std::size_t> lids,
+                    mneme::span<std::size_t> localNos, Vector<double const> const& x_0,
+                    std::array<Vector<double const>, NumFacets> const& x_n,
+                    Vector<double>& y_0) const {
+    double Minv0[tensor::M::size()];
+    compute_inverse_mass_matrix(elNo, Minv0);
+
+    double sigma[tensor::sigma::size()];
+    kernel::stress_volume sv;
+    sv.Dxi_Q = Dxi_Q.data();
+    sv.E_Q = E_Q.data();
+    sv.G_Q = vol[elNo].get<JInv>().data()->data();
+    sv.J_Q = vol[elNo].get<AbsDetJ>().data();
+    sv.K = material[elNo].get<K>().data();
+    sv.Minv(0) = Minv0;
+    sv.U = x_0.data();
+    sv.W = volRule.weights().data();
+    sv.matDxi_Q = matDxi_Q.data();
+    sv.matE_Q_T = matE_Q_T.data();
+    sv.sigma = sigma;
+    sv.execute();
+
+    double u_hat_q[tensor::u_hat_q::size()];
+
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+        kernel::flux_u_skeleton fus;
+        fus.E_q(0) = E_q[f].data();
+        fus.E_q(1) = E_q[localNos[f]].data();
+        fus.U = x_0.data();
+        fus.U_ext = x_n[f].data();
+        fus.u_hat_q = u_hat_q;
+        fus.execute();
+    /*generator.add('stress_facet', sigma['ur'] <= sigma['ur'] - Minv[0]['uk'] *
+    w['q'] * K['m'] * matE_q_T['qm'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
+
+        kernel::stress_facet sf;
+        sf.E_q(0) = E_q[f].data();
+        sf.K = material[elNo].get<K>().data();
+        sf.Minv(0) = Minv0;
+        sf.matE_Q_T = matE_Q_T.data();
+        sf.n_q = 
+        tensor::E_q::Container<double const*> E_q;
+        double const* K{};
+        tensor::Minv::Container<double const*> Minv;
+        double const* matE_q_T{};
+        double const* n_q{};
+        double* sigma{};
+        double const* u_hat_q{};
+        double const* w{};*/
+        
+    }
+
+    /*sigma = Tensor('sigma', (Nbf, dim))
+    U = Tensor('U', (Nbf,))
+    U_ext = Tensor('U_ext', (Nbf,))
+    U_new = Tensor('U_new', (Nbf,))
+    u_hat_q = Tensor('u_hat_q', (nq,))
+    sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
+
+    generator.add('flux_u_skeleton',
+        u_hat_q['q'] <= 0.5 * (E_q[0]['lq'] * U['l'] + E_q[1]['lq'] * U_ext['l']))
+    generator.add('stress_volume', sigma['ur'] <= Minv[0]['uk'] * W['q'] * J_Q['q'] *
+        G_Q['erq'] * (K['m'] * E_Q['kq'] * matDxi_Q['meq'] + K['m'] * matE_Q_T['qm'] * Dxi_Q['keq'])
+    * E_Q['lq'] * U['l'])
+    generator.add('stress_facet', sigma['ur'] <= sigma['ur'] - Minv[0]['uk'] *
+    w['q'] * K['m'] * matE_q_T['qm'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
+
+    generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
+            (K_Dx_q[0]['lpq'] * U['l'] + K_Dx_q[1]['lpq'] * U_ext['l']) +
+            c0[0] * (E_q[0]['lq'] * U['l'] - E_q[1]['lq'] * U_ext['l']) * n_unit_q['pq'])
+    generator.add('flux_sigma_boundary', sigma_hat_q['pq'] <=
+            K_Dx_q[0]['lpq'] * U['l'] + c0[0] * E_q[0]['lq'] * U['l'] * n_unit_q['pq'])
+    generator.add('apply_volume', U_new['k'] <= W['q'] * J_Q['q'] * E_Q['lq'] *
+        G_Q['erq'] * Dxi_Q['keq'] * sigma['lr'])
+    generator.add('apply_facet', U_new['k'] <= U_new['k'] -
+        w['q'] * E_q[0]['kq'] * n_q['rq'] * sigma_hat_q['rq'])*/
 }
 
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,

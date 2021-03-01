@@ -22,21 +22,27 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
         throw std::runtime_error("Boundary conditions not set.");
     }
 
+    constexpr auto num_facets = D + 1;
+    auto neigh_storage = std::make_shared<neighbour_t>(numLocalElems_ * num_facets);
+    neighbourInfo.setStorage(neigh_storage, 0, numLocalElems_, num_facets);
+
 #pragma omp parallel
     {
 #pragma omp for
         for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
+            FacetInfo& info = fctInfo[fctNo];
+
             auto elNos = mesh.template upward<D - 1u>(fctNo);
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             auto dws = mesh.template downward<D - 1u, D>(elNos[0]);
             auto localFctNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
             assert(localFctNo < D + 1u);
 
-            fctInfo[fctNo].up[0] = elNos[0];
-            fctInfo[fctNo].g_up[0] = mesh.elements().l2cg(elNos[0]);
-            fctInfo[fctNo].localNo[0] = localFctNo;
-            fctInfo[fctNo].inside[0] = elNos[0] < numLocalElems_;
-            fctInfo[fctNo].bc = boundaryData->getBoundaryConditions()[fctNo];
+            info.up[0] = elNos[0];
+            info.g_up[0] = mesh.elements().l2cg(elNos[0]);
+            info.localNo[0] = localFctNo;
+            info.inside[0] = elNos[0] < numLocalElems_;
+            info.bc = boundaryData->getBoundaryConditions()[fctNo];
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);
@@ -44,17 +50,25 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
                     dwsOther.begin(), std::find(dwsOther.begin(), dwsOther.end(), fctNo));
                 assert(localFNoOther < D + 1u);
 
-                fctInfo[fctNo].up[1] = elNos[1];
-                fctInfo[fctNo].g_up[1] = mesh.elements().l2cg(elNos[1]);
-                fctInfo[fctNo].localNo[1] = localFNoOther;
-                fctInfo[fctNo].inside[1] = elNos[1] < numLocalElems_;
+                info.up[1] = elNos[1];
+                info.g_up[1] = mesh.elements().l2cg(elNos[1]);
+                info.localNo[1] = localFNoOther;
+                info.inside[1] = elNos[1] < numLocalElems_;
             } else {
-                fctInfo[fctNo].up[1] = fctInfo[fctNo].up[0];
-                fctInfo[fctNo].g_up[1] = fctInfo[fctNo].g_up[0];
-                fctInfo[fctNo].localNo[1] = fctInfo[fctNo].localNo[0];
-                fctInfo[fctNo].inside[1] = fctInfo[fctNo].inside[0];
+                info.up[1] = info.up[0];
+                info.g_up[1] = info.g_up[0];
+                info.localNo[1] = info.localNo[0];
+                info.inside[1] = info.inside[0];
             }
-            assert(fctInfo[fctNo].inside[0] || fctInfo[fctNo].inside[1]);
+            assert(info.inside[0] || info.inside[1]);
+
+            for (int i = 0; i < 2; ++i) {
+                if (info.inside[0]) {
+                    auto& n = neighbourInfo[info.up[i]];
+                    n.template get<LID>()[info.localNo[i]] = info.up[(i + 1) % 2];
+                    n.template get<LocalNo>()[info.localNo[i]] = info.localNo[(i + 1) % 2];
+                }
+            }
         }
 
 #pragma omp for
