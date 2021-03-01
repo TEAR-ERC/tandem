@@ -77,15 +77,14 @@ void Poisson::compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
     }
 }
 
-void Poisson::compute_K_w_q(std::size_t fctNo, FacetInfo const& info,
-                            std::array<double*, 2> K_w_q) const {
-    kernel::K_w_q kw;
+void Poisson::compute_K_q(std::size_t fctNo, FacetInfo const& info,
+                          std::array<double*, 2> K_q) const {
+    kernel::K_q kw;
     for (int i = 0; i < 2; ++i) {
-        if (K_w_q[i]) {
+        if (K_q[i]) {
             kw.matE_q_T = matE_q_T[info.localNo[i]].data();
             kw.K = material[info.up[i]].get<K>().data();
-            kw.K_w_q(0) = K_w_q[i];
-            kw.w = fctRule.weights().data();
+            kw.K_q(0) = K_q[i];
             kw.execute();
         }
     }
@@ -187,15 +186,16 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
             compute_inverse_mass_matrix(info.up[i], Minv[i]);
         }
 
-        double K_w_q0[tensor::K_w_q::size(0)];
-        double K_w_q1[tensor::K_w_q::size(1)];
-        auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
-        compute_K_w_q(fctNo, info, K_w_q);
+        double K_q0[tensor::K_q::size(0)];
+        double K_q1[tensor::K_q::size(1)];
+        auto K_q = std::array<double*, 2>{K_q0, K_q1};
+        compute_K_q(fctNo, info, K_q);
 
         kernel::lift_skeleton lift;
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
         for (int i = 0; i < 2; ++i) {
-            lift.K_w_q(i) = K_w_q[i];
+            lift.K_q(i) = K_q[i];
             lift.L_q(i) = L_q[i];
             lift.Minv(i) = Minv[i];
             lift.E_q(i) = E_q[info.localNo[i]].data();
@@ -257,15 +257,16 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
         double Minv0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv0);
 
-        double K_w_q[tensor::K_w_q::size(0)];
-        compute_K_w_q(fctNo, info, {K_w_q, nullptr});
+        double K_q[tensor::K_q::size(0)];
+        compute_K_q(fctNo, info, {K_q, nullptr});
 
         kernel::lift_boundary lift;
-        lift.K_w_q(0) = K_w_q;
+        lift.K_q(0) = K_q;
         lift.L_q(0) = L0;
         lift.Minv(0) = Minv0;
         lift.E_q(0) = E_q[info.localNo[0]].data();
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
         lift.execute();
     } else { // IP
         kernel::lift_ip lift;
@@ -352,20 +353,21 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
         compute_inverse_mass_matrix(info.up[0], Minv[0]);
         compute_inverse_mass_matrix(info.up[1], Minv[1]);
 
-        double K_w_q0[tensor::K_w_q::size(0)];
-        double K_w_q1[tensor::K_w_q::size(1)];
-        auto K_w_q = std::array<double*, 2>{K_w_q0, K_w_q1};
-        compute_K_w_q(fctNo, info, K_w_q);
+        double K_q0[tensor::K_q::size(0)];
+        double K_q1[tensor::K_q::size(1)];
+        auto K_q = std::array<double*, 2>{K_q0, K_q1};
+        compute_K_q(fctNo, info, K_q);
 
         kernel::rhs_lift_skeleton lift;
         for (int i = 0; i < 2; ++i) {
             lift.E_q(i) = E_q[info.localNo[i]].data();
-            lift.K_w_q(i) = K_w_q[i];
+            lift.K_q(i) = K_q[i];
             lift.Minv(i) = Minv[i];
         }
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
         lift.f_q = f_q_raw;
         lift.f_lifted_q = f_lifted_q;
+        lift.w = fctRule.weights().data();
         lift.execute();
     } else { // IP
         kernel::rhs_lift_ip lift;
@@ -412,16 +414,17 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
         double M0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], M0);
 
-        double K_w_q[tensor::K_w_q::size(0)];
-        compute_K_w_q(fctNo, info, {K_w_q, nullptr});
+        double K_q[tensor::K_q::size(0)];
+        compute_K_q(fctNo, info, {K_q, nullptr});
 
         kernel::rhs_lift_boundary lift;
         lift.E_q(0) = E_q[info.localNo[0]].data();
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
-        lift.K_w_q(0) = K_w_q;
+        lift.K_q(0) = K_q;
         lift.Minv(0) = M0;
         lift.f_q = f_q_raw;
         lift.f_lifted_q = f_lifted_q;
+        lift.w = fctRule.weights().data();
         lift.execute();
     } else { // IP
         kernel::rhs_lift_ip lift;

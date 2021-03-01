@@ -101,8 +101,7 @@ private:
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     void compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
                         std::array<double*, 2> K_Dx_q) const;
-    void compute_K_w_q(std::size_t fctNo, FacetInfo const& info,
-                       std::array<double*, 2> K_w_q) const;
+    void compute_K_q(std::size_t fctNo, FacetInfo const& info, std::array<double*, 2> K_q) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
