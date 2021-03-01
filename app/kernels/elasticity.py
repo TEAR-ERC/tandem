@@ -108,20 +108,20 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     ])
 
     def test_normal(x):
-        return lam_q[x]['p'] * delta['ij'] * n_q['up'] + mu_q[x]['p'] * \
-            (delta['ui'] * n_q['jp'] + delta['uj'] * n_q['ip'])
+        return lam_q[x]['q'] * delta['us'] * n_q['iq'] + mu_q[x]['q'] * \
+            (delta['iu'] * n_q['sq'] + delta['is'] * n_q['uq'])
 
     generator.addFamily('lift_ip', simpleParameterSpace(2),
         lambda x: L_q[x]['lpuq'] <= E_q[x]['lq'] * delta['pu'] * nl_q['q'])
     generator.addFamily('lift_skeleton', simpleParameterSpace(2), \
         lambda x: L_q[x]['liuq'] <= 0.25 * ( \
-            n_q['jq'] * E_q[0]['mq'] * \
-                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[x]['lp'] * test_normal(0) + \
-            n_q['jq'] * E_q[1]['nq'] * \
-                Minv[1]['no'] * w['p'] * E_q[1]['op'] * E_q[x]['lp'] * test_normal(1) \
+            test_normal(0) * E_q[0]['mq'] * \
+                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[x]['lp'] * n_q['sp'] + \
+            test_normal(1) * E_q[1]['nq'] * \
+                Minv[1]['no'] * w['p'] * E_q[1]['op'] * E_q[x]['lp'] * n_q['sp'] \
         ))
-    generator.add('lift_boundary', L_q[0]['liuq'] <= n_q['jq'] * E_q[0]['mq'] * \
-                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[0]['lp'] * test_normal(0))
+    generator.add('lift_boundary', L_q[0]['liuq'] <= test_normal(0) * E_q[0]['mq'] * \
+                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[0]['lp'] * n_q['sp'])
 
     def assembleTractionOp(x):
         return traction_op_q[x]['kpuq'] <= lam_q[x]['q'] * Dx_q[x]['kpq'] * n_q['uq'] + \
@@ -143,11 +143,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     f_lifted_q = Tensor('f_lifted_q', (dim, nq))
     generator.add('rhs_lift_ip', f_lifted_q['iq'] <= f_q['iq'] * nl_q['q'])
     generator.add('rhs_lift_boundary', f_lifted_q['iq'] <= \
-        n_q['jq'] * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * test_normal(0))
+        test_normal(0) * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'])
 
     generator.add('rhs_lift_skeleton', f_lifted_q['iq'] <= 0.25 * ( \
-        n_q['jq'] * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * test_normal(0) + \
-        n_q['jq'] * E_q[1]['mq'] * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * test_normal(1)))
+        test_normal(0) * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'] + \
+        test_normal(1) * E_q[1]['mq'] * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * n_q['sp']))
 
     b = Tensor('b', (Nbf, dim))
     F_Q = Tensor('F_Q', (dim, Nq))
