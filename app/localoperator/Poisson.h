@@ -118,10 +118,11 @@ private:
     // Matrices
     Managed<Matrix<double>> Minv_;
     Managed<Matrix<double>> E_Q;
+    Managed<Matrix<double>> E_Q_T;
     Managed<Matrix<double>> MinvRef_E_Q;
     Managed<Tensor<double, 3u>> Dxi_Q;
     std::vector<Managed<Matrix<double>>> E_q;
-    std::vector<Managed<Matrix<double>>> MinvRef_E_q;
+    std::vector<Managed<Matrix<double>>> E_q_T;
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
 
     Managed<Matrix<double>> matE_Q_T;

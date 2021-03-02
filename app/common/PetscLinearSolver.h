@@ -3,6 +3,7 @@
 
 #include "PetscUtil.h"
 #include "common/PetscDGMatrix.h"
+#include "common/PetscDGShell.h"
 #include "common/PetscVector.h"
 
 #include <petscksp.h>
@@ -20,15 +21,16 @@ class PetscLinearSolver {
 public:
     template <typename DGOp> PetscLinearSolver(DGOp& dgop) {
         auto const& topo = dgop.topo();
-        A_ = std::make_unique<PetscDGMatrix>(dgop.block_size(), topo);
+        A_ = std::make_unique<PetscDGShell>(dgop);
+        P_ = std::make_unique<PetscDGMatrix>(dgop.block_size(), topo);
         b_ = std::make_unique<PetscVector>(dgop.block_size(), topo.numLocalElements(), topo.comm());
         x_ = std::make_unique<PetscVector>(*b_);
-        dgop.assemble(*A_);
+        dgop.assemble(*P_);
         dgop.rhs(*b_);
 
         CHKERRTHROW(KSPCreate(topo.comm(), &ksp_));
         CHKERRTHROW(KSPSetType(ksp_, KSPCG));
-        CHKERRTHROW(KSPSetOperators(ksp_, A_->mat(), A_->mat()));
+        CHKERRTHROW(KSPSetOperators(ksp_, A_->mat(), P_->mat()));
         CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
         CHKERRTHROW(KSPSetFromOptions(ksp_));
     }
@@ -57,7 +59,8 @@ private:
     void warmup_sub_pcs(PC pc);
     void warmup_composite(PC pc);
 
-    std::unique_ptr<PetscDGMatrix> A_;
+    std::unique_ptr<PetscDGShell> A_;
+    std::unique_ptr<PetscDGMatrix> P_;
     std::unique_ptr<PetscVector> b_;
     std::unique_ptr<PetscVector> x_;
     KSP ksp_ = nullptr;

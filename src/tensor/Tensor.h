@@ -23,6 +23,8 @@ public:
 
     template <typename T> using is_slice = std::is_same<slice, T>;
 
+    Tensor() : Base(), data_(nullptr) {}
+
     Tensor(real_t* memory, multi_index_t const& shape) : Base(shape), data_(memory) {
         static_assert(Packed);
         computeStride();

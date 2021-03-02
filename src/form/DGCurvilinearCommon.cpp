@@ -33,9 +33,9 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
                    fctRule.size());
     vol.setStorage(std::make_shared<vol_t>(numElements * volRule.size()), 0u, numElements,
                    volRule.size());
-    const auto totalLocalFacets = NumFacets * numLocalElements;
-    fct_on_vol.setStorage(std::make_shared<fct_on_vol_t>(totalLocalFacets * fctRule.size()), 0u,
-                          totalLocalFacets, fctRule.size());
+    const auto totalFacets = NumFacets * numElements;
+    fct_on_vol.setStorage(std::make_shared<fct_on_vol_t>(totalFacets * fctRule.size()), 0u,
+                          totalFacets, fctRule.size());
     penalty.resize(numElements, 0.0);
 }
 
@@ -101,29 +101,40 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     cl_->jacobian(info.up[1], geoDxi_q[info.localNo[1]], J);
     cl_->jacobianInv(J, jInv1);
 
-    const auto j0 = NumFacets * info.up[0] + info.localNo[0];
-    const auto j1 = NumFacets * info.up[1] + info.localNo[1];
-    auto& n0 = fct_on_vol[j0].template get<Normal>();
-    auto& n1 = fct_on_vol[j1].template get<Normal>();
-    auto& n_unit0 = fct_on_vol[j0].template get<UnitNormal>();
-    auto& n_unit1 = fct_on_vol[j1].template get<UnitNormal>();
-    for (std::size_t q = 0; q < fctRule.size(); ++q) {
-        for (std::size_t i = 0; i < D; ++i) {
-            n0[q][i] = normal(i, q);
-            n1[q][i] = -normal(i, q);
-            n_unit0[q][i] = unit_normal(i, q);
-            n_unit1[q][i] = -unit_normal(i, q);
-        }
-    }
-    auto& ji0 = fct_on_vol[j0].template get<JInv0>();
-    auto& ji1 = fct_on_vol[j1].template get<JInv0>();
-    for (std::size_t q = 0; q < fctRule.size(); ++q) {
-        for (std::size_t i = 0; i < D; ++i) {
-            for (std::size_t j = 0; j < D; ++j) {
-                ji0[i + j * D][q] = jInv0(i, j, q);
-                ji1[i + j * D][q] = jInv1(i, j, q);
+    const auto copy_normals_and_jinv = [&](int side) {
+        const auto idx = NumFacets * info.up[side] + info.localNo[side];
+        auto& n = fct_on_vol[idx].template get<Normal>();
+        auto& n_unit = fct_on_vol[idx].template get<UnitNormal>();
+        double sign = (side == 1) ? -1.0 : 1.0;
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            assert(q < n.size());
+            assert(q < normal.shape(1));
+            for (std::size_t i = 0; i < D; ++i) {
+                assert(i < n[q].size());
+                assert(i < normal.shape(0));
+                n[q][i] = sign * normal(i, q);
+                n_unit[q][i] = sign * unit_normal(i, q);
             }
         }
+        auto& ji0 = fct_on_vol[idx].template get<JInv0>();
+        const auto& jInv01 = (side == 1) ? jInv1 : jInv0;
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            assert(q < ji0.size());
+            assert(q < jInv01.shape(2));
+            for (std::size_t j = 0; j < D; ++j) {
+                assert(j < jInv01.shape(1));
+                for (std::size_t i = 0; i < D; ++i) {
+                    assert(i < jInv01.shape(0));
+                    assert(i + j * D < ji0[q].size());
+                    ji0[q][i + j * D] = jInv01(i, j, q);
+                }
+            }
+        }
+    };
+
+    copy_normals_and_jinv(0);
+    if (info.up[0] != info.up[1]) {
+        copy_normals_and_jinv(1);
     }
 }
 

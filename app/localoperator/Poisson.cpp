@@ -12,7 +12,9 @@
 #include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/EigenMap.h"
 #include "util/LinearAllocator.h"
+#include "util/Stopwatch.h"
 
+#include <Eigen/Core>
 #include <Eigen/LU>
 #include <cassert>
 
@@ -32,6 +34,7 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
 
     Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
+    E_Q_T = space_.evaluateBasisAt(volRule.points(), {1, 0});
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
 
     MinvRef_E_Q = Managed<Matrix<double>>(E_Q.shape());
@@ -40,11 +43,9 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
+        E_q_T.emplace_back(space_.evaluateBasisAt(points, {1, 0}));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
-
-        MinvRef_E_q.emplace_back(Managed<Matrix<double>>(E_q.back().shape()));
-        EigenMap(MinvRef_E_q.back()) = EigenMap(Minv_) * EigenMap(E_q.back());
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
@@ -471,35 +472,41 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
 void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                     std::array<Vector<double const>, NumFacets> const& x_n,
                     Vector<double>& y_0) const {
-    double Minv0[tensor::M::size()];
-    compute_inverse_mass_matrix(elNo, Minv0);
+    unsigned long flops = 0;
+    Stopwatch sw;
+    sw.start();
 
     double sigma[tensor::sigma::size()];
     kernel::stress_volume sv;
     sv.Dxi_Q = Dxi_Q.data();
     sv.G_Q = vol[elNo].get<JInv>().data()->data();
     sv.J_Q = vol[elNo].get<AbsDetJ>().data();
-    sv.MinvRef_E_Q = MinvRef_E_Q.data();
+    sv.E_Q_T = E_Q_T.data();
     sv.U = x_0.data();
     sv.W = volRule.weights().data();
     sv.sigma = sigma;
     sv.execute();
+    auto sv_time = sw.stop();
+    sw.start();
+
+    flops += kernel::stress_volume::HardwareFlops;
 
     double u_hat_q[tensor::u_hat_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
         if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
             kernel::flux_u_skeleton fu;
+            fu.E_q_T(0) = E_q_T[f].data();
+            fu.E_q_T(1) = E_q_T[info[f].localNo].data();
             fu.U = x_0.data();
-            fu.u_hat_q = u_hat_q;
-            fu.E_q(0) = E_q[f].data();
-            fu.E_q(1) = E_q[info[f].localNo].data();
             fu.U_ext = x_n[f].data();
+            fu.u_hat_q = u_hat_q;
             fu.execute();
+            flops += kernel::flux_u_skeleton::HardwareFlops;
         } else if (info[f].bc == BC::Natural) {
             kernel::flux_u_boundary fu;
             fu.U = x_0.data();
             fu.u_hat_q = u_hat_q;
-            fu.E_q(0) = E_q[f].data();
+            fu.E_q_T(0) = E_q_T[f].data();
             fu.execute();
         } else {
             continue;
@@ -509,10 +516,13 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
         sf.sigma = sigma;
         sf.u_hat_q = u_hat_q;
         sf.w = fctRule.weights().data();
-        sf.MinvRef_E_q = MinvRef_E_q[f].data();
+        sf.E_q(0) = E_q[f].data();
         sf.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         sf.execute();
+        flops += kernel::stress_facet::HardwareFlops;
     }
+    auto sf_time = sw.stop();
+    sw.start();
 
     double K_Jinv_Q[tensor::K_Jinv_Q::size()];
     static_assert(tensor::K_Q::size() == tensor::K_Jinv_Q::size());
@@ -521,18 +531,23 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
     kq.K = material[elNo].get<K>().data();
     kq.matE_Q_T = matE_Q_T.data();
     kq.execute();
+    flops += kernel::K_Q::HardwareFlops;
 
+    auto J_Q = vol[elNo].get<AbsDetJ>();
     for (std::size_t q = 0; q < volRule.size(); ++q) {
-        K_Jinv_Q[q] /= vol[elNo].get<AbsDetJ>()[q];
+        K_Jinv_Q[q] /= J_Q[q];
     }
 
     kernel::project_stress ps;
-    ps.E_Q = E_Q.data();
     ps.K_Jinv_Q = K_Jinv_Q;
     ps.MinvRef_E_Q = MinvRef_E_Q.data();
     ps.W = volRule.weights().data();
     ps.sigma = sigma;
     ps.execute();
+    flops += kernel::project_stress::HardwareFlops;
+
+    auto ps_time = sw.stop();
+    sw.start();
 
     kernel::apply_volume av;
     av.Dxi_Q = Dxi_Q.data();
@@ -542,33 +557,39 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
     av.U_new = y_0.data();
     av.W = volRule.weights().data();
     av.sigma = sigma;
+    av.execute();
+    flops += kernel::apply_volume::HardwareFlops;
+
+    auto av_time = sw.stop();
+    sw.start();
 
     double sigma_hat_q[tensor::sigma_hat_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
-
-        double K_Dx_q0[tensor::K_Dx_q::size(0)];
-        double K_Dx_q1[tensor::K_Dx_q::size(1)];
+        double K_Dx_q0[tensor::K_Dx_q::size(0)] = {};
+        double K_Dx_q1[tensor::K_Dx_q::size(1)] = {};
         kernel::K_Dx_q dx;
+        dx.Dxi_q = Dxi_q[f].data();
         dx.G_q = fct_on_vol[NumFacets * elNo + f].get<JInv0>().data()->data();
-        dx.matE_q_T = matE_q_T[f].data();
         dx.K = material[elNo].get<K>().data();
         dx.K_Dx_q(0) = K_Dx_q0;
-        dx.Dxi_q = Dxi_q[f].data();
+        dx.matE_q_T = matE_q_T[f].data();
         dx.execute();
+        flops += kernel::K_Dx_q::HardwareFlops;
 
         if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+            dx.Dxi_q = Dxi_q[info[f].localNo].data();
             dx.G_q =
                 fct_on_vol[NumFacets * info[f].lid + info[f].localNo].get<JInv0>().data()->data();
-            dx.matE_q_T = matE_q_T[info[f].localNo].data();
             dx.K = material[info[f].lid].get<K>().data();
-            dx.K_Dx_q(1) = K_Dx_q1;
-            dx.Dxi_q = Dxi_q[info[f].lid].data();
+            dx.K_Dx_q(0) = K_Dx_q1;
+            dx.matE_q_T = matE_q_T[info[f].localNo].data();
             dx.execute();
+            flops += kernel::K_Dx_q::HardwareFlops;
 
             kernel::flux_sigma_skeleton fs;
             fs.c00 = -penalty(elNo, info[f].lid);
-            fs.E_q(0) = E_q[f].data();
-            fs.E_q(1) = E_q[info[f].localNo].data();
+            fs.E_q_T(0) = E_q_T[f].data();
+            fs.E_q_T(1) = E_q_T[info[f].localNo].data();
             fs.K_Dx_q(0) = K_Dx_q0;
             fs.K_Dx_q(1) = K_Dx_q1;
             fs.U = x_0.data();
@@ -576,26 +597,36 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
             fs.sigma_hat_q = sigma_hat_q;
             fs.execute();
+            flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (info[f].bc == BC::Dirichlet) {
-            kernel::flux_sigma_skeleton fs;
+            kernel::flux_sigma_boundary fs;
             fs.c00 = -penalty(elNo, elNo);
-            fs.E_q(0) = E_q[f].data();
+            fs.E_q_T(0) = E_q_T[f].data();
             fs.K_Dx_q(0) = K_Dx_q0;
             fs.U = x_0.data();
             fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
             fs.sigma_hat_q = sigma_hat_q;
             fs.execute();
+            flops += kernel::flux_sigma_boundary::HardwareFlops;
         } else {
             continue;
         }
 
         kernel::apply_facet af;
+        af.E_q(0) = E_q[f].data();
         af.U_new = y_0.data();
         af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         af.sigma_hat_q = sigma_hat_q;
         af.w = fctRule.weights().data();
         af.execute();
+        flops += kernel::apply_facet::HardwareFlops;
     }
+    auto af_time = sw.stop();
+
+    std::cout << sv_time << " " << sf_time << " " << ps_time << " " << av_time << " " << af_time
+              << std::endl;
+    std::cout << flops << " " << flops / (sv_time + sf_time + ps_time + av_time + af_time) / 1e9
+              << std::endl;
 }
 
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,

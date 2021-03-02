@@ -101,25 +101,26 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     U_new = Tensor('U_new', (Nbf,))
     u_hat_q = Tensor('u_hat_q', (nq,))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
+    E_Q_T = Tensor('E_Q_T', (Nq, Nbf))
+    E_q_T = [Tensor('E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
     MinvRef_E_Q = Tensor('MinvRef_E_Q', (Nbf, Nq))
-    MinvRef_E_q = Tensor('MinvRef_E_q', (Nbf, nq))
     K_Jinv_Q = Tensor('K_Jinv_Q', (Nq,))
 
     generator.add('flux_u_skeleton',
-        u_hat_q['q'] <= 0.5 * (E_q[0]['lq'] * U['l'] + E_q[1]['lq'] * U_ext['l']))
-    generator.add('flux_u_boundary', u_hat_q['q'] <= E_q[0]['lq'] * U['l'])
-    generator.add('stress_volume', sigma['kr'] <= J_Q['q'] * W['q'] *
-        MinvRef_E_Q['kq'] * G_Q['erq'] * Dxi_Q['leq'] * U['l'])
+        u_hat_q['q'] <= 0.5 * (E_q_T[0]['ql'] * U['l'] + E_q_T[1]['ql'] * U_ext['l']))
+    generator.add('flux_u_boundary', u_hat_q['q'] <= E_q_T[0]['ql'] * U['l'])
+    generator.add('stress_volume', sigma['kr'] <= -J_Q['q'] * W['q'] *
+        Dxi_Q['keq'] * G_Q['erq'] * E_Q_T['ql'] * U['l'])
     generator.add('stress_facet', sigma['kr'] <= sigma['kr'] +
-        w['q'] * MinvRef_E_q['kq'] * n_q['rq'] * u_hat_q['q'])
+        w['q'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
     generator.add('project_stress', sigma['kr'] <=
-        K_Jinv_Q['q'] * W['q'] * MinvRef_E_Q['kq'] * E_Q['lq'] * sigma['lr'])
+        K_Jinv_Q['q'] * W['q'] * MinvRef_E_Q['kq'] * MinvRef_E_Q['lq'] * sigma['lr'])
 
     generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
             (K_Dx_q[0]['lpq'] * U['l'] + K_Dx_q[1]['lpq'] * U_ext['l']) +
-            c0[0] * (E_q[0]['lq'] * U['l'] - E_q[1]['lq'] * U_ext['l']) * n_unit_q['pq'])
+            c0[0] * (E_q_T[0]['ql'] * U['l'] - E_q_T[1]['ql'] * U_ext['l']) * n_unit_q['pq'])
     generator.add('flux_sigma_boundary', sigma_hat_q['pq'] <=
-            K_Dx_q[0]['lpq'] * U['l'] + c0[0] * E_q[0]['lq'] * U['l'] * n_unit_q['pq'])
+            K_Dx_q[0]['lpq'] * U['l'] + c0[0] * E_q_T[0]['ql'] * U['l'] * n_unit_q['pq'])
     generator.add('apply_volume', U_new['k'] <= W['q'] * J_Q['q'] * E_Q['lq'] *
         G_Q['erq'] * Dxi_Q['keq'] * sigma['lr'])
     generator.add('apply_facet', U_new['k'] <= U_new['k'] -
