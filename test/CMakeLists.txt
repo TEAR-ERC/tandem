@@ -2,12 +2,14 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 add_library(test-runner main.cpp)
+target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
 target_include_directories(test-runner PUBLIC
     ../external
 )
 target_link_libraries(test-runner PUBLIC tandem-lib)
 
 add_library(test-runner-mpi main-mpi.cpp)
+target_compile_options(test-runner-mpi PUBLIC ${CPU_ARCH_FLAGS})
 target_include_directories(test-runner-mpi PUBLIC
     ../external
 )

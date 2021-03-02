@@ -1,21 +1,26 @@
 # Apps without generated kernels
 
 add_executable(preprocess preprocess.cpp)
+target_compile_options(preprocess PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(preprocess PRIVATE ../external/)
 target_link_libraries(preprocess PRIVATE tandem-fem-lib)
 
 add_executable(tensors tensors.cpp)
+target_compile_options(tensors PRIVATE ${CPU_ARCH_FLAGS})
 target_link_libraries(tensors PRIVATE tandem-fem-lib)
 
 add_executable(warp-blend-opt warp-blend-opt.cpp)
+target_compile_options(warp-blend-opt PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(warp-blend-opt PRIVATE ../external/)
 target_link_libraries(warp-blend-opt PRIVATE tandem-fem-lib)
 
 add_executable(test-mesh test-mesh.cpp)
+target_compile_options(test-mesh PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(test-mesh PRIVATE ../external/)
 target_link_libraries(test-mesh PRIVATE tandem-lib tinyxml2)
 
 add_executable(test-gauss test-gauss.cpp)
+target_compile_options(test-gauss PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(test-gauss PRIVATE ../external/)
 target_link_libraries(test-gauss PRIVATE tandem-lib)
 
@@ -81,8 +86,12 @@ function(generate_code APP)
         kernels/${APP}/subroutine.cpp
         kernels/${APP}/tensor.cpp
     )
+    if(NO_REDZONE)
+        set_source_files_properties(kernels/${APP}/subroutine.cpp PROPERTIES COMPILE_FLAGS -mno-red-zone)
+    endif()
     # Use C++-17 in order to enforce inline "constexpr static" variables 
     target_compile_features(${APP}-kernels-lib PUBLIC cxx_std_17)
+    target_compile_options(${APP}-kernels-lib PUBLIC ${CPU_ARCH_FLAGS})
     target_include_directories(${APP}-kernels-lib PUBLIC
         ../external/
         ../submodules/yateto/include/

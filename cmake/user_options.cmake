@@ -9,3 +9,11 @@ endif()
 if(NOT ${MIN_QUADRATURE_ORDER} GREATER_EQUAL 0)
     message(FATAL_ERROR "Minimum order of quadrature rule must be integer and greater equal 0.")
 endif()
+
+set(ARCH "hsw" CACHE STRING "CPU architecture")
+set(ARCH_OPTIONS   noarch snb hsw skl skx)
+set(ARCH_ALIGNMENT     16  32  32  32  64)
+set_property(CACHE ARCH PROPERTY STRINGS ${ARCH_OPTIONS})
+
+list(FIND ARCH_OPTIONS ${ARCH} INDEX)
+list(GET ARCH_ALIGNMENT ${INDEX} ALIGNMENT)
