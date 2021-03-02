@@ -13,6 +13,7 @@
 #include "tensor/TensorBase.h"
 #include "util/LinearAllocator.h"
 
+#include "mneme/allocators.hpp"
 #include "mneme/storage.hpp"
 #include "mneme/view.hpp"
 
@@ -138,6 +139,7 @@ private:
     // Precomputed data
     struct K {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K>;

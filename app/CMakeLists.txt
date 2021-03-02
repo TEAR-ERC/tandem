@@ -57,11 +57,15 @@ include(../cmake/doctest.cmake)
 function(generate_code APP)
     set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/kernels/${APP})
     file(MAKE_DIRECTORY ${OUTPUT_DIR})
+    set(YATETO_ARCH ${ARCH})
+    if("${YATETO_ARCH}" STREQUAL "skl")
+        set(YATETO_ARCH "hsw")
+    endif()
     add_custom_command(
         COMMAND
             ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
             "--app" ${APP}
-            "--arch" "dnoarch"
+            "--arch" "d${YATETO_ARCH}"
             "--options" ${OPTIONS_FILE_NAME}
             "--outputDir" ${OUTPUT_DIR}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
@@ -149,6 +153,7 @@ if(${LAPACK_FOUND})
     )
 endif()
 add_library(app-common ${APP_COMMON_SRCS})
+target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
     ${LAPACK_LIBRARIES}
     poisson-kernels-lib
