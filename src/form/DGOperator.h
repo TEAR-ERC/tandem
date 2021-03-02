@@ -209,13 +209,13 @@ public:
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
                 auto y_0 = y.get_block(y_handle, elNo);
                 auto x_0 = x.get_block(x_handle, elNo);
-                auto lids = topo_->neighbour_lids(elNo);
-                assert(lids.size() == NumFacets);
+                auto info = topo_->neighbours(elNo);
+                assert(info.size() == NumFacets);
                 std::array<decltype(x_0), NumFacets> x_n;
                 for (std::size_t d = 0; d < NumFacets; ++d) {
-                    x_n[d] = x.get_block(x_handle, lids[d]);
+                    x_n[d] = x.get_block(x_handle, info[d].lid);
                 }
-                lop_->apply(elNo, lids, topo_->neighbour_localNos(elNo), x_0, x_n, y_0);
+                lop_->apply(elNo, info, x_0, x_n, y_0);
             }
         }
         x.end_access_readonly(x_handle);

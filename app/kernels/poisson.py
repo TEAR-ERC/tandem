@@ -11,7 +11,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     W = Tensor('W', (Nq,))
     E_Q = Tensor('E_Q', (Nbf, Nq))
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
-    matDxi_Q = Tensor('matDxi_Q', (Nbf, dim, Nq))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
     A = Tensor('A', (Nbf, Nbf))
@@ -26,6 +25,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.add('project_K_lhs', matM['kl'] <= matE_Q_T['qk'] * W['q'] * J_Q['q'] * matE_Q_T['ql'])
     generator.add('project_K_rhs', K['k'] <= K_Q['q'] * matE_Q_T['qk'] * W['q'] * J_Q['q'])
+    generator.add('K_Q', K_Q['q'] <= K['m'] * matE_Q_T['qm'])
 
     generator.add('Dx_Q', Dx_Q['kiq'] <= G_Q['eiq'] * Dxi_Q['keq'])
     generator.add('assembleVolume',
@@ -95,22 +95,25 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # matrix-free
 
-    J_K_W_Q = Tensor('J_K_W_Q', (Nq,))
-    generator.add('J_K_W_Q', J_K_W_Q['q'] <= J_Q['q'] * K['m'] * matE_Q_T['qm'] * W['q'])
-
     sigma = Tensor('sigma', (Nbf, dim))
     U = Tensor('U', (Nbf,))
     U_ext = Tensor('U_ext', (Nbf,))
     U_new = Tensor('U_new', (Nbf,))
     u_hat_q = Tensor('u_hat_q', (nq,))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
+    MinvRef_E_Q = Tensor('MinvRef_E_Q', (Nbf, Nq))
+    MinvRef_E_q = Tensor('MinvRef_E_q', (Nbf, nq))
+    K_Jinv_Q = Tensor('K_Jinv_Q', (Nq,))
 
     generator.add('flux_u_skeleton',
-        u_hat_q['q'] <= 0.5 * (E_q[0]['lq'] * U['l'] - E_q[1]['lq'] * U_ext['l']))
-    generator.add('stress_volume', sigma['kr'] <= J_K_W_Q['q'] *
-        E_Q['kq'] * G_Q['erq'] * Dxi_Q['leq'] * U['l'])
+        u_hat_q['q'] <= 0.5 * (E_q[0]['lq'] * U['l'] + E_q[1]['lq'] * U_ext['l']))
+    generator.add('flux_u_boundary', u_hat_q['q'] <= E_q[0]['lq'] * U['l'])
+    generator.add('stress_volume', sigma['kr'] <= J_Q['q'] * W['q'] *
+        MinvRef_E_Q['kq'] * G_Q['erq'] * Dxi_Q['leq'] * U['l'])
     generator.add('stress_facet', sigma['kr'] <= sigma['kr'] +
-            K_w_q[0]['q'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
+        w['q'] * MinvRef_E_q['kq'] * n_q['rq'] * u_hat_q['q'])
+    generator.add('project_stress', sigma['kr'] <=
+        K_Jinv_Q['q'] * W['q'] * MinvRef_E_Q['kq'] * E_Q['lq'] * sigma['lr'])
 
     generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
             (K_Dx_q[0]['lpq'] * U['l'] + K_Dx_q[1]['lpq'] * U_ext['l']) +

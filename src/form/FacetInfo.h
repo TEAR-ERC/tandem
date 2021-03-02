@@ -8,6 +8,12 @@
 
 namespace tndm {
 
+struct SideInfo {
+    std::size_t lid;
+    std::size_t localNo;
+    BC bc;
+};
+
 struct FacetInfo {
     std::array<bool, 2> inside;
     std::array<std::size_t, 2> up;

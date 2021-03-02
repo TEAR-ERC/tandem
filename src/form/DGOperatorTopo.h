@@ -40,12 +40,7 @@ public:
     unsigned const* numGhostNeighbours() const {
         return &volInfo[0].template get<NumGhostNeighbours>();
     }
-    mneme::span<std::size_t> neighbour_lids(std::size_t elNo) const {
-        return neighbourInfo[elNo].template get<LID>();
-    }
-    mneme::span<std::size_t> neighbour_localNos(std::size_t elNo) const {
-        return neighbourInfo[elNo].template get<LocalNo>();
-    }
+    mneme::span<SideInfo> neighbours(std::size_t elNo) const { return neighbourInfo[elNo]; }
 
     MPI_Comm comm() const { return comm_; }
 
@@ -70,13 +65,10 @@ protected:
     mneme::MultiStorage<mneme::DataLayout::SoA, GID, NumLocalNeighbours, NumGhostNeighbours>
         volInfo;
 
-    struct LID {
-        using type = std::size_t;
+    struct Side {
+        using type = SideInfo;
     };
-    struct LocalNo {
-        using type = std::size_t;
-    };
-    using neighbour_t = mneme::MultiStorage<mneme::DataLayout::SoA, LID, LocalNo>;
+    using neighbour_t = mneme::SingleStorage<Side>;
     mneme::StridedView<neighbour_t> neighbourInfo;
 };
 

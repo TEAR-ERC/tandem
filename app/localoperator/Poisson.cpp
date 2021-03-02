@@ -10,6 +10,7 @@
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "quadrules/SimplexQuadratureRule.h"
+#include "tensor/EigenMap.h"
 #include "util/LinearAllocator.h"
 
 #include <Eigen/LU>
@@ -32,11 +33,18 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
+
+    MinvRef_E_Q = Managed<Matrix<double>>(E_Q.shape());
+    EigenMap(MinvRef_E_Q) = EigenMap(Minv_) * EigenMap(E_Q);
+
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
+
+        MinvRef_E_q.emplace_back(Managed<Matrix<double>>(E_q.back().shape()));
+        EigenMap(MinvRef_E_q.back()) = EigenMap(Minv_) * EigenMap(E_q.back());
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
@@ -460,8 +468,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     return true;
 }
 
-void Poisson::apply(std::size_t elNo, mneme::span<std::size_t> lids,
-                    mneme::span<std::size_t> localNos, Vector<double const> const& x_0,
+void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                     std::array<Vector<double const>, NumFacets> const& x_n,
                     Vector<double>& y_0) const {
     double Minv0[tensor::M::size()];
@@ -470,72 +477,125 @@ void Poisson::apply(std::size_t elNo, mneme::span<std::size_t> lids,
     double sigma[tensor::sigma::size()];
     kernel::stress_volume sv;
     sv.Dxi_Q = Dxi_Q.data();
-    sv.E_Q = E_Q.data();
     sv.G_Q = vol[elNo].get<JInv>().data()->data();
     sv.J_Q = vol[elNo].get<AbsDetJ>().data();
-    sv.K = material[elNo].get<K>().data();
-    sv.Minv(0) = Minv0;
+    sv.MinvRef_E_Q = MinvRef_E_Q.data();
     sv.U = x_0.data();
     sv.W = volRule.weights().data();
-    sv.matDxi_Q = matDxi_Q.data();
-    sv.matE_Q_T = matE_Q_T.data();
     sv.sigma = sigma;
     sv.execute();
 
     double u_hat_q[tensor::u_hat_q::size()];
-
     for (std::size_t f = 0; f < NumFacets; ++f) {
-        kernel::flux_u_skeleton fus;
-        fus.E_q(0) = E_q[f].data();
-        fus.E_q(1) = E_q[localNos[f]].data();
-        fus.U = x_0.data();
-        fus.U_ext = x_n[f].data();
-        fus.u_hat_q = u_hat_q;
-        fus.execute();
-    /*generator.add('stress_facet', sigma['ur'] <= sigma['ur'] - Minv[0]['uk'] *
-    w['q'] * K['m'] * matE_q_T['qm'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
+        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+            kernel::flux_u_skeleton fu;
+            fu.U = x_0.data();
+            fu.u_hat_q = u_hat_q;
+            fu.E_q(0) = E_q[f].data();
+            fu.E_q(1) = E_q[info[f].localNo].data();
+            fu.U_ext = x_n[f].data();
+            fu.execute();
+        } else if (info[f].bc == BC::Natural) {
+            kernel::flux_u_boundary fu;
+            fu.U = x_0.data();
+            fu.u_hat_q = u_hat_q;
+            fu.E_q(0) = E_q[f].data();
+            fu.execute();
+        } else {
+            continue;
+        }
 
         kernel::stress_facet sf;
-        sf.E_q(0) = E_q[f].data();
-        sf.K = material[elNo].get<K>().data();
-        sf.Minv(0) = Minv0;
-        sf.matE_Q_T = matE_Q_T.data();
-        sf.n_q = 
-        tensor::E_q::Container<double const*> E_q;
-        double const* K{};
-        tensor::Minv::Container<double const*> Minv;
-        double const* matE_q_T{};
-        double const* n_q{};
-        double* sigma{};
-        double const* u_hat_q{};
-        double const* w{};*/
-        
+        sf.sigma = sigma;
+        sf.u_hat_q = u_hat_q;
+        sf.w = fctRule.weights().data();
+        sf.MinvRef_E_q = MinvRef_E_q[f].data();
+        sf.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
+        sf.execute();
     }
 
-    /*sigma = Tensor('sigma', (Nbf, dim))
-    U = Tensor('U', (Nbf,))
-    U_ext = Tensor('U_ext', (Nbf,))
-    U_new = Tensor('U_new', (Nbf,))
-    u_hat_q = Tensor('u_hat_q', (nq,))
-    sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
+    double K_Jinv_Q[tensor::K_Jinv_Q::size()];
+    static_assert(tensor::K_Q::size() == tensor::K_Jinv_Q::size());
+    kernel::K_Q kq;
+    kq.K_Q = K_Jinv_Q;
+    kq.K = material[elNo].get<K>().data();
+    kq.matE_Q_T = matE_Q_T.data();
+    kq.execute();
 
-    generator.add('flux_u_skeleton',
-        u_hat_q['q'] <= 0.5 * (E_q[0]['lq'] * U['l'] + E_q[1]['lq'] * U_ext['l']))
-    generator.add('stress_volume', sigma['ur'] <= Minv[0]['uk'] * W['q'] * J_Q['q'] *
-        G_Q['erq'] * (K['m'] * E_Q['kq'] * matDxi_Q['meq'] + K['m'] * matE_Q_T['qm'] * Dxi_Q['keq'])
-    * E_Q['lq'] * U['l'])
-    generator.add('stress_facet', sigma['ur'] <= sigma['ur'] - Minv[0]['uk'] *
-    w['q'] * K['m'] * matE_q_T['qm'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        K_Jinv_Q[q] /= vol[elNo].get<AbsDetJ>()[q];
+    }
 
-    generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
-            (K_Dx_q[0]['lpq'] * U['l'] + K_Dx_q[1]['lpq'] * U_ext['l']) +
-            c0[0] * (E_q[0]['lq'] * U['l'] - E_q[1]['lq'] * U_ext['l']) * n_unit_q['pq'])
-    generator.add('flux_sigma_boundary', sigma_hat_q['pq'] <=
-            K_Dx_q[0]['lpq'] * U['l'] + c0[0] * E_q[0]['lq'] * U['l'] * n_unit_q['pq'])
-    generator.add('apply_volume', U_new['k'] <= W['q'] * J_Q['q'] * E_Q['lq'] *
-        G_Q['erq'] * Dxi_Q['keq'] * sigma['lr'])
-    generator.add('apply_facet', U_new['k'] <= U_new['k'] -
-        w['q'] * E_q[0]['kq'] * n_q['rq'] * sigma_hat_q['rq'])*/
+    kernel::project_stress ps;
+    ps.E_Q = E_Q.data();
+    ps.K_Jinv_Q = K_Jinv_Q;
+    ps.MinvRef_E_Q = MinvRef_E_Q.data();
+    ps.W = volRule.weights().data();
+    ps.sigma = sigma;
+    ps.execute();
+
+    kernel::apply_volume av;
+    av.Dxi_Q = Dxi_Q.data();
+    av.E_Q = E_Q.data();
+    av.G_Q = vol[elNo].get<JInv>().data()->data();
+    av.J_Q = vol[elNo].get<AbsDetJ>().data();
+    av.U_new = y_0.data();
+    av.W = volRule.weights().data();
+    av.sigma = sigma;
+
+    double sigma_hat_q[tensor::sigma_hat_q::size()];
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+
+        double K_Dx_q0[tensor::K_Dx_q::size(0)];
+        double K_Dx_q1[tensor::K_Dx_q::size(1)];
+        kernel::K_Dx_q dx;
+        dx.G_q = fct_on_vol[NumFacets * elNo + f].get<JInv0>().data()->data();
+        dx.matE_q_T = matE_q_T[f].data();
+        dx.K = material[elNo].get<K>().data();
+        dx.K_Dx_q(0) = K_Dx_q0;
+        dx.Dxi_q = Dxi_q[f].data();
+        dx.execute();
+
+        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+            dx.G_q =
+                fct_on_vol[NumFacets * info[f].lid + info[f].localNo].get<JInv0>().data()->data();
+            dx.matE_q_T = matE_q_T[info[f].localNo].data();
+            dx.K = material[info[f].lid].get<K>().data();
+            dx.K_Dx_q(1) = K_Dx_q1;
+            dx.Dxi_q = Dxi_q[info[f].lid].data();
+            dx.execute();
+
+            kernel::flux_sigma_skeleton fs;
+            fs.c00 = -penalty(elNo, info[f].lid);
+            fs.E_q(0) = E_q[f].data();
+            fs.E_q(1) = E_q[info[f].localNo].data();
+            fs.K_Dx_q(0) = K_Dx_q0;
+            fs.K_Dx_q(1) = K_Dx_q1;
+            fs.U = x_0.data();
+            fs.U_ext = x_n[f].data();
+            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.sigma_hat_q = sigma_hat_q;
+            fs.execute();
+        } else if (info[f].bc == BC::Dirichlet) {
+            kernel::flux_sigma_skeleton fs;
+            fs.c00 = -penalty(elNo, elNo);
+            fs.E_q(0) = E_q[f].data();
+            fs.K_Dx_q(0) = K_Dx_q0;
+            fs.U = x_0.data();
+            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.sigma_hat_q = sigma_hat_q;
+            fs.execute();
+        } else {
+            continue;
+        }
+
+        kernel::apply_facet af;
+        af.U_new = y_0.data();
+        af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
+        af.sigma_hat_q = sigma_hat_q;
+        af.w = fctRule.weights().data();
+        af.execute();
+    }
 }
 
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,
