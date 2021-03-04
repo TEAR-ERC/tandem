@@ -51,6 +51,7 @@ else()
 endif()
 
 find_package(Eigen3 REQUIRED NO_MODULE)
+find_package(LibxsmmGenerator)
 include(CTest)
 include(../cmake/doctest.cmake)
 
@@ -61,6 +62,10 @@ function(generate_code APP)
     if("${YATETO_ARCH}" STREQUAL "skl")
         set(YATETO_ARCH "hsw")
     endif()
+    set(WITH_LIBXSMM "no")
+    if(${LibxsmmGeneratorExecutable})
+        set(WITH_LIBXSMM "yes")
+    endif()
     add_custom_command(
         COMMAND
             ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
@@ -68,6 +73,7 @@ function(generate_code APP)
             "--arch" "d${YATETO_ARCH}"
             "--options" ${OPTIONS_FILE_NAME}
             "--outputDir" ${OUTPUT_DIR}
+            "--with_libxsmm" ${WITH_LIBXSMM}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
         DEPENDS
             ${OPTIONS_FILE_NAME}

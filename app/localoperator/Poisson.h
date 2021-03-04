@@ -120,11 +120,15 @@ private:
     Managed<Matrix<double>> Minv_;
     Managed<Matrix<double>> E_Q;
     Managed<Matrix<double>> E_Q_T;
+    Managed<Matrix<double>> negative_E_Q_T;
     Managed<Matrix<double>> MinvRef_E_Q;
+    Managed<Matrix<double>> MinvRef_E_Q_T;
     Managed<Tensor<double, 3u>> Dxi_Q;
     std::vector<Managed<Matrix<double>>> E_q;
     std::vector<Managed<Matrix<double>>> E_q_T;
+    std::vector<Managed<Matrix<double>>> negative_E_q_T;
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
+    std::vector<Managed<Tensor<double, 3u>>> Dxi_q_120;
 
     Managed<Matrix<double>> matE_Q_T;
     Managed<Tensor<double, 3u>> matDxi_Q;
@@ -141,9 +145,24 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct AbsDetJWJInv {
+        using type = std::array<double, Dim * Dim>;
+    };
+    struct KJInv {
+        using type = std::array<double, Dim * Dim>;
+    };
+    struct KWAbsDetJInv {
+        using type = double;
+    };
 
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K>;
     mneme::StridedView<material_vol_t> material;
+
+    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJWJInv, KWAbsDetJInv>;
+    mneme::StridedView<vol_pre_t> volPre;
+
+    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, KJInv>;
+    mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
 
     // Options
     constexpr static double epsilon = -1.0;

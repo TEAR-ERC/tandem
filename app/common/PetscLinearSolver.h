@@ -19,18 +19,25 @@ namespace tndm {
 
 class PetscLinearSolver {
 public:
-    template <typename DGOp> PetscLinearSolver(DGOp& dgop) {
+    template <typename DGOp> PetscLinearSolver(DGOp& dgop, bool matrix_free = false) {
         auto const& topo = dgop.topo();
-        A_ = std::make_unique<PetscDGShell>(dgop);
+        if (matrix_free) {
+            A_ = std::make_unique<PetscDGShell>(dgop);
+        }
         P_ = std::make_unique<PetscDGMatrix>(dgop.block_size(), topo);
+        dgop.assemble(*P_);
+
         b_ = std::make_unique<PetscVector>(dgop.block_size(), topo.numLocalElements(), topo.comm());
         x_ = std::make_unique<PetscVector>(*b_);
-        dgop.assemble(*P_);
         dgop.rhs(*b_);
 
         CHKERRTHROW(KSPCreate(topo.comm(), &ksp_));
         CHKERRTHROW(KSPSetType(ksp_, KSPCG));
-        CHKERRTHROW(KSPSetOperators(ksp_, A_->mat(), P_->mat()));
+        if (matrix_free) {
+            CHKERRTHROW(KSPSetOperators(ksp_, A_->mat(), P_->mat()));
+        } else {
+            CHKERRTHROW(KSPSetOperators(ksp_, P_->mat(), P_->mat()));
+        }
         CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
         CHKERRTHROW(KSPSetFromOptions(ksp_));
     }

@@ -9,7 +9,7 @@ import json
 
 from yateto import useArchitectureIdentifiedBy, Generator
 from yateto.ast.visitor import PrettyPrinter
-from yateto.gemm_configuration import GeneratorCollection, Eigen
+from yateto.gemm_configuration import GeneratorCollection, Eigen, LIBXSMM
 
 import poisson
 import elasticity
@@ -21,6 +21,7 @@ cmdLineParser.add_argument('--app', required=True)
 cmdLineParser.add_argument('--arch', required=True)
 cmdLineParser.add_argument('--options', required=True)
 cmdLineParser.add_argument('--outputDir', required=True)
+cmdLineParser.add_argument('--with_libxsmm', type=bool, default=False)
 cmdLineArgs = cmdLineParser.parse_args()
 
 arch = useArchitectureIdentifiedBy(cmdLineArgs.arch)
@@ -55,9 +56,14 @@ elif cmdLineArgs.app == 'elasticity_adapter':
             options['numFaultBasisFunctions'],
             options['numFacetQuadPoints'])
 
+gemmgen_list = []
+if cmdLineArgs.with_libxsmm and cmdLineArgs.app == 'poisson':
+    gemmgen_list.append(LIBXSMM(arch))
+gemmgen_list.append(Eigen(arch))
+
 # Generate code
 g.generate(outputDir=cmdLineArgs.outputDir,
-           gemm_cfg=GeneratorCollection([Eigen(arch)]),
+           gemm_cfg=GeneratorCollection(gemmgen_list),
            namespace='tndm::{}'.format(cmdLineArgs.app))
 
 for kernel in g.kernels():

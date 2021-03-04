@@ -1,0 +1,5 @@
+include(FindPackageHandleStandardArgs)
+
+find_program(LibxsmmGeneratorExecutable libxsmm_gemm_generator)
+
+find_package_handle_standard_args(LibxsmmGenerator REQUIRED_VARS LibxsmmGeneratorExecutable)

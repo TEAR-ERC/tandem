@@ -13,7 +13,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
-    A = Tensor('A', (Nbf, Nbf))
+    A = Tensor('A', (Nbf, Nbf), alignStride=Alignment.Unaligned)
     M = Tensor('M', (Nbf, Nbf))
     MinvRef = Tensor('MinvRef', (Nbf, Nbf))
     MinvWA = Tensor('MinvWA', (Nbf, Nbf))
@@ -25,7 +25,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.add('project_K_lhs', matM['kl'] <= matE_Q_T['qk'] * W['q'] * J_Q['q'] * matE_Q_T['ql'])
     generator.add('project_K_rhs', K['k'] <= K_Q['q'] * matE_Q_T['qk'] * W['q'] * J_Q['q'])
-    generator.add('K_Q', K_Q['q'] <= K['m'] * matE_Q_T['qm'])
 
     generator.add('Dx_Q', Dx_Q['kiq'] <= G_Q['eiq'] * Dxi_Q['keq'])
     generator.add('assembleVolume',
@@ -39,9 +38,10 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     w = Tensor('w', (nq,))
     E_q = [Tensor('E_q({})'.format(x), (Nbf, nq)) for x in range(2)]
     matE_q_T = Tensor('matE_q_T', (nq, Nbf))
-    Dxi_q = Tensor('Dxi_q', (Nbf, dim, nq))
+    Dxi_q = [Tensor('Dxi_q({})'.format(x), (Nbf, dim, nq)) for x in range(2)]
     K_Dx_q = [Tensor('K_Dx_q({})'.format(x), (Nbf, dim, nq)) for x in range(2)]
-    a = [[Tensor('a({},{})'.format(x, y), (Nbf, Nbf)) for y in range(2)] for x in range(2)]
+    a = [[Tensor('a({},{})'.format(x, y), (Nbf, Nbf), alignStride=Alignment.Unaligned)
+          for y in range(2)] for x in range(2)]
     c0 = [Scalar('c0{}'.format(x)) for x in range(2)]
     c1 = [Scalar('c1{}'.format(x)) for x in range(2)]
     c2 = [Scalar('c2{}'.format(x)) for x in range(2)]
@@ -49,7 +49,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     Minv = [Tensor('Minv({})'.format(x), (Nbf, Nbf)) for x in range(2)]
     K_q = [Tensor('K_q({})'.format(x), (nq,)) for x in range(2)]
 
-    generator.add('K_Dx_q', K_Dx_q[0]['kiq'] <= K['m'] * matE_q_T['qm'] * G_q['eiq'] * Dxi_q['keq'])
+    generator.add('K_Dx_q', K_Dx_q[0]['kiq'] <= K['m'] * matE_q_T['qm'] * G_q['eiq'] * Dxi_q[0]['keq'])
     generator.add('K_q', K_q[0]['q'] <= K['m'] * matE_q_T['qm'])
 
     generator.addFamily('lift_ip', simpleParameterSpace(2), \
@@ -72,7 +72,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), surface)
 
-    b = Tensor('b', (Nbf,))
+    b = Tensor('b', (Nbf,), alignStride=Alignment.Unaligned)
     F_Q = Tensor('F_Q', (Nq,))
     generator.add('rhsVolume', b['k'] <= b['k'] + J_Q['q'] * W['q'] * E_Q['kq'] * F_Q['q'])
 
@@ -96,39 +96,51 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     # matrix-free
 
     sigma = Tensor('sigma', (Nbf, dim))
-    U = Tensor('U', (Nbf,))
-    U_ext = Tensor('U_ext', (Nbf,))
-    U_new = Tensor('U_new', (Nbf,))
+    U = Tensor('U', (Nbf,), alignStride=Alignment.Unaligned)
+    U_ext = Tensor('U_ext', (Nbf,), alignStride=Alignment.Unaligned)
+    U_new = Tensor('U_new', (Nbf,), alignStride=Alignment.Unaligned)
     u_hat_q = Tensor('u_hat_q', (nq,))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
     E_Q_T = Tensor('E_Q_T', (Nq, Nbf))
+    negative_E_Q_T = Tensor('negative_E_Q_T', (Nq, Nbf))
     E_q_T = [Tensor('E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
+    negative_E_q_T = [Tensor('negative_E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
     MinvRef_E_Q = Tensor('MinvRef_E_Q', (Nbf, Nq))
-    K_Jinv_Q = Tensor('K_Jinv_Q', (Nq,))
+    MinvRef_E_Q_T = Tensor('MinvRef_E_Q_T', (Nq, Nbf))
+    Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
+    K_W_Jinv_Q = Tensor('K_W_Jinv_Q', (Nq,))
+    J_W_G_Q = Tensor('J_W_G_Q', (dim, dim, Nq))
+    K_G_q = [Tensor('K_G_q({})'.format(x), (dim, dim, nq)) for x in range(2)]
+
+    generator.add('K_W_Jinv_Q', K_W_Jinv_Q['q'] <= K['m'] * matE_Q_T['qm'] * W['q'] * Jinv_Q['q'])
+    generator.add('J_W_G_Q', J_W_G_Q['keq'] <= J_Q['q'] * W['q'] * G_Q['keq'])
+    generator.add('K_G_q', K_G_q[0]['eiq'] <= K['m'] * matE_q_T['qm'] * G_q['eiq'])
 
     generator.add('flux_u_skeleton',
         u_hat_q['q'] <= 0.5 * (E_q_T[0]['ql'] * U['l'] + E_q_T[1]['ql'] * U_ext['l']))
     generator.add('flux_u_boundary', u_hat_q['q'] <= E_q_T[0]['ql'] * U['l'])
-    generator.add('stress_volume', sigma['kr'] <= -J_Q['q'] * W['q'] *
-        Dxi_Q['keq'] * G_Q['erq'] * E_Q_T['ql'] * U['l'])
+    generator.add('stress_volume', sigma['kr'] <= 
+        Dxi_Q['keq'] * J_W_G_Q['erq'] * negative_E_Q_T['ql'] * U['l'])
     generator.add('stress_facet', sigma['kr'] <= sigma['kr'] +
         w['q'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
     generator.add('project_stress', sigma['kr'] <=
-        K_Jinv_Q['q'] * W['q'] * MinvRef_E_Q['kq'] * MinvRef_E_Q['lq'] * sigma['lr'])
+        K_W_Jinv_Q['q'] * MinvRef_E_Q['kq'] * MinvRef_E_Q_T['ql'] * sigma['lr'])
 
     generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
-            (K_Dx_q[0]['lpq'] * U['l'] + K_Dx_q[1]['lpq'] * U_ext['l']) +
-            c0[0] * (E_q_T[0]['ql'] * U['l'] - E_q_T[1]['ql'] * U_ext['l']) * n_unit_q['pq'])
+        (K_G_q[0]['epq'] * Dxi_q_120[0]['eql'] * U['l']
+            + K_G_q[1]['epq'] * Dxi_q_120[1]['eql'] * U_ext['l']) +
+        c0[0] * (E_q_T[0]['ql'] * U['l'] + negative_E_q_T[1]['ql'] * U_ext['l']) * n_unit_q['pq'])
     generator.add('flux_sigma_boundary', sigma_hat_q['pq'] <=
-            K_Dx_q[0]['lpq'] * U['l'] + c0[0] * E_q_T[0]['ql'] * U['l'] * n_unit_q['pq'])
-    generator.add('apply_volume', U_new['k'] <= W['q'] * J_Q['q'] * E_Q['lq'] *
-        G_Q['erq'] * Dxi_Q['keq'] * sigma['lr'])
+        K_G_q[0]['epq'] * Dxi_q_120[0]['eql'] * U['l']
+            + c0[0] * E_q_T[0]['ql'] * U['l'] * n_unit_q['pq'])
+    generator.add('apply_volume', U_new['k'] <= J_W_G_Q['erq'] *
+        Dxi_Q['keq'] * E_Q['lq'] * sigma['lr'])
     generator.add('apply_facet', U_new['k'] <= U_new['k'] -
         w['q'] * E_q[0]['kq'] * n_q['rq'] * sigma_hat_q['rq'])
 
     # traction
 
-    u = [Tensor('u({})'.format(x), (Nbf,)) for x in range(2)]
+    u = [Tensor('u({})'.format(x), (Nbf,), alignStride=Alignment.Unaligned) for x in range(2)]
     grad_u = Tensor('grad_u', (dim, nq))
     generator.add('grad_u',
         grad_u['pq'] <= 0.5 * (K_Dx_q[0]['lpq'] * u[0]['l'] + K_Dx_q[1]['lpq'] * u[1]['l']) +

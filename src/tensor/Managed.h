@@ -5,6 +5,7 @@
 #include "TensorBase.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <memory>
 
 namespace tndm {
@@ -14,15 +15,16 @@ public:
     using typename Tensor::index_t;
     using typename Tensor::multi_index_t;
     using typename Tensor::real_t;
+    static constexpr std::size_t DefaultAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
     Managed() : Tensor(nullptr, multi_index_t{}) {}
-    Managed(multi_index_t const& shape)
-        : Tensor(nullptr, shape), managedData(std::make_unique<real_t[]>(Tensor::size())) {
+    Managed(multi_index_t const& shape, std::size_t alignment = DefaultAlignment)
+        : Tensor(nullptr, shape), managedData(make_storage(Tensor::size(), alignment)) {
         Tensor::data_ = managedData.get();
     }
     template <typename... Shape>
     Managed(Shape... shape)
-        : Tensor(nullptr, shape...), managedData(std::make_unique<real_t[]>(Tensor::size())) {
+        : Tensor(nullptr, shape...), managedData(make_storage(Tensor::size(), DefaultAlignment)) {
         Tensor::data_ = managedData.get();
     }
 
@@ -34,14 +36,25 @@ public:
     Managed& operator=(Managed<Tensor>&& other) = default;
 
     template <typename OtherTensor>
-    Managed(TensorBase<OtherTensor> const& info)
-        : Tensor(nullptr, info), managedData(std::make_unique<real_t[]>(Tensor::size())) {
+    Managed(TensorBase<OtherTensor> const& info, std::size_t alignment = DefaultAlignment)
+        : Tensor(nullptr, info), managedData(make_storage(Tensor::size(), alignment)) {
         Tensor::data_ = managedData.get();
     }
     virtual ~Managed() = default;
 
 protected:
-    std::unique_ptr<real_t[]> managedData;
+    struct Deleter {
+        void operator()(real_t* ptr) { std::free(ptr); }
+    };
+
+    std::unique_ptr<real_t[], Deleter> make_storage(std::size_t num_reals,
+                                                    std::size_t alignment) const {
+        return std::unique_ptr<real_t[], Deleter>(
+            static_cast<real_t*>(std::aligned_alloc(alignment, sizeof(real_t) * num_reals)),
+            Deleter{});
+    }
+
+    std::unique_ptr<real_t[], Deleter> managedData;
 };
 
 template <typename T>

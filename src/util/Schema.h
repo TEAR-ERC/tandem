@@ -106,8 +106,8 @@ public:
             result = (*converter_)(value);
         } else {
             if constexpr (std::is_same_v<bool, T>) {
-                std::string data;
-                std::transform(value.begin(), value.end(), data.begin(),
+                auto data = std::string(value);
+                std::transform(data.begin(), data.end(), data.begin(),
                                [](unsigned char c) { return std::tolower(c); });
                 result = data == "yes" || data == "true";
                 if (!result) {
