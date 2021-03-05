@@ -235,9 +235,9 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
-    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
-    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
     alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     alignas(ALIGNMENT) double K_Dx_q1[tensor::K_Dx_q::size(1)];
@@ -314,9 +314,9 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
-    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
-    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
     alignas(ALIGNMENT) double L0[tensor::L_q::size(0)];
     if (method_ == DGMethod::BR2) {

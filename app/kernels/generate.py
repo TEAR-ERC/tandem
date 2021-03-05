@@ -57,7 +57,7 @@ elif cmdLineArgs.app == 'elasticity_adapter':
             options['numFacetQuadPoints'])
 
 gemmgen_list = []
-if cmdLineArgs.with_libxsmm and cmdLineArgs.app == 'poisson':
+if cmdLineArgs.with_libxsmm and cmdLineArgs.app == 'elasticity':
     gemmgen_list.append(LIBXSMM(arch))
 gemmgen_list.append(Eigen(arch))
 

@@ -55,6 +55,8 @@ find_package(LibxsmmGenerator)
 include(CTest)
 include(../cmake/doctest.cmake)
 
+add_library(global-flop-counter kernels/flop_counter.cpp)
+
 function(generate_code APP)
     set(OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/kernels/${APP})
     file(MAKE_DIRECTORY ${OUTPUT_DIR})
@@ -106,6 +108,7 @@ function(generate_code APP)
         ../external/
         ../submodules/yateto/include/
     )
+    target_link_libraries(${APP}-kernels-lib PRIVATE global-flop-counter)
     target_link_libraries(${APP}-kernels-lib PUBLIC Eigen3::Eigen)
 
     add_executable(test-${APP}-kernel kernels/${APP}/test-kernel.cpp)

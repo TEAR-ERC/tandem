@@ -12,6 +12,7 @@
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
 
+#include "mneme/allocators.hpp"
 #include "mneme/storage.hpp"
 #include "mneme/view.hpp"
 
@@ -33,11 +34,6 @@ public:
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                functional_t<1> mu, DGMethod method = DGMethod::BR2);
-
-    std::size_t scratch_mem_size() const {
-        auto matNbf = materialSpace_.numBasisFunctions();
-        return base::scratch_mem_size() + matNbf * matNbf;
-    }
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
 
@@ -63,6 +59,9 @@ public:
                       Vector<double>& B1, LinearAllocator<double>& scratch) const;
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator<double>& scratch) const;
+
+    void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+               std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
 
     TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
@@ -100,16 +99,18 @@ public:
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
 
 private:
-    double penalty(FacetInfo const& info) const {
+    double penalty(std::size_t elNo0, std::size_t elNo1) const {
         if (method_ == DGMethod::BR2) {
             return 3;
         }
-        return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
+        return std::max(base::penalty[elNo0], base::penalty[elNo1]);
     }
+    double penalty(FacetInfo const& info) const { return penalty(info.up[0], info.up[1]); }
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+    void copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side);
 
     DGMethod method_;
 
@@ -118,9 +119,16 @@ private:
     NodalRefElement<DomainDimension> materialSpace_;
 
     // Matrices
+    Managed<Matrix<double>> MhatInv;
     Managed<Matrix<double>> E_Q;
+    Managed<Matrix<double>> E_Q_T;
+    Managed<Matrix<double>> negative_E_Q_T;
+    Managed<Matrix<double>> MinvRef_E_Q;
+    Managed<Matrix<double>> MinvRef_E_Q_T;
     Managed<Tensor<double, 3u>> Dxi_Q;
     std::vector<Managed<Matrix<double>>> E_q;
+    std::vector<Managed<Matrix<double>>> E_q_T;
+    std::vector<Managed<Matrix<double>>> negative_E_q_T;
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
 
     Managed<Matrix<double>> matE_Q_T;
@@ -136,14 +144,16 @@ private:
     // Precomputed data
     struct lam {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct lam_W_J {
+    struct lam_W_Q {
         using type = double;
     };
-    struct mu_W_J {
+    struct mu_W_Q {
         using type = double;
     };
     struct lam_q_0 {
@@ -162,11 +172,14 @@ private:
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu>;
     mneme::StridedView<material_vol_t> material;
 
-    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J, mu_W_J>;
+    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_Q, mu_W_Q>;
     mneme::StridedView<vol_pre_t> volPre;
 
     using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;
     mneme::StridedView<fct_pre_t> fctPre;
+
+    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0>;
+    mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
 
     // Options
     constexpr static double epsilon = -1.0;
