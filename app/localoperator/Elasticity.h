@@ -123,13 +123,14 @@ private:
     Managed<Matrix<double>> E_Q;
     Managed<Matrix<double>> E_Q_T;
     Managed<Matrix<double>> negative_E_Q_T;
-    Managed<Matrix<double>> MinvRef_E_Q;
-    Managed<Matrix<double>> MinvRef_E_Q_T;
     Managed<Tensor<double, 3u>> Dxi_Q;
+    Managed<Tensor<double, 3u>> Dxi_Q_120;
     std::vector<Managed<Matrix<double>>> E_q;
     std::vector<Managed<Matrix<double>>> E_q_T;
+    std::vector<Managed<Matrix<double>>> negative_E_q;
     std::vector<Managed<Matrix<double>>> negative_E_q_T;
     std::vector<Managed<Tensor<double, 3u>>> Dxi_q;
+    std::vector<Managed<Tensor<double, 3u>>> Dxi_q_120;
 
     Managed<Matrix<double>> matE_Q_T;
     std::vector<Managed<Matrix<double>>> matE_q_T;
@@ -150,35 +151,45 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct lam_W_Q {
+    struct lam_W_J_Q {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct mu_W_Q {
+    struct mu_W_J_Q {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct lam_q_0 {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu_q_0 {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct lam_q_1 {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu_q_1 {
         using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct JInvT {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu>;
     mneme::StridedView<material_vol_t> material;
 
-    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_Q, mu_W_Q>;
+    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, JInvT>;
     mneme::StridedView<vol_pre_t> volPre;
 
     using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;
     mneme::StridedView<fct_pre_t> fctPre;
 
-    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0>;
+    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, JInvT>;
     mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
 
     // Options

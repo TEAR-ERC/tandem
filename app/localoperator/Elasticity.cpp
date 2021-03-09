@@ -36,12 +36,7 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     E_Q = space_.evaluateBasisAt(volRule.points());
     E_Q_T = space_.evaluateBasisAt(volRule.points(), {1, 0});
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
-
-    MinvRef_E_Q = Managed<Matrix<double>>(E_Q.shape(), std::size_t{ALIGNMENT});
-    EigenMap(MinvRef_E_Q) = EigenMap(MhatInv) * EigenMap(E_Q);
-
-    MinvRef_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
-    EigenMap(MinvRef_E_Q_T) = EigenMap(E_Q_T) * EigenMap(MhatInv).transpose();
+    Dxi_Q_120 = space_.evaluateGradientAt(volRule.points(), {1, 2, 0});
 
     negative_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
     EigenMap(negative_E_Q_T) = -EigenMap(E_Q_T);
@@ -51,11 +46,16 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
         E_q.emplace_back(space_.evaluateBasisAt(points));
         E_q_T.emplace_back(space_.evaluateBasisAt(points, {1, 0}));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
+        Dxi_q_120.emplace_back(space_.evaluateGradientAt(points, {1, 2, 0}));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
 
+        negative_E_q.emplace_back(space_.evaluateBasisAt(points));
+        auto neg = EigenMap(negative_E_q.back());
+        neg = -neg;
+
         negative_E_q_T.emplace_back(space_.evaluateBasisAt(points, {1, 0}));
-        auto E = EigenMap(negative_E_q_T.back());
-        E = -E;
+        auto negT = EigenMap(negative_E_q_T.back());
+        negT = -negT;
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
@@ -150,14 +150,26 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     auto mu_eigen = MuMap(mu_field);
     mu_eigen = proj.solve(mu_eigen);
+
+    auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
+    auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
+    for (std::ptrdiff_t q = 0; q < G_Q.shape(2); ++q) {
+        for (std::ptrdiff_t i = 0; i < G_Q.shape(0); ++i) {
+            for (std::ptrdiff_t j = 0; j < G_Q.shape(1); ++j) {
+                G_Q_T(i, j, q) = G_Q(j, i, q);
+            }
+        }
+    }
 }
 
 void Elasticity::copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side) {
     const auto& lam_q = (side == 1) ? fctPre[fctNo].get<lam_q_1>() : fctPre[fctNo].get<lam_q_0>();
     const auto& mu_q = (side == 1) ? fctPre[fctNo].get<mu_q_1>() : fctPre[fctNo].get<mu_q_0>();
+    const auto& G_q = (side == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
     const auto idx = NumFacets * info.up[side] + info.localNo[side];
     auto& l = fct_on_vol_pre[idx].get<lam_q_0>();
     auto& m = fct_on_vol_pre[idx].get<mu_q_0>();
+    auto G_q_T = fct_on_vol_pre[idx].get<JInvT>();
     for (std::size_t q = 0; q < fctRule.size(); ++q) {
         assert(q < l.size());
         assert(q < lam_q.size());
@@ -165,6 +177,11 @@ void Elasticity::copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side)
         assert(q < mu_q.size());
         l[q] = lam_q[q];
         m[q] = mu_q[q];
+        for (std::ptrdiff_t i = 0; i < Dim; ++i) {
+            for (std::ptrdiff_t j = 0; j < Dim; ++j) {
+                G_q_T[q][i + j * Dim] = G_q[q][j + i * Dim];
+            }
+        }
     }
 };
 
@@ -214,11 +231,12 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
 
     kernel::precomputeVolume krnl_pre;
     krnl_pre.matE_Q_T = matE_Q_T.data();
-    krnl_pre.W = volRule.weights().data();
+    krnl_pre.J = vol[elNo].get<AbsDetJ>().data();
     krnl_pre.lam = lam_field.data();
-    krnl_pre.lam_W_Q = volPre[elNo].template get<lam_W_Q>().data();
+    krnl_pre.lam_W_J_Q = volPre[elNo].template get<lam_W_J_Q>().data();
     krnl_pre.mu = mu_field.data();
-    krnl_pre.mu_W_Q = volPre[elNo].template get<mu_W_Q>().data();
+    krnl_pre.mu_W_J_Q = volPre[elNo].template get<mu_W_J_Q>().data();
+    krnl_pre.W = volRule.weights().data();
     krnl_pre.execute();
 
     assert(lam_field.size() == mu_field.size());
@@ -250,9 +268,8 @@ bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
     krnl.A = A00.data();
     krnl.delta = init::delta::Values;
     krnl.Dx_Q = Dx_Q;
-    krnl.J = vol[elNo].get<AbsDetJ>().data();
-    krnl.lam_W_Q = volPre[elNo].get<lam_W_Q>().data();
-    krnl.mu_W_Q = volPre[elNo].get<mu_W_Q>().data();
+    krnl.lam_W_J_Q = volPre[elNo].get<lam_W_J_Q>().data();
+    krnl.mu_W_J_Q = volPre[elNo].get<mu_W_J_Q>().data();
     krnl.execute();
     return true;
 }
@@ -604,107 +621,56 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     Stopwatch sw;
     sw.start();
 
-    alignas(ALIGNMENT) double sigma[tensor::sigma::size()];
-    kernel::stress_volume sv;
-    sv.Dxi_Q = Dxi_Q.data();
-    sv.J = vol[elNo].template get<AbsDetJ>().data();
-    sv.G = vol[elNo].template get<JInv>().data()->data();
-    sv.negative_E_Q_T = negative_E_Q_T.data();
-    sv.U = x_0.data();
-    sv.sigma = sigma;
-    sv.W = volRule.weights().data();
-    sv.execute();
-    auto sv_time = sw.stop();
-    auto sv_flops = kernel::stress_volume::HardwareFlops;
-
-    unsigned sf_flops = 0;
+    unsigned av_flops = 0;
     sw.start();
-    alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()];
+
+    alignas(ALIGNMENT) double Dx_Q[tensor::Dx_Q::size()];
+    alignas(ALIGNMENT) double Ju_Q[tensor::Ju_Q::size()];
+    kernel::apply_volume av;
+    av.delta = init::delta::Values;
+    av.Dx_Q = Dx_Q;
+    av.Dxi_Q = Dxi_Q.data();
+    av.Dxi_Q_120 = Dxi_Q_120.data();
+    av.Ju_Q = Ju_Q;
+    av.G_Q_T = volPre[elNo].get<JInvT>().data()->data();
+    av.lam_W_J_Q = volPre[elNo].get<lam_W_J_Q>().data();
+    av.mu_W_J_Q = volPre[elNo].get<mu_W_J_Q>().data();
+    av.U = x_0.data();
+    av.Unew = y_0.data();
+    av.execute();
+
+    av_flops += kernel::apply_volume::HardwareFlops;
+    auto av_time = sw.stop();
+
+    unsigned af_flops = 0;
+    sw.start();
+    alignas(ALIGNMENT) double Ju_q0[tensor::Ju_q::size(0)];
+    alignas(ALIGNMENT) double Ju_q1[tensor::Ju_q::size(1)];
     for (std::size_t f = 0; f < NumFacets; ++f) {
+        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
+        alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
+
+        std::size_t idx0 = NumFacets * elNo + f;
+        std::size_t idx1 = NumFacets * info[f].lid + info[f].localNo;
+
         if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
             kernel::flux_u_skeleton fu;
-            fu.E_q_T(0) = E_q_T[f].data();
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
             fu.U = x_0.data();
             fu.U_ext = x_n[f].data();
             fu.u_hat_q = u_hat_q;
             fu.execute();
-            sf_flops += kernel::flux_u_skeleton::HardwareFlops;
-        } else if (info[f].bc == BC::Natural) {
-            kernel::flux_u_boundary fu;
-            fu.U = x_0.data();
-            fu.u_hat_q = u_hat_q;
-            fu.E_q_T(0) = E_q_T[f].data();
-            fu.execute();
-        } else {
-            continue;
-        }
+            af_flops += kernel::flux_u_skeleton::HardwareFlops;
 
-        kernel::stress_facet sf;
-        sf.sigma = sigma;
-        sf.u_hat_q = u_hat_q;
-        sf.w = fctRule.weights().data();
-        sf.E_q(0) = E_q[f].data();
-        sf.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
-        sf.execute();
-        sf_flops += kernel::stress_facet::HardwareFlops;
-    }
-    auto sf_time = sw.stop();
-
-    unsigned ps_flops = 0;
-    sw.start();
-    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
-    const auto& J_Q = vol[elNo].get<AbsDetJ>();
-    for (std::size_t q = 0; q < volRule.size(); ++q) {
-        Jinv_Q[q] = 1.0 / J_Q[q];
-    }
-    alignas(ALIGNMENT) double sigma_Q[tensor::sigma_Q::size()];
-    kernel::project_stress ps;
-    ps.delta = init::delta::Values;
-    ps.Jinv_Q = Jinv_Q;
-    ps.MinvRef_E_Q = MinvRef_E_Q.data();
-    ps.MinvRef_E_Q_T = MinvRef_E_Q_T.data();
-    ps.lam_W_Q = volPre[elNo].template get<lam_W_Q>().data();
-    ps.mu_W_Q = volPre[elNo].template get<mu_W_Q>().data();
-    ps.sigma = sigma;
-    ps.sigma_Q = sigma_Q;
-    ps.execute();
-    ps_flops += kernel::project_stress::HardwareFlops;
-
-    auto ps_time = sw.stop();
-
-    unsigned av_flops = 0;
-    sw.start();
-    kernel::apply_volume av;
-    av.Dxi_Q = Dxi_Q.data();
-    av.E_Q = E_Q.data();
-    av.J = J_Q.data();
-    av.G = vol[elNo].get<JInv>().data()->data();
-    av.Unew = y_0.data();
-    av.sigma = sigma;
-    av.W = volRule.weights().data();
-    av.execute();
-    av_flops += kernel::apply_volume::HardwareFlops;
-
-    auto av_time = sw.stop();
-
-    unsigned af_flops = 0;
-    sw.start();
-    alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()];
-    alignas(ALIGNMENT) double strain_q0[tensor::strain_q::size(0)];
-    alignas(ALIGNMENT) double strain_q1[tensor::strain_q::size(1)];
-    for (std::size_t f = 0; f < NumFacets; ++f) {
-        std::size_t idx0 = NumFacets * elNo + f;
-        std::size_t idx1 = NumFacets * info[f].lid + info[f].localNo;
-        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
             kernel::flux_sigma_skeleton fs;
             fs.c00 = -penalty(elNo, info[f].lid);
             fs.delta = init::delta::Values;
-            fs.Dxi_q(0) = Dxi_q[f].data();
-            fs.Dxi_q(1) = Dxi_q[info[f].localNo].data();
+            fs.Dxi_q_120(0) = Dxi_q_120[f].data();
+            fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.g(0) = fct_on_vol[idx0].get<JInv0>().data()->data();
-            fs.g(1) = fct_on_vol[idx1].get<JInv0>().data()->data();
+            fs.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
+            fs.G_q_T(1) = fct_on_vol_pre[idx1].get<JInvT>().data()->data();
             fs.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
             fs.lam_q(1) = fct_on_vol_pre[idx1].get<lam_q_0>().data();
             fs.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
@@ -714,23 +680,29 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.U_ext = x_n[f].data();
             fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
             fs.sigma_hat_q = sigma_hat_q;
-            fs.strain_q(0) = strain_q0;
-            fs.strain_q(1) = strain_q1;
+            fs.Ju_q(0) = Ju_q0;
+            fs.Ju_q(1) = Ju_q1;
             fs.execute();
             af_flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (info[f].bc == BC::Dirichlet) {
+            kernel::flux_u_boundary fu;
+            fu.U = x_0.data();
+            fu.u_hat_q = u_hat_q;
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
+            fu.execute();
+
             kernel::flux_sigma_boundary fs;
             fs.c00 = -penalty(elNo, elNo);
             fs.delta = init::delta::Values;
-            fs.Dxi_q(0) = Dxi_q[f].data();
+            fs.Dxi_q_120(0) = Dxi_q_120[f].data();
+            fs.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.g(0) = fct_on_vol[idx0].get<JInv0>().data()->data();
             fs.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
             fs.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
             fs.U = x_0.data();
             fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
             fs.sigma_hat_q = sigma_hat_q;
-            fs.strain_q(0) = strain_q0;
+            fs.Ju_q(0) = Ju_q0;
             fs.execute();
             af_flops += kernel::flux_sigma_boundary::HardwareFlops;
         } else {
@@ -738,29 +710,30 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         }
 
         kernel::apply_facet af;
-        af.E_q(0) = E_q[f].data();
-        af.Unew = y_0.data();
+        af.delta = init::delta::Values;
+        af.Dxi_q(0) = Dxi_q[f].data();
+        af.negative_E_q(0) = negative_E_q[f].data();
+        af.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
+        af.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
+        af.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
         af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         af.sigma_hat_q = sigma_hat_q;
+        af.u_hat_q = u_hat_q;
+        af.Unew = y_0.data();
         af.w = fctRule.weights().data();
         af.execute();
         af_flops += kernel::apply_facet::HardwareFlops;
     }
     auto af_time = sw.stop();
 
-    // std::cout << sv_time << " " << sf_time << " " << ps_time << " " << av_time << " " << af_time
+    // std::cout << "Time: " << av_time << " " << af_time << std::endl;
+    // double time = av_time + af_time;
+    // std::cout << "Percent: " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
+    // std::cout << "Flops: " << av_flops << " " << af_flops << std::endl;
+    // std::cout << "Perf: " << av_flops / av_time * 1e-9 << " " << af_flops / af_time * 1e-9
     //<< std::endl;
-    // double time = (sv_time + sf_time + ps_time + av_time + af_time);
-    // std::cout << sv_time / time * 100 << " " << sf_time / time * 100 << " " << ps_time / time *
-    // 100
-    //<< " " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
-    // std::cout << sv_flops << " " << sf_flops << " " << ps_flops << " " << av_flops << " "
-    //<< af_flops << std::endl;
-    // std::cout << sv_flops / sv_time * 1e-9 << " " << sf_flops / sf_time * 1e-9 << " "
-    //<< ps_flops / ps_time * 1e-9 << " " << av_flops / av_time * 1e-9 << " "
-    //<< af_flops / af_time * 1e-9 << std::endl;
-    // unsigned flops = sv_flops + sf_flops + ps_flops + av_flops + af_flops;
-    // std::cout << flops << " " << flops / time / 1e9 << std::endl;
+    // unsigned flops = av_flops + af_flops;
+    // std::cout << "Total: " << flops << " " << flops / time / 1e9 << std::endl;
 }
 
 void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C,

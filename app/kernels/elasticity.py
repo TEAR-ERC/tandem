@@ -13,8 +13,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     mu = Tensor('mu', (Nbf,))
     mu_Q = Tensor('mu_Q', (Nq,))
     W = Tensor('W', (Nq,))
-    lam_W_Q = Tensor('lam_W_Q', (Nq,))
-    mu_W_Q = Tensor('mu_W_Q', (Nq,))
+    lam_W_J_Q = Tensor('lam_W_J_Q', (Nq,))
+    mu_W_J_Q = Tensor('mu_W_J_Q', (Nq,))
     E_Q = Tensor('E_Q', (Nbf, Nq))
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
@@ -36,17 +36,17 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     ])
 
     generator.add('precomputeVolume', [
-        lam_W_Q['q'] <= matE_Q_T['qt'] * lam['t'] * W['q'],
-        mu_W_Q['q'] <= matE_Q_T['qt'] * mu['t'] * W['q']
+        lam_W_J_Q['q'] <= matE_Q_T['qt'] * lam['t'] * W['q'] * J['q'],
+        mu_W_J_Q['q'] <= matE_Q_T['qt'] * mu['t'] * W['q'] * J['q']
     ])
 
     generator.add('Dx_Q', Dx_Q['kiq'] <= G['eiq'] * Dxi_Q['keq'])
 
-    generator.add('volumeOp', Unew['kp'] <= lam_W_Q['q'] * J['q'] * Dx_Q['lrq'] * U['lr'] * Dx_Q['kpq'] \
-                + mu_W_Q['q'] * J['q'] * Dx_Q['kjq'] * (Dx_Q['ljq'] * U['lp'] + Dx_Q['lpq'] * U['lj']))
+    generator.add('volumeOp', Unew['kp'] <= lam_W_J_Q['q'] * Dx_Q['lrq'] * U['lr'] * Dx_Q['kpq'] \
+                + mu_W_J_Q['q'] * Dx_Q['kjq'] * (Dx_Q['ljq'] * U['lp'] + Dx_Q['lpq'] * U['lj']))
 
-    generator.add('assembleVolume', A['kplu'] <= lam_W_Q['q'] * J['q'] * Dx_Q['luq'] * Dx_Q['kpq'] \
-                + mu_W_Q['q'] * J['q'] * Dx_Q['kjq'] * (Dx_Q['ljq'] * delta['pu'] + Dx_Q['lpq'] * delta['ju']))
+    generator.add('assembleVolume', A['kplu'] <= lam_W_J_Q['q'] * Dx_Q['luq'] * Dx_Q['kpq'] \
+                + mu_W_J_Q['q'] * Dx_Q['kjq'] * (Dx_Q['ljq'] * delta['pu'] + Dx_Q['lpq'] * delta['ju']))
 
     # surface
 
@@ -161,9 +161,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # matrix-free
 
-    sigma = Tensor('sigma', (Nbf, dim, dim))
-    sigma_Q = Tensor('sigma_Q', (Nq, dim, dim))
-    strain_q = [Tensor('strain_q({})'.format(x), (nq, dim, dim)) for x in range(2)]
     U_ext = Tensor('U_ext', (Nbf, dim), alignStride=Alignment.Unaligned)
     u_hat_q = Tensor('u_hat_q', (nq, dim))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, dim, nq))
@@ -171,43 +168,46 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     negative_E_Q = Tensor('negative_E_Q', (Nbf, Nq))
     negative_E_Q_T = Tensor('negative_E_Q_T', (Nq, Nbf))
     E_q_T = [Tensor('E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
+    negative_E_q = [Tensor('negative_E_q({})'.format(x), (Nbf, nq)) for x in range(2)]
     negative_E_q_T = [Tensor('negative_E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
-    MinvRef_E_Q = Tensor('MinvRef_E_Q', (Nbf, Nq))
-    MinvRef_E_Q_T = Tensor('MinvRef_E_Q_T', (Nq, Nbf))
-    Jinv_Q = Tensor('Jinv_Q', (Nq,))
+    Ju_Q = Tensor('Ju_Q', (Nq, dim, dim))
+    Ju_q = [Tensor('Ju_q({})'.format(x), (nq, dim, dim)) for x in range(2)]
+    G_Q_T = Tensor('G_Q_T', (dim, dim, Nq))
+    G_q_T = [Tensor('G_q_T({})'.format(x), (dim, dim, nq)) for x in range(2)]
+    Dxi_Q_120 = Tensor('Dxi_Q_120', (dim, Nq, Nbf))
+    Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
+
 
     generator.add('flux_u_skeleton',
-        u_hat_q['qi'] <= 0.5 * (E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
-    generator.add('flux_u_boundary', u_hat_q['qi'] <= E_q_T[0]['ql'] * U['li'])
-    generator.add('stress_volume', sigma['kuv'] <= 
-        J['q'] * W['q'] * G['evq'] * Dxi_Q['keq'] * negative_E_Q_T['ql'] * U['lu'])
-    generator.add('stress_facet', sigma['kuv'] <= sigma['kuv'] +
-        w['q'] * E_q[0]['kq'] * n_q['vq'] * u_hat_q['qu'])
-    generator.add('project_stress', [
-        sigma_Q['qrs'] <= MinvRef_E_Q_T['ql'] * sigma['lrs'],
-        sigma['kuv'] <= Jinv_Q['q'] * MinvRef_E_Q['kq'] * (
-            lam_W_Q['q'] * delta['uv'] * delta['rs'] * sigma_Q['qrs']
-            + mu_W_Q['q'] * (sigma_Q['quv'] + sigma_Q['qvu']))
-    ])
+        u_hat_q['qi'] <= 0.5 * (negative_E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
+    generator.add('flux_u_boundary', u_hat_q['qi'] <= negative_E_q_T[0]['ql'] * U['li'])
 
     def constitutive_q(x):
-        return lam_q[x]['q'] * delta['ij'] * delta['rs'] * strain_q[x]['qrs'] \
-               + mu_q[x]['q'] * (strain_q[x]['qij'] + strain_q[x]['qji'])
+        return lam_q[x]['q'] * delta['ij'] * delta['rs'] * Ju_q[x]['qrs'] \
+               + mu_q[x]['q'] * (Ju_q[x]['qij'] + Ju_q[x]['qji'])
 
     generator.add('flux_sigma_skeleton', [
-        strain_q[0]['qrs'] <= g[0]['esq'] * Dxi_q[0]['leq'] * U['lr'],
-        strain_q[1]['qrs'] <= g[1]['esq'] * Dxi_q[1]['leq'] * U_ext['lr'],
+        Ju_q[0]['qrs'] <= G_q_T[0]['seq'] * Dxi_q_120[0]['eql'] * U['lr'],
+        Ju_q[1]['qrs'] <= G_q_T[1]['seq'] * Dxi_q_120[1]['eql'] * U_ext['lr'],
         sigma_hat_q['ijq'] <= 0.5 * (constitutive_q(0) + constitutive_q(1)) +
             c0[0] * (E_q_T[0]['ql'] * U['li'] + negative_E_q_T[1]['ql'] * U_ext['li']) * n_unit_q['jq']
     ])
+
     generator.add('flux_sigma_boundary', [
-        strain_q[0]['qrs'] <= g[0]['esq'] * Dxi_q[0]['leq'] * U['lr'],
+        Ju_q[0]['qrs'] <= G_q_T[0]['seq'] * Dxi_q_120[0]['eql'] * U['lr'],
         sigma_hat_q['ijq'] <= constitutive_q(0) + c0[0] * E_q_T[0]['ql'] * U['li'] * n_unit_q['jq']
     ])
-    generator.add('apply_volume', Unew['ku'] <= J['q'] * W['q'] * G['ejq'] *
-        Dxi_Q['keq'] * E_Q['lq'] * sigma['luj'])
-    generator.add('apply_facet', Unew['ku'] <= Unew['ku'] -
-        w['q'] * E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq'])
+    generator.add('apply_volume', [
+        Dx_Q['krq'] <= Dxi_Q['keq'] * G_Q_T['req'],
+        Ju_Q['qsr'] <= G_Q_T['seq'] * Dxi_Q_120['eql'] * U['lr'],
+        Unew['ku'] <= Dx_Q['kjq'] * (lam_W_J_Q['q'] * delta['uj'] * delta['rs'] * Ju_Q['qrs'] +
+            mu_W_J_Q['q'] * (Ju_Q['quj'] + Ju_Q['qju']))
+    ])
+    generator.add('apply_facet', Unew['ku'] <= Unew['ku'] + w['q'] * (
+        G_q_T[0]['jeq'] * Dxi_q[0]['keq'] * (lam_q[0]['q'] * delta['uj'] * u_hat_q['qr'] * n_q['rq'] +
+            mu_q[0]['q'] * (u_hat_q['qu'] * n_q['jq'] + u_hat_q['qj'] * n_q['uq'])) +
+        negative_E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq']
+    ))
 
     # traction
 
