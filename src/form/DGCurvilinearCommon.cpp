@@ -103,8 +103,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 
     const auto copy_normals_and_jinv = [&](int side) {
         const auto idx = NumFacets * info.up[side] + info.localNo[side];
-        auto& n = fct_on_vol[idx].template get<Normal>();
-        auto& n_unit = fct_on_vol[idx].template get<UnitNormal>();
+        auto n = fct_on_vol[idx].template get<Normal>();
+        auto n_unit = fct_on_vol[idx].template get<UnitNormal>();
         double sign = (side == 1) ? -1.0 : 1.0;
         for (std::size_t q = 0; q < fctRule.size(); ++q) {
             assert(q < n.size());
@@ -116,7 +116,7 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
                 n_unit[q][i] = sign * unit_normal(i, q);
             }
         }
-        auto& ji0 = fct_on_vol[idx].template get<JInv0>();
+        auto ji0 = fct_on_vol[idx].template get<JInv0>();
         const auto& jInv01 = (side == 1) ? jInv1 : jInv0;
         for (std::size_t q = 0; q < fctRule.size(); ++q) {
             assert(q < ji0.size());

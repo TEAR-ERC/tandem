@@ -37,12 +37,6 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     E_Q_T = space_.evaluateBasisAt(volRule.points(), {1, 0});
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
 
-    MinvRef_E_Q = Managed<Matrix<double>>(E_Q.shape(), std::size_t{ALIGNMENT});
-    EigenMap(MinvRef_E_Q) = EigenMap(Minv_) * EigenMap(E_Q);
-
-    MinvRef_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
-    EigenMap(MinvRef_E_Q_T) = EigenMap(E_Q_T) * EigenMap(Minv_).transpose();
-
     negative_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
     EigenMap(negative_E_Q_T) = -EigenMap(E_Q_T);
 
@@ -172,25 +166,13 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     base::penalty[elNo] *=
         Kmax * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
 
-    kernel::J_W_G_Q krnl;
-    krnl.G_Q = vol[elNo].get<JInv>().data()->data();
-    krnl.J_W_G_Q = volPre[elNo].get<AbsDetJWJInv>().data()->data();
+    kernel::J_W_K_Q krnl;
+    krnl.J_W_K_Q = volPre[elNo].get<AbsDetJWK>().data()->data();
     krnl.J_Q = vol[elNo].get<AbsDetJ>().data();
+    krnl.K = Kfield;
+    krnl.matE_Q_T = matE_Q_T.data();
     krnl.W = volRule.weights().data();
     krnl.execute();
-
-    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()];
-    auto J_Q = vol[elNo].get<AbsDetJ>();
-    for (std::size_t q = 0; q < volRule.size(); ++q) {
-        Jinv_Q[q] = 1.0 / J_Q[q];
-    }
-    kernel::K_W_Jinv_Q krnl2;
-    krnl2.Jinv_Q = Jinv_Q;
-    krnl2.K = material[elNo].get<K>().data();
-    krnl2.K_W_Jinv_Q = volPre[elNo].get<KWAbsDetJInv>().data();
-    krnl2.matE_Q_T = matE_Q_T.data();
-    krnl2.W = volRule.weights().data();
-    krnl2.execute();
 
     for (std::size_t f = 0; f < NumFacets; ++f) {
         auto idx = NumFacets * elNo + f;
@@ -520,84 +502,41 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
 void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                     std::array<Vector<double const>, NumFacets> const& x_n,
                     Vector<double>& y_0) const {
+
     Stopwatch sw;
     sw.start();
 
-    alignas(ALIGNMENT) double sigma[tensor::sigma::size()];
-    kernel::stress_volume sv;
-    sv.Dxi_Q = Dxi_Q.data();
-    sv.J_W_G_Q = volPre[elNo].get<AbsDetJWJInv>().data()->data();
-    sv.negative_E_Q_T = negative_E_Q_T.data();
-    sv.U = x_0.data();
-    sv.sigma = sigma;
-    sv.execute();
-    auto sv_time = sw.stop();
-    auto sv_flops = kernel::stress_volume::HardwareFlops;
-
-    unsigned sf_flops = 0;
+    unsigned av_flops = 0;
     sw.start();
-    alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()];
+
+    alignas(ALIGNMENT) double Dx_Q[tensor::Dx_Q::size()];
+    kernel::apply_volume av;
+    av.Dx_Q = Dx_Q;
+    av.Dxi_Q = Dxi_Q.data();
+    av.G_Q = vol[elNo].get<JInv>().data()->data();
+    av.J_W_K_Q = volPre[elNo].get<AbsDetJWK>().data()->data();
+    av.U = x_0.data();
+    av.U_new = y_0.data();
+    av.execute();
+
+    av_flops += kernel::apply_volume::HardwareFlops;
+    auto av_time = sw.stop();
+
+    unsigned af_flops = 0;
+    sw.start();
     for (std::size_t f = 0; f < NumFacets; ++f) {
+        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
+        alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
         if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
             kernel::flux_u_skeleton fu;
-            fu.E_q_T(0) = E_q_T[f].data();
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
             fu.U = x_0.data();
             fu.U_ext = x_n[f].data();
             fu.u_hat_q = u_hat_q;
             fu.execute();
-            sf_flops += kernel::flux_u_skeleton::HardwareFlops;
-        } else if (info[f].bc == BC::Natural) {
-            kernel::flux_u_boundary fu;
-            fu.U = x_0.data();
-            fu.u_hat_q = u_hat_q;
-            fu.E_q_T(0) = E_q_T[f].data();
-            fu.execute();
-        } else {
-            continue;
-        }
+            af_flops += kernel::flux_u_skeleton::HardwareFlops;
 
-        kernel::stress_facet sf;
-        sf.sigma = sigma;
-        sf.u_hat_q = u_hat_q;
-        sf.w = fctRule.weights().data();
-        sf.E_q(0) = E_q[f].data();
-        sf.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
-        sf.execute();
-        sf_flops += kernel::stress_facet::HardwareFlops;
-    }
-    auto sf_time = sw.stop();
-
-    unsigned ps_flops = 0;
-    sw.start();
-    kernel::project_stress ps;
-    ps.K_W_Jinv_Q = volPre[elNo].get<KWAbsDetJInv>().data();
-    ps.MinvRef_E_Q = MinvRef_E_Q.data();
-    ps.MinvRef_E_Q_T = MinvRef_E_Q_T.data();
-    ps.sigma = sigma;
-    ps.execute();
-    ps_flops += kernel::project_stress::HardwareFlops;
-
-    auto ps_time = sw.stop();
-
-    unsigned av_flops = 0;
-    sw.start();
-    kernel::apply_volume av;
-    av.Dxi_Q = Dxi_Q.data();
-    av.E_Q = E_Q.data();
-    av.J_W_G_Q = volPre[elNo].get<AbsDetJWJInv>().data()->data();
-    av.U_new = y_0.data();
-    av.sigma = sigma;
-    av.execute();
-    av_flops += kernel::apply_volume::HardwareFlops;
-
-    auto av_time = sw.stop();
-
-    unsigned af_flops = 0;
-    sw.start();
-    alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()];
-    for (std::size_t f = 0; f < NumFacets; ++f) {
-        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
             kernel::flux_sigma_skeleton fs;
             fs.c00 = -penalty(elNo, info[f].lid);
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
@@ -616,6 +555,13 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fs.execute();
             af_flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (info[f].bc == BC::Dirichlet) {
+            kernel::flux_u_boundary fu;
+            fu.U = x_0.data();
+            fu.u_hat_q = u_hat_q;
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
+            fu.execute();
+            af_flops += kernel::flux_u_boundary::HardwareFlops;
+
             kernel::flux_sigma_boundary fs;
             fs.c00 = -penalty(elNo, elNo);
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
@@ -631,29 +577,27 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
         }
 
         kernel::apply_facet af;
+        af.Dxi_q(0) = Dxi_q[f].data();
         af.E_q(0) = E_q[f].data();
-        af.U_new = y_0.data();
+        af.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
         af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         af.sigma_hat_q = sigma_hat_q;
+        af.u_hat_q = u_hat_q;
+        af.U_new = y_0.data();
         af.w = fctRule.weights().data();
         af.execute();
         af_flops += kernel::apply_facet::HardwareFlops;
     }
     auto af_time = sw.stop();
 
-    // std::cout << sv_time << " " << sf_time << " " << ps_time << " " << av_time << " " << af_time
+    // std::cout << "Time: " << av_time << " " << af_time << std::endl;
+    // double time = av_time + af_time;
+    // std::cout << "Percent: " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
+    // std::cout << "Flops: " << av_flops << " " << af_flops << std::endl;
+    // std::cout << "Perf: " << av_flops / av_time * 1e-9 << " " << af_flops / af_time * 1e-9
     //<< std::endl;
-    // double time = (sv_time + sf_time + ps_time + av_time + af_time);
-    // std::cout << sv_time / time * 100 << " " << sf_time / time * 100 << " " << ps_time / time *
-    // 100
-    //<< " " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
-    // std::cout << sv_flops << " " << sf_flops << " " << ps_flops << " " << av_flops << " "
-    //<< af_flops << std::endl;
-    // std::cout << sv_flops / sv_time * 1e-9 << " " << sf_flops / sf_time * 1e-9 << " "
-    //<< ps_flops / ps_time * 1e-9 << " " << av_flops / av_time * 1e-9 << " "
-    //<< af_flops / af_time * 1e-9 << std::endl;
-    // unsigned flops = sv_flops + sf_flops + ps_flops + av_flops + af_flops;
-    // std::cout << flops << " " << flops / time / 1e9 << std::endl;
+    // unsigned flops = av_flops + af_flops;
+    // std::cout << "Total: " << flops << " " << flops / time / 1e9 << std::endl;
 }
 
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,

@@ -95,7 +95,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # matrix-free
 
-    sigma = Tensor('sigma', (Nbf, dim))
     U = Tensor('U', (Nbf,), alignStride=Alignment.Unaligned)
     U_ext = Tensor('U_ext', (Nbf,), alignStride=Alignment.Unaligned)
     U_new = Tensor('U_new', (Nbf,), alignStride=Alignment.Unaligned)
@@ -105,27 +104,16 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     negative_E_Q_T = Tensor('negative_E_Q_T', (Nq, Nbf))
     E_q_T = [Tensor('E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
     negative_E_q_T = [Tensor('negative_E_q_T({})'.format(x), (nq, Nbf)) for x in range(2)]
-    MinvRef_E_Q = Tensor('MinvRef_E_Q', (Nbf, Nq))
-    MinvRef_E_Q_T = Tensor('MinvRef_E_Q_T', (Nq, Nbf))
     Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
-    K_W_Jinv_Q = Tensor('K_W_Jinv_Q', (Nq,))
-    J_W_G_Q = Tensor('J_W_G_Q', (dim, dim, Nq))
+    J_W_K_Q = Tensor('J_W_K_Q', (Nq,))
     K_G_q = [Tensor('K_G_q({})'.format(x), (dim, dim, nq)) for x in range(2)]
 
-    generator.add('K_W_Jinv_Q', K_W_Jinv_Q['q'] <= K['m'] * matE_Q_T['qm'] * W['q'] * Jinv_Q['q'])
-    generator.add('J_W_G_Q', J_W_G_Q['keq'] <= J_Q['q'] * W['q'] * G_Q['keq'])
+    generator.add('J_W_K_Q', J_W_K_Q['q'] <= J_Q['q'] * W['q'] * K['m'] * matE_Q_T['qm'])
     generator.add('K_G_q', K_G_q[0]['eiq'] <= K['m'] * matE_q_T['qm'] * G_q['eiq'])
 
     generator.add('flux_u_skeleton',
-        u_hat_q['q'] <= 0.5 * (E_q_T[0]['ql'] * U['l'] + E_q_T[1]['ql'] * U_ext['l']))
-    generator.add('flux_u_boundary', u_hat_q['q'] <= E_q_T[0]['ql'] * U['l'])
-    generator.add('stress_volume', sigma['kr'] <= 
-        Dxi_Q['keq'] * J_W_G_Q['erq'] * negative_E_Q_T['ql'] * U['l'])
-    generator.add('stress_facet', sigma['kr'] <= sigma['kr'] +
-        w['q'] * E_q[0]['kq'] * n_q['rq'] * u_hat_q['q'])
-    generator.add('project_stress', sigma['kr'] <=
-        K_W_Jinv_Q['q'] * MinvRef_E_Q['kq'] * MinvRef_E_Q_T['ql'] * sigma['lr'])
-
+        u_hat_q['q'] <= 0.5 * (negative_E_q_T[0]['ql'] * U['l'] + E_q_T[1]['ql'] * U_ext['l']))
+    generator.add('flux_u_boundary', u_hat_q['q'] <= negative_E_q_T[0]['ql'] * U['l'])
     generator.add('flux_sigma_skeleton', sigma_hat_q['pq'] <= 0.5 *
         (K_G_q[0]['epq'] * Dxi_q_120[0]['eql'] * U['l']
             + K_G_q[1]['epq'] * Dxi_q_120[1]['eql'] * U_ext['l']) +
@@ -133,10 +121,14 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     generator.add('flux_sigma_boundary', sigma_hat_q['pq'] <=
         K_G_q[0]['epq'] * Dxi_q_120[0]['eql'] * U['l']
             + c0[0] * E_q_T[0]['ql'] * U['l'] * n_unit_q['pq'])
-    generator.add('apply_volume', U_new['k'] <= J_W_G_Q['erq'] *
-        Dxi_Q['keq'] * E_Q['lq'] * sigma['lr'])
-    generator.add('apply_facet', U_new['k'] <= U_new['k'] -
-        w['q'] * E_q[0]['kq'] * n_q['rq'] * sigma_hat_q['rq'])
+    generator.add('apply_volume', [
+        Dx_Q['krq'] <= Dxi_Q['keq'] * G_Q['erq'],
+        U_new['k'] <= J_W_K_Q['q'] * Dx_Q['krq'] * Dx_Q['lrq'] * U['l']
+    ])
+    generator.add('apply_facet', U_new['k'] <= U_new['k'] + w['q'] * n_q['rq'] * (
+        u_hat_q['q'] * K_G_q[0]['erq'] * Dxi_q[0]['keq'] -
+        E_q[0]['kq'] * sigma_hat_q['rq']
+    ))
 
     # traction
 
