@@ -3,7 +3,7 @@
 from yateto import *
 import numpy as np
 
-def add(generator, dim, nbf, Nbf, nq, Nq):
+def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     # volume
 
     J = Tensor('J', (Nq,))
@@ -19,8 +19,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
-    U = Tensor('U', (Nbf, dim), alignStride=Alignment.Unaligned)
-    Unew = Tensor('Unew', (Nbf, dim), alignStride=Alignment.Unaligned)
+    U = Tensor('U', (Nbf, dim), alignStride=petsc_alignment)
+    Unew = Tensor('Unew', (Nbf, dim), alignStride=petsc_alignment)
     A = Tensor('A', (Nbf, dim, Nbf, dim), alignStride=Alignment.Unaligned)
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
     M = Tensor('M', (Nbf, Nbf))
@@ -149,7 +149,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         test_normal(0) * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'] + \
         test_normal(1) * E_q[1]['mq'] * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * n_q['sp']))
 
-    b = Tensor('b', (Nbf, dim), alignStride=Alignment.Unaligned)
+    b = Tensor('b', (Nbf, dim), alignStride=petsc_alignment)
     F_Q = Tensor('F_Q', (dim, Nq))
     generator.add('rhsVolume', b['kp'] <= b['kp'] + J['q'] * W['q'] * E_Q['kq'] * F_Q['pq'])
 
@@ -161,7 +161,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # matrix-free
 
-    U_ext = Tensor('U_ext', (Nbf, dim), alignStride=Alignment.Unaligned)
+    U_ext = Tensor('U_ext', (Nbf, dim), alignStride=petsc_alignment)
     u_hat_q = Tensor('u_hat_q', (nq, dim))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, dim, nq))
     E_Q_T = Tensor('E_Q_T', (Nq, Nbf))
@@ -203,11 +203,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
         Unew['ku'] <= Dx_Q['kjq'] * (lam_W_J_Q['q'] * delta['uj'] * delta['rs'] * Ju_Q['qrs'] +
             mu_W_J_Q['q'] * (Ju_Q['quj'] + Ju_Q['qju']))
     ])
-    generator.add('apply_facet', Unew['ku'] <= Unew['ku'] + w['q'] * (
-        G_q_T[0]['jeq'] * Dxi_q[0]['keq'] * (lam_q[0]['q'] * delta['uj'] * u_hat_q['qr'] * n_q['rq'] +
+    generator.add('apply_facet', Unew['ku'] <= Unew['ku'] + w['q'] * G_q_T[0]['jeq'] * Dxi_q[0]['keq'] *
+            (lam_q[0]['q'] * delta['uj'] * u_hat_q['qr'] * n_q['rq'] +
             mu_q[0]['q'] * (u_hat_q['qu'] * n_q['jq'] + u_hat_q['qj'] * n_q['uq'])) +
-        negative_E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq']
-    ))
+        w['q'] * negative_E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq']
+    )
 
     # traction
 

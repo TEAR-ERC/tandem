@@ -2,7 +2,7 @@
 
 from yateto import *
 
-def add(generator, dim, nbf, Nbf, nq, Nq):
+def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     J_Q = Tensor('J_Q', (Nq,))
     Jinv_Q = Tensor('Jinv_Q', (Nq,))
     G_Q = Tensor('G_Q', (dim, dim, Nq))
@@ -72,7 +72,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), surface)
 
-    b = Tensor('b', (Nbf,), alignStride=Alignment.Unaligned)
+    b = Tensor('b', (Nbf,), alignStride=petsc_alignment)
     F_Q = Tensor('F_Q', (Nq,))
     generator.add('rhsVolume', b['k'] <= b['k'] + J_Q['q'] * W['q'] * E_Q['kq'] * F_Q['q'])
 
@@ -95,9 +95,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # matrix-free
 
-    U = Tensor('U', (Nbf,), alignStride=Alignment.Unaligned)
-    U_ext = Tensor('U_ext', (Nbf,), alignStride=Alignment.Unaligned)
-    U_new = Tensor('U_new', (Nbf,), alignStride=Alignment.Unaligned)
+    U = Tensor('U', (Nbf,), alignStride=petsc_alignment)
+    U_ext = Tensor('U_ext', (Nbf,), alignStride=petsc_alignment)
+    U_new = Tensor('U_new', (Nbf,), alignStride=petsc_alignment)
     u_hat_q = Tensor('u_hat_q', (nq,))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, nq))
     E_Q_T = Tensor('E_Q_T', (Nq, Nbf))
@@ -132,7 +132,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     # traction
 
-    u = [Tensor('u({})'.format(x), (Nbf,), alignStride=Alignment.Unaligned) for x in range(2)]
+    u = [Tensor('u({})'.format(x), (Nbf,), alignStride=petsc_alignment) for x in range(2)]
     grad_u = Tensor('grad_u', (dim, nq))
     generator.add('grad_u',
         grad_u['pq'] <= 0.5 * (K_Dx_q[0]['lpq'] * u[0]['l'] + K_Dx_q[1]['lpq'] * u[1]['l']) +

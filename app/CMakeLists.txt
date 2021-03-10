@@ -55,6 +55,8 @@ find_package(LibxsmmGenerator)
 include(CTest)
 include(../cmake/doctest.cmake)
 
+find_package(PETSc REQUIRED)
+
 add_library(global-flop-counter kernels/flop_counter.cpp)
 
 function(generate_code APP)
@@ -76,6 +78,7 @@ function(generate_code APP)
             "--options" ${OPTIONS_FILE_NAME}
             "--outputDir" ${OUTPUT_DIR}
             "--with_libxsmm" ${WITH_LIBXSMM}
+            "--petsc_memalign" ${PETSC_MEMALIGN}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
         DEPENDS
             ${OPTIONS_FILE_NAME}
@@ -117,9 +120,6 @@ function(generate_code APP)
 endfunction()
 
 # Apps using generated kernels
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET PETSc)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
@@ -170,7 +170,7 @@ target_link_libraries(app-common PUBLIC
     elasticity-kernels-lib
     elasticity_adapter-kernels-lib
     tandem-lib
-    PkgConfig::PETSC)
+    PETSc::PETSc)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Static solver
