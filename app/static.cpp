@@ -19,6 +19,7 @@
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "tensor/Managed.h"
+#include "util/Affinity.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 #include "util/Stopwatch.h"
@@ -130,6 +131,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 }
 
 int main(int argc, char** argv) {
+    auto affinity = Affinity();
+
     int pArgc = 0;
     char** pArgv = nullptr;
     for (int i = 0; i < argc; ++i) {
@@ -180,6 +183,8 @@ int main(int argc, char** argv) {
     if (!cfg) {
         return -1;
     }
+
+    std::cout << "Worker affinity: " << affinity.to_string(affinity.worker_mask()) << std::endl;
 
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
     CHKERRQ(register_PCs());
