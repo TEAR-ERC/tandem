@@ -163,12 +163,12 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 }
 
 void Elasticity::copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side) {
-    const auto& lam_q = (side == 1) ? fctPre[fctNo].get<lam_q_1>() : fctPre[fctNo].get<lam_q_0>();
-    const auto& mu_q = (side == 1) ? fctPre[fctNo].get<mu_q_1>() : fctPre[fctNo].get<mu_q_0>();
-    const auto& G_q = (side == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
+    const auto lam_q = (side == 1) ? fctPre[fctNo].get<lam_q_1>() : fctPre[fctNo].get<lam_q_0>();
+    const auto mu_q = (side == 1) ? fctPre[fctNo].get<mu_q_1>() : fctPre[fctNo].get<mu_q_0>();
+    const auto G_q = (side == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
     const auto idx = NumFacets * info.up[side] + info.localNo[side];
-    auto& l = fct_on_vol_pre[idx].get<lam_q_0>();
-    auto& m = fct_on_vol_pre[idx].get<mu_q_0>();
+    auto l = fct_on_vol_pre[idx].get<lam_q_0>();
+    auto m = fct_on_vol_pre[idx].get<mu_q_0>();
     auto G_q_T = fct_on_vol_pre[idx].get<JInvT>();
     for (std::size_t q = 0; q < fctRule.size(); ++q) {
         assert(q < l.size());
