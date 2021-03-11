@@ -11,8 +11,8 @@ if(NOT ${MIN_QUADRATURE_ORDER} GREATER_EQUAL 0)
 endif()
 
 set(ARCH "hsw" CACHE STRING "CPU architecture")
-set(ARCH_OPTIONS   noarch snb hsw skl skx)
-set(ARCH_ALIGNMENT     16  32  32  32  64)
+set(ARCH_OPTIONS   noarch snb hsw skl skx naples rome)
+set(ARCH_ALIGNMENT     16  32  32  32  64     32   32)
 set_property(CACHE ARCH PROPERTY STRINGS ${ARCH_OPTIONS})
 
 list(FIND ARCH_OPTIONS ${ARCH} INDEX)
