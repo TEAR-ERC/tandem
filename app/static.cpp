@@ -1,3 +1,4 @@
+#include "common/Banner.h"
 #include "common/CmdLine.h"
 #include "common/ElasticityScenario.h"
 #include "common/MeshConfig.h"
@@ -184,14 +185,16 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    std::cout << "Worker affinity: " << affinity.to_string(affinity.worker_mask()) << std::endl;
-
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
     CHKERRQ(register_PCs());
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
+
+    if (rank == 0) {
+        Banner::print_logo_version_and_affinity(std::cout, affinity);
+    }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
     if (cfg->mesh_file) {
