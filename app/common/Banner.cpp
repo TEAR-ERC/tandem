@@ -32,13 +32,13 @@ void Banner::print_centered(std::ostream& out, std::string_view str, std::size_t
 }
 
 void Banner::print_logo_and_version(std::ostream& out) {
-    out << std::endl << Logo << std::endl;
+    out << Logo << std::endl;
     print_centered(out, "tandem version " + std::string(VersionString));
     out << std::endl << std::endl << std::endl;
 }
 
 void Banner::print_logo_version_and_affinity(std::ostream& out, Affinity const& affinity) {
-    out << std::endl << Logo << std::endl;
+    out << Logo << std::endl;
     print_centered(out, "tandem version " + std::string(VersionString));
     out << std::endl;
 

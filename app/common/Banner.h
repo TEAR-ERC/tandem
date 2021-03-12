@@ -12,6 +12,7 @@ namespace tndm {
 class Banner {
 public:
     static constexpr char Logo[] = R"LOGO(
+               ___          ___         _____         ___          ___
       ___     /  /\        /__/\       /  /::\       /  /\        /__/\
      /  /\   /  /::\       \  \:\     /  /:/\:\     /  /:/_      |  |::\
     /  /:/  /  /:/\:\       \  \:\   /  /:/  \:\   /  /:/ /\     |  |:|:\
