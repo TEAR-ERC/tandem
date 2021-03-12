@@ -39,11 +39,11 @@ add_library(tandem-lib
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
+    parallel/Affinity.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
     parallel/SortedDistribution.cpp
     script/LuaLib.cpp
-    util/Affinity.cpp
     util/Zero.cpp
 )
 

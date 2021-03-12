@@ -1,7 +1,7 @@
 #ifndef BANNER_20210312_H
 #define BANNER_20210312_H
 
-#include "util/Affinity.h"
+#include "parallel/Affinity.h"
 
 #include <cstddef>
 #include <ostream>
