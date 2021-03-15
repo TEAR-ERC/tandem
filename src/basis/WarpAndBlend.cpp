@@ -44,13 +44,16 @@ double warpAndBlendAlpha(std::size_t D, unsigned degree) {
 
 template <>
 std::vector<std::array<double, 1>> WarpAndBlendFactory<1>::operator()(unsigned degree) const {
-    assert(degree > 0);
-
     unsigned numNodes = degree + 1;
     std::vector<std::array<double, 1>> result(numNodes);
-    auto gll = LegendreGaussLobattoPoints(numNodes, 0, 0);
-    for (unsigned i = 0; i < numNodes; ++i) {
-        result[i][0] = gll[i];
+
+    if (degree > 0) {
+        auto gll = LegendreGaussLobattoPoints(numNodes, 0, 0);
+        for (unsigned i = 0; i < numNodes; ++i) {
+            result[i][0] = gll[i];
+        }
+    } else {
+        result[0][0] = 0.0;
     }
 
     std::array<std::array<double, 1>, 2> gllVerts = {{{-1.0}, {1.0}}};
@@ -59,32 +62,35 @@ std::vector<std::array<double, 1>> WarpAndBlendFactory<1>::operator()(unsigned d
         result[n] = equiToRef(result[n]);
     }
     return result;
-} // namespace tndm
+}
 
 template <>
 std::vector<std::array<double, 2>> WarpAndBlendFactory<2>::operator()(unsigned degree) const {
-    assert(degree > 0);
-
-    double alpha = alphaFun(degree);
-
     unsigned numNodes = binom(degree + 2, 2);
     std::vector<std::array<double, 2>> result(numNodes);
-    Map<Matrix<double, Dynamic, Dynamic, RowMajor>> resultMap(result.data()->data(), numNodes, 2);
-
-    MatrixXd L(numNodes, 3);
-
-    std::size_t idx = 0;
-    for (auto i : AllIntegerSums<2>(degree)) {
-        L(idx, 2) = i[1] / static_cast<double>(degree);
-        L(idx, 1) = i[0] / static_cast<double>(degree);
-        L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2);
-        ++idx;
-    }
-
     auto equilateralVerts = equilateralTriangle();
-    const Map<const Matrix<double, 3, 2, RowMajor>> equiMap(equilateralVerts.data()->data());
 
-    resultMap = L * equiMap + warpAndBlendTriangle(degree, alpha, L);
+    if (degree > 0) {
+        MatrixXd L(numNodes, 3);
+
+        std::size_t idx = 0;
+        for (auto i : AllIntegerSums<2>(degree)) {
+            L(idx, 2) = i[1] / static_cast<double>(degree);
+            L(idx, 1) = i[0] / static_cast<double>(degree);
+            L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2);
+            ++idx;
+        }
+
+        const auto equiMap =
+            Map<const Matrix<double, 3, 2, RowMajor>>(equilateralVerts.data()->data());
+        auto resultMap =
+            Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(result.data()->data(), numNodes, 2);
+
+        double alpha = alphaFun(degree);
+        resultMap = L * equiMap + warpAndBlendTriangle(degree, alpha, L);
+    } else {
+        result[0] = std::array<double, 2>{0.0, 0.0};
+    }
 
     GeneralPlexToRefPlex equiToRef(equilateralVerts);
     for (std::size_t n = 0; n < numNodes; ++n) {
@@ -96,76 +102,78 @@ std::vector<std::array<double, 2>> WarpAndBlendFactory<2>::operator()(unsigned d
 
 template <>
 std::vector<std::array<double, 3>> WarpAndBlendFactory<3>::operator()(unsigned degree) const {
-    assert(degree > 0);
-
-    double alpha = alphaFun(degree);
-
     unsigned numNodes = binom(degree + 3, 3);
     std::vector<std::array<double, 3>> result(numNodes);
-    Map<Matrix<double, Dynamic, Dynamic, RowMajor>> resultMap(result.data()->data(), numNodes, 3);
-
-    MatrixXd L(numNodes, 4);
-    std::size_t idx = 0;
-    for (auto i : AllIntegerSums<3>(degree)) {
-        L(idx, 3) = i[2] / static_cast<double>(degree);
-        L(idx, 2) = i[1] / static_cast<double>(degree);
-        L(idx, 1) = i[0] / static_cast<double>(degree);
-        L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2) - L(idx, 3);
-        ++idx;
-    }
-
     auto eqVerts = equilateralTetrahedron();
-    const Map<const Matrix<double, 4, 3, RowMajor>> equiMap(eqVerts.data()->data());
 
-    resultMap = MatrixXd::Zero(numNodes, 3);
+    if (degree > 0) {
+        double alpha = alphaFun(degree);
+        auto resultMap =
+            Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(result.data()->data(), numNodes, 3);
+        const auto equiMap = Map<const Matrix<double, 4, 3, RowMajor>>(eqVerts.data()->data());
 
-    auto refTet = Simplex<3>::referenceSimplex();
-    MatrixXd Lface(numNodes, 3);
-    MatrixXd warp(numNodes, 3);
-    VectorXd blend(numNodes);
-    VectorXd denom(numNodes);
-    VectorXd mask(numNodes);
-    VectorXd factor(numNodes);
-    for (auto const& facet : refTet.downward()) {
-        Matrix<double, 2, 3> tangents;
-        tangents.row(0) = (equiMap.row(facet[1]) - equiMap.row(facet[0])).normalized();
-        tangents.row(1) =
-            (equiMap.row(facet[2]) - 0.5 * (equiMap.row(facet[1]) + equiMap.row(facet[0])))
-                .normalized();
-
-        Lface << L.col(facet[0]), L.col(facet[1]), L.col(facet[2]);
-        warp = warpAndBlendTriangle(degree, alpha, Lface) * tangents;
-
-        std::vector<uint64_t> mv;
-        std::set_difference(refTet.begin(), refTet.end(), facet.begin(), facet.end(),
-                            std::inserter(mv, mv.begin()));
-        assert(mv.size() == 1);
-
-        blend = Lface.col(0);
-        for (unsigned i = 1; i < 3; ++i) {
-            blend = blend.cwiseProduct(Lface.col(i));
+        MatrixXd L(numNodes, 4);
+        std::size_t idx = 0;
+        for (auto i : AllIntegerSums<3>(degree)) {
+            L(idx, 3) = i[2] / static_cast<double>(degree);
+            L(idx, 2) = i[1] / static_cast<double>(degree);
+            L(idx, 1) = i[0] / static_cast<double>(degree);
+            L(idx, 0) = 1.0 - L(idx, 1) - L(idx, 2) - L(idx, 3);
+            ++idx;
         }
-        denom = (Lface.col(0) + 0.5 * L.col(mv[0]));
-        for (unsigned i = 1; i < 3; ++i) {
-            denom = denom.cwiseProduct(Lface.col(i) + 0.5 * L.col(mv[0]));
-        }
-        double alpha2 = alpha * alpha;
-        factor = VectorXd::Ones(numNodes) + alpha2 * L.col(mv[0]).cwiseProduct(L.col(mv[0]));
 
-        for (Eigen::Index i = 0; i < numNodes; ++i) {
-            if (std::fabs(denom(i)) < std::numeric_limits<double>::epsilon()) {
-                blend(i) = 1.0;
-                mask(i) = 0.0;
-            } else {
-                blend(i) = factor(i) * blend(i) / denom(i);
-                mask(i) = 1.0;
+        resultMap = MatrixXd::Zero(numNodes, 3);
+
+        auto refTet = Simplex<3>::referenceSimplex();
+        MatrixXd Lface(numNodes, 3);
+        MatrixXd warp(numNodes, 3);
+        VectorXd blend(numNodes);
+        VectorXd denom(numNodes);
+        VectorXd mask(numNodes);
+        VectorXd factor(numNodes);
+        for (auto const& facet : refTet.downward()) {
+            Matrix<double, 2, 3> tangents;
+            tangents.row(0) = (equiMap.row(facet[1]) - equiMap.row(facet[0])).normalized();
+            tangents.row(1) =
+                (equiMap.row(facet[2]) - 0.5 * (equiMap.row(facet[1]) + equiMap.row(facet[0])))
+                    .normalized();
+
+            Lface << L.col(facet[0]), L.col(facet[1]), L.col(facet[2]);
+            warp = warpAndBlendTriangle(degree, alpha, Lface) * tangents;
+
+            std::vector<uint64_t> mv;
+            std::set_difference(refTet.begin(), refTet.end(), facet.begin(), facet.end(),
+                                std::inserter(mv, mv.begin()));
+            assert(mv.size() == 1);
+
+            blend = Lface.col(0);
+            for (unsigned i = 1; i < 3; ++i) {
+                blend = blend.cwiseProduct(Lface.col(i));
             }
+            denom = (Lface.col(0) + 0.5 * L.col(mv[0]));
+            for (unsigned i = 1; i < 3; ++i) {
+                denom = denom.cwiseProduct(Lface.col(i) + 0.5 * L.col(mv[0]));
+            }
+            double alpha2 = alpha * alpha;
+            factor = VectorXd::Ones(numNodes) + alpha2 * L.col(mv[0]).cwiseProduct(L.col(mv[0]));
+
+            for (Eigen::Index i = 0; i < numNodes; ++i) {
+                if (std::fabs(denom(i)) < std::numeric_limits<double>::epsilon()) {
+                    blend(i) = 1.0;
+                    mask(i) = 0.0;
+                } else {
+                    blend(i) = factor(i) * blend(i) / denom(i);
+                    mask(i) = 1.0;
+                }
+            }
+
+            resultMap = mask.asDiagonal() * resultMap + blend.asDiagonal() * warp;
         }
 
-        resultMap = mask.asDiagonal() * resultMap + blend.asDiagonal() * warp;
+        resultMap += L * equiMap;
+    } else {
+        result[0] = std::array<double, 3>{0.0, 0.0, 0.0};
     }
-
-    resultMap += L * equiMap;
 
     GeneralPlexToRefPlex equiToRef(eqVerts);
     for (std::size_t n = 0; n < numNodes; ++n) {

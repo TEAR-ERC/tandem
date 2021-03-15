@@ -271,8 +271,19 @@ TEST_CASE("Nodes") {
         }
     };
 
+    auto wab1 = WarpAndBlendFactory<1>();
     auto wab2 = WarpAndBlendFactory<2>();
     auto wab3 = WarpAndBlendFactory<3>();
+
+    SUBCASE("Line nodes P0") {
+        std::vector<std::array<double, 1>> refNodes{{0.5}};
+        checkNodes(wab1(0), refNodes);
+    }
+
+    SUBCASE("Triangle nodes P0") {
+        std::vector<std::array<double, 2>> refNodes{{1.0 / 3.0, 1.0 / 3.0}};
+        checkNodes(wab2(0), refNodes);
+    }
 
     SUBCASE("Triangle nodes P1") {
         std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
@@ -318,6 +329,11 @@ TEST_CASE("Nodes") {
             {0.17267316464601140114, 0.82732683535398865438},
             {0.00000000000000000000, 1.00000000000000000000}};
         checkNodes(wab2(4), refNodes);
+    }
+
+    SUBCASE("Tet nodes P0") {
+        std::vector<std::array<double, 3>> refNodes{{1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}};
+        checkNodes(wab3(0), refNodes);
     }
 
     SUBCASE("Tet nodes P1") {
