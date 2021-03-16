@@ -1,3 +1,4 @@
+#include "common/Banner.h"
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
 #include "config.h"
@@ -12,6 +13,7 @@
 #include "io/GlobalSimplexMeshBuilder.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
+#include "parallel/Affinity.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
@@ -33,6 +35,8 @@
 using namespace tndm;
 
 int main(int argc, char** argv) {
+    auto affinity = Affinity();
+
     int pArgc = 0;
     char** pArgv = nullptr;
     for (int i = 0; i < argc; ++i) {
@@ -108,6 +112,10 @@ int main(int argc, char** argv) {
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
+
+    if (rank == 0) {
+        Banner::print_logo_version_and_affinity(std::cout, affinity);
+    }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
     if (cfg->mesh_file) {
