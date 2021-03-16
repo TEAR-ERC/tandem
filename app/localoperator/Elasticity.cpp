@@ -756,8 +756,7 @@ void Elasticity::assemble_interpolate(std::size_t elNo, unsigned level,
     kernel::assemble_interpolate i;
     i.delta = init::delta::Values;
     i.Interpl(level) = Interpl.data();
-    i.select_cols(level) = init::select_cols::Values[level];
-    i.V(level + 1) = level_space_[level + 1].vandermonde().data();
+    i.VTrunc(level + 1) = level_space_[level + 1].vandermonde().data();
     i.VInv(level) = level_space_[level].vandermondeInv().data();
     i.execute(level);
 }

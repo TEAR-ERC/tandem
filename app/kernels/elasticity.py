@@ -235,24 +235,18 @@ def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     levels.reverse()
     ninterpl = len(levels) - 1
 
-    V = [
-        Tensor('V({})'.format(l), (B, B))
-        for l, B in enumerate(levels)
-    ]
     VInv = [
         Tensor('VInv({})'.format(l), (B, B))
         for l, B in enumerate(levels)
     ]
     Interpl = list()
-    select_cols = list()
+    VTrunc = [None]
     for l in range(ninterpl):
         l1 = levels[l+1]
         l2 = levels[l]
         Interpl.append(Tensor('Interpl({})'.format(l), (l1, dim, l2, dim)))
-        select_cols_spp = np.identity(l1)[:,:l2]
-        select_cols.append(Tensor('select_cols({})'.format(l), (l1, l2), spp=select_cols_spp))
+        VTrunc.append(Tensor('VTrunc({})'.format(l + 1), (l1, l2)))
 
     generator.addFamily('assemble_interpolate', simpleParameterSpace(ninterpl),
-        lambda l: Interpl[l]['kplu'] <=
-            V[l + 1]['km'] * select_cols[l]['mn'] * VInv[l]['nl'] * delta['pu'])
+        lambda l: Interpl[l]['kplu'] <= VTrunc[l + 1]['km'] * VInv[l]['ml'] * delta['pu'])
 
