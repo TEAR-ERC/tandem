@@ -51,7 +51,7 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     assert(traction.shape(0) == nbf);
     assert(traction.shape(1) == DomainDimension);
 
-    double traction_q_raw[elasticity::tensor::traction_q::Size];
+    alignas(ALIGNMENT) double traction_q_raw[elasticity::tensor::traction_q::Size];
     auto traction_q = Matrix<double>(traction_q_raw, dgop_->lop().tractionResultInfo());
     assert(traction_q.size() == elasticity::tensor::traction_q::Size);
 

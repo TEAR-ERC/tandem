@@ -52,7 +52,7 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
                                   LinearAllocator<double>&) const {
     std::fill(traction.data(), traction.data() + traction.size(), 0.0);
 
-    double grad_u_raw[poisson::tensor::grad_u::Size];
+    alignas(ALIGNMENT) double grad_u_raw[poisson::tensor::grad_u::Size];
     auto grad_u = Matrix<double>(grad_u_raw, dgop_->lop().tractionResultInfo());
     assert(grad_u.size() == poisson::tensor::grad_u::Size);
 

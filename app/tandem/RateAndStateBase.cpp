@@ -8,7 +8,8 @@
 namespace tndm {
 
 RateAndStateBase::RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl)
-    : cl_(std::move(cl)), space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>()) {
+    : cl_(std::move(cl)),
+      space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>(), ALIGNMENT) {
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, space_.refNodes());
