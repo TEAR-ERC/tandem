@@ -30,7 +30,7 @@ TEST_CASE("Basis") {
                 for (unsigned b = 0; b < 4; ++b) {
                     for (auto& point : testPoints1) {
                         CHECK(JacobiP(n, a, b, point / divisor) * std::pow(divisor, n) ==
-                              SingularityFreeJacobiP(n, a, b, point, divisor));
+                              doctest::Approx(SingularityFreeJacobiP(n, a, b, point, divisor)));
                     }
                 }
             }
