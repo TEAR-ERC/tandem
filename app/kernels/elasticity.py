@@ -243,6 +243,8 @@ def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     while dn > 0:
         levels.append(Nbf_d(dn))
         dn = dn // 2
+    if degree == 1:
+        levels.append(Nbf_d(0))
     levels.reverse()
     ninterpl = len(levels) - 1
 
