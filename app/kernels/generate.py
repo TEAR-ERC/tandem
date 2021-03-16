@@ -16,12 +16,22 @@ import elasticity
 import poisson_adapter
 import elasticity_adapter
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    elif v.lower() in ('yes', 'true', 'y', 't', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'n', 'f', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Expect boolean.')
+
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
 cmdLineParser.add_argument('--arch', required=True)
 cmdLineParser.add_argument('--options', required=True)
 cmdLineParser.add_argument('--outputDir', required=True)
-cmdLineParser.add_argument('--with_libxsmm', type=bool, default=False)
+cmdLineParser.add_argument('--with_libxsmm', type=str2bool, default=False, nargs='?', const=True)
 cmdLineParser.add_argument('--petsc_memalign', type=int, default=8)
 cmdLineArgs = cmdLineParser.parse_args()
 
