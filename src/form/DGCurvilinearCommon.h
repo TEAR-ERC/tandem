@@ -32,6 +32,8 @@ public:
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
 
+    constexpr static std::size_t NumFacets = D + 1;
+
     DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
 
     std::size_t scratch_mem_size() const {

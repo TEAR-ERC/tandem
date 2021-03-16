@@ -93,7 +93,7 @@ public:
 private:
     double penalty(FacetInfo const& info) const {
         if (method_ == DGMethod::BR2) {
-            return 3;
+            return NumFacets;
         }
         return std::max(base::penalty[info.up[0]], base::penalty[info.up[1]]);
     }
