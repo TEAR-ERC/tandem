@@ -256,6 +256,8 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     auto L_q = std::array<double*, 2>{L_q0, L_q1};
 
     if (method_ == DGMethod::BR2) {
+        double Lift0[tensor::Lift::size(0)];
+        double Lift1[tensor::Lift::size(1)];
         double Minv[2][tensor::M::size()];
         for (int i = 0; i < 2; ++i) {
             compute_inverse_mass_matrix(info.up[i], Minv[i]);
@@ -263,6 +265,8 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 
         kernel::lift_skeleton lift;
         lift.delta = init::delta::Values;
+        lift.Lift(0) = Lift0;
+        lift.Lift(1) = Lift1;
         lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
         lift.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
         lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
@@ -348,11 +352,13 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
 
     double L_q0[tensor::L_q::size(0)];
     if (method_ == DGMethod::BR2) {
+        double Lift0[tensor::Lift::size(0)];
         double Minv0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv0);
 
         kernel::lift_boundary lift;
         lift.delta = init::delta::Values;
+        lift.Lift(0) = Lift0;
         lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
         lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
@@ -444,6 +450,8 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
 
     double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
+        double f_lifted0[tensor::f_lifted::size(0)];
+        double f_lifted1[tensor::f_lifted::size(1)];
         double Minv[2][tensor::M::size()];
         for (int i = 0; i < 2; ++i) {
             compute_inverse_mass_matrix(info.up[i], Minv[i]);
@@ -452,6 +460,8 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
         kernel::rhs_lift_skeleton lift;
         lift.delta = init::delta::Values;
         lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
+        lift.f_lifted(1) = f_lifted1;
         lift.f_lifted_q = f_lifted_q;
         lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
         lift.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
@@ -510,12 +520,14 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
 
     double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
+        double f_lifted0[tensor::f_lifted::size(0)];
         double Minv0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv0);
 
         kernel::rhs_lift_boundary lift;
         lift.delta = init::delta::Values;
         lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
         lift.f_lifted_q = f_lifted_q;
         lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
         lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();

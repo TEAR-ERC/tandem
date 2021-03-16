@@ -69,6 +69,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
     u_jump = Tensor('u_jump', (dim, nq)) 
     traction_q = Tensor('traction_q', (dim, nq))
     traction_op_q = [Tensor('traction_op_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
+    Lift = [Tensor('Lift({})'.format(x), (Nbf, dim, Nbf)) for x in range(2)]
     L_q = [Tensor('L_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
     Minv = [Tensor('Minv({})'.format(x), (Nbf, Nbf)) for x in range(2)]
     a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
@@ -113,15 +114,18 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
     generator.addFamily('lift_ip', simpleParameterSpace(2),
         lambda x: L_q[x]['lpuq'] <= E_q[x]['lq'] * delta['pu'] * nl_q['q'])
-    generator.addFamily('lift_skeleton', simpleParameterSpace(2), \
-        lambda x: L_q[x]['liuq'] <= 0.25 * ( \
-            test_normal(0) * E_q[0]['mq'] * \
-                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[x]['lp'] * n_q['sp'] + \
-            test_normal(1) * E_q[1]['nq'] * \
-                Minv[1]['no'] * w['p'] * E_q[1]['op'] * E_q[x]['lp'] * n_q['sp'] \
-        ))
-    generator.add('lift_boundary', L_q[0]['liuq'] <= test_normal(0) * E_q[0]['mq'] * \
-                Minv[0]['mo'] * w['p'] * E_q[0]['op'] * E_q[0]['lp'] * n_q['sp'])
+    generator.addFamily('lift_skeleton', simpleParameterSpace(2), lambda x: [
+        Lift[0]['lsm'] <= 0.5 * Minv[0]['mo'] * w['q'] * E_q[0]['oq'] * E_q[x]['lq'] * n_q['sq'],
+        Lift[1]['lsn'] <= 0.5 * Minv[1]['no'] * w['q'] * E_q[1]['oq'] * E_q[x]['lq'] * n_q['sq'],
+        L_q[x]['liuq'] <= 0.5 * ( \
+            test_normal(0) * E_q[0]['mq'] * Lift[0]['lsm'] + \
+            test_normal(1) * E_q[1]['nq'] * Lift[1]['lsn'] \
+        )
+    ])
+    generator.add('lift_boundary', [
+        Lift[0]['lsm'] <= Minv[0]['mo'] * w['q'] * E_q[0]['oq'] * E_q[0]['lq'] * n_q['sq'],
+        L_q[0]['liuq'] <= test_normal(0) * E_q[0]['mq'] * Lift[0]['lsm']
+    ])
 
     def assembleTractionOp(x):
         return traction_op_q[x]['kpuq'] <= lam_q[x]['q'] * Dx_q[x]['kpq'] * n_q['uq'] + \
@@ -140,14 +144,21 @@ def add(generator, dim, nbf, Nbf, nq, Nq):
 
 
     f_q = Tensor('f_q', (dim, nq))
+    f_lifted = [Tensor('f_lifted({})'.format(x), (dim, Nbf, dim)) for x in range(2)]
     f_lifted_q = Tensor('f_lifted_q', (dim, nq))
     generator.add('rhs_lift_ip', f_lifted_q['iq'] <= f_q['iq'] * nl_q['q'])
-    generator.add('rhs_lift_boundary', f_lifted_q['iq'] <= \
-        test_normal(0) * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'])
+    generator.add('rhs_lift_boundary', [
+        f_lifted[0]['ums'] <= Minv[0]['mo'] * w['q'] * E_q[0]['oq'] * f_q['uq'] * n_q['sq'],
+        f_lifted_q['iq'] <= test_normal(0) * E_q[0]['mq'] * f_lifted[0]['ums']
+    ])
 
-    generator.add('rhs_lift_skeleton', f_lifted_q['iq'] <= 0.25 * ( \
-        test_normal(0) * E_q[0]['mq'] * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'] + \
-        test_normal(1) * E_q[1]['mq'] * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * n_q['sp']))
+    generator.add('rhs_lift_skeleton', [
+        f_lifted[0]['ums'] <= 0.5 * Minv[0]['mo'] * w['p'] * E_q[0]['op'] * f_q['up'] * n_q['sp'],
+        f_lifted[1]['ums'] <= 0.5 * Minv[1]['mo'] * w['p'] * E_q[1]['op'] * f_q['up'] * n_q['sp'],
+        f_lifted_q['iq'] <= 0.5 * ( \
+            test_normal(0) * E_q[0]['mq'] * f_lifted[0]['ums'] + \
+            test_normal(1) * E_q[1]['mq'] * f_lifted[1]['ums'])
+    ])
 
     b = Tensor('b', (Nbf, dim))
     F_Q = Tensor('F_Q', (dim, Nq))
