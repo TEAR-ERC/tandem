@@ -37,6 +37,11 @@ public:
             DGMethod method = DGMethod::BR2);
 
     std::size_t block_size() const { return space_.numBasisFunctions(); }
+    unsigned num_levels() const { return 0; }
+    std::size_t block_size_level(unsigned level) const {
+        throw std::logic_error("Not implemented");
+        return 0;
+    }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);

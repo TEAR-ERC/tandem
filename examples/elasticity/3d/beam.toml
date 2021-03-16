@@ -1,6 +1,6 @@
 resolution = 0.125
 
-[problem]
+[elasticity]
 lib = "beam.lua"
 force = "gravity"
 boundary = "left_boundary"

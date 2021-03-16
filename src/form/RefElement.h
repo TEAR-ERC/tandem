@@ -134,6 +134,9 @@ public:
 
     auto const& refNodes() const { return refNodes_; }
 
+    auto const& vandermonde() const { return vandermonde_; }
+    auto const& vandermondeInv() const { return vandermondeInv_; }
+
 private:
     std::vector<std::array<double, D>> refNodes_;
     Eigen::MatrixXd vandermonde_, vandermondeInv_;

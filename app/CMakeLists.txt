@@ -154,6 +154,7 @@ set(APP_COMMON_SRCS
     common/Banner.cpp
     common/MeshConfig.cpp
     common/PetscDGMatrix.cpp
+    common/PetscInterplMatrix.cpp
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp

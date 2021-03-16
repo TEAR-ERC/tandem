@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
 from yateto import *
+from functools import reduce
 import numpy as np
+import operator
+import math
 
-def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
+def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     # volume
 
     J = Tensor('J', (Nq,))
@@ -218,3 +221,38 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     generator.add('compute_traction_bnd',
         traction_q['pq'] <= traction(0, n_unit_q) +
                             c0[0] * (E_q[0]['lq'] * u[0]['lp'] - f_q['pq']))
+
+    # restrict / interpolate
+
+    Nbf_d = lambda d: reduce(operator.mul, range(d + 1, d + dim + 1), 1) // math.factorial(dim)
+    assert Nbf == Nbf_d(degree)
+
+    levels = []
+    dn = degree
+    while dn > 0:
+        levels.append(Nbf_d(dn))
+        dn = dn // 2
+    levels.reverse()
+    ninterpl = len(levels) - 1
+
+    V = [
+        Tensor('V({})'.format(l), (B, B))
+        for l, B in enumerate(levels)
+    ]
+    VInv = [
+        Tensor('VInv({})'.format(l), (B, B))
+        for l, B in enumerate(levels)
+    ]
+    Interpl = list()
+    select_cols = list()
+    for l in range(ninterpl):
+        l1 = levels[l+1]
+        l2 = levels[l]
+        Interpl.append(Tensor('Interpl({})'.format(l), (l1, dim, l2, dim)))
+        select_cols_spp = np.identity(l1)[:,:l2]
+        select_cols.append(Tensor('select_cols({})'.format(l), (l1, l2), spp=select_cols_spp))
+
+    generator.addFamily('assemble_interpolate', simpleParameterSpace(ninterpl),
+        lambda l: Interpl[l]['kplu'] <=
+            V[l + 1]['km'] * select_cols[l]['mn'] * VInv[l]['nl'] * delta['pu'])
+

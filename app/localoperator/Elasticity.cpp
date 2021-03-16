@@ -59,6 +59,18 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
+
+    unsigned nlevels = 1 + std::floor(std::log2(PolynomialDegree));
+    auto level_degree = std::vector<unsigned>(nlevels);
+    level_degree.back() = PolynomialDegree;
+    for (int l = nlevels - 1; l > 0; --l) {
+        level_degree[l - 1] = level_degree[l] / 2;
+        assert(level_degree[l - 1] > 0);
+    }
+    for (unsigned l = 0; l < nlevels; ++l) {
+        level_space_.push_back(
+            NodalRefElement<Dim>(level_degree[l], WarpAndBlendFactory<Dim>(), ALIGNMENT));
+    }
 }
 
 void Elasticity::compute_mass_matrix(std::size_t elNo, double* M) const {
@@ -734,6 +746,20 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     //<< std::endl;
     // unsigned flops = av_flops + af_flops;
     // std::cout << "Total: " << flops << " " << flops / time / 1e9 << std::endl;
+}
+
+void Elasticity::assemble_interpolate(std::size_t elNo, unsigned level,
+                                      Matrix<double>& Interpl) const {
+    assert(Interpl.size() == init::Interpl::size(level));
+    assert(level < level_space_.size() - 1);
+
+    kernel::assemble_interpolate i;
+    i.delta = init::delta::Values;
+    i.Interpl(level) = Interpl.data();
+    i.select_cols(level) = init::select_cols::Values[level];
+    i.V(level + 1) = level_space_[level + 1].vandermonde().data();
+    i.VInv(level) = level_space_[level].vandermondeInv().data();
+    i.execute(level);
 }
 
 void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C,

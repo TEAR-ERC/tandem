@@ -34,6 +34,7 @@ public:
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
+    template <class T> using assemble_interpolate_t = decltype(&T::assemble_interpolate);
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)) {
@@ -74,6 +75,8 @@ public:
 
     LocalOperator& lop() { return *lop_; }
     std::size_t block_size() const { return lop_->block_size(); }
+    std::size_t num_levels() const { return lop_->num_levels(); }
+    std::size_t block_size_level(unsigned level) const { return lop_->block_size_level(level); }
     std::size_t numLocalElements() const { return topo_->numLocalElements(); }
     DGOperatorTopo const& topo() const { return *topo_; }
 
@@ -220,6 +223,27 @@ public:
         }
         x.end_access_readonly(x_handle);
         y.end_access(y_handle);
+    }
+
+    template <typename BlockMatrix> void assemble_interpolate(unsigned level, BlockMatrix& matrix) {
+        auto bs_lp1 = lop_->block_size_level(level + 1);
+        auto bs_l = lop_->block_size_level(level);
+        auto scratch_mem_size = bs_lp1 * bs_l;
+        auto scratch_mem = std::make_unique<double[]>(scratch_mem_size);
+        auto scratch =
+            LinearAllocator<double>(scratch_mem.get(), scratch_mem.get() + scratch_mem_size);
+
+        matrix.begin_assembly();
+        if constexpr (std::experimental::is_detected_v<assemble_interpolate_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch.reset();
+                double* buffer = scratch.allocate(bs_lp1 * bs_l);
+                auto Interpl = Matrix<double>(buffer, bs_lp1, bs_l);
+                lop_->assemble_interpolate(elNo, level, Interpl);
+                matrix.add_block(elNo, elNo, Interpl);
+            }
+        }
+        matrix.end_assembly();
     }
 
     template <typename BlockVector> auto solution(BlockVector& vector) const {

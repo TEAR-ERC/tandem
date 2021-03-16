@@ -4,10 +4,12 @@
 #include "PetscUtil.h"
 #include "common/PetscDGMatrix.h"
 #include "common/PetscDGShell.h"
+#include "common/PetscInterplMatrix.h"
 #include "common/PetscVector.h"
 
 #include <petscksp.h>
 #include <petscpc.h>
+#include <petscpctypes.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
 
@@ -24,6 +26,7 @@ public:
         if (matrix_free) {
             A_ = std::make_unique<PetscDGShell>(dgop);
         }
+
         P_ = std::make_unique<PetscDGMatrix>(dgop.block_size(), topo);
         dgop.assemble(*P_);
 
@@ -40,6 +43,18 @@ public:
         }
         CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
         CHKERRTHROW(KSPSetFromOptions(ksp_));
+
+        PC pc;
+        CHKERRTHROW(KSPGetPC(ksp_, &pc));
+        PCType type;
+        PCGetType(pc, &type);
+        switch (fnv1a(type)) {
+        case HASH_DEF(PCMG):
+            setup_mg(dgop, pc);
+            break;
+        default:
+            break;
+        };
     }
     ~PetscLinearSolver() { KSPDestroy(&ksp_); }
 
@@ -63,6 +78,18 @@ public:
     void dump() const;
 
 private:
+    template <typename DGOp> void setup_mg(DGOp& dgop, PC pc) {
+        auto const& topo = dgop.topo();
+        CHKERRTHROW(PCMGSetLevels(pc, dgop.num_levels() + 1, nullptr));
+        CHKERRTHROW(PCMGSetGalerkin(pc, PC_MG_GALERKIN_BOTH));
+        for (unsigned l = 0; l < dgop.num_levels(); ++l) {
+            auto Interpl =
+                PetscInterplMatrix(dgop.block_size_level(l + 1), dgop.block_size_level(l), topo);
+            dgop.assemble_interpolate(l, Interpl);
+
+            CHKERRTHROW(PCMGSetInterpolation(pc, l + 1, Interpl.mat()));
+        }
+    }
     void warmup_sub_pcs(PC pc);
     void warmup_composite(PC pc);
 
