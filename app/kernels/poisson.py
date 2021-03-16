@@ -13,7 +13,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
-    A = Tensor('A', (Nbf, Nbf), alignStride=Alignment.Unaligned)
+    A = Tensor('A', (Nbf, Nbf))
     M = Tensor('M', (Nbf, Nbf))
     MinvRef = Tensor('MinvRef', (Nbf, Nbf))
     MinvWA = Tensor('MinvWA', (Nbf, Nbf))
@@ -40,7 +40,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     matE_q_T = Tensor('matE_q_T', (nq, Nbf))
     Dxi_q = [Tensor('Dxi_q({})'.format(x), (Nbf, dim, nq)) for x in range(2)]
     K_Dx_q = [Tensor('K_Dx_q({})'.format(x), (Nbf, dim, nq)) for x in range(2)]
-    a = [[Tensor('a({},{})'.format(x, y), (Nbf, Nbf), alignStride=Alignment.Unaligned)
+    a = [[Tensor('a({},{})'.format(x, y), (Nbf, Nbf))
           for y in range(2)] for x in range(2)]
     c0 = [Scalar('c0{}'.format(x)) for x in range(2)]
     c1 = [Scalar('c1{}'.format(x)) for x in range(2)]

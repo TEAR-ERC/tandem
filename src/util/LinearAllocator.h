@@ -38,6 +38,13 @@ public:
     void deallocate(value_type*, std::size_t) noexcept {}
     void reset() { current_ = start_; }
 
+protected:
+    void set_pointers(value_type* start, value_type* end) {
+        start_ = start;
+        end_ = end;
+        reset();
+    }
+
 private:
     value_type* start_;
     value_type* end_;

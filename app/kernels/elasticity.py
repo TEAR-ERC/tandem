@@ -24,7 +24,7 @@ def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
     U = Tensor('U', (Nbf, dim), alignStride=petsc_alignment)
     Unew = Tensor('Unew', (Nbf, dim), alignStride=petsc_alignment)
-    A = Tensor('A', (Nbf, dim, Nbf, dim), alignStride=Alignment.Unaligned)
+    A = Tensor('A', (Nbf, dim, Nbf, dim))
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
     M = Tensor('M', (Nbf, Nbf))
     matM = Tensor('matM', (Nbf, Nbf))
@@ -74,7 +74,7 @@ def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     traction_op_q = [Tensor('traction_op_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
     L_q = [Tensor('L_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
     Minv = [Tensor('Minv({})'.format(x), (Nbf, Nbf)) for x in range(2)]
-    a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim), alignStride=Alignment.Unaligned) for y in range(2)] for x in range(2)]
+    a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
 
     generator.addFamily('precomputeSurface', simpleParameterSpace(2), lambda x: [
         lam_q[x]['q'] <= matE_q_T[x]['qt'] * lam['t'],

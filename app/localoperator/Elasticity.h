@@ -35,6 +35,7 @@ public:
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                functional_t<1> mu, DGMethod method = DGMethod::BR2);
 
+    constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
     std::size_t num_levels() const { return level_space_.size() - 1; }
     std::size_t block_size_level(unsigned level) const {

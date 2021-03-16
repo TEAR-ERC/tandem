@@ -36,6 +36,7 @@ public:
     Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
             DGMethod method = DGMethod::BR2);
 
+    constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions(); }
     unsigned num_levels() const { return 0; }
     std::size_t block_size_level(unsigned level) const {
