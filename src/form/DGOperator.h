@@ -82,7 +82,9 @@ public:
     template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {
         auto bs = lop_->block_size();
 
-        auto a_scratch = Scratch<double>(4 * bs * bs, lop_->alignment());
+        auto reals_per_vec = lop_->alignment() / sizeof(double);
+        auto A_size = (1 + (bs * bs - 1) / reals_per_vec) * reals_per_vec;
+        auto a_scratch = Scratch<double>(4 * A_size, lop_->alignment());
         auto scratch_matrix = [&bs](LinearAllocator<double>& scratch) {
             double* buffer = scratch.allocate(bs * bs);
             return Matrix<double>(buffer, bs, bs);
@@ -149,7 +151,9 @@ public:
     template <typename BlockVector> void rhs(BlockVector& vector) {
         auto bs = lop_->block_size();
 
-        auto a_scratch = Scratch<double>(2 * bs, lop_->alignment());
+        auto reals_per_vec = lop_->alignment() / sizeof(double);
+        auto b_size = (1 + (bs - 1) / reals_per_vec) * reals_per_vec;
+        auto a_scratch = Scratch<double>(2 * b_size, lop_->alignment());
         auto sv = [&bs](LinearAllocator<double>& scratch) {
             double* buffer = scratch.allocate(bs);
             return Vector<double>(buffer, bs);
