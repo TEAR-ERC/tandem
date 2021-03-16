@@ -103,7 +103,7 @@ public:
 private:
     double penalty(std::size_t elNo0, std::size_t elNo1) const {
         if (method_ == DGMethod::BR2) {
-            return 3;
+            return NumFacets;
         }
         return std::max(base::penalty[elNo0], base::penalty[elNo1]);
     }

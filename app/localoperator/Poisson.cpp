@@ -229,6 +229,8 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
     alignas(ALIGNMENT) double L_q[2][std::max(tensor::L_q::size(0), tensor::L_q::size(1))];
 
     if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double Lift0[tensor::Lift::size(0)];
+        alignas(ALIGNMENT) double Lift1[tensor::Lift::size(1)];
         alignas(ALIGNMENT) double Minv[2][tensor::M::size()];
         for (int i = 0; i < 2; ++i) {
             compute_inverse_mass_matrix(info.up[i], Minv[i]);
@@ -240,6 +242,8 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
         compute_K_q(fctNo, info, K_q);
 
         kernel::lift_skeleton lift;
+        lift.Lift(0) = Lift0;
+        lift.Lift(1) = Lift1;
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
         lift.w = fctRule.weights().data();
         for (int i = 0; i < 2; ++i) {
@@ -302,6 +306,7 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
 
     alignas(ALIGNMENT) double L0[tensor::L_q::size(0)];
     if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double Lift0[tensor::Lift::size(0)];
         alignas(ALIGNMENT) double Minv0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv0);
 
@@ -309,6 +314,7 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
         compute_K_q(fctNo, info, {K_q, nullptr});
 
         kernel::lift_boundary lift;
+        lift.Lift(0) = Lift0;
         lift.K_q(0) = K_q;
         lift.L_q(0) = L0;
         lift.Minv(0) = Minv0;
@@ -397,6 +403,8 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 
     alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
+        alignas(ALIGNMENT) double f_lifted1[tensor::f_lifted::size(1)];
         alignas(ALIGNMENT) double Minv[2][tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv[0]);
         compute_inverse_mass_matrix(info.up[1], Minv[1]);
@@ -414,6 +422,8 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
         }
         lift.n_q = fct[fctNo].get<Normal>().data()->data();
         lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
+        lift.f_lifted(1) = f_lifted1;
         lift.f_lifted_q = f_lifted_q;
         lift.w = fctRule.weights().data();
         lift.execute();
@@ -459,6 +469,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
 
     alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
         alignas(ALIGNMENT) double M0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], M0);
 
@@ -471,6 +482,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
         lift.K_q(0) = K_q;
         lift.Minv(0) = M0;
         lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
         lift.f_lifted_q = f_lifted_q;
         lift.w = fctRule.weights().data();
         lift.execute();
