@@ -1,6 +1,7 @@
 #include "common/Banner.h"
 #include "common/CmdLine.h"
 #include "common/ElasticityScenario.h"
+#include "common/MGConfig.h"
 #include "common/MeshConfig.h"
 #include "common/PetscLinearSolver.h"
 #include "common/PetscUtil.h"
@@ -48,6 +49,8 @@ struct Config {
     std::optional<double> resolution;
     DGMethod method;
     bool matrix_free;
+    MGStrategy mg_strategy;
+    unsigned mg_coarse_level;
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<PoissonScenarioConfig> poisson;
@@ -57,7 +60,7 @@ struct Config {
 
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
-                    DGMethod method, bool matrix_free, std::optional<std::string> const& output) {
+                    Config const& cfg) {
     tndm::Stopwatch sw;
     double time;
 
@@ -70,12 +73,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
                                                              PolynomialDegree);
 
-    auto lop = scenario.make_local_operator(cl, method);
+    auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto dgop = DGOperator(topo, std::move(lop));
 
     sw.start();
-    auto solver = PetscLinearSolver(dgop, matrix_free);
+    auto solver =
+        PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     time = sw.stop();
     if (rank == 0) {
         std::cout << "Assembly: " << time << " s" << std::endl;
@@ -120,14 +124,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         }
     }
 
-    if (output) {
+    if (cfg.output) {
         auto coeffs = dgop.coefficients();
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.numLocalElements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData("u", numeric);
         piece.addPointData("material", coeffs);
-        writer.write(*output);
+        writer.write(*cfg.output);
     }
 }
 
@@ -169,6 +173,21 @@ int main(int argc, char** argv) {
         .default_value(DGMethod::IP)
         .validator([](DGMethod const& type) { return type != DGMethod::Unknown; });
     schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
+    schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
+    schema.add_value("mg_strategy", &Config::mg_strategy)
+        .converter([](std::string_view value) {
+            if (iEquals(value, "TwoLevel")) {
+                return MGStrategy::TwoLevel;
+            } else if (iEquals(value, "Logarithmic")) {
+                return MGStrategy::Logarithmic;
+            } else if (iEquals(value, "Full")) {
+                return MGStrategy::Full;
+            } else {
+                return MGStrategy::Unknown;
+            }
+        })
+        .default_value(MGStrategy::Logarithmic)
+        .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; });
     schema.add_value("output", &Config::output).help("Output file name");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
@@ -232,10 +251,10 @@ int main(int argc, char** argv) {
 
     if (cfg->poisson && !cfg->elasticity) {
         auto scenario = PoissonScenario(*cfg->poisson);
-        static_problem(*mesh, scenario, cfg->method, cfg->matrix_free, cfg->output);
+        static_problem(*mesh, scenario, *cfg);
     } else if (!cfg->poisson && cfg->elasticity) {
         auto scenario = ElasticityScenario(*cfg->elasticity);
-        static_problem(*mesh, scenario, cfg->method, cfg->matrix_free, cfg->output);
+        static_problem(*mesh, scenario, *cfg);
     } else {
         std::cerr << "Please specify either [poisson] or [elasticity] (but not both)." << std::endl;
     }

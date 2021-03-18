@@ -1,6 +1,7 @@
 #ifndef PETSCSOLVER_20200910_H
 #define PETSCSOLVER_20200910_H
 
+#include "common/MGConfig.h"
 #include "common/PetscDGMatrix.h"
 #include "common/PetscDGShell.h"
 #include "common/PetscInterplMatrix.h"
@@ -18,6 +19,7 @@
 
 #include <cstddef>
 #include <experimental/type_traits>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -26,7 +28,9 @@ namespace tndm {
 
 class PetscLinearSolver {
 public:
-    template <typename DGOp> PetscLinearSolver(DGOp& dgop, bool matrix_free = false) {
+    template <typename DGOp>
+    PetscLinearSolver(DGOp& dgop, bool matrix_free = false,
+                      MGConfig const& mg_config = MGConfig()) {
         auto const& topo = dgop.topo();
         if (matrix_free) {
             A_ = std::make_unique<PetscDGShell>(dgop);
@@ -55,7 +59,7 @@ public:
         PCGetType(pc, &type);
         switch (fnv1a(type)) {
         case HASH_DEF(PCMG):
-            setup_mg(dgop, pc);
+            setup_mg(dgop, pc, mg_config);
             break;
         default:
             break;
@@ -86,18 +90,20 @@ private:
     template <class LocalOperator>
     using make_interpolation_op_t = decltype(&LocalOperator::make_interpolation_op);
 
-    template <typename DGOp> void setup_mg(DGOp& dgop, PC pc) {
+    template <typename DGOp> void setup_mg(DGOp& dgop, PC pc, MGConfig const& mg_config) {
         if constexpr (std::experimental::is_detected_v<make_interpolation_op_t,
                                                        typename DGOp::local_operator_t>) {
             auto i_op = InterpolationOperator(dgop.topo().numLocalElements(),
                                               dgop.lop().make_interpolation_op());
-            unsigned nlevels = 1 + std::floor(std::log2(i_op.max_degree()));
-            auto level_degree = std::vector<unsigned>(nlevels);
-            level_degree.back() = PolynomialDegree;
-            for (int l = nlevels - 1; l > 0; --l) {
-                level_degree[l - 1] = level_degree[l] / 2;
-                assert(level_degree[l - 1] > 0);
+
+            auto level_degree = mg_config.levels(i_op.max_degree());
+            unsigned nlevels = level_degree.size();
+
+            std::cout << "Multigrid P-levels: ";
+            for (auto level : level_degree) {
+                std::cout << level << " ";
             }
+            std::cout << std::endl;
 
             CHKERRTHROW(PCMGSetLevels(pc, nlevels, nullptr));
             CHKERRTHROW(PCMGSetGalerkin(pc, PC_MG_GALERKIN_BOTH));
@@ -113,8 +119,10 @@ private:
             throw std::logic_error("interpolation not set up for selected local operator");
         }
     }
+    void warmup_ksp(KSP ksp);
     void warmup_sub_pcs(PC pc);
     void warmup_composite(PC pc);
+    void warmup_mg(PC pc);
 
     std::unique_ptr<PetscDGShell> A_;
     std::unique_ptr<PetscDGMatrix> P_;
