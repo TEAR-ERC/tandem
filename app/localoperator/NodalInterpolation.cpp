@@ -2,7 +2,6 @@
 #include "util/LinearAllocator.h"
 
 #include <cassert>
-#include <iostream>
 
 namespace tndm {
 

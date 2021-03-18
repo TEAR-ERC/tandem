@@ -1,10 +1,14 @@
 #include "Zero.h"
 
-#include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 
 namespace tndm {
+
+function_nan_inf::function_nan_inf(double x, double Fx) noexcept {
+    snprintf(what_, MaxLen - 1, "NaN or Inf detected: F(x) = %lf with x = %lf", Fx, x);
+}
 
 double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
     double eps = std::numeric_limits<double>::epsilon();
@@ -13,9 +17,16 @@ double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
         return a;
     }
     double Fb = F(b);
-    assert(!std::isnan(Fa));
-    assert(!std::isnan(Fb));
-    assert(Fb == 0.0 || std::copysign(Fa, Fb) != Fa); // Fa and Fb have different signs
+
+    if (std::isnan(Fa) || std::isinf(Fa)) {
+        throw function_nan_inf(a, Fa);
+    }
+    if (std::isnan(Fb) || std::isinf(Fb)) {
+        throw function_nan_inf(b, Fb);
+    }
+    if (Fb != 0.0 && std::copysign(Fa, Fb) == Fa) {
+        throw std::logic_error("F(a) and F(b) must have different sign.");
+    }
     double c = a;
     double Fc = Fa;
     double d = b - a;
@@ -81,7 +92,9 @@ double zeroIn(double a, double b, std::function<double(double)> F, double tol) {
             b += std::copysign(tol1, xm);
         }
         Fb = F(b);
-        assert(!std::isnan(Fb));
+        if (std::isnan(Fb) || std::isinf(Fb)) {
+            throw function_nan_inf(b, Fb);
+        }
     }
     return b;
 }

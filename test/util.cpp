@@ -143,7 +143,7 @@ TEST_CASE("Root finding") {
     CHECK(zeroIn(2.0, 3.0, F1) == doctest::Approx(2.0945514815));
 
     auto F2 = [](double x) { return 1.0 / (x - 3.0) - 6.0; };
-    CHECK(zeroIn(3.0, 4.0, F2) == doctest::Approx(3.0 + 1.0 / 6.0));
+    CHECK(zeroIn(3.0 + 1.0 / 100.0, 4.0, F2) == doctest::Approx(3.0 + 1.0 / 6.0));
 
     auto F3 = [](double x) { return x; };
     CHECK(zeroIn(-1.0, 0.0, F3) == 0.0);
