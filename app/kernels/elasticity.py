@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 from yateto import *
-from functools import reduce
 import numpy as np
-import operator
-import math
 
-def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
+def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     # volume
 
     J = Tensor('J', (Nq,))
@@ -232,34 +229,4 @@ def add(generator, degree, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     generator.add('compute_traction_bnd',
         traction_q['pq'] <= traction(0, n_unit_q) +
                             c0[0] * (E_q[0]['lq'] * u[0]['lp'] - f_q['pq']))
-
-    # restrict / interpolate
-
-    Nbf_d = lambda d: reduce(operator.mul, range(d + 1, d + dim + 1), 1) // math.factorial(dim)
-    assert Nbf == Nbf_d(degree)
-
-    levels = []
-    dn = degree
-    while dn > 0:
-        levels.append(Nbf_d(dn))
-        dn = dn // 2
-    if degree == 1:
-        levels.append(Nbf_d(0))
-    levels.reverse()
-    ninterpl = len(levels) - 1
-
-    VInv = [
-        Tensor('VInv({})'.format(l), (B, B))
-        for l, B in enumerate(levels)
-    ]
-    Interpl = list()
-    VTrunc = [None]
-    for l in range(ninterpl):
-        l1 = levels[l+1]
-        l2 = levels[l]
-        Interpl.append(Tensor('Interpl({})'.format(l), (l1, dim, l2, dim)))
-        VTrunc.append(Tensor('VTrunc({})'.format(l + 1), (l1, l2)))
-
-    generator.addFamily('assemble_interpolate', simpleParameterSpace(ninterpl),
-        lambda l: Interpl[l]['kplu'] <= VTrunc[l + 1]['km'] * VInv[l]['ml'] * delta['pu'])
 

@@ -34,7 +34,6 @@ public:
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
-    template <class T> using assemble_interpolate_t = decltype(&T::assemble_interpolate);
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
@@ -74,16 +73,13 @@ public:
 
     LocalOperator& lop() { return *lop_; }
     std::size_t block_size() const { return lop_->block_size(); }
-    std::size_t num_levels() const { return lop_->num_levels(); }
-    std::size_t block_size_level(unsigned level) const { return lop_->block_size_level(level); }
     std::size_t numLocalElements() const { return topo_->numLocalElements(); }
     DGOperatorTopo const& topo() const { return *topo_; }
 
     template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {
         auto bs = lop_->block_size();
 
-        auto reals_per_vec = lop_->alignment() / sizeof(double);
-        auto A_size = (1 + (bs * bs - 1) / reals_per_vec) * reals_per_vec;
+        auto A_size = LinearAllocator<double>::allocation_size(bs * bs, lop_->alignment());
         auto a_scratch = Scratch<double>(4 * A_size, lop_->alignment());
         auto scratch_matrix = [&bs](LinearAllocator<double>& scratch) {
             double* buffer = scratch.allocate(bs * bs);
@@ -151,8 +147,7 @@ public:
     template <typename BlockVector> void rhs(BlockVector& vector) {
         auto bs = lop_->block_size();
 
-        auto reals_per_vec = lop_->alignment() / sizeof(double);
-        auto b_size = (1 + (bs - 1) / reals_per_vec) * reals_per_vec;
+        auto b_size = LinearAllocator<double>::allocation_size(bs, lop_->alignment());
         auto a_scratch = Scratch<double>(2 * b_size, lop_->alignment());
         auto sv = [&bs](LinearAllocator<double>& scratch) {
             double* buffer = scratch.allocate(bs);
@@ -216,24 +211,6 @@ public:
         }
         x.end_access_readonly(x_handle);
         y.end_access(y_handle);
-    }
-
-    template <typename BlockMatrix> void assemble_interpolate(unsigned level, BlockMatrix& matrix) {
-        auto bs_lp1 = lop_->block_size_level(level + 1);
-        auto bs_l = lop_->block_size_level(level);
-        auto scratch = Scratch<double>(bs_lp1 * bs_l, lop_->alignment());
-
-        matrix.begin_assembly();
-        if constexpr (std::experimental::is_detected_v<assemble_interpolate_t, LocalOperator>) {
-            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
-                scratch.reset();
-                double* buffer = scratch.allocate(bs_lp1 * bs_l);
-                auto Interpl = Matrix<double>(buffer, bs_lp1, bs_l);
-                lop_->assemble_interpolate(elNo, level, Interpl);
-                matrix.add_block(elNo, elNo, Interpl);
-            }
-        }
-        matrix.end_assembly();
     }
 
     template <typename BlockVector> auto solution(BlockVector& vector) const {

@@ -2,6 +2,7 @@
 #define POISSON_20200910_H
 
 #include "config.h"
+#include "localoperator/ModalInterpolation.h"
 
 #include "form/DGCurvilinearCommon.h"
 #include "form/FacetInfo.h"
@@ -38,10 +39,9 @@ public:
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions(); }
-    unsigned num_levels() const { return 0; }
-    std::size_t block_size_level(unsigned level) const {
-        throw std::logic_error("Not implemented");
-        return 0;
+    auto make_interpolation_op() const {
+        return std::make_unique<ModalInterpolation<Dim>>(PolynomialDegree, NumQuantities,
+                                                         alignment());
     }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,

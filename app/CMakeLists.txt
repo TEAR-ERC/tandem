@@ -158,6 +158,7 @@ set(APP_COMMON_SRCS
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
+    localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
     pc/register.cpp

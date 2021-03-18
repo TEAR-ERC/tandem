@@ -1,7 +1,9 @@
 #ifndef ELASTICITY_20200929_H
 #define ELASTICITY_20200929_H
 
+#include "basis/WarpAndBlend.h"
 #include "config.h"
+#include "localoperator/NodalInterpolation.h"
 
 #include "form/DGCurvilinearCommon.h"
 #include "form/FacetInfo.h"
@@ -37,9 +39,9 @@ public:
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
-    std::size_t num_levels() const { return level_space_.size() - 1; }
-    std::size_t block_size_level(unsigned level) const {
-        return level_space_[level].numBasisFunctions() * NumQuantities;
+    auto make_interpolation_op() const {
+        return std::make_unique<NodalInterpolation<Dim>>(
+            PolynomialDegree, WarpAndBlendFactory<Dim>(), NumQuantities, alignment());
     }
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
@@ -67,8 +69,6 @@ public:
 
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
-
-    void assemble_interpolate(std::size_t elNo, unsigned level, Matrix<double>& Interpl) const;
 
     TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
@@ -124,9 +124,6 @@ private:
     // Ref elements
     NodalRefElement<DomainDimension> space_;
     NodalRefElement<DomainDimension> materialSpace_;
-
-    // Interpolation spaces
-    std::vector<NodalRefElement<DomainDimension>> level_space_;
 
     // Matrices
     Managed<Matrix<double>> MhatInv;

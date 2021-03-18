@@ -23,6 +23,7 @@ template <std::size_t D> class NodesFactory;
  */
 template <std::size_t D> class RefElement {
 public:
+    static constexpr std::size_t Dim = D;
     static constexpr std::size_t DefaultAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
     /**

@@ -54,7 +54,6 @@ if cmdLineArgs.app == 'poisson':
             petsc_alignment)
 elif cmdLineArgs.app == 'elasticity':
     elasticity.add(g,
-            options['degree'],
             options['dim'],
             options['numFacetBasisFunctions'],
             options['numElementBasisFunctions'],
