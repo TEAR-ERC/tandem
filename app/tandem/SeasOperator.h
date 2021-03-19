@@ -48,6 +48,7 @@ public:
     MPI_Comm comm() const { return adapter_->topo().comm(); }
     BoundaryMap const& faultMap() const { return adapter_->faultMap(); }
     SeasAdapter const& adapter() const { return *adapter_; }
+    std::size_t number_of_local_dofs() const { return numLocalElements() * block_size(); }
 
     template <class BlockVector> void initial_condition(BlockVector& vector) {
         auto access_handle = vector.begin_access();

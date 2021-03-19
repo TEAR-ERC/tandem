@@ -76,6 +76,7 @@ public:
 
     auto displacement() const { return dgop_->solution(linear_solver_.x()); }
     std::size_t numLocalElements() const { return dgop_->numLocalElements(); }
+    std::size_t number_of_local_dofs() const { return dgop_->number_of_local_dofs(); }
 
 private:
     void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& s_q) const;

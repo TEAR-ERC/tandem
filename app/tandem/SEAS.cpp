@@ -16,6 +16,7 @@
 #include "form/DGOperatorTopo.h"
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "parallel/MPITraits.h"
 #include "tensor/Managed.h"
 
 #include <mpi.h>
@@ -97,10 +98,26 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     ts.solve(cfg.final_time);
 
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+
+    const auto reduce_number = [&topo](std::size_t number) {
+        std::size_t number_global;
+        MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, topo->comm());
+        return number_global;
+    };
+    std::size_t num_dofs_domain = reduce_number(seasop->adapter().number_of_local_dofs());
+    std::size_t num_dofs_fault = reduce_number(seasop->number_of_local_dofs());
+
+    if (rank == 0) {
+        std::cout << "DOFs (domain): " << num_dofs_domain << std::endl;
+        std::cout << "DOFs (fault): " << num_dofs_fault << std::endl;
+        std::cout << "Steps: " << ts.get_step_number() << std::endl;
+        std::cout << "Step rejections: " << ts.get_step_rejections() << std::endl;
+    }
+
     auto solution = scenario.solution(cfg.final_time);
     if (solution) {
-        int rank;
-        MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
         auto numeric = seasop->adapter().displacement();
         double error =
             tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
