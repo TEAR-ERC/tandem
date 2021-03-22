@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
                 return MGStrategy::Unknown;
             }
         })
-        .default_value(MGStrategy::Logarithmic)
+        .default_value(MGStrategy::TwoLevel)
         .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; });
     schema.add_value("output", &Config::output).help("Output file name");
     schema.add_value("mesh_file", &Config::mesh_file)
