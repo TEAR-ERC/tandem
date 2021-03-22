@@ -40,9 +40,9 @@ template <> struct adapter<SeasType::Poisson> {
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
         auto lop = std::make_unique<Poisson>(cl, scenario.mu(), DGMethod::IP);
-        return std::make_unique<SeasPoissonAdapter>(std::move(cl), std::move(topo),
-                                                    std::move(space), std::move(lop), cfg.seas.up,
-                                                    cfg.seas.ref_normal);
+        return std::make_unique<SeasPoissonAdapter>(
+            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
+            cfg.seas.ref_normal, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 template <> struct adapter<SeasType::Elasticity> {
@@ -52,9 +52,9 @@ template <> struct adapter<SeasType::Elasticity> {
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
         auto lop = std::make_unique<Elasticity>(cl, scenario.lam(), scenario.mu(), DGMethod::IP);
-        return std::make_unique<SeasElasticityAdapter>(std::move(cl), std::move(topo),
-                                                       std::move(space), std::move(lop),
-                                                       cfg.seas.up, cfg.seas.ref_normal);
+        return std::make_unique<SeasElasticityAdapter>(
+            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
+            cfg.seas.ref_normal, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 

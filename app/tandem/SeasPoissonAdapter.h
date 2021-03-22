@@ -1,6 +1,7 @@
 #ifndef SEASPOISSONADAPTER_20201102_H
 #define SEASPOISSONADAPTER_20201102_H
 
+#include "common/MGConfig.h"
 #include "common/PetscLinearSolver.h"
 #include "common/PetscVector.h"
 #include "geometry/Curvilinear.h"
@@ -35,8 +36,8 @@ public:
     SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl, std::shared_ptr<DGOperatorTopo> topo,
                        std::unique_ptr<RefElement<Dim - 1u>> space,
                        std::unique_ptr<local_operator_t> local_operator,
-                       std::array<double, Dim> const& up,
-                       std::array<double, Dim> const& ref_normal);
+                       std::array<double, Dim> const& up, std::array<double, Dim> const& ref_normal,
+                       MGConfig const& mg_config = MGConfig());
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 

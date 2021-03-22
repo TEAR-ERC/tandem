@@ -18,11 +18,12 @@ SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
                                        std::unique_ptr<RefElement<Dim - 1u>> space,
                                        std::unique_ptr<Poisson> local_operator,
                                        std::array<double, Dim> const& up,
-                                       std::array<double, Dim> const& ref_normal)
+                                       std::array<double, Dim> const& ref_normal,
+                                       MGConfig const& mg_config)
     : SeasAdapterBase(std::move(cl), topo, std::move(space),
                       local_operator->facetQuadratureRule().points(), up, ref_normal),
       dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_) {}
+      linear_solver_(*dgop_, false, mg_config) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                               Matrix<double>& slip_q) const {

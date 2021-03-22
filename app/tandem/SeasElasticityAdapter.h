@@ -1,8 +1,9 @@
 #ifndef SEASELASTICITYADAPTER_20201103_H
 #define SEASELASTICITYADAPTER_20201103_H
 
-#include "common/PetscVector.h"
+#include "common/MGConfig.h"
 #include "common/PetscLinearSolver.h"
+#include "common/PetscVector.h"
 #include "geometry/Curvilinear.h"
 #include "localoperator/Elasticity.h"
 #include "tandem/SeasAdapterBase.h"
@@ -37,7 +38,8 @@ public:
                           std::unique_ptr<RefElement<Dim - 1u>> space,
                           std::unique_ptr<local_operator_t> local_operator,
                           std::array<double, Dim> const& up,
-                          std::array<double, Dim> const& ref_normal);
+                          std::array<double, Dim> const& ref_normal,
+                          MGConfig const& mg_config = MGConfig());
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 

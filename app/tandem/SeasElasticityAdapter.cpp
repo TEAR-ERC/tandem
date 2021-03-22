@@ -20,11 +20,12 @@ SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> c
                                              std::unique_ptr<RefElement<Dim - 1u>> space,
                                              std::unique_ptr<Elasticity> local_operator,
                                              std::array<double, Dim> const& up,
-                                             std::array<double, Dim> const& ref_normal)
+                                             std::array<double, Dim> const& ref_normal,
+                                             MGConfig const& mg_config)
     : SeasAdapterBase(std::move(cl), topo, std::move(space),
                       local_operator->facetQuadratureRule().points(), up, ref_normal),
       dgop_(std::make_unique<DGOperator<Elasticity>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_) {}
+      linear_solver_(*dgop_, false, mg_config) {}
 
 void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                                  Matrix<double>& slip_q) const {
