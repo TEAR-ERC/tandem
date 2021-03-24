@@ -67,7 +67,7 @@ function(generate_code APP)
         set(YATETO_ARCH "hsw")
     endif()
     set(WITH_LIBXSMM "no")
-    if(${LibxsmmGeneratorExecutable})
+    if(${LibxsmmGenerator_FOUND})
         set(WITH_LIBXSMM "yes")
     endif()
     add_custom_command(
@@ -105,6 +105,7 @@ function(generate_code APP)
         set_source_files_properties(kernels/${APP}/subroutine.cpp PROPERTIES COMPILE_FLAGS -mno-red-zone)
     endif()
     # Use C++-17 in order to enforce inline "constexpr static" variables 
+    target_compile_definitions(${APP}-kernels-lib PUBLIC -DEIGEN_STACK_ALLOCATION_LIMIT=2097152)
     target_compile_features(${APP}-kernels-lib PUBLIC cxx_std_17)
     target_compile_options(${APP}-kernels-lib PUBLIC ${CPU_ARCH_FLAGS})
     target_include_directories(${APP}-kernels-lib PUBLIC

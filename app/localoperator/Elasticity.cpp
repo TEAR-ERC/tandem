@@ -636,14 +636,13 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     unsigned av_flops = 0;
     sw.start();
 
-    alignas(ALIGNMENT) double Dx_Q[tensor::Dx_Q::size()];
     alignas(ALIGNMENT) double Ju_Q[tensor::Ju_Q::size()];
     kernel::apply_volume av;
     av.delta = init::delta::Values;
-    av.Dx_Q = Dx_Q;
     av.Dxi_Q = Dxi_Q.data();
     av.Dxi_Q_120 = Dxi_Q_120.data();
     av.Ju_Q = Ju_Q;
+    av.G = vol[elNo].get<JInv>().data()->data();
     av.G_Q_T = volPre[elNo].get<JInvT>().data()->data();
     av.lam_W_J_Q = volPre[elNo].get<lam_W_J_Q>().data();
     av.mu_W_J_Q = volPre[elNo].get<mu_W_J_Q>().data();

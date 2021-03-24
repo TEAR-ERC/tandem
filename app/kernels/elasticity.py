@@ -209,9 +209,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
         sigma_hat_q['ijq'] <= constitutive_q(0) + c0[0] * E_q_T[0]['ql'] * U['li'] * n_unit_q['jq']
     ])
     generator.add('apply_volume', [
-        Dx_Q['krq'] <= Dxi_Q['keq'] * G_Q_T['req'],
         Ju_Q['qsr'] <= G_Q_T['seq'] * Dxi_Q_120['eql'] * U['lr'],
-        Unew['ku'] <= Dx_Q['kjq'] * (lam_W_J_Q['q'] * delta['uj'] * delta['rs'] * Ju_Q['qrs'] +
+        Unew['ku'] <= Dxi_Q['keq'] * G['ejq'] *
+            (lam_W_J_Q['q'] * delta['uj'] * delta['rs'] * Ju_Q['qrs'] +
             mu_W_J_Q['q'] * (Ju_Q['quj'] + Ju_Q['qju']))
     ])
     generator.add('apply_facet', Unew['ku'] <= Unew['ku'] + w['q'] * G_q_T[0]['jeq'] * Dxi_q[0]['keq'] *
