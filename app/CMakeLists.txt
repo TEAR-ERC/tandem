@@ -24,6 +24,11 @@ target_compile_options(test-gauss PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(test-gauss PRIVATE ../external/)
 target_link_libraries(test-gauss PRIVATE tandem-lib)
 
+add_executable(test-scatter test-scatter.cpp)
+target_compile_options(test-scatter PRIVATE ${CPU_ARCH_FLAGS})
+target_include_directories(test-scatter PRIVATE ../external/)
+target_link_libraries(test-scatter PRIVATE tandem-lib)
+
 # Preprocessing for kernel generation
 
 set(OPTIONS_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/options.json)

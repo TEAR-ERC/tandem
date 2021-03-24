@@ -1,4 +1,5 @@
 #include "doctest.h"
+#include "util/Algorithm.h"
 #include "util/Combinatorics.h"
 #include "util/LinearAllocator.h"
 #include "util/Zero.h"
@@ -10,6 +11,7 @@
 using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::Choose;
+using tndm::find_blocks;
 using tndm::LinearAllocator;
 using tndm::zeroIn;
 
@@ -183,4 +185,15 @@ TEST_CASE("Allocator") {
         except = true;
     }
     REQUIRE(except);
+}
+
+TEST_CASE("Algorithm") {
+    auto indices = std::array<std::size_t, 10>{5, 6, 7, 3, 1, 45, 46, 47, 49, 50};
+    auto [block_lengths, displacements] = find_blocks(indices);
+
+    CHECK(block_lengths.size() == 5);
+    CHECK(displacements.size() == block_lengths.size());
+
+    auto ref_displs = std::vector<std::size_t>{5, 3, 1, 45, 49};
+    CHECK(std::equal(ref_displs.begin(), ref_displs.end(), displacements.begin()));
 }
