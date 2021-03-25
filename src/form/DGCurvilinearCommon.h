@@ -4,7 +4,7 @@
 #include "form/FacetInfo.h"
 #include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
-#include "parallel/Scatter.h"
+#include "parallel/ScatterPlan.h"
 #include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
@@ -52,7 +52,7 @@ public:
         prepare_bndskl(fctNo, info, true, scratch);
     }
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
-    void end_preparation(Scatter& elementScatter);
+    void end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan);
 
     template <std::size_t Q>
     auto make_volume_functional(functional_t<Q> fun) const -> volume_functional_t {

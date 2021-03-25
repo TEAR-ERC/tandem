@@ -1,6 +1,7 @@
 #include "DGCurvilinearCommon.h"
 
 #include "geometry/Vector.h"
+#include "parallel/SimpleScatter.h"
 #include "quadrules/AutoRule.h"
 
 #include <memory>
@@ -153,8 +154,10 @@ void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
     penalty[elNo] /= volume;
 }
 
-template <std::size_t D> void DGCurvilinearCommon<D>::end_preparation(Scatter& elementScatter) {
-    elementScatter.scatter(penalty.data());
+template <std::size_t D>
+void DGCurvilinearCommon<D>::end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan) {
+    auto scatter = SimpleScatter<double>(std::move(elementScatterPlan));
+    scatter.scatter(penalty.data());
 }
 
 template class DGCurvilinearCommon<2u>;

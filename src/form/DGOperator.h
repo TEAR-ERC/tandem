@@ -3,6 +3,8 @@
 
 #include "form/DGOperatorTopo.h"
 #include "form/FiniteElementFunction.h"
+#include "parallel/Scatter.h"
+#include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
 #include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
@@ -37,7 +39,9 @@ public:
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
-          scratch_(lop_->scratch_mem_size(), lop_->alignment()) {
+          scratch_(lop_->scratch_mem_size(), lop_->alignment()),
+          scatter_(topo->elementScatterPlan()),
+          ghost_(scatter_.recv_prototype<double>(lop_->block_size(), lop_->alignment())) {
 
         lop_->begin_preparation(topo_->numElements(), topo_->numLocalElements(),
                                 topo_->numLocalFacets());
@@ -68,7 +72,7 @@ public:
                 lop_->prepare_volume_post_skeleton(elNo, scratch_);
             }
         }
-        lop_->end_preparation(topo_->elementScatter());
+        lop_->end_preparation(topo_->elementScatterPlan());
     }
 
     LocalOperator& lop() { return *lop_; }
@@ -198,16 +202,45 @@ public:
         auto y_handle = y.begin_access();
         auto x_handle = x.begin_access_readonly();
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
-            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+            auto copy_first = topo_->numInteriorElements();
+            auto ghost_first = topo_->numLocalElements();
+
+            auto const get_interior_copy = [&](std::size_t elNo) {
+                assert(elNo < ghost_first);
+                return x.get_block(x_handle, elNo);
+            };
+
+            auto const get_general = [&](std::size_t elNo) {
+                if (elNo < ghost_first) {
+                    return x.get_block(x_handle, elNo);
+                } else {
+                    const auto& const_ghost = ghost_;
+                    return const_ghost.get_block(elNo);
+                }
+            };
+
+            const auto lop_apply = [&](std::size_t elNo, auto get) {
                 auto y_0 = y.get_block(y_handle, elNo);
                 auto x_0 = x.get_block(x_handle, elNo);
                 auto info = topo_->neighbours(elNo);
                 assert(info.size() == NumFacets);
                 std::array<decltype(x_0), NumFacets> x_n;
                 for (std::size_t d = 0; d < NumFacets; ++d) {
-                    x_n[d] = x.get_block(x_handle, info[d].lid);
+                    x_n[d] = get(info[d].lid);
                 }
                 lop_->apply(elNo, info, x_0, x_n, y_0);
+            };
+
+            scatter_.begin_scatter(x, ghost_);
+
+            for (std::size_t elNo = 0; elNo < copy_first; ++elNo) {
+                lop_apply(elNo, get_interior_copy);
+            }
+
+            scatter_.wait_scatter();
+
+            for (std::size_t elNo = copy_first; elNo < ghost_first; ++elNo) {
+                lop_apply(elNo, get_general);
             }
         }
         x.end_access_readonly(x_handle);
@@ -245,6 +278,8 @@ private:
     std::shared_ptr<DGOperatorTopo> topo_;
     std::unique_ptr<LocalOperator> lop_;
     Scratch<double> scratch_;
+    Scatter scatter_;
+    SparseBlockVector<double> ghost_;
 };
 
 } // namespace tndm

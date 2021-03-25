@@ -34,8 +34,8 @@ public:
         std::size_t N1 = spaces_[to_degree].numBasisFunctions();
         std::size_t N2 = spaces_[from_degree].numBasisFunctions();
 
-        assert(I.shape(0) == N1 * numQuantities);
-        assert(I.shape(1) == N2 * numQuantities);
+        assert(I.shape(0) == N1 * numQuantities_);
+        assert(I.shape(1) == N2 * numQuantities_);
 
         I.set_zero();
         for (int l = 0; l < N2; ++l) {

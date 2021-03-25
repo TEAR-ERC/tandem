@@ -18,8 +18,8 @@ void NodalInterpolation<D>::assemble(unsigned to_degree, unsigned from_degree, M
     std::size_t N1 = V_to.rows();
     std::size_t N2 = VInv_from.cols();
 
-    assert(I.shape(0) == N1 * numQuantities);
-    assert(I.shape(1) == N2 * numQuantities);
+    assert(I.shape(0) == N1 * numQuantities_);
+    assert(I.shape(1) == N2 * numQuantities_);
 
     double* mem = scratch.allocate(N1 * N2);
     auto tmp = Eigen::Map<Eigen::MatrixXd>(mem, N1, N2);

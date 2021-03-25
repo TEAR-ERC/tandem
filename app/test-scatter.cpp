@@ -1,7 +1,7 @@
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
 #include "mesh/LocalSimplexMesh.h"
-#include "parallel/Scatter.h"
+#include "parallel/SimpleScatter.h"
 #include "util/Stopwatch.h"
 
 #include <argparse.hpp>
@@ -12,7 +12,7 @@
 
 using namespace tndm;
 
-template <std::size_t D, typename scatter_t> void test_scatter(LocalSimplexMesh<D> const& mesh) {
+template <std::size_t D> void test_scatter(LocalSimplexMesh<D> const& mesh) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -22,7 +22,8 @@ template <std::size_t D, typename scatter_t> void test_scatter(LocalSimplexMesh<
     for (std::size_t elNo = 0; elNo < elements.localSize(); ++elNo) {
         test_data[elNo] = elements.l2cg(elNo);
     }
-    auto scatter = scatter_t(elements, MPI_COMM_WORLD);
+    auto scatter =
+        SimpleScatter<std::size_t>(std::make_shared<ScatterPlan>(elements, MPI_COMM_WORLD));
     scatter.scatter(test_data.data());
 
     const auto check_scatter = [](const auto& elements, std::vector<std::size_t> const& data) {
@@ -71,7 +72,7 @@ template <std::size_t D> void test(std::string mesh_file, unsigned long overlap)
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(overlap);
 
-    test_scatter<D, Scatter>(*mesh);
+    test_scatter<D>(*mesh);
 }
 
 int main(int argc, char** argv) {

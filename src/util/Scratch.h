@@ -4,6 +4,7 @@
 #include "util/LinearAllocator.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <memory>
 
 namespace tndm {

@@ -19,9 +19,12 @@ class PetscVectorView {
 public:
     using handle = PetscScalar*;
     using const_handle = PetscScalar const*;
+    using value_type = PetscScalar;
 
     PetscVectorView() {}
     PetscVectorView(Vec x);
+
+    std::size_t block_size() const { return block_size_; }
 
     void add_block(std::size_t ib_local, Vector<double> const& values) {
         PetscInt pib = ib_local;
