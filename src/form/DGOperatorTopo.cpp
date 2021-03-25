@@ -33,7 +33,7 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             lastElNoInInterior = elNo;
         }
     }
-    if (lastElNoInInterior + 1 != numInteriorElems_) {
+    if (numInteriorElems_ > 0 && lastElNoInInterior + 1 != numInteriorElems_) {
         throw std::runtime_error("Assertion failed. Interior elements are not compact.");
     }
 
