@@ -121,7 +121,7 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
         std::make_shared<material_vol_t>(numElements * materialSpace_.numBasisFunctions()), 0u,
         numElements, materialSpace_.numBasisFunctions());
 
-    volPre.setStorage(std::make_shared<vol_pre_t>(numLocalElements * volRule.size()), 0u,
+    volPre.setStorage(std::make_shared<vol_pre_t>(numElements * volRule.size()), 0u,
                       numLocalElements, volRule.size());
 
     const auto totalFacets = NumFacets * numElements;

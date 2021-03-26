@@ -20,7 +20,8 @@ public:
     using byte_t = unsigned char;
 
     Scatter(std::shared_ptr<ScatterPlan> topo) : topo_(std::move(topo)) {
-        requests_.resize(topo_->recv_blocks().size() + topo_->send_blocks().size());
+        requests_.resize(topo_->recv_blocks().size() + topo_->send_blocks().size(),
+                         MPI_REQUEST_NULL);
     }
 
     template <typename T>

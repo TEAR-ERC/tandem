@@ -151,9 +151,11 @@ private:
     };
     struct AbsDetJWK {
         using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct KJInv {
         using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K>;

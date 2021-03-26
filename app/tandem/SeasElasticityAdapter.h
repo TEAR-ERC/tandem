@@ -62,6 +62,8 @@ public:
         linear_solver_.update_rhs(*dgop_);
         linear_solver_.solve();
         state.end_access_readonly(in_handle);
+        scatter_.begin_scatter(linear_solver_.x(), ghost_);
+        scatter_.wait_scatter();
     }
 
     TensorBase<Matrix<double>> traction_info() const;
@@ -85,6 +87,8 @@ private:
 
     std::unique_ptr<DGOperator<local_operator_t>> dgop_;
     PetscLinearSolver linear_solver_;
+    Scatter scatter_;
+    SparseBlockVector<double> ghost_;
 
     time_functional_t fun_boundary =
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {

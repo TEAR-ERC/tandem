@@ -18,7 +18,8 @@ public:
     SimpleScatter(std::shared_ptr<ScatterPlan> topo, std::size_t block_size = 1,
                   MPI_Datatype const& mpiType = mpi_type_t<T>())
         : topo_(std::move(topo)), block_size_(block_size), mpi_type_(mpiType) {
-        requests_.resize(topo_->recv_blocks().size() + topo_->send_blocks().size());
+        requests_.resize(topo_->recv_blocks().size() + topo_->send_blocks().size(),
+                         MPI_REQUEST_NULL);
         send_buffer_.resize(topo_->send_indices().size() * block_size);
         recv_buffer_.resize(topo_->recv_indices().size() * block_size);
     }
