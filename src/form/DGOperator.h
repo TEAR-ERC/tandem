@@ -36,6 +36,7 @@ public:
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
+    template <class T> using flops_apply_t = decltype(&T::flops_apply);
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
@@ -245,6 +246,16 @@ public:
         }
         x.end_access_readonly(x_handle);
         y.end_access(y_handle);
+    }
+
+    std::size_t flops_apply() {
+        std::size_t flops = 0;
+        if constexpr (std::experimental::is_detected_v<flops_apply_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                flops += lop_->flops_apply(elNo, topo_->neighbours(elNo));
+            }
+        }
+        return flops;
     }
 
     template <typename BlockVector> auto solution(BlockVector& vector) const {

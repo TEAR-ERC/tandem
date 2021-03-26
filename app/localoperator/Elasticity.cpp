@@ -630,12 +630,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
                        Vector<double const> const& x_0,
                        std::array<Vector<double const>, NumFacets> const& x_n,
                        Vector<double>& y_0) const {
-    Stopwatch sw;
-    sw.start();
-
-    unsigned av_flops = 0;
-    sw.start();
-
     alignas(ALIGNMENT) double Ju_Q[tensor::Ju_Q::size()];
     kernel::apply_volume av;
     av.delta = init::delta::Values;
@@ -650,11 +644,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     av.Unew = y_0.data();
     av.execute();
 
-    av_flops += kernel::apply_volume::HardwareFlops;
-    auto av_time = sw.stop();
-
-    unsigned af_flops = 0;
-    sw.start();
     alignas(ALIGNMENT) double Ju_q0[tensor::Ju_q::size(0)];
     alignas(ALIGNMENT) double Ju_q1[tensor::Ju_q::size(1)];
     for (std::size_t f = 0; f < NumFacets; ++f) {
@@ -672,7 +661,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fu.U_ext = x_n[f].data();
             fu.u_hat_q = u_hat_q;
             fu.execute();
-            af_flops += kernel::flux_u_skeleton::HardwareFlops;
 
             kernel::flux_sigma_skeleton fs;
             fs.c00 = -penalty(elNo, info[f].lid);
@@ -694,7 +682,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.Ju_q(0) = Ju_q0;
             fs.Ju_q(1) = Ju_q1;
             fs.execute();
-            af_flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (info[f].bc == BC::Dirichlet) {
             kernel::flux_u_boundary fu;
             fu.U = x_0.data();
@@ -715,7 +702,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.sigma_hat_q = sigma_hat_q;
             fs.Ju_q(0) = Ju_q0;
             fs.execute();
-            af_flops += kernel::flux_sigma_boundary::HardwareFlops;
         } else {
             continue;
         }
@@ -733,18 +719,24 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         af.Unew = y_0.data();
         af.w = fctRule.weights().data();
         af.execute();
-        af_flops += kernel::apply_facet::HardwareFlops;
     }
-    auto af_time = sw.stop();
+}
 
-    // std::cout << "Time: " << av_time << " " << af_time << std::endl;
-    // double time = av_time + af_time;
-    // std::cout << "Percent: " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
-    // std::cout << "Flops: " << av_flops << " " << af_flops << std::endl;
-    // std::cout << "Perf: " << av_flops / av_time * 1e-9 << " " << af_flops / af_time * 1e-9
-    //<< std::endl;
-    // unsigned flops = av_flops + af_flops;
-    // std::cout << "Total: " << flops << " " << flops / time / 1e9 << std::endl;
+std::size_t Elasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const {
+    std::size_t flops = kernel::apply_volume::HardwareFlops;
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+            flops += kernel::flux_u_skeleton::HardwareFlops;
+            flops += kernel::flux_sigma_skeleton::HardwareFlops;
+        } else if (info[f].bc == BC::Dirichlet) {
+            flops += kernel::flux_u_boundary::HardwareFlops;
+            flops += kernel::flux_sigma_boundary::HardwareFlops;
+        } else {
+            continue;
+        }
+        flops += kernel::apply_facet::HardwareFlops;
+    }
+    return flops;
 }
 
 void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C,
