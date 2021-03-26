@@ -38,7 +38,7 @@ public:
                           std::unique_ptr<RefElement<Dim - 1u>> space,
                           std::unique_ptr<local_operator_t> local_operator,
                           std::array<double, Dim> const& up,
-                          std::array<double, Dim> const& ref_normal,
+                          std::array<double, Dim> const& ref_normal, bool matrix_free = false,
                           MGConfig const& mg_config = MGConfig());
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }

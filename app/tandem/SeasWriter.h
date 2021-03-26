@@ -51,7 +51,11 @@ public:
     }
 
     template <class BlockVector> void monitor(double time, BlockVector const& state) {
-        auto interval = output_interval(seasop_->VMax());
+        double VMax_local = seasop_->VMax_local();
+        double VMax;
+        MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
+
+        auto interval = output_interval(VMax);
         if (time - last_output_time_ >= interval) {
             auto fault_writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
             fault_writer.addFieldData("time", &time, 1);

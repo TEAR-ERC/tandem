@@ -54,7 +54,7 @@ template <> struct adapter<SeasType::Elasticity> {
         auto lop = std::make_unique<Elasticity>(cl, scenario.lam(), scenario.mu(), DGMethod::IP);
         return std::make_unique<SeasElasticityAdapter>(
             std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
-            cfg.seas.ref_normal, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            cfg.seas.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 

@@ -126,7 +126,7 @@ public:
 
     void set_boundary(time_functional_t fun) { adapter_->set_boundary(std::move(fun)); }
 
-    double VMax() const { return VMax_; }
+    double VMax_local() const { return VMax_; }
     LocalOperator& lop() { return *lop_; }
 
 private:

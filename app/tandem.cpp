@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
+    schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
     schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
     schema.add_value("mg_strategy", &Config::mg_strategy)
         .converter([](std::string_view value) {
