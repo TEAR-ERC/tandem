@@ -12,6 +12,7 @@
 #include "form/InterpolationOperator.h"
 
 #include <petscksp.h>
+#include <petscmat.h>
 #include <petscpc.h>
 #include <petscpctypes.h>
 #include <petscsys.h>
@@ -65,7 +66,12 @@ public:
             break;
         };
     }
-    ~PetscLinearSolver() { KSPDestroy(&ksp_); }
+    ~PetscLinearSolver() {
+        for (auto&& A : mat_cleanup) {
+            MatDestroy(&A);
+        }
+        KSPDestroy(&ksp_);
+    }
 
     template <typename DGOp> void update_rhs(DGOp& dgop) {
         b_->set_zero();
@@ -106,14 +112,29 @@ private:
             std::cout << std::endl;
 
             CHKERRTHROW(PCMGSetLevels(pc, nlevels, nullptr));
-            CHKERRTHROW(PCMGSetGalerkin(pc, PC_MG_GALERKIN_BOTH));
-            for (unsigned l = 0; l < nlevels - 1; ++l) {
+            CHKERRTHROW(PCMGSetGalerkin(pc, PC_MG_GALERKIN_NONE));
+            KSP smooth;
+            CHKERRTHROW(PCMGGetSmoother(pc, nlevels - 1, &smooth));
+            if (A_) {
+                CHKERRTHROW(KSPSetOperators(smooth, A_->mat(), P_->mat()));
+            } else {
+                CHKERRTHROW(KSPSetOperators(smooth, P_->mat(), P_->mat()));
+            }
+            Mat A_lp1 = P_->mat();
+            for (int l = nlevels - 2; l >= 0; --l) {
                 unsigned to_degree = level_degree[l + 1];
                 unsigned from_degree = level_degree[l];
                 auto I = PetscInterplMatrix(i_op.block_size(to_degree),
                                             i_op.block_size(from_degree), dgop.topo());
                 i_op.assemble(to_degree, from_degree, I);
                 CHKERRTHROW(PCMGSetInterpolation(pc, l + 1, I.mat()));
+
+                Mat A_l;
+                CHKERRTHROW(MatPtAP(A_lp1, I.mat(), MAT_INITIAL_MATRIX, PETSC_DEFAULT, &A_l));
+                CHKERRTHROW(PCMGGetSmoother(pc, l, &smooth));
+                CHKERRTHROW(KSPSetOperators(smooth, A_l, A_l));
+                mat_cleanup.push_back(A_l);
+                A_lp1 = A_l;
             }
         } else {
             throw std::logic_error("interpolation not set up for selected local operator");
@@ -129,6 +150,8 @@ private:
     std::unique_ptr<PetscVector> b_;
     std::unique_ptr<PetscVector> x_;
     KSP ksp_ = nullptr;
+
+    std::vector<Mat> mat_cleanup;
 };
 
 } // namespace tndm
