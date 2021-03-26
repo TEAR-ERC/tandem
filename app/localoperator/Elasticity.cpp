@@ -653,7 +653,9 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         std::size_t idx0 = NumFacets * elNo + f;
         std::size_t idx1 = NumFacets * info[f].lid + info[f].localNo;
 
-        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+        bool is_skeleton_face = elNo != info[f].lid;
+        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
@@ -682,7 +684,7 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.Ju_q(0) = Ju_q0;
             fs.Ju_q(1) = Ju_q1;
             fs.execute();
-        } else if (info[f].bc == BC::Dirichlet) {
+        } else if (is_fault_or_dirichlet) {
             kernel::flux_u_boundary fu;
             fu.U = x_0.data();
             fu.u_hat_q = u_hat_q;
@@ -725,10 +727,12 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
 std::size_t Elasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const {
     std::size_t flops = kernel::apply_volume::HardwareFlops;
     for (std::size_t f = 0; f < NumFacets; ++f) {
-        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+        bool is_skeleton_face = elNo != info[f].lid;
+        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
             flops += kernel::flux_u_skeleton::HardwareFlops;
             flops += kernel::flux_sigma_skeleton::HardwareFlops;
-        } else if (info[f].bc == BC::Dirichlet) {
+        } else if (is_fault_or_dirichlet) {
             flops += kernel::flux_u_boundary::HardwareFlops;
             flops += kernel::flux_sigma_boundary::HardwareFlops;
         } else {
