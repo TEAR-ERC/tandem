@@ -11,6 +11,7 @@
 
 #include "form/InterpolationOperator.h"
 
+#include <mpi.h>
 #include <petscksp.h>
 #include <petscmat.h>
 #include <petscpc.h>
@@ -105,11 +106,15 @@ private:
             auto level_degree = mg_config.levels(i_op.max_degree());
             unsigned nlevels = level_degree.size();
 
-            std::cout << "Multigrid P-levels: ";
-            for (auto level : level_degree) {
-                std::cout << level << " ";
+            int rank;
+            MPI_Comm_rank(dgop.topo().comm(), &rank);
+            if (rank == 0) {
+                std::cout << "Multigrid P-levels: ";
+                for (auto level : level_degree) {
+                    std::cout << level << " ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
 
             CHKERRTHROW(PCMGSetLevels(pc, nlevels, nullptr));
             CHKERRTHROW(PCMGSetGalerkin(pc, PC_MG_GALERKIN_NONE));
