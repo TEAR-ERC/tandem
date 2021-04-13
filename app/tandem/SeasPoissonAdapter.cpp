@@ -47,7 +47,7 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
-    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 2);
+    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 1);
 }
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,

@@ -30,6 +30,10 @@ public:
         PetscInt pib = ib_local;
         VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), ADD_VALUES);
     }
+    void insert_block(std::size_t ib_local, Vector<double> const& values) {
+        PetscInt pib = ib_local;
+        VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), INSERT_VALUES);
+    }
     void begin_assembly() {}
     void end_assembly() {
         CHKERRTHROW(VecAssemblyBegin(x_));

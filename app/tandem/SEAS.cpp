@@ -5,6 +5,7 @@
 #include "localoperator/Poisson.h"
 #include "tandem/Config.h"
 #include "tandem/DieterichRuinaAgeing.h"
+#include "tandem/DiscreteGreenAdapter.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/RateAndState.h"
 #include "tandem/SeasElasticityAdapter.h"
@@ -32,7 +33,7 @@
 
 namespace tndm::detail {
 
-template <SeasType type> struct adapter;
+template <SeasType Type> struct adapter;
 template <> struct adapter<SeasType::Poisson> {
     using type = SeasPoissonAdapter;
     static auto make(Config const& cfg, SeasScenario<Poisson> const& scenario,
@@ -58,10 +59,23 @@ template <> struct adapter<SeasType::Elasticity> {
     }
 };
 
-template <SeasType type>
+template <class Adapter, bool MakeGreen> struct discrete_green;
+template <class Adapter> struct discrete_green<Adapter, false> {
+    using type = Adapter;
+    static auto wrap(std::unique_ptr<Adapter> adapter, std::size_t) { return std::move(adapter); }
+};
+template <class Adapter> struct discrete_green<Adapter, true> {
+    using type = DiscreteGreenAdapter<Adapter>;
+    static auto wrap(std::unique_ptr<Adapter> adapter, std::size_t slip_block_size) {
+        return std::make_unique<type>(std::move(adapter), slip_block_size);
+    }
+};
+
+template <SeasType Type, bool MakeGreen>
 void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using adapter_t = typename adapter<type>::type;
-    using adapter_lop_t = typename adapter<type>::type::local_operator_t;
+    using base_adapter_t = typename adapter<Type>::type;
+    using adapter_lop_t = typename adapter<Type>::type::local_operator_t;
+    using adapter_t = typename discrete_green<base_adapter_t, MakeGreen>::type;
     using fault_op_t = RateAndState<DieterichRuinaAgeing>;
     using seas_op_t = SeasOperator<fault_op_t, adapter_t>;
     using seas_writer_t = SeasWriter<DomainDimension, seas_op_t>;
@@ -74,7 +88,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto fop = std::make_unique<fault_op_t>(cl);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
-    auto adapt = adapter<type>::make(cfg, scenario, cl, topo, fop->space().clone());
+    auto adapt = discrete_green<base_adapter_t, MakeGreen>::wrap(
+        adapter<Type>::make(cfg, scenario, cl, topo, fop->space().clone()), fop->slip_block_size());
 
     auto seasop = std::make_shared<seas_op_t>(std::move(fop), std::move(adapt));
     seasop->lop().set_constant_params(friction_scenario.constant_params());
@@ -133,9 +148,17 @@ namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     if (cfg.seas.type == SeasType::Poisson) {
-        detail::solve_seas_problem<SeasType::Poisson>(mesh, cfg);
+        if (cfg.discrete_green) {
+            detail::solve_seas_problem<SeasType::Poisson, true>(mesh, cfg);
+        } else {
+            detail::solve_seas_problem<SeasType::Poisson, false>(mesh, cfg);
+        }
     } else if (cfg.seas.type == SeasType::Elasticity) {
-        detail::solve_seas_problem<SeasType::Elasticity>(mesh, cfg);
+        if (cfg.discrete_green) {
+            detail::solve_seas_problem<SeasType::Elasticity, true>(mesh, cfg);
+        } else {
+            detail::solve_seas_problem<SeasType::Elasticity, false>(mesh, cfg);
+        }
     }
 }
 

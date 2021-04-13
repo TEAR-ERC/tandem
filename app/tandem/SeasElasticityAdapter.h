@@ -66,6 +66,13 @@ public:
         scatter_.wait_scatter();
     }
 
+    template <typename BlockVector>
+    void full_solve(double time, BlockVector& state, bool reuse_last_solve) {
+        if (!reuse_last_solve) {
+            solve(time, state);
+        }
+    }
+
     TensorBase<Matrix<double>> traction_info() const;
     template <class Func> void begin_traction(Func state_access) {
         handle_ = linear_solver_.x().begin_access_readonly();

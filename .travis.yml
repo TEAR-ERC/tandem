@@ -26,6 +26,5 @@ script:
   - mkdir build && cd build
   - cmake ..
   - make -j2
-  - ./test/test-basis
   - make test
 

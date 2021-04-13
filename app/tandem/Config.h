@@ -24,6 +24,7 @@ struct Config {
     std::optional<double> resolution;
     double final_time;
     std::optional<std::string> mesh_file;
+    bool discrete_green;
     bool matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;

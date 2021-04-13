@@ -68,6 +68,7 @@ public:
                 pvd_fault_.write(fault_base_);
             }
 
+            seasop_->adapter().full_solve(time, state, true);
             auto displacement = seasop_->adapter().displacement();
             auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
             writer.addFieldData("time", &time, 1);

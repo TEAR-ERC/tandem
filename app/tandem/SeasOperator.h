@@ -47,6 +47,7 @@ public:
     std::size_t numLocalElements() const { return adapter_->faultMap().size(); }
     MPI_Comm comm() const { return adapter_->topo().comm(); }
     BoundaryMap const& faultMap() const { return adapter_->faultMap(); }
+    SeasAdapter& adapter() { return *adapter_; }
     SeasAdapter const& adapter() const { return *adapter_; }
     std::size_t number_of_local_dofs() const { return numLocalElements() * block_size(); }
 

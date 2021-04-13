@@ -65,8 +65,15 @@ int main(int argc, char** argv) {
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
-    schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
-    schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
+    schema.add_value("discrete_green", &Config::discrete_green)
+        .default_value(false)
+        .help("Pre-compute discrete Green's function");
+    schema.add_value("matrix_free", &Config::matrix_free)
+        .default_value(false)
+        .help("Use matrix-free operators");
+    schema.add_value("mg_coarse_level", &Config::mg_coarse_level)
+        .default_value(1)
+        .help("Polynomial degree of coarsest MG level");
     schema.add_value("mg_strategy", &Config::mg_strategy)
         .converter([](std::string_view value) {
             if (iEquals(value, "TwoLevel")) {
@@ -80,7 +87,8 @@ int main(int argc, char** argv) {
             }
         })
         .default_value(MGStrategy::TwoLevel)
-        .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; });
+        .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; })
+        .help("MG level selection strategy (TwoLevel|Logarithmic|Full)");
     auto& seasSchema = schema.add_table("seas", &Config::seas);
     SeasScenarioConfig::setSchema(seasSchema, makePathRelativeToConfig);
     auto& frictionSchema = schema.add_table("friction", &Config::friction);
