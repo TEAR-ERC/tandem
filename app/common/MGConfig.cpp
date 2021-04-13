@@ -1,5 +1,7 @@
 #include "MGConfig.h"
-#include "tandem/RateAndStateBase.h"
+
+#include <algorithm>
+#include <numeric>
 
 namespace tndm {
 

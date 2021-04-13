@@ -5,7 +5,6 @@
 #include "quadrules/AutoRule.h"
 
 #include <memory>
-#include <unordered_map>
 #include <utility>
 
 namespace tndm {
