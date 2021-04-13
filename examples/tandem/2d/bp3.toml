@@ -22,8 +22,8 @@ Sinit = "Sinit"
     L = 0.008
     f0 = 0.6
 
-[output]
-prefix = "bp3"
+[fault_output]
+prefix = "bp3-fault"
 V_ref = 0.001
 t_min = 0.05
 t_max = 9460800

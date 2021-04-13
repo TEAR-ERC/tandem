@@ -18,6 +18,10 @@ struct OutputConfig {
     double t_min;
     double t_max;
     AdaptiveOutputStrategy strategy;
+
+    AdaptiveOutputInterval make_adaptive_output_interval() const {
+        return AdaptiveOutputInterval(V_ref, t_min, t_max, strategy);
+    }
 };
 
 struct Config {
@@ -31,7 +35,8 @@ struct Config {
     SeasScenarioConfig seas;
     DieterichRuinaAgeingConfig friction;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
-    std::optional<OutputConfig> output;
+    std::optional<OutputConfig> domain_output;
+    std::optional<OutputConfig> fault_output;
 };
 
 } // namespace tndm

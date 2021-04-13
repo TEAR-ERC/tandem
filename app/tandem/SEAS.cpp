@@ -79,7 +79,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     using adapter_t = typename discrete_green<base_adapter_t, MakeGreen>::type;
     using fault_op_t = RateAndState<DieterichRuinaAgeing>;
     using seas_op_t = SeasOperator<fault_op_t, adapter_t>;
-    using seas_writer_t = SeasWriter<DomainDimension, seas_op_t>;
+    using seas_fault_writer_t = SeasFaultWriter<DomainDimension, seas_op_t>;
+    using seas_domain_writer_t = SeasDomainWriter<DomainDimension, seas_op_t>;
+    using seas_monitor_t = SeasMonitor<seas_op_t>;
 
     auto scenario = SeasScenario<adapter_lop_t>(cfg.seas);
     auto friction_scenario = DieterichRuinaAgeingScenario(cfg.friction);
@@ -104,12 +106,29 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto ts = PetscTimeSolver(*seasop);
 
-    std::unique_ptr<seas_writer_t> writer;
-    if (cfg.output) {
-        writer = std::make_unique<seas_writer_t>(cfg.output->prefix, mesh, cl, seasop,
-                                                 PolynomialDegree, cfg.output->V_ref,
-                                                 cfg.output->t_min, cfg.output->t_max);
-        ts.set_monitor(*writer);
+    std::unique_ptr<seas_monitor_t> monitor;
+    {
+        std::vector<std::unique_ptr<SeasWriter>> writers;
+        if (cfg.fault_output && cfg.domain_output) {
+            if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
+                throw std::runtime_error(
+                    "Fault output prefix and domain output prefix must not be identical");
+            }
+        }
+        if (cfg.fault_output) {
+            writers.emplace_back(std::make_unique<seas_fault_writer_t>(
+                cfg.fault_output->prefix, cfg.fault_output->make_adaptive_output_interval(), mesh,
+                cl, seasop, PolynomialDegree));
+        }
+        if (cfg.domain_output) {
+            writers.emplace_back(std::make_unique<seas_domain_writer_t>(
+                cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh,
+                cl, seasop, PolynomialDegree));
+        }
+        if (!writers.empty()) {
+            monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers));
+            ts.set_monitor(*monitor);
+        }
     }
 
     int rank;

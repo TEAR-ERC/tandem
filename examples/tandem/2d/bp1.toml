@@ -21,5 +21,5 @@ Vinit = "Vinit"
     L = 0.008
     f0 = 0.6
 
-[output]
-prefix = "bp1"
+[fault_output]
+prefix = "bp1-fault"
