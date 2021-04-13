@@ -19,6 +19,7 @@
 #include "geometry/Curvilinear.h"
 #include "parallel/MPITraits.h"
 #include "tensor/Managed.h"
+#include "util/Stopwatch.h"
 
 #include <mpi.h>
 #include <petscsys.h>
@@ -111,8 +112,6 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         ts.set_monitor(*writer);
     }
 
-    ts.solve(cfg.final_time);
-
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
@@ -127,6 +126,15 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     if (rank == 0) {
         std::cout << "DOFs (domain): " << num_dofs_domain << std::endl;
         std::cout << "DOFs (fault): " << num_dofs_fault << std::endl;
+    }
+
+    Stopwatch sw;
+    sw.start();
+    ts.solve(cfg.final_time);
+    double time = sw.stop();
+
+    if (rank == 0) {
+        std::cout << "Solve time: " << time << std::endl;
         std::cout << "Steps: " << ts.get_step_number() << std::endl;
         std::cout << "Step rejections: " << ts.get_step_rejections() << std::endl;
     }
