@@ -13,18 +13,6 @@
 #include <cassert>
 
 namespace tndm {
-SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
-                                       std::shared_ptr<DGOperatorTopo> topo,
-                                       std::unique_ptr<RefElement<Dim - 1u>> space,
-                                       std::unique_ptr<Poisson> local_operator,
-                                       std::array<double, Dim> const& up,
-                                       std::array<double, Dim> const& ref_normal,
-                                       MGConfig const& mg_config)
-    : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                      local_operator->facetQuadratureRule().points(), up, ref_normal),
-      dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_, false, mg_config), scatter_(topo_->elementScatterPlan()),
-      ghost_(scatter_.recv_prototype<double>(dgop_->block_size(), dgop_->lop().alignment())) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                               Matrix<double>& slip_q) const {

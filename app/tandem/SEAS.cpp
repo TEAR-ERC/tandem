@@ -43,7 +43,7 @@ template <> struct adapter<SeasType::Poisson> {
         auto lop = std::make_unique<Poisson>(cl, scenario.mu(), DGMethod::IP);
         return std::make_unique<SeasPoissonAdapter>(
             std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
-            cfg.seas.ref_normal, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            cfg.seas.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 template <> struct adapter<SeasType::Elasticity> {
