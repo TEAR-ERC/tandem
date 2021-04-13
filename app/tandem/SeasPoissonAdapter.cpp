@@ -47,7 +47,10 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
-    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 1);
+    // Traction needs only one component for Poisson.
+    // We still set 2 components here in order to enable a standardised interface,
+    // which includes shear and normal components of traction.
+    return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 2);
 }
 
 void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
@@ -62,7 +65,7 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     auto const& info = dgop_->topo().info(fctNo);
     const auto get = [&](std::size_t elNo) {
         if (elNo < dgop_->numLocalElements()) {
-            return linear_solver_.x().get_block(handle_, elNo);
+            return handle_.subtensor(slice{}, elNo);
         } else {
             return ghost_.get_block(elNo);
         }

@@ -1,6 +1,7 @@
 #ifndef SCATTER_20200715_H
 #define SCATTER_20200715_H
 
+#include "interface/BlockVector.h"
 #include "parallel/MPITraits.h"
 #include "parallel/ScatterPlan.h"
 #include "parallel/SparseBlockVector.h"
@@ -30,9 +31,8 @@ public:
         return SparseBlockVector<T>(topo_->recv_indices(), block_size, alignment);
     }
 
-    template <typename BlockVector, typename T>
-    void begin_scatter(BlockVector const& x, SparseBlockVector<T>& y) {
-        static_assert(std::is_same_v<typename BlockVector::value_type, T>,
+    template <typename T> void begin_scatter(BlockVector const& x, SparseBlockVector<T>& y) {
+        static_assert(std::is_same_v<BlockVector::value_type, T>,
                       "Basic type of x and y must match");
         assert(x.block_size() == y.block_size());
 
@@ -58,7 +58,7 @@ public:
         auto x_handle = x.begin_access_readonly();
         for (std::size_t i = 0; i < topo_->send_indices().size(); ++i) {
             auto idx = topo_->send_indices()[i];
-            auto block = x.get_block(x_handle, idx);
+            auto block = x_handle.subtensor(slice{}, idx);
             memcpy(&sendBuf[i * bs], block.data(), bs * sizeof(T));
         }
         x.end_access_readonly(x_handle);

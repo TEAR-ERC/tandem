@@ -4,6 +4,7 @@
 #include "tandem/AdaptiveOutputStrategy.h"
 
 #include "geometry/Curvilinear.h"
+#include "interface/BlockVector.h"
 #include "io/PVDWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
@@ -50,7 +51,7 @@ public:
         return interval;
     }
 
-    template <class BlockVector> void monitor(double time, BlockVector const& state) {
+    void monitor(double time, BlockVector const& state) {
         double VMax_local = seasop_->VMax_local();
         double VMax;
         MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());

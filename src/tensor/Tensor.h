@@ -76,6 +76,32 @@ public:
 
     void set_zero() { std::fill(data_, data_ + size(), RealT(0.0)); }
 
+    template <typename OtherRealT, bool OtherPacked>
+    void copy_values(Tensor<OtherRealT, D, OtherPacked> const& other) {
+        multi_index_t entry{};
+        auto stop0 = this->shape(0);
+        while (entry[D - 1] != this->shape(D - 1)) {
+            OtherRealT const* source = &other(entry);
+            real_t* target = &operator()(entry);
+            for (index_t i = 0; i < stop0; ++i) {
+                *target = *source;
+                target += stride_[0];
+                source += other.stride(0);
+            }
+
+            if (D == 1) {
+                break;
+            }
+
+            index_t d = 0;
+            do {
+                entry[d] = 0;
+                d++;
+                ++entry[d];
+            } while (entry[d] == this->shape(d) && d < D - 1);
+        }
+    }
+
 protected:
     void computeStride() {
         stride_[0] = 1;

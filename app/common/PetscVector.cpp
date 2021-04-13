@@ -9,15 +9,6 @@ PetscVectorView::PetscVectorView(Vec x) : x_(x) {
     block_size_ = bs;
 }
 
-void PetscVectorView::copy(const_handle access, std::size_t ib_local, Vector<double>& to) const {
-    assert(access != nullptr);
-    assert(block_size_ == to.size());
-    std::size_t i0 = ib_local * block_size_;
-    for (std::size_t i = 0; i < block_size_; ++i) {
-        to(i) = access[i0 + i];
-    }
-}
-
 PetscVector::PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm) {
     PetscInt localRows = numLocalElems * blockSize;
     CHKERRTHROW(VecCreate(comm, &x_));

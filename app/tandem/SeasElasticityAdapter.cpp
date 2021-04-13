@@ -61,7 +61,7 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     auto const& info = dgop_->topo().info(fctNo);
     const auto get = [&](std::size_t elNo) {
         if (elNo < dgop_->numLocalElements()) {
-            return linear_solver_.x().get_block(handle_, elNo);
+            return handle_.subtensor(slice{}, elNo);
         } else {
             return ghost_.get_block(elNo);
         }

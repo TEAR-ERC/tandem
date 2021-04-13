@@ -50,30 +50,31 @@ public:
         compute_discrete_greens_function();
     }
 
-    template <typename BlockVector> void solve(double time, BlockVector& state) {
-        auto in_handle = state.begin_access();
+    void solve(double time, BlockVector const& state) {
+        auto in_handle = state.begin_access_readonly();
         for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
-            auto state_block = state.get_block(in_handle, faultNo);
+            auto state_block = in_handle.subtensor(slice{}, faultNo);
             S_->insert_block(faultNo, state_block);
         }
         S_->begin_assembly();
         S_->end_assembly();
-        state.end_access(in_handle);
+        state.end_access_readonly(in_handle);
 
         CHKERRTHROW(MatMult(T_, S_->vec(), t_->vec()));
         CHKERRTHROW(VecAXPY(t_->vec(), time, t_boundary_->vec()));
     }
 
-    template <typename BlockVector>
-    void full_solve(double time, BlockVector& state, bool reuse_last_solve) {
+    void full_solve(double time, BlockVector const& state, bool reuse_last_solve) {
         adapter_->solve(time, state);
     }
 
     TensorBase<Matrix<double>> traction_info() const { return adapter_->traction_info(); }
-    template <class Func> void begin_traction(Func func) { handle_ = t_->begin_access_readonly(); }
+    void begin_traction(Matrix<const double> state_access) {
+        handle_ = t_->begin_access_readonly();
+    }
     void traction(std::size_t faultNo, Matrix<double>& traction,
                   LinearAllocator<double>& blabla) const {
-        auto block = t_->get_block(handle_, faultNo);
+        auto block = handle_.subtensor(slice{}, faultNo);
         assert(block.size() == traction.size());
 
         for (int i = 0; i < block.size(); ++i) {
@@ -98,7 +99,7 @@ private:
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;
     std::unique_ptr<PetscVector> t_;
-    PetscVector::const_handle handle_;
+    Matrix<const double> handle_;
 };
 
 template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete_greens_function() {
@@ -147,8 +148,7 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
         adapter_->solve(0.0, *S_);
 
         auto S_handle = S_->begin_access_readonly();
-        adapter_->begin_traction(
-            [this, &S_handle](std::size_t faultNo) { return S_->get_block(S_handle, faultNo); });
+        adapter_->begin_traction(S_handle);
         for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
             scratch.reset();
             adapter_->traction(faultNo, traction, scratch);
@@ -179,8 +179,7 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_boundary
     adapter_->solve(1.0, *S_);
 
     auto S_handle = S_->begin_access_readonly();
-    adapter_->begin_traction(
-        [this, &S_handle](std::size_t faultNo) { return S_->get_block(S_handle, faultNo); });
+    adapter_->begin_traction(S_handle);
     for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
         scratch.reset();
         adapter_->traction(faultNo, traction, scratch);

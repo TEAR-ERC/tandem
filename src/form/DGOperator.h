@@ -3,6 +3,7 @@
 
 #include "form/DGOperatorTopo.h"
 #include "form/FiniteElementFunction.h"
+#include "interface/BlockVector.h"
 #include "parallel/Scatter.h"
 #include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
@@ -150,7 +151,7 @@ public:
         matrix.end_assembly();
     }
 
-    template <typename BlockVector> void rhs(BlockVector& vector) {
+    void rhs(BlockVector& vector) {
         auto bs = lop_->block_size();
 
         auto b_size = LinearAllocator<double>::allocation_size(bs, lop_->alignment());
@@ -164,7 +165,7 @@ public:
         if constexpr (std::experimental::is_detected_v<rhs_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
                 scratch_.reset();
-                auto B0 = vector.get_block(access_handle, elNo);
+                auto B0 = access_handle.subtensor(slice{}, elNo);
                 lop_->rhs_volume(elNo, B0, scratch_);
             }
         }
@@ -177,12 +178,14 @@ public:
                 auto ib0 = info.up[0];
                 auto ib1 = info.up[1];
                 if (info.up[0] != info.up[1]) {
-                    auto B0 = info.inside[0] ? vector.get_block(access_handle, ib0) : sv(a_scratch);
-                    auto B1 = info.inside[1] ? vector.get_block(access_handle, ib1) : sv(a_scratch);
+                    auto B0 =
+                        info.inside[0] ? access_handle.subtensor(slice{}, ib0) : sv(a_scratch);
+                    auto B1 =
+                        info.inside[1] ? access_handle.subtensor(slice{}, ib1) : sv(a_scratch);
                     lop_->rhs_skeleton(fctNo, info, B0, B1, scratch_);
                 } else {
                     if (info.inside[0]) {
-                        auto B0 = vector.get_block(access_handle, ib0);
+                        auto B0 = access_handle.subtensor(slice{}, ib0);
                         lop_->rhs_boundary(fctNo, info, B0, scratch_);
                     }
                 }
@@ -191,14 +194,14 @@ public:
         if constexpr (std::experimental::is_detected_v<rhs_volume_post_skeleton_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
                 scratch_.reset();
-                auto B0 = vector.get_block(access_handle, elNo);
+                auto B0 = access_handle.subtensor(slice{}, elNo);
                 lop_->rhs_volume_post_skeleton(elNo, B0, scratch_);
             }
         }
         vector.end_access(access_handle);
     }
 
-    template <typename BlockVector> void apply(BlockVector const& x, BlockVector& y) {
+    void apply(BlockVector const& x, BlockVector& y) {
         constexpr std::size_t NumFacets = LocalOperator::Dim + 1;
         auto y_handle = y.begin_access();
         auto x_handle = x.begin_access_readonly();
@@ -208,12 +211,12 @@ public:
 
             auto const get_interior_copy = [&](std::size_t elNo) {
                 assert(elNo < ghost_first);
-                return x.get_block(x_handle, elNo);
+                return x_handle.subtensor(slice{}, elNo);
             };
 
             auto const get_general = [&](std::size_t elNo) {
                 if (elNo < ghost_first) {
-                    return x.get_block(x_handle, elNo);
+                    return x_handle.subtensor(slice{}, elNo);
                 } else {
                     const auto& const_ghost = ghost_;
                     return const_ghost.get_block(elNo);
@@ -221,8 +224,8 @@ public:
             };
 
             const auto lop_apply = [&](std::size_t elNo, auto get) {
-                auto y_0 = y.get_block(y_handle, elNo);
-                auto x_0 = x.get_block(x_handle, elNo);
+                auto y_0 = y_handle.subtensor(slice{}, elNo);
+                auto x_0 = x_handle.subtensor(slice{}, elNo);
                 auto info = topo_->neighbours(elNo);
                 assert(info.size() == NumFacets);
                 std::array<decltype(x_0), NumFacets> x_n;
@@ -258,16 +261,13 @@ public:
         return flops;
     }
 
-    template <typename BlockVector> auto solution(BlockVector& vector) const {
+    auto solution(BlockVector const& vector) const {
         auto soln = lop_->solution_prototype(topo_->numLocalElements());
         auto& values = soln.values();
         auto value_matrix = reshape(values, lop_->block_size(), topo_->numLocalElements());
 
         auto access_handle = vector.begin_access_readonly();
-        for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
-            auto block = value_matrix.subtensor(slice{}, elNo);
-            vector.copy(access_handle, elNo, block);
-        }
+        value_matrix.copy_values(access_handle);
         vector.end_access_readonly(access_handle);
         return soln;
     }

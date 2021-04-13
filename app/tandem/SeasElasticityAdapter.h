@@ -43,12 +43,12 @@ public:
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
-    template <typename BlockVector> void solve(double time, BlockVector& state) {
+    void solve(double time, BlockVector const& state) {
         auto in_handle = state.begin_access_readonly();
         dgop_->lop().set_slip(
             [this, &state, &in_handle](std::size_t fctNo, Matrix<double>& f_q, bool) {
                 auto faultNo = this->faultMap_.bndNo(fctNo);
-                auto state_block = state.get_block(in_handle, faultNo);
+                auto state_block = in_handle.subtensor(slice{}, faultNo);
                 this->slip(faultNo, state_block, f_q);
             });
         dgop_->lop().set_dirichlet(
@@ -66,19 +66,18 @@ public:
         scatter_.wait_scatter();
     }
 
-    template <typename BlockVector>
-    void full_solve(double time, BlockVector& state, bool reuse_last_solve) {
+    void full_solve(double time, BlockVector const& state, bool reuse_last_solve) {
         if (!reuse_last_solve) {
             solve(time, state);
         }
     }
 
     TensorBase<Matrix<double>> traction_info() const;
-    template <class Func> void begin_traction(Func state_access) {
+    void begin_traction(Matrix<const double> state_access) {
         handle_ = linear_solver_.x().begin_access_readonly();
         dgop_->lop().set_slip([this, state_access](std::size_t fctNo, Matrix<double>& f_q, bool) {
             auto faultNo = this->faultMap_.bndNo(fctNo);
-            auto state_block = state_access(faultNo);
+            auto state_block = state_access.subtensor(slice{}, faultNo);
             this->slip(faultNo, state_block, f_q);
         });
     }
@@ -101,7 +100,7 @@ private:
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, NumQuantities> {
         return {};
     };
-    PetscVector::const_handle handle_;
+    Matrix<const double> handle_;
 };
 
 } // namespace tndm
