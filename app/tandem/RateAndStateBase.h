@@ -31,6 +31,9 @@ public:
     RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl);
 
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
+    std::size_t slip_block_size() const {
+        return space_.numBasisFunctions() * TangentialComponents;
+    }
     std::size_t scratch_mem_size() const { return 1; }
 
     void begin_preparation(std::size_t numFaultFaces);

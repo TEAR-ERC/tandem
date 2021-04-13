@@ -4,7 +4,7 @@
 #include "form/FacetInfo.h"
 #include "geometry/Curvilinear.h"
 #include "geometry/Vector.h"
-#include "parallel/Scatter.h"
+#include "parallel/ScatterPlan.h"
 #include "quadrules/SimplexQuadratureRule.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
@@ -52,7 +52,7 @@ public:
         prepare_bndskl(fctNo, info, true, scratch);
     }
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
-    void end_preparation(Scatter& elementScatter);
+    void end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan);
 
     template <std::size_t Q>
     auto make_volume_functional(functional_t<Q> fun) const -> volume_functional_t {
@@ -153,9 +153,11 @@ protected:
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
                                       NormalLength, Coords>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
+    using fct_on_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, Normal, UnitNormal, JInv0>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
+    mneme::StridedView<fct_on_vol_t> fct_on_vol;
     std::vector<double> penalty;
 };
 

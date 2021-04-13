@@ -15,16 +15,6 @@
 #include <cassert>
 
 namespace tndm {
-SeasElasticityAdapter::SeasElasticityAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
-                                             std::shared_ptr<DGOperatorTopo> topo,
-                                             std::unique_ptr<RefElement<Dim - 1u>> space,
-                                             std::unique_ptr<Elasticity> local_operator,
-                                             std::array<double, Dim> const& up,
-                                             std::array<double, Dim> const& ref_normal)
-    : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                      local_operator->facetQuadratureRule().points(), up, ref_normal),
-      dgop_(std::make_unique<DGOperator<Elasticity>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_) {}
 
 void SeasElasticityAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                                  Matrix<double>& slip_q) const {
@@ -51,14 +41,21 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     assert(traction.shape(0) == nbf);
     assert(traction.shape(1) == DomainDimension);
 
-    double traction_q_raw[elasticity::tensor::traction_q::Size];
+    alignas(ALIGNMENT) double traction_q_raw[elasticity::tensor::traction_q::Size];
     auto traction_q = Matrix<double>(traction_q_raw, dgop_->lop().tractionResultInfo());
     assert(traction_q.size() == elasticity::tensor::traction_q::Size);
 
     auto fctNo = faultMap_.fctNo(faultNo);
     auto const& info = dgop_->topo().info(fctNo);
-    auto u0 = linear_solver_.x().get_block(handle_, info.up[0]);
-    auto u1 = linear_solver_.x().get_block(handle_, info.up[1]);
+    const auto get = [&](std::size_t elNo) {
+        if (elNo < dgop_->numLocalElements()) {
+            return handle_.subtensor(slice{}, elNo);
+        } else {
+            return ghost_.get_block(elNo);
+        }
+    };
+    auto u0 = get(info.up[0]);
+    auto u1 = get(info.up[1]);
     if (info.up[0] == info.up[1]) {
         dgop_->lop().traction_boundary(fctNo, info, u0, traction_q);
     } else {

@@ -3,12 +3,15 @@
 
 #include "form/FacetInfo.h"
 #include "mesh/LocalSimplexMesh.h"
-#include "parallel/Scatter.h"
+#include "parallel/ScatterPlan.h"
 
+#include "mneme/span.hpp"
 #include "mneme/storage.hpp"
+#include "mneme/view.hpp"
 #include <mpi.h>
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 namespace tndm {
@@ -18,10 +21,24 @@ public:
     template <std::size_t D> DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm);
     virtual ~DGOperatorTopo() = default;
 
-    std::size_t numElements() const { return numElems_; }
+    /**
+     * @brief Number of elements in interior layer.
+     */
+    std::size_t numInteriorElements() const { return numInteriorElems_; }
+    /**
+     * @brief Number of elements owned by the partition, i.e. interior + copy.
+     */
     std::size_t numLocalElements() const { return numLocalElems_; }
+    /**
+     * @brief Number of elements in the partition, i.e. interior + copy + ghost.
+     *
+     * Interior ids: [0, numInteriorElements).
+     * Copy ids:     [numInteriorElements, numLocalElements).
+     * Ghost ids:    [numLocalElements, numElements).
+     */
+    std::size_t numElements() const { return numElems_; }
     std::size_t numLocalFacets() const { return numLocalFacets_; }
-    Scatter& elementScatter() { return elementScatter_; }
+    std::shared_ptr<ScatterPlan> elementScatterPlan() { return elementScatterPlan_; }
 
     FacetInfo const& info(std::size_t fctNo) const { return fctInfo[fctNo]; }
     std::size_t gid(std::size_t elNo) const { return volInfo[elNo].template get<GID>(); }
@@ -38,14 +55,16 @@ public:
     unsigned const* numGhostNeighbours() const {
         return &volInfo[0].template get<NumGhostNeighbours>();
     }
+    mneme::span<SideInfo> neighbours(std::size_t elNo) const { return neighbourInfo[elNo]; }
 
     MPI_Comm comm() const { return comm_; }
 
 protected:
     std::size_t numElems_;
+    std::size_t numInteriorElems_;
     std::size_t numLocalElems_;
     std::size_t numLocalFacets_;
-    Scatter elementScatter_;
+    std::shared_ptr<ScatterPlan> elementScatterPlan_;
     MPI_Comm comm_;
 
     std::vector<FacetInfo> fctInfo;
@@ -61,6 +80,12 @@ protected:
     };
     mneme::MultiStorage<mneme::DataLayout::SoA, GID, NumLocalNeighbours, NumGhostNeighbours>
         volInfo;
+
+    struct Side {
+        using type = SideInfo;
+    };
+    using neighbour_t = mneme::SingleStorage<Side>;
+    mneme::StridedView<neighbour_t> neighbourInfo;
 };
 
 } // namespace tndm

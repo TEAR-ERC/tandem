@@ -1,4 +1,5 @@
 #include "PetscVector.h"
+#include <petscvec.h>
 
 namespace tndm {
 
@@ -8,15 +9,6 @@ PetscVectorView::PetscVectorView(Vec x) : x_(x) {
     block_size_ = bs;
 }
 
-void PetscVectorView::copy(const_handle access, std::size_t ib_local, Vector<double>& to) const {
-    assert(access != nullptr);
-    assert(block_size_ == to.size());
-    std::size_t i0 = ib_local * block_size_;
-    for (std::size_t i = 0; i < block_size_; ++i) {
-        to(i) = access[i0 + i];
-    }
-}
-
 PetscVector::PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm) {
     PetscInt localRows = numLocalElems * blockSize;
     CHKERRTHROW(VecCreate(comm, &x_));
@@ -24,6 +16,22 @@ PetscVector::PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_C
     CHKERRTHROW(VecSetFromOptions(x_));
     CHKERRTHROW(VecSetBlockSize(x_, blockSize));
     block_size_ = blockSize;
+
+    PetscInt local_elems = numLocalElems;
+    PetscInt offset = 0;
+    MPI_Scan(&local_elems, &offset, 1, MPIU_INT, MPI_SUM, comm);
+    offset -= local_elems;
+
+    PetscInt* l2g;
+    CHKERRTHROW(PetscMalloc(numLocalElems * sizeof(PetscInt), &l2g));
+    for (std::size_t elNo = 0; elNo < numLocalElems; ++elNo) {
+        l2g[elNo] = offset + elNo;
+    }
+    ISLocalToGlobalMapping is_l2g;
+    CHKERRTHROW(ISLocalToGlobalMappingCreate(comm, block_size_, numLocalElems, l2g,
+                                             PETSC_OWN_POINTER, &is_l2g));
+    CHKERRTHROW(VecSetLocalToGlobalMapping(x_, is_l2g));
+    CHKERRTHROW(ISLocalToGlobalMappingDestroy(&is_l2g));
 }
 
 PetscVector::PetscVector(PetscVector const& prototype) {

@@ -93,7 +93,9 @@ public:
         if (force_) {
             lop.set_force(*force_);
         }
-        if (boundary_) {
+        if (boundary_ && ref_normal_) {
+            lop.set_dirichlet(*boundary_, *ref_normal_);
+        } else if (boundary_) {
             lop.set_dirichlet(*boundary_);
         }
         if (slip_ && ref_normal_) {

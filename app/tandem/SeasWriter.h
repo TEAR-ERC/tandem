@@ -4,6 +4,7 @@
 #include "tandem/AdaptiveOutputStrategy.h"
 
 #include "geometry/Curvilinear.h"
+#include "interface/BlockVector.h"
 #include "io/PVDWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
@@ -50,8 +51,12 @@ public:
         return interval;
     }
 
-    template <class BlockVector> void monitor(double time, BlockVector const& state) {
-        auto interval = output_interval(seasop_->VMax());
+    void monitor(double time, BlockVector const& state) {
+        double VMax_local = seasop_->VMax_local();
+        double VMax;
+        MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
+
+        auto interval = output_interval(VMax);
         if (time - last_output_time_ >= interval) {
             auto fault_writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
             fault_writer.addFieldData("time", &time, 1);
@@ -64,6 +69,7 @@ public:
                 pvd_fault_.write(fault_base_);
             }
 
+            seasop_->adapter().full_solve(time, state, true);
             auto displacement = seasop_->adapter().displacement();
             auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
             writer.addFieldData("time", &time, 1);

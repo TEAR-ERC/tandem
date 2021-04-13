@@ -10,8 +10,11 @@
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "quadrules/SimplexQuadratureRule.h"
+#include "tensor/EigenMap.h"
 #include "util/LinearAllocator.h"
+#include "util/Stopwatch.h"
 
+#include <Eigen/Core>
 #include <Eigen/LU>
 #include <cassert>
 
@@ -24,22 +27,34 @@ namespace tndm {
 Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
                  DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
-      space_(PolynomialDegree),
-      materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>()),
+      space_(PolynomialDegree, ALIGNMENT),
+      materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
       fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
 
     Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
+    E_Q_T = space_.evaluateBasisAt(volRule.points(), {1, 0});
     Dxi_Q = space_.evaluateGradientAt(volRule.points());
+
+    negative_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
+    EigenMap(negative_E_Q_T) = -EigenMap(E_Q_T);
+
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
+        E_q_T.emplace_back(space_.evaluateBasisAt(points, {1, 0}));
         Dxi_q.emplace_back(space_.evaluateGradientAt(points));
+        Dxi_q_120.emplace_back(space_.evaluateGradientAt(points, {1, 2, 0}));
         matE_q_T.emplace_back(materialSpace_.evaluateBasisAt(points, {1, 0}));
+
+        negative_E_q_T.emplace_back(space_.evaluateBasisAt(points, {1, 0}));
+        auto E = EigenMap(negative_E_q_T.back());
+        E = -E;
     }
 
     matE_Q_T = materialSpace_.evaluateBasisAt(volRule.points(), {1, 0});
+    matDxi_Q = materialSpace_.evaluateGradientAt(volRule.points());
 }
 
 void Poisson::compute_mass_matrix(std::size_t elNo, double* M) const {
@@ -55,7 +70,7 @@ void Poisson::compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const 
     compute_mass_matrix(elNo, Minv);
 
     auto J_Q = vol[elNo].get<AbsDetJ>();
-    double Jinv_Q[tensor::Jinv_Q::size()] = {};
+    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
     for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
         Jinv_Q[q] = 1.0 / J_Q[q];
     }
@@ -79,7 +94,7 @@ void Poisson::compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
             dx.matE_q_T = matE_q_T[info.localNo[i]].data();
             dx.K = material[info.up[i]].get<K>().data();
             dx.K_Dx_q(0) = K_Dx_q[i];
-            dx.Dxi_q = Dxi_q[info.localNo[i]].data();
+            dx.Dxi_q(0) = Dxi_q[info.localNo[i]].data();
             dx.execute();
         }
     }
@@ -105,17 +120,24 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
     material.setStorage(
         std::make_shared<material_vol_t>(numElements * materialSpace_.numBasisFunctions()), 0u,
         numElements, materialSpace_.numBasisFunctions());
+
+    volPre.setStorage(std::make_shared<vol_pre_t>(numElements * volRule.size()), 0u,
+                      numLocalElements, volRule.size());
+
+    const auto totalFacets = NumFacets * numElements;
+    fct_on_vol_pre.setStorage(std::make_shared<fct_on_vol_pre_t>(totalFacets * fctRule.size()), 0u,
+                              totalFacets, fctRule.size());
 }
 
 void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume_post_skeleton(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
-    double K_Q_raw[tensor::K_Q::size()];
+    alignas(ALIGNMENT) double K_Q_raw[tensor::K_Q::size()];
     auto K_Q = Matrix<double>(K_Q_raw, 1, volRule.size());
     fun_K(elNo, K_Q);
 
-    double Mmem[tensor::matM::size()];
+    alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
     kernel::project_K_lhs krnl_lhs;
     krnl_lhs.matE_Q_T = matE_Q_T.data();
     krnl_lhs.J_Q = vol[elNo].get<AbsDetJ>().data();
@@ -143,11 +165,29 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
     base::penalty[elNo] *=
         Kmax * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
+
+    kernel::J_W_K_Q krnl;
+    krnl.J_W_K_Q = volPre[elNo].get<AbsDetJWK>().data()->data();
+    krnl.J_Q = vol[elNo].get<AbsDetJ>().data();
+    krnl.K = Kfield;
+    krnl.matE_Q_T = matE_Q_T.data();
+    krnl.W = volRule.weights().data();
+    krnl.execute();
+
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+        auto idx = NumFacets * elNo + f;
+        kernel::K_G_q k;
+        k.G_q = fct_on_vol[idx].get<JInv0>().data()->data();
+        k.K = material[elNo].get<K>().data();
+        k.K_G_q(0) = fct_on_vol_pre[idx].get<KJInv>().data()->data();
+        k.matE_q_T = matE_q_T[f].data();
+        k.execute();
+    }
 }
 
 bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
                               LinearAllocator<double>& scratch) const {
-    double Dx_Q[tensor::Dx_Q::size()];
+    alignas(ALIGNMENT) double Dx_Q[tensor::Dx_Q::size()];
 
     assert(volRule.size() == tensor::W::Shape[0]);
     assert(Dxi_Q.shape(0) == tensor::Dxi_Q::Shape[0]);
@@ -177,27 +217,27 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
-    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
-    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
-    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q1[tensor::K_Dx_q::size(1)];
     auto K_Dx_q = std::array<double*, 2>{K_Dx_q0, K_Dx_q1};
     compute_K_Dx_q(fctNo, info, K_Dx_q);
 
-    double L_q[2][std::max(tensor::L_q::size(0), tensor::L_q::size(1))];
+    alignas(ALIGNMENT) double L_q[2][std::max(tensor::L_q::size(0), tensor::L_q::size(1))];
 
     if (method_ == DGMethod::BR2) {
-        double Lift0[tensor::Lift::size(0)];
-        double Lift1[tensor::Lift::size(1)];
-        double Minv[2][tensor::M::size()];
+        alignas(ALIGNMENT) double Lift0[tensor::Lift::size(0)];
+        alignas(ALIGNMENT) double Lift1[tensor::Lift::size(1)];
+        alignas(ALIGNMENT) double Minv[2][tensor::M::size()];
         for (int i = 0; i < 2; ++i) {
             compute_inverse_mass_matrix(info.up[i], Minv[i]);
         }
 
-        double K_q0[tensor::K_q::size(0)];
-        double K_q1[tensor::K_q::size(1)];
+        alignas(ALIGNMENT) double K_q0[tensor::K_q::size(0)];
+        alignas(ALIGNMENT) double K_q1[tensor::K_q::size(1)];
         auto K_q = std::array<double*, 2>{K_q0, K_q1};
         compute_K_q(fctNo, info, K_q);
 
@@ -260,17 +300,17 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     assert(fctRule.size() == tensor::w::Shape[0]);
     assert(E_q[0].shape(0) == tensor::E_q::Shape[0][0]);
     assert(E_q[0].shape(1) == tensor::E_q::Shape[0][1]);
-    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0]);
-    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[1]);
-    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[2]);
+    assert(Dxi_q[0].shape(0) == tensor::Dxi_q::Shape[0][0]);
+    assert(Dxi_q[0].shape(1) == tensor::Dxi_q::Shape[0][1]);
+    assert(Dxi_q[0].shape(2) == tensor::Dxi_q::Shape[0][2]);
 
-    double L0[tensor::L_q::size(0)];
+    alignas(ALIGNMENT) double L0[tensor::L_q::size(0)];
     if (method_ == DGMethod::BR2) {
-        double Lift0[tensor::Lift::size(0)];
-        double Minv0[tensor::M::size()];
+        alignas(ALIGNMENT) double Lift0[tensor::Lift::size(0)];
+        alignas(ALIGNMENT) double Minv0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv0);
 
-        double K_q[tensor::K_q::size(0)];
+        alignas(ALIGNMENT) double K_q[tensor::K_q::size(0)];
         compute_K_q(fctNo, info, {K_q, nullptr});
 
         kernel::lift_boundary lift;
@@ -290,7 +330,7 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
         lift.execute(0);
     }
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
     kernel::assembleSurface assemble;
@@ -311,7 +351,7 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B,
                          LinearAllocator<double>& scratch) const {
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
-    double F_Q_raw[tensor::F_Q::size()];
+    alignas(ALIGNMENT) double F_Q_raw[tensor::F_Q::size()];
     assert(tensor::F_Q::size() == volRule.size());
     auto F_Q = Matrix<double>(F_Q_raw, 1, tensor::F_Q::Shape[0]);
     fun_force(elNo, F_Q);
@@ -356,21 +396,21 @@ bool Poisson::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
 
 bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            Vector<double>& B1, LinearAllocator<double>& scratch) const {
-    double f_q_raw[tensor::f_q::size()];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     if (!bc_skeleton(fctNo, info.bc, f_q_raw)) {
         return false;
     }
 
-    double f_lifted_q[tensor::f_lifted_q::size()];
+    alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
-        double f_lifted0[tensor::f_lifted::size(0)];
-        double f_lifted1[tensor::f_lifted::size(1)];
-        double Minv[2][tensor::M::size()];
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
+        alignas(ALIGNMENT) double f_lifted1[tensor::f_lifted::size(1)];
+        alignas(ALIGNMENT) double Minv[2][tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], Minv[0]);
         compute_inverse_mass_matrix(info.up[1], Minv[1]);
 
-        double K_q0[tensor::K_q::size(0)];
-        double K_q1[tensor::K_q::size(1)];
+        alignas(ALIGNMENT) double K_q0[tensor::K_q::size(0)];
+        alignas(ALIGNMENT) double K_q1[tensor::K_q::size(1)];
         auto K_q = std::array<double*, 2>{K_q0, K_q1};
         compute_K_q(fctNo, info, K_q);
 
@@ -395,8 +435,8 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
         lift.execute();
     }
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
-    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q1[tensor::K_Dx_q::size(1)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, K_Dx_q1});
 
     kernel::rhsFacet rhs;
@@ -422,18 +462,18 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 
 bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            LinearAllocator<double>& scratch) const {
-    double f_q_raw[tensor::f_q::size()];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
         return false;
     }
 
-    double f_lifted_q[tensor::f_lifted_q::size()];
+    alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
     if (method_ == DGMethod::BR2) {
-        double f_lifted0[tensor::f_lifted::size(0)];
-        double M0[tensor::M::size()];
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
+        alignas(ALIGNMENT) double M0[tensor::M::size()];
         compute_inverse_mass_matrix(info.up[0], M0);
 
-        double K_q[tensor::K_q::size(0)];
+        alignas(ALIGNMENT) double K_q[tensor::K_q::size(0)];
         compute_K_q(fctNo, info, {K_q, nullptr});
 
         kernel::rhs_lift_boundary lift;
@@ -454,7 +494,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
         lift.execute();
     }
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
     kernel::rhsFacet rhs;
@@ -469,6 +509,107 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.execute();
     return true;
+}
+
+void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+                    std::array<Vector<double const>, NumFacets> const& x_n,
+                    Vector<double>& y_0) const {
+
+    Stopwatch sw;
+    sw.start();
+
+    unsigned av_flops = 0;
+    sw.start();
+
+    alignas(ALIGNMENT) double Dx_Q[tensor::Dx_Q::size()];
+    kernel::apply_volume av;
+    av.Dx_Q = Dx_Q;
+    av.Dxi_Q = Dxi_Q.data();
+    av.G_Q = vol[elNo].get<JInv>().data()->data();
+    av.J_W_K_Q = volPre[elNo].get<AbsDetJWK>().data()->data();
+    av.U = x_0.data();
+    av.U_new = y_0.data();
+    av.execute();
+
+    av_flops += kernel::apply_volume::HardwareFlops;
+    auto av_time = sw.stop();
+
+    unsigned af_flops = 0;
+    sw.start();
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
+        alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
+        if (info[f].bc == BC::None || info[f].bc == BC::Fault) {
+            kernel::flux_u_skeleton fu;
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
+            fu.E_q_T(1) = E_q_T[info[f].localNo].data();
+            fu.U = x_0.data();
+            fu.U_ext = x_n[f].data();
+            fu.u_hat_q = u_hat_q;
+            fu.execute();
+            af_flops += kernel::flux_u_skeleton::HardwareFlops;
+
+            kernel::flux_sigma_skeleton fs;
+            fs.c00 = -penalty(elNo, info[f].lid);
+            fs.Dxi_q_120(0) = Dxi_q_120[f].data();
+            fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
+            fs.E_q_T(0) = E_q_T[f].data();
+            fs.negative_E_q_T(1) = negative_E_q_T[info[f].localNo].data();
+            fs.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
+            fs.K_G_q(1) = fct_on_vol_pre[NumFacets * info[f].lid + info[f].localNo]
+                              .get<KJInv>()
+                              .data()
+                              ->data();
+            fs.U = x_0.data();
+            fs.U_ext = x_n[f].data();
+            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.sigma_hat_q = sigma_hat_q;
+            fs.execute();
+            af_flops += kernel::flux_sigma_skeleton::HardwareFlops;
+        } else if (info[f].bc == BC::Dirichlet) {
+            kernel::flux_u_boundary fu;
+            fu.U = x_0.data();
+            fu.u_hat_q = u_hat_q;
+            fu.negative_E_q_T(0) = negative_E_q_T[f].data();
+            fu.execute();
+            af_flops += kernel::flux_u_boundary::HardwareFlops;
+
+            kernel::flux_sigma_boundary fs;
+            fs.c00 = -penalty(elNo, elNo);
+            fs.Dxi_q_120(0) = Dxi_q_120[f].data();
+            fs.E_q_T(0) = E_q_T[f].data();
+            fs.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
+            fs.U = x_0.data();
+            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.sigma_hat_q = sigma_hat_q;
+            fs.execute();
+            af_flops += kernel::flux_sigma_boundary::HardwareFlops;
+        } else {
+            continue;
+        }
+
+        kernel::apply_facet af;
+        af.Dxi_q(0) = Dxi_q[f].data();
+        af.E_q(0) = E_q[f].data();
+        af.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
+        af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
+        af.sigma_hat_q = sigma_hat_q;
+        af.u_hat_q = u_hat_q;
+        af.U_new = y_0.data();
+        af.w = fctRule.weights().data();
+        af.execute();
+        af_flops += kernel::apply_facet::HardwareFlops;
+    }
+    auto af_time = sw.stop();
+
+    // std::cout << "Time: " << av_time << " " << af_time << std::endl;
+    // double time = av_time + af_time;
+    // std::cout << "Percent: " << av_time / time * 100 << " " << af_time / time * 100 << std::endl;
+    // std::cout << "Flops: " << av_flops << " " << af_flops << std::endl;
+    // std::cout << "Perf: " << av_flops / av_time * 1e-9 << " " << af_flops / af_time * 1e-9
+    //<< std::endl;
+    // unsigned flops = av_flops + af_flops;
+    // std::cout << "Total: " << flops << " " << flops / time / 1e9 << std::endl;
 }
 
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,
@@ -488,11 +629,11 @@ void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector
                                 Vector<double const>& u1, Matrix<double>& result) const {
     assert(result.size() == tensor::grad_u::size());
 
-    double f_q_raw[tensor::f_q::size()];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     bc_skeleton(fctNo, info.bc, f_q_raw);
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
-    double K_Dx_q1[tensor::K_Dx_q::size(1)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q1[tensor::K_Dx_q::size(1)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, K_Dx_q1});
 
     kernel::grad_u krnl;
@@ -513,10 +654,10 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
                                 Matrix<double>& result) const {
     assert(result.size() == tensor::grad_u::size());
 
-    double f_q_raw[tensor::f_q::size()];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     bc_boundary(fctNo, info.bc, f_q_raw);
 
-    double K_Dx_q0[tensor::K_Dx_q::size(0)];
+    alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
     kernel::grad_u_bnd krnl;

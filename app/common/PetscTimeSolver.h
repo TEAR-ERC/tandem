@@ -33,6 +33,18 @@ public:
         CHKERRTHROW(TSSolve(ts_, state_->vec()));
     }
 
+    std::size_t get_step_number() const {
+        PetscInt steps;
+        CHKERRTHROW(TSGetStepNumber(ts_, &steps));
+        return steps;
+    }
+
+    std::size_t get_step_rejections() const {
+        PetscInt rejects;
+        CHKERRTHROW(TSGetStepRejections(ts_, &rejects));
+        return rejects;
+    }
+
     auto& state() { return *state_; }
     auto const& state() const { return *state_; }
 

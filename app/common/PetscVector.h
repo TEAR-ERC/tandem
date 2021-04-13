@@ -3,6 +3,7 @@
 
 #include "common/PetscUtil.h"
 
+#include "interface/BlockVector.h"
 #include "tensor/Tensor.h"
 
 #include <petscsys.h>
@@ -15,17 +16,28 @@
 
 namespace tndm {
 
-class PetscVectorView {
+class PetscVectorView : public BlockVector {
 public:
-    using handle = PetscScalar*;
-    using const_handle = PetscScalar const*;
-
     PetscVectorView() {}
     PetscVectorView(Vec x);
+
+    std::size_t block_size() const { return block_size_; }
 
     void add_block(std::size_t ib_local, Vector<double> const& values) {
         PetscInt pib = ib_local;
         VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), ADD_VALUES);
+    }
+    void add_block(std::size_t ib_local, Vector<const double> const& values) {
+        PetscInt pib = ib_local;
+        VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), ADD_VALUES);
+    }
+    void insert_block(std::size_t ib_local, Vector<double> const& values) {
+        PetscInt pib = ib_local;
+        VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), INSERT_VALUES);
+    }
+    void insert_block(std::size_t ib_local, Vector<const double> const& values) {
+        PetscInt pib = ib_local;
+        VecSetValuesBlockedLocal(x_, 1, &pib, values.data(), INSERT_VALUES);
     }
     void begin_assembly() {}
     void end_assembly() {
@@ -33,29 +45,31 @@ public:
         CHKERRTHROW(VecAssemblyEnd(x_));
     }
 
-    handle begin_access() {
-        handle xv;
+    Matrix<double> begin_access() {
+        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
+        PetscScalar* xv;
+        PetscInt size;
         CHKERRTHROW(VecGetArray(x_, &xv));
-        return xv;
+        CHKERRTHROW(VecGetLocalSize(x_, &size));
+        assert(size % block_size_ == 0);
+        return Matrix<double>(xv, block_size_, size / block_size_);
     }
-    void end_access(handle xv) { CHKERRTHROW(VecRestoreArray(x_, &xv)); }
-    const_handle begin_access_readonly() const {
-        const_handle xv;
+    void end_access(Matrix<double>& data) {
+        PetscScalar* xv = data.data();
+        CHKERRTHROW(VecRestoreArray(x_, &xv));
+    }
+    Matrix<const double> begin_access_readonly() const {
+        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
+        PetscScalar const* xv;
+        PetscInt size;
         CHKERRTHROW(VecGetArrayRead(x_, &xv));
-        return xv;
+        CHKERRTHROW(VecGetLocalSize(x_, &size));
+        assert(size % block_size_ == 0);
+        return Matrix<const double>(xv, block_size_, size / block_size_);
     }
-    void end_access_readonly(const_handle xv) const { CHKERRTHROW(VecRestoreArrayRead(x_, &xv)); }
-
-    void copy(const_handle access, std::size_t ib_local, Vector<double>& to) const;
-    auto get_block(handle access, std::size_t ib_local) {
-        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
-        assert(access != nullptr);
-        return Vector<double>(&access[ib_local * block_size_], block_size_);
-    }
-    auto get_block(const_handle access, std::size_t ib_local) const {
-        static_assert(std::is_same_v<PetscScalar, double>, "PetscScalar must be double");
-        assert(access != nullptr);
-        return Vector<double const>(&access[ib_local * block_size_], block_size_);
+    void end_access_readonly(Matrix<const double>& data) const {
+        PetscScalar const* xv = data.data();
+        CHKERRTHROW(VecRestoreArrayRead(x_, &xv));
     }
 
     void set_zero() { VecZeroEntries(x_); }
@@ -68,9 +82,6 @@ protected:
 
 class PetscVector : public PetscVectorView {
 public:
-    using handle = PetscScalar*;
-    using const_handle = PetscScalar const*;
-
     PetscVector(std::size_t blockSize, std::size_t numLocalElems, MPI_Comm comm);
     PetscVector(PetscVector const& prototype);
     ~PetscVector() { VecDestroy(&x_); }

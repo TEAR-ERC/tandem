@@ -4,11 +4,13 @@
 
 namespace tndm {
 
-void PetscLinearSolver::warmup() {
+void PetscLinearSolver::warmup() { warmup_ksp(ksp_); }
+
+void PetscLinearSolver::warmup_ksp(KSP ksp) {
     PC pc;
-    CHKERRTHROW(KSPSetUp(ksp_));
-    CHKERRTHROW(KSPSetUpOnBlocks(ksp_));
-    CHKERRTHROW(KSPGetPC(ksp_, &pc));
+    CHKERRTHROW(KSPSetUp(ksp));
+    CHKERRTHROW(KSPSetUpOnBlocks(ksp));
+    CHKERRTHROW(KSPGetPC(ksp, &pc));
     warmup_sub_pcs(pc);
 }
 
@@ -18,6 +20,9 @@ void PetscLinearSolver::warmup_sub_pcs(PC pc) {
     switch (fnv1a(type)) {
     case HASH_DEF(PCCOMPOSITE):
         warmup_composite(pc);
+        break;
+    case HASH_DEF(PCMG):
+        warmup_mg(pc);
         break;
     default:
         break;
@@ -33,6 +38,16 @@ void PetscLinearSolver::warmup_composite(PC pc) {
         CHKERRTHROW(PCSetUp(sub));
         CHKERRTHROW(PCSetUpOnBlocks(sub));
         warmup_sub_pcs(sub);
+    }
+}
+
+void PetscLinearSolver::warmup_mg(PC pc) {
+    PetscInt levels;
+    CHKERRTHROW(PCMGGetLevels(pc, &levels));
+    for (PetscInt level = 0; level < levels; ++level) {
+        KSP smoother;
+        CHKERRTHROW(PCMGGetSmoother(pc, level, &smoother));
+        warmup_ksp(smoother);
     }
 }
 

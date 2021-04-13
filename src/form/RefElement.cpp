@@ -13,13 +13,14 @@
 #include <Eigen/LU>
 
 #include <cassert>
+#include <cstddef>
 
 namespace tndm {
 
 template <std::size_t D> Managed<Matrix<double>> ModalRefElement<D>::massMatrix() const {
     auto rule = simplexQuadratureRule<D>(2 * this->degree());
-    auto nbf = this->numBasisFunctions();
-    Managed<Matrix<double>> M(nbf, nbf);
+    std::ptrdiff_t nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> M({nbf, nbf}, this->alignment());
     auto E = evaluateBasisAt(rule.points(), {0, 1});
     for (std::ptrdiff_t i = 0; i < M.shape(0); ++i) {
         for (std::ptrdiff_t j = 0; j < M.shape(1); ++j) {
@@ -51,7 +52,7 @@ ModalRefElement<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& po
     using index_t = Matrix<double>::index_t;
     auto shape =
         permute(permutation, make_index<index_t>(this->numBasisFunctions(), points.size()));
-    Managed<Matrix<double>> E(shape);
+    Managed<Matrix<double>> E(shape, this->alignment());
     for (std::size_t p = 0; p < points.size(); ++p) {
         for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(this->degree()))) {
             auto index = permute(permutation, make_index<index_t>(bf, p));
@@ -68,7 +69,7 @@ ModalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const&
     using index_t = Matrix<double>::index_t;
     auto shape =
         permute(permutation, make_index<index_t>(this->numBasisFunctions(), D, points.size()));
-    Managed<Tensor<double, 3u>> grad(shape);
+    Managed<Tensor<double, 3u>> grad(shape, this->alignment());
     for (std::size_t p = 0; p < points.size(); ++p) {
         for (auto&& [bf, j] : enumerate(AllIntegerSums<D>(this->degree()))) {
             auto dphi = gradDubinerP(j, points[p]);
@@ -82,28 +83,31 @@ ModalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const&
 }
 
 template <std::size_t D>
-NodalRefElement<D>::NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory)
-    : RefElement<D>(degree), refNodes_(nodesFactory(degree)) {
+NodalRefElement<D>::NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory,
+                                    std::size_t alignment)
+    : RefElement<D>(degree, alignment), refNodes_(nodesFactory(degree)) {
     assert(this->numBasisFunctions() == refNodes_.size());
     vandermonde_ = Vandermonde(this->degree(), refNodes_);
     vandermondeInv_ = vandermonde_.inverse();
 }
 
 template <std::size_t D> Managed<Matrix<double>> NodalRefElement<D>::massMatrix() const {
-    auto nbf = this->numBasisFunctions();
-    Managed<Matrix<double>> M(nbf, nbf);
+    std::ptrdiff_t nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> M({nbf, nbf}, this->alignment());
 
-    Managed<Matrix<double>> modalM = ModalRefElement<D>(this->degree()).massMatrix();
+    Managed<Matrix<double>> modalM =
+        ModalRefElement<D>(this->degree(), this->alignment()).massMatrix();
     EigenMap(M) = vandermondeInv_.transpose() * EigenMap(modalM) * vandermondeInv_;
 
     return M;
 }
 
 template <std::size_t D> Managed<Matrix<double>> NodalRefElement<D>::inverseMassMatrix() const {
-    auto nbf = this->numBasisFunctions();
-    Managed<Matrix<double>> Minv(nbf, nbf);
+    std::ptrdiff_t nbf = this->numBasisFunctions();
+    Managed<Matrix<double>> Minv({nbf, nbf}, this->alignment());
 
-    Managed<Matrix<double>> modalMinv = ModalRefElement<D>(this->degree()).inverseMassMatrix();
+    Managed<Matrix<double>> modalMinv =
+        ModalRefElement<D>(this->degree(), this->alignment()).inverseMassMatrix();
     EigenMap(Minv) = vandermonde_ * EigenMap(modalMinv) * vandermonde_.transpose();
 
     return Minv;
@@ -114,7 +118,7 @@ Managed<Matrix<double>>
 NodalRefElement<D>::evaluateBasisAt(std::vector<std::array<double, D>> const& points,
                                     std::array<unsigned, 2> const& permutation) const {
     Managed<Matrix<double>> E =
-        ModalRefElement<D>(this->degree()).evaluateBasisAt(points, permutation);
+        ModalRefElement<D>(this->degree(), this->alignment()).evaluateBasisAt(points, permutation);
     auto Emap = EigenMap(E);
     if (permutation[0] == 0 && permutation[1] == 1) {
         Emap = vandermondeInv_.transpose() * Emap;
@@ -130,8 +134,8 @@ template <std::size_t D>
 Managed<Tensor<double, 3u>>
 NodalRefElement<D>::evaluateGradientAt(std::vector<std::array<double, D>> const& points,
                                        std::array<unsigned, 3> const& permutation) const {
-    Managed<Tensor<double, 3u>> gradE =
-        ModalRefElement<D>(this->degree()).evaluateGradientAt(points, permutation);
+    Managed<Tensor<double, 3u>> gradE = ModalRefElement<D>(this->degree(), this->alignment())
+                                            .evaluateGradientAt(points, permutation);
 
     assert(vandermondeInv_.cols() == vandermondeInv_.rows());
     // 0,1,2 F_idq = V_ji E_jdq => F_i(dq) = V^T E_j(dq)

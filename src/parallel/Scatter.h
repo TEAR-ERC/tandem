@@ -1,13 +1,17 @@
 #ifndef SCATTER_20200715_H
 #define SCATTER_20200715_H
 
-#include "mesh/LocalFaces.h"
+#include "interface/BlockVector.h"
 #include "parallel/MPITraits.h"
+#include "parallel/ScatterPlan.h"
+#include "parallel/SparseBlockVector.h"
+#include "tensor/Tensor.h"
 
 #include <mpi.h>
 
+#include <cassert>
 #include <cstddef>
-#include <unordered_map>
+#include <memory>
 #include <vector>
 
 namespace tndm {
@@ -16,80 +20,64 @@ class Scatter {
 public:
     using byte_t = unsigned char;
 
-    template <std::size_t D>
-    Scatter(LocalFaces<D> const& faces, MPI_Comm comm = MPI_COMM_WORLD) : comm_(comm) {
-        int rank;
-        MPI_Comm_rank(comm_, &rank);
-
-        for (std::size_t f = 0; f < faces.size(); ++f) {
-            auto owner = faces.owner(f);
-            if (owner == rank) {
-                for (auto&& shRk : faces.getSharedRanks(f)) {
-                    sendMap_[shRk].push_back(f);
-                }
-            } else {
-                recvMap_[owner].push_back(f);
-            }
-        }
-
-        sendSize_ = 0;
-        recvSize_ = 0;
-        for (auto& [key, value] : sendMap_) {
-            sendSize_ += value.size();
-        }
-        for (auto& [key, value] : recvMap_) {
-            recvSize_ += value.size();
-        }
-
-        requests_.resize(sendMap_.size() + recvMap_.size());
+    Scatter(std::shared_ptr<ScatterPlan> topo) : topo_(std::move(topo)) {
+        requests_.resize(topo_->recv_blocks().size() + topo_->send_blocks().size(),
+                         MPI_REQUEST_NULL);
     }
 
-    template <typename T> void scatter(T* data, MPI_Datatype const& mpiType = mpi_type_t<T>()) {
+    template <typename T>
+    auto recv_prototype(std::size_t block_size,
+                        std::size_t alignment = SparseBlockVector<T>::DefaultAlignment) const {
+        return SparseBlockVector<T>(topo_->recv_indices(), block_size, alignment);
+    }
+
+    template <typename T> void begin_scatter(BlockVector const& x, SparseBlockVector<T>& y) {
+        static_assert(std::is_same_v<BlockVector::value_type, T>,
+                      "Basic type of x and y must match");
+        assert(x.block_size() == y.block_size());
+
+        const auto mpiType = mpi_type_t<T>();
+
+        std::size_t bs = x.block_size();
         auto const resizeIfNecessary = [](std::vector<byte_t>& buffer, std::size_t size) {
             std::size_t requiredSize = sizeof(T) * size;
             if (requiredSize > buffer.size()) {
                 buffer.resize(requiredSize);
             }
         };
-        resizeIfNecessary(sendBuffer_, sendSize_);
-        resizeIfNecessary(recvBuffer_, recvSize_);
-        T* sendBuf = reinterpret_cast<T*>(sendBuffer_.data());
-        T* recvBuf = reinterpret_cast<T*>(recvBuffer_.data());
+        resizeIfNecessary(send_buffer_, bs * topo_->send_indices().size());
+        T* sendBuf = reinterpret_cast<T*>(send_buffer_.data());
 
-        std::size_t offset = 0;
         std::size_t requestNo = 0;
-        for (auto& [key, value] : recvMap_) {
-            MPI_Irecv(&recvBuf[offset], value.size(), mpiType, key, 0, comm_,
-                      &requests_[requestNo++]);
-            offset += value.size();
+        for (auto const& block : topo_->recv_blocks()) {
+            int size = block.count * bs;
+            MPI_Irecv(&y.data()[block.offset * bs], size, mpiType, block.source_or_dest, 0,
+                      topo_->comm(), &requests_[requestNo++]);
         }
-        offset = 0;
-        for (auto& [key, value] : sendMap_) {
-            for (auto&& v : value) {
-                sendBuf[offset++] = data[v];
-            }
-            MPI_Isend(&sendBuf[offset - value.size()], value.size(), mpiType, key, 0, comm_,
-                      &requests_[requestNo++]);
+
+        auto x_handle = x.begin_access_readonly();
+        for (std::size_t i = 0; i < topo_->send_indices().size(); ++i) {
+            auto idx = topo_->send_indices()[i];
+            auto block = x_handle.subtensor(slice{}, idx);
+            memcpy(&sendBuf[i * bs], block.data(), bs * sizeof(T));
         }
-        MPI_Waitall(requestNo, requests_.data(), MPI_STATUSES_IGNORE);
-        offset = 0;
-        for (auto& [key, value] : recvMap_) {
-            for (auto&& v : value) {
-                data[v] = recvBuf[offset++];
-            }
+        x.end_access_readonly(x_handle);
+        for (auto const& block : topo_->send_blocks()) {
+            int size = block.count * bs;
+            MPI_Isend(&sendBuf[block.offset * bs], size, mpiType, block.source_or_dest, 0,
+                      topo_->comm(), &requests_[requestNo++]);
         }
+
+        assert(requestNo == requests_.size());
     }
 
+    void wait_scatter() { MPI_Waitall(requests_.size(), requests_.data(), MPI_STATUSES_IGNORE); }
+
 private:
-    MPI_Comm comm_;
-    std::unordered_map<int, std::vector<std::size_t>> sendMap_;
-    std::unordered_map<int, std::vector<std::size_t>> recvMap_;
-    std::size_t sendSize_ = 0, recvSize_ = 0;
+    std::shared_ptr<ScatterPlan> topo_;
 
     std::vector<MPI_Request> requests_;
-
-    std::vector<byte_t> sendBuffer_;
-    std::vector<byte_t> recvBuffer_;
+    std::vector<byte_t> send_buffer_;
 };
 
 } // namespace tndm

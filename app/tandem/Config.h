@@ -1,6 +1,7 @@
 #ifndef CONFIG_20200825_H
 #define CONFIG_20200825_H
 
+#include "common/MGConfig.h"
 #include "common/MeshConfig.h"
 #include "tandem/AdaptiveOutputStrategy.h"
 #include "tandem/FrictionConfig.h"
@@ -23,6 +24,10 @@ struct Config {
     std::optional<double> resolution;
     double final_time;
     std::optional<std::string> mesh_file;
+    bool discrete_green;
+    bool matrix_free;
+    MGStrategy mg_strategy;
+    unsigned mg_coarse_level;
     SeasScenarioConfig seas;
     DieterichRuinaAgeingConfig friction;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;

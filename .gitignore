@@ -3,7 +3,12 @@
 compile_commands.json
 
 # Build folders
-build*
+build*/
+docs/_build/
 
 # Python stuff
-app/kernels/__pycache__/
+**/__pycache__/
+**/.ipynb_checkpoints/
+
+# Mesh files
+examples/**/*.msh

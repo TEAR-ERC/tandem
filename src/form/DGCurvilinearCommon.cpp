@@ -1,10 +1,10 @@
 #include "DGCurvilinearCommon.h"
 
 #include "geometry/Vector.h"
+#include "parallel/SimpleScatter.h"
 #include "quadrules/AutoRule.h"
 
 #include <memory>
-#include <unordered_map>
 #include <utility>
 
 namespace tndm {
@@ -33,6 +33,9 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
                    fctRule.size());
     vol.setStorage(std::make_shared<vol_t>(numElements * volRule.size()), 0u, numElements,
                    volRule.size());
+    const auto totalFacets = NumFacets * numElements;
+    fct_on_vol.setStorage(std::make_shared<fct_on_vol_t>(totalFacets * fctRule.size()), 0u,
+                          totalFacets, fctRule.size());
     penalty.resize(numElements, 0.0);
 }
 
@@ -97,6 +100,42 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 
     cl_->jacobian(info.up[1], geoDxi_q[info.localNo[1]], J);
     cl_->jacobianInv(J, jInv1);
+
+    const auto copy_normals_and_jinv = [&](int side) {
+        const auto idx = NumFacets * info.up[side] + info.localNo[side];
+        auto n = fct_on_vol[idx].template get<Normal>();
+        auto n_unit = fct_on_vol[idx].template get<UnitNormal>();
+        double sign = (side == 1) ? -1.0 : 1.0;
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            assert(q < n.size());
+            assert(q < normal.shape(1));
+            for (std::size_t i = 0; i < D; ++i) {
+                assert(i < n[q].size());
+                assert(i < normal.shape(0));
+                n[q][i] = sign * normal(i, q);
+                n_unit[q][i] = sign * unit_normal(i, q);
+            }
+        }
+        auto ji0 = fct_on_vol[idx].template get<JInv0>();
+        const auto& jInv01 = (side == 1) ? jInv1 : jInv0;
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            assert(q < ji0.size());
+            assert(q < jInv01.shape(2));
+            for (std::size_t j = 0; j < D; ++j) {
+                assert(j < jInv01.shape(1));
+                for (std::size_t i = 0; i < D; ++i) {
+                    assert(i < jInv01.shape(0));
+                    assert(i + j * D < ji0[q].size());
+                    ji0[q][i + j * D] = jInv01(i, j, q);
+                }
+            }
+        }
+    };
+
+    copy_normals_and_jinv(0);
+    if (info.up[0] != info.up[1]) {
+        copy_normals_and_jinv(1);
+    }
 }
 
 template <std::size_t D>
@@ -114,8 +153,10 @@ void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
     penalty[elNo] /= volume;
 }
 
-template <std::size_t D> void DGCurvilinearCommon<D>::end_preparation(Scatter& elementScatter) {
-    elementScatter.scatter(penalty.data());
+template <std::size_t D>
+void DGCurvilinearCommon<D>::end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan) {
+    auto scatter = SimpleScatter<double>(std::move(elementScatterPlan));
+    scatter.scatter(penalty.data());
 }
 
 template class DGCurvilinearCommon<2u>;

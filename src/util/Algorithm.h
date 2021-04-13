@@ -1,6 +1,8 @@
 #ifndef ALGORITHM_20200710_H
 #define ALGORITHM_20200710_H
 
+#include <limits>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -34,6 +36,37 @@ void apply_permutation(std::vector<T>& v, std::vector<U> indices) {
         }
         indices[current] = current;
     }
+}
+
+/**
+ * @brief Finds consecutive blocks in a list of indices
+ *
+ * @tparam IterableType Some iterable type, e.g. std::vector or std::array
+ * @tparam OutIdxT Integer type of output
+ * @param indices Vector of indices
+ *
+ * @return block_lengths and displacements
+ */
+template <typename IterableType, typename OutIdxT = typename IterableType::value_type>
+auto find_blocks(IterableType const& indices)
+    -> std::tuple<std::vector<OutIdxT>, std::vector<OutIdxT>> {
+    std::vector<OutIdxT> block_lengths, displacements;
+
+    block_lengths.reserve(indices.size());
+    displacements.reserve(indices.size());
+    for (auto idx : indices) {
+        if (!displacements.empty() && !block_lengths.empty() &&
+            idx - displacements.back() == block_lengths.back()) {
+            ++block_lengths.back();
+        } else {
+            block_lengths.push_back(1);
+            displacements.push_back(idx);
+        }
+    }
+    block_lengths.shrink_to_fit();
+    displacements.shrink_to_fit();
+
+    return {block_lengths, displacements};
 }
 
 } // namespace tndm

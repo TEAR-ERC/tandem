@@ -12,8 +12,31 @@ template <typename T> class LinearAllocator {
 public:
     using value_type = T;
 
-    LinearAllocator(value_type* start, value_type* end, std::size_t alignment = alignof(T)) noexcept
+    /**
+     * @brief Allocation size measured in sizeof(T).
+     *
+     * Remarks:
+     * 1. It is assumed that "start" is properly aligned.
+     * 2. The allocation size includes the padding for the next allocation. E.g.
+     *    if a 24 byte allocation is made with 32 byte alignment, then the next
+     *    allocation on the same buffer must start at 32 byte offset and not at
+     *    24 byte offset.
+     *
+     * @param n Number of T
+     * @param alignment Alignment in bytes
+     */
+    static std::size_t allocation_size(std::size_t n, std::size_t alignment) {
+        std::size_t size = n * sizeof(T);
+        std::size_t a_size = (1 + (size - 1) / alignment) * alignment;
+        return 1 + (a_size - 1) / sizeof(T);
+    }
+
+    LinearAllocator(value_type* start, value_type* end, std::size_t alignment = alignof(T))
         : start_(start), end_(end), alignment_(alignment) {
+        if (reinterpret_cast<uintptr_t>(start) % alignment != 0) {
+            throw std::invalid_argument("Start pointer given to LinerAllocator must satisfy the "
+                                        "requested memory alignment.");
+        }
         reset();
     }
     template <class U> LinearAllocator(LinearAllocator<U> const& allocator) = delete;
@@ -37,6 +60,13 @@ public:
     }
     void deallocate(value_type*, std::size_t) noexcept {}
     void reset() { current_ = start_; }
+
+protected:
+    void set_pointers(value_type* start, value_type* end) {
+        start_ = start;
+        end_ = end;
+        reset();
+    }
 
 private:
     value_type* start_;

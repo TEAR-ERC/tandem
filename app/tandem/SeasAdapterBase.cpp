@@ -56,7 +56,7 @@ void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scra
         auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
         auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
         auto up_dot_n = dot(up_, normal_i);
-        if (std::fabs(up_dot_n) > 10.0 * std::numeric_limits<double>::epsilon()) {
+        if (std::fabs(up_dot_n) > 1000.0 * std::numeric_limits<double>::epsilon()) {
             sign_flipped = up_dot_n < 0;
         } else {
             sign_flipped = dot(ref_normal_, normal_i) < 0;

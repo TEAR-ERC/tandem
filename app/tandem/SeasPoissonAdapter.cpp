@@ -13,16 +13,6 @@
 #include <cassert>
 
 namespace tndm {
-SeasPoissonAdapter::SeasPoissonAdapter(std::shared_ptr<Curvilinear<Dim>> cl,
-                                       std::shared_ptr<DGOperatorTopo> topo,
-                                       std::unique_ptr<RefElement<Dim - 1u>> space,
-                                       std::unique_ptr<Poisson> local_operator,
-                                       std::array<double, Dim> const& up,
-                                       std::array<double, Dim> const& ref_normal)
-    : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                      local_operator->facetQuadratureRule().points(), up, ref_normal),
-      dgop_(std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(local_operator))),
-      linear_solver_(*dgop_) {}
 
 void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
                               Matrix<double>& slip_q) const {
@@ -45,6 +35,9 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 TensorBase<Matrix<double>> SeasPoissonAdapter::traction_info() const {
+    // Traction needs only one component for Poisson.
+    // We still set 2 components here in order to enable a standardised interface,
+    // which includes shear and normal components of traction.
     return TensorBase<Matrix<double>>(poisson_adapter::tensor::traction::Shape[0], 2);
 }
 
@@ -52,14 +45,21 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
                                   LinearAllocator<double>&) const {
     std::fill(traction.data(), traction.data() + traction.size(), 0.0);
 
-    double grad_u_raw[poisson::tensor::grad_u::Size];
+    alignas(ALIGNMENT) double grad_u_raw[poisson::tensor::grad_u::Size];
     auto grad_u = Matrix<double>(grad_u_raw, dgop_->lop().tractionResultInfo());
     assert(grad_u.size() == poisson::tensor::grad_u::Size);
 
     auto fctNo = faultMap_.fctNo(faultNo);
     auto const& info = dgop_->topo().info(fctNo);
-    auto u0 = linear_solver_.x().get_block(handle_, info.up[0]);
-    auto u1 = linear_solver_.x().get_block(handle_, info.up[1]);
+    const auto get = [&](std::size_t elNo) {
+        if (elNo < dgop_->numLocalElements()) {
+            return handle_.subtensor(slice{}, elNo);
+        } else {
+            return ghost_.get_block(elNo);
+        }
+    };
+    auto u0 = get(info.up[0]);
+    auto u1 = get(info.up[1]);
     if (info.up[0] == info.up[1]) {
         dgop_->lop().traction_boundary(fctNo, info, u0, grad_u);
     } else {

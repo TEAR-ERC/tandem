@@ -1,3 +1,4 @@
+#include "common/Banner.h"
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
 #include "config.h"
@@ -12,6 +13,7 @@
 #include "io/GlobalSimplexMeshBuilder.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
+#include "parallel/Affinity.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
@@ -33,6 +35,8 @@
 using namespace tndm;
 
 int main(int argc, char** argv) {
+    auto affinity = Affinity();
+
     int pArgc = 0;
     char** pArgv = nullptr;
     for (int i = 0; i < argc; ++i) {
@@ -61,6 +65,30 @@ int main(int argc, char** argv) {
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
+    schema.add_value("discrete_green", &Config::discrete_green)
+        .default_value(false)
+        .help("Pre-compute discrete Green's function");
+    schema.add_value("matrix_free", &Config::matrix_free)
+        .default_value(false)
+        .help("Use matrix-free operators");
+    schema.add_value("mg_coarse_level", &Config::mg_coarse_level)
+        .default_value(1)
+        .help("Polynomial degree of coarsest MG level");
+    schema.add_value("mg_strategy", &Config::mg_strategy)
+        .converter([](std::string_view value) {
+            if (iEquals(value, "TwoLevel")) {
+                return MGStrategy::TwoLevel;
+            } else if (iEquals(value, "Logarithmic")) {
+                return MGStrategy::Logarithmic;
+            } else if (iEquals(value, "Full")) {
+                return MGStrategy::Full;
+            } else {
+                return MGStrategy::Unknown;
+            }
+        })
+        .default_value(MGStrategy::TwoLevel)
+        .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; })
+        .help("MG level selection strategy (TwoLevel|Logarithmic|Full)");
     auto& seasSchema = schema.add_table("seas", &Config::seas);
     SeasScenarioConfig::setSchema(seasSchema, makePathRelativeToConfig);
     auto& frictionSchema = schema.add_table("friction", &Config::friction);
@@ -108,6 +136,10 @@ int main(int argc, char** argv) {
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
+
+    if (rank == 0) {
+        Banner::print_logo_version_and_affinity(std::cout, affinity);
+    }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
     if (cfg->mesh_file) {

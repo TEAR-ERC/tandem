@@ -12,7 +12,7 @@
 namespace tndm {
 
 PetscDGMatrix::PetscDGMatrix(std::size_t blockSize, DGOperatorTopo const& topo)
-    : block_size_(blockSize) {
+    : PetscMatrix(), block_size_(blockSize) {
     const auto numLocalElems = topo.numLocalElements();
     const auto numElems = topo.numElements();
     const auto* gids = topo.gids();
