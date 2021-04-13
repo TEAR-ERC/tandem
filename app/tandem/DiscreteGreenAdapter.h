@@ -129,9 +129,12 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
     t_ = std::make_unique<PetscVector>(m_bs, numFaultFaces_, comm);
     t_boundary_ = std::make_unique<PetscVector>(m_bs, numFaultFaces_, comm);
 
-    for (PetscInt i = 0; i < n; ++i) {
+    PetscInt N;
+    CHKERRTHROW(VecGetSize(S_->vec(), &N));
+
+    for (PetscInt i = 0; i < N; ++i) {
         if (rank == 0) {
-            std::cout << "Computing Green's function " << (i + 1) << "/" << n << std::endl;
+            std::cout << "Computing Green's function " << (i + 1) << "/" << N << std::endl;
         }
         CHKERRTHROW(VecZeroEntries(S_->vec()));
         if (i >= nb_offset && i < nb_offset + m) {
@@ -162,7 +165,12 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
 }
 
 template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_boundary_traction() {
-    std::cout << "Computing boundary Green's function" << std::endl;
+    MPI_Comm comm = topo().comm();
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    if (rank == 0) {
+        std::cout << "Computing boundary Green's function" << std::endl;
+    }
 
     auto scratch = Scratch<double>(adapter_->scratch_mem_size(), ALIGNMENT);
     auto traction = Managed<Matrix<double>>(adapter_->traction_info());
