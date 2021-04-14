@@ -24,11 +24,11 @@ void SeasPoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
     krnl.slip_q = slip_q.data();
     krnl.execute();
 
-    /* Slip in the Poisson solver is defined as [[u]] := u^- - u^+.
-     * In the friction solver the sign of slip S is flipped, that is, S = -[[u]].
+    /* We need to flip the sign in the case that the fault normal points opposite
+     * to the face's normal.
      */
     for (std::size_t i = 0; i < nq_; ++i) {
-        if (!fault_[faultNo].template get<SignFlipped>()[i]) {
+        if (fault_[faultNo].template get<SignFlipped>()[i]) {
             slip_q(0, i) = -slip_q(0, i);
         }
     }

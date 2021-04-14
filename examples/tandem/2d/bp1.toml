@@ -6,7 +6,7 @@ type = "poisson"
 lib = "bp1.lua"
 boundary = "boundary"
 mu = "mu"
-ref_normal = [1, 0]
+ref_normal = [-1, 0]
 
 [friction]
 lib = "bp1.lua"

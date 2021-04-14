@@ -42,6 +42,6 @@ function tau_pre(x, y)
     local V0 = 1e-6
     local Vi = Vinit(x, y)
     local sn = sn_pre(x, y)
-    local e = math.exp((f0 + b * math.log(V0 / Vi)) / amax);
-    return sn * amax * math.asinh((Vi / (2.0 * V0)) * e) + eta(x, y) * Vi;
+    local e = math.exp((f0 + b * math.log(V0 / Vi)) / amax)
+    return -(sn * amax * math.asinh((Vi / (2.0 * V0)) * e) + eta(x, y) * Vi)
 end

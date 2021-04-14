@@ -3,13 +3,13 @@ mesh_file = "bp3.msh"
 
 [seas]
 type = "elasticity"
-lib = "bp3.lua"
+lib = "bp3_d60_reverse.lua"
 boundary = "boundary"
 lam = "lam"
 mu = "mu"
 
 [friction]
-lib = "bp3.lua"
+lib = "bp3_d60_reverse.lua"
 a = "a"
 eta = "eta"
 sn_pre = "sn_pre"

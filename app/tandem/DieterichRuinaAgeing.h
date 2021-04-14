@@ -73,7 +73,7 @@ public:
             return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
         };
         double V = zeroIn(a, b, fF);
-        return (V / (F(index, snAbs, V, psi) + eta * V)) * tauAbsVec;
+        return -(V / (F(index, snAbs, V, psi) + eta * V)) * tauAbsVec;
     }
 
     double state_rhs(std::size_t index, double V, double psi) const {
@@ -81,11 +81,11 @@ public:
     }
 
 private:
-    double F(std::size_t index, double sn, double V, double psi) const {
+    double F(std::size_t index, double snAbs, double V, double psi) const {
         auto a = p_[index].get<A>();
         double e = exp(psi / a);
         double f = a * asinh((V / (2.0 * cp_.V0)) * e);
-        return sn * f;
+        return snAbs * f;
     }
 
     ConstantParams cp_;
