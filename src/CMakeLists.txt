@@ -38,6 +38,7 @@ add_library(tandem-lib
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
+    geometry/PointLocator.cpp
     parallel/Affinity.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
