@@ -1,4 +1,5 @@
 #include "form/BC.h"
+#include "form/BoundaryMap.h"
 #include "geometry/Curvilinear.h"
 #include "geometry/PointLocator.h"
 #include "geometry/SimplexDistance.h"
@@ -111,61 +112,61 @@ TEST_CASE("Curvilinear") {
 
 TEST_CASE("Simplex distance") {
     SUBCASE("Line") {
-        auto d = SimplexDistance<1u>(Simplex<1u>::referenceSimplexVertices());
+        auto d = SimplexDistance(Simplex<1u>::referenceSimplexVertices());
         {
-            auto [dist, x] = d.closest({-1.0});
+            auto [dist, x, bary] = d.closest({-1.0});
             CHECK(dist == doctest::Approx(1.0));
             CHECK(x[0] == doctest::Approx(0.0));
         }
         {
-            auto [dist, x] = d.closest({3.0});
+            auto [dist, x, bary] = d.closest({3.0});
             CHECK(dist == doctest::Approx(2.0));
             CHECK(x[0] == doctest::Approx(1.0));
         }
         {
-            auto [dist, x] = d.closest({0.5});
+            auto [dist, x, bary] = d.closest({0.5});
             CHECK(dist == doctest::Approx(0.0));
             CHECK(x[0] == doctest::Approx(0.5));
         }
     }
     SUBCASE("Triangle") {
-        auto d = SimplexDistance<2u>(Simplex<2u>::referenceSimplexVertices());
+        auto d = SimplexDistance(Simplex<2u>::referenceSimplexVertices());
         {
-            auto [dist, x] = d.closest({-1.0, 0.0});
+            auto [dist, x, bary] = d.closest({-1.0, 0.0});
             CHECK(dist == doctest::Approx(1.0));
             CHECK(x[0] == doctest::Approx(0.0));
             CHECK(x[1] == doctest::Approx(0.0));
         }
         {
-            auto [dist, x] = d.closest({1.5, -1.0});
+            auto [dist, x, bary] = d.closest({1.5, -1.0});
             CHECK(dist == doctest::Approx(sqrt(1.25)));
             CHECK(x[0] == doctest::Approx(1.0));
             CHECK(x[1] == doctest::Approx(0.0));
         }
         {
-            auto [dist, x] = d.closest({2.0, 2.0});
+            auto [dist, x, bary] = d.closest({2.0, 2.0});
             CHECK(dist == doctest::Approx(sqrt(4.5)));
             CHECK(x[0] == doctest::Approx(0.5));
             CHECK(x[1] == doctest::Approx(0.5));
         }
         {
-            auto [dist, x] = d.closest({0.1, 0.2});
+            auto [dist, x, bary] = d.closest({0.1, 0.2});
             CHECK(dist == doctest::Approx(0.0));
             CHECK(x[0] == doctest::Approx(0.1));
             CHECK(x[1] == doctest::Approx(0.2));
         }
     }
     SUBCASE("Tet") {
-        auto d = SimplexDistance<3u>(Simplex<3u>::referenceSimplexVertices());
+        auto d = SimplexDistance(Simplex<3u>::referenceSimplexVertices());
         {
-            auto [dist, x] = d.closest({0.1, 0.2, 0.3});
+            auto [dist, x, bary] = d.closest({0.1, 0.2, 0.3});
             CHECK(dist == doctest::Approx(0.0));
             CHECK(x[0] == doctest::Approx(0.1));
             CHECK(x[1] == doctest::Approx(0.2));
             CHECK(x[2] == doctest::Approx(0.3));
         }
         {
-            auto [dist, x] = d.closest({2.0, 2.0, 2.0});
+            auto [dist, x, bary] = d.closest({2.0, 2.0, 2.0});
             CHECK(dist == doctest::Approx((2 - 1.0 / 3.0) * sqrt(3.0)));
             CHECK(x[0] == doctest::Approx(1.0 / 3.0));
             CHECK(x[1] == doctest::Approx(1.0 / 3.0));
@@ -184,25 +185,56 @@ TEST_CASE("Point locator") {
     };
 
     std::array<std::pair<BC, BC>, D> BCs;
-    BCs.fill(std::make_pair(BC::None, BC::None));
+    BCs.fill(std::make_pair(BC::Dirichlet, BC::Dirichlet));
     GenMesh<D> meshGen(N, BCs);
     auto globalMesh = meshGen.uniformMesh();
     auto mesh = globalMesh->getLocalMesh();
     auto cl = std::make_shared<Curvilinear<D>>(*mesh, transform);
-    auto pl = PointLocator(cl);
+    auto pl = std::make_shared<PointLocator<D>>(cl);
 
-    auto X = Managed(cl->mapResultInfo(1));
-    {
-        constexpr std::size_t original_mesh_id = 6;
-        constexpr auto original_xi = std::array<double, 2>{0.1, 0.2};
-        auto E = cl->evaluateBasisAt({original_xi});
-        cl->map(original_mesh_id, E, X);
+    SUBCASE("In mesh") {
+        auto X = Managed(cl->mapResultInfo(1));
+        {
+            constexpr std::size_t original_mesh_id = 6;
+            constexpr auto original_xi = std::array<double, 2>{0.1, 0.2};
+            auto E = cl->evaluateBasisAt({original_xi});
+            cl->map(original_mesh_id, E, X);
 
-        auto [mesh_id, xi] = pl.locate({X(0, 0), X(1, 0)});
-        REQUIRE(mesh_id == original_mesh_id);
+            auto r = pl->locate({X(0, 0), X(1, 0)});
+            REQUIRE(r.no == original_mesh_id);
+            CHECK(r.dist == doctest::Approx(0.0));
 
-        for (std::size_t d = 0; d < D; ++d) {
-            CHECK(xi[d] == doctest::Approx(original_xi[d]));
+            for (std::size_t d = 0; d < D; ++d) {
+                CHECK(r.xi[d] == doctest::Approx(original_xi[d]));
+            }
+        }
+    }
+
+    SUBCASE("On boundary") {
+        auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
+        if (!boundaryData) {
+            throw std::runtime_error("Boundary conditions not set.");
+        }
+        std::vector<std::size_t> boundary;
+        for (std::size_t fctNo = 0; fctNo < mesh->numFacets(); ++fctNo) {
+            if (boundaryData->getBoundaryConditions()[fctNo] == BC::Dirichlet) {
+                boundary.push_back(fctNo);
+            }
+        }
+        auto bpl = BoundaryPointLocator(pl, *mesh, boundary);
+        auto X = Managed(cl->mapResultInfo(1));
+        {
+            constexpr std::size_t original_mesh_id = 7;
+            constexpr std::size_t face_no = 2;
+            const std::size_t original_fct_no = mesh->downward<D - 1, D>(original_mesh_id)[face_no];
+            constexpr auto original_chi = std::array<double, 1>{0.3};
+            auto E = cl->evaluateBasisAt({cl->facetParam(face_no, original_chi)});
+            cl->map(original_mesh_id, E, X);
+
+            auto r = bpl.locate({X(0, 0), X(1, 0)});
+            REQUIRE(r.no == original_fct_no);
+            CHECK(r.dist == doctest::Approx(0.0));
+            CHECK(r.xi[0] == doctest::Approx(original_chi[0]));
         }
     }
 }
