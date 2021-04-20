@@ -129,8 +129,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.numLocalElements());
         auto piece = writer.addPiece(adapter);
-        piece.addPointData("u", numeric);
-        piece.addPointData("material", coeffs);
+        piece.addPointData(numeric);
+        piece.addPointData(coeffs);
         writer.write(*cfg.output);
     }
 }

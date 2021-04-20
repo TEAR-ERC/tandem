@@ -26,7 +26,6 @@ public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
     // D-1 slip components + 1 state component
     constexpr static std::size_t NumQuantities = TangentialComponents + 1u;
-    constexpr static std::size_t NumInternalQuantities = 2 + 3 * TangentialComponents;
 
     RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl);
 
@@ -39,11 +38,6 @@ public:
     void begin_preparation(std::size_t numFaultFaces);
     void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator<double>&);
     void end_preparation() {}
-
-    auto state_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), NumInternalQuantities,
-                                                           numLocalElements);
-    }
 
     auto const& space() const { return space_; }
 

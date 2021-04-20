@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdio>
 #include <functional>
 #include <optional>
 
@@ -46,6 +47,8 @@ public:
 
     double rhs(std::size_t faultNo, double time, Matrix<double> const& traction,
                Vector<double const>& state, Vector<double>& result, LinearAllocator<double>&) const;
+
+    auto state_prototype(std::size_t numLocalElements) const;
     void state(std::size_t faultNo, Matrix<double> const& traction, Vector<double const>& state,
                Matrix<double>& result, LinearAllocator<double>&) const;
 
@@ -123,6 +126,28 @@ double RateAndState<Law>::rhs(std::size_t faultNo, double time, Matrix<double> c
         }
     }
     return VMax;
+}
+
+template <class Law> auto RateAndState<Law>::state_prototype(std::size_t numLocalElements) const {
+    auto names = std::vector<std::string>(2 + 3 * TangentialComponents);
+    char buf[100];
+
+    std::size_t out = 0;
+    names[out++] = "state";
+    for (std::size_t t = 0; t < TangentialComponents; ++t) {
+        snprintf(buf, sizeof(buf), "slip%lu", t);
+        names[out++] = buf;
+    }
+    for (std::size_t t = 0; t < TangentialComponents; ++t) {
+        snprintf(buf, sizeof(buf), "traction%lu", t);
+        names[out++] = buf;
+    }
+    for (std::size_t t = 0; t < TangentialComponents; ++t) {
+        snprintf(buf, sizeof(buf), "slip-rate%lu", t);
+        names[out++] = buf;
+    }
+    names[out++] = "normal-stress";
+    return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), names, numLocalElements);
 }
 
 template <class Law>

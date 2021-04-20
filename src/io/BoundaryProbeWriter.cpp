@@ -81,8 +81,7 @@ BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
 
 template <std::size_t D>
 void BoundaryProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& p,
-                                          std::string const& name,
-                                          std::size_t numQuantities) const {
+                                          FiniteElementFunction<D - 1> const& function) const {
     file << "TITLE = \"Station " << p.name << " (x = [";
     for (std::size_t d = 0; d < D; ++d) {
         file << p.x[d] << ", ";
@@ -90,14 +89,14 @@ void BoundaryProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& 
     file.seekp(-2, std::ios::cur);
     file << "])\"" << std::endl;
     file << "VARIABLES = \"Time\"";
-    for (std::size_t q = 0; q < numQuantities; ++q) {
-        file << ",\"" << name << q << "\"";
+    for (std::size_t q = 0; q < function.numQuantities(); ++q) {
+        file << ",\"" << function.name(q) << "\"";
     }
     file << std::endl;
 }
 
 template <std::size_t D>
-void BoundaryProbeWriter<D>::write(double time, std::string const& name,
+void BoundaryProbeWriter<D>::write(double time,
                                    FiniteElementFunction<D - 1> const& function) const {
     assert(function.numElements() == probes_.size());
 
@@ -106,7 +105,7 @@ void BoundaryProbeWriter<D>::write(double time, std::string const& name,
         std::ofstream file;
         if (time <= 0.0) {
             file.open(probe.file_name, std::ios::out);
-            write_header(file, probe, name, function.numQuantities());
+            write_header(file, probe, function);
         } else {
             file.open(probe.file_name, std::ios::app);
         }

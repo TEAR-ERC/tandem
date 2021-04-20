@@ -130,9 +130,9 @@ public:
     VTUPiece(tinyxml2::XMLElement* piece, VTUWriter<D>& writer) : piece_(piece), writer_(writer) {}
 
     /**
-     * @brief Samples FiniteElementFunction and adds point data with name "name" to VTU file.
+     * @brief Samples FiniteElementFunction and adds point data to VTU file.
      */
-    void addPointData(std::string const& name, FiniteElementFunction<D> const& function);
+    void addPointData(FiniteElementFunction<D> const& function);
     /**
      * @brief Adds cell data with name "name" to VTU file.
      *

@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 
 #include <cassert>
+#include <cstdio>
 
 namespace tndm {
 
@@ -29,6 +30,16 @@ void FiniteElementFunction<D>::map(std::size_t eleNo, Matrix<double> const& eval
 
     auto mat = data_.subtensor(slice{}, slice{}, eleNo);
     EigenMap(result) = EigenMap(evalMatrix) * EigenMap(mat);
+}
+
+template <std::size_t D> std::string FiniteElementFunction<D>::name(std::size_t q) const {
+    assert(q < numQuantities());
+    if (!names_.empty()) {
+        return names_[q];
+    }
+    char buf[100];
+    snprintf(buf, sizeof(buf), "q%lu", q);
+    return std::string(buf);
 }
 
 template class FiniteElementFunction<1ul>;

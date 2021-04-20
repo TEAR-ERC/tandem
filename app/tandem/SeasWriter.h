@@ -62,7 +62,7 @@ public:
 
     void write_step(double time, BlockVector const& state) {
         if (writer_.num_probes() > 0) {
-            writer_.write(time, "state", seasop_->state(state, writer_.begin(), writer_.end()));
+            writer_.write(time, seasop_->state(state, writer_.begin(), writer_.end()));
         }
     }
 
@@ -86,7 +86,7 @@ public:
         auto writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
         writer.addFieldData("time", &time, 1);
         auto piece = writer.addPiece(adapter_);
-        piece.addPointData("state", seasop_->state(state));
+        piece.addPointData(seasop_->state(state));
         auto base_step = name();
         writer.write(base_step);
         if (rank == 0) {
@@ -118,7 +118,7 @@ public:
         auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
         writer.addFieldData("time", &time, 1);
         auto piece = writer.addPiece(adapter_);
-        piece.addPointData("u", displacement);
+        piece.addPointData(displacement);
         auto base_step = name();
         writer.write(base_step);
         if (rank == 0) {

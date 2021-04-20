@@ -24,8 +24,7 @@ public:
                         LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                         BoundaryMap const& bnd_map, MPI_Comm comm);
 
-    void write(double time, std::string const& name,
-               FiniteElementFunction<D - 1> const& function) const;
+    void write(double time, FiniteElementFunction<D - 1> const& function) const;
 
     auto begin() const { return bndNos_.begin(); }
     auto end() const { return bndNos_.end(); }
@@ -40,8 +39,8 @@ private:
         std::array<double, D> x;
     };
 
-    void write_header(std::ofstream& file, ProbeMeta const& p, std::string const& name,
-                      std::size_t numQuantities) const;
+    void write_header(std::ofstream& file, ProbeMeta const& p,
+                      FiniteElementFunction<D - 1> const& function) const;
 
     std::vector<std::size_t> bndNos_;
     std::vector<ProbeMeta> probes_;

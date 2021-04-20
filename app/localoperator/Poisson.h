@@ -72,13 +72,13 @@ public:
                            Matrix<double>& result) const;
 
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(space_.clone(), NumQuantities,
-                                                      numLocalElements);
+        return FiniteElementFunction<DomainDimension>(space_.clone(), {"u"}, numLocalElements);
     }
 
     FiniteElementFunction<DomainDimension>
     coefficients_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), 1, numLocalElements);
+        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), {"K"},
+                                                      numLocalElements);
     }
     void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator<double>&) const;
 

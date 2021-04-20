@@ -95,8 +95,7 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapt
     return vtupiece;
 }
 
-template <std::size_t D>
-void VTUPiece<D>::addPointData(std::string const& name, FiniteElementFunction<D> const& function) {
+template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D> const& function) {
     auto pointsPerElement = writer_.refNodes().size();
 
     XMLElement* pdata = piece_->LastChildElement("PointData");
@@ -117,15 +116,7 @@ void VTUPiece<D>::addPointData(std::string const& name, FiniteElementFunction<D>
         }
     }
     for (std::size_t p = 0; p < function.numQuantities(); ++p) {
-        std::string fname;
-        if (function.numQuantities() == 1) {
-            fname = name;
-        } else {
-            std::stringstream ss;
-            ss << name << p;
-            fname = ss.str();
-        }
-        writer_.addDataArray(pdata, fname, 1, &data(0, 0, p),
+        writer_.addDataArray(pdata, function.name(p), 1, &data(0, 0, p),
                              pointsPerElement * function.numElements());
     }
 }
