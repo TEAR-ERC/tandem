@@ -28,10 +28,12 @@ public:
     virtual ~SeasWriter() {}
 
     void monitor(double time, BlockVector const& state, double VMax) {
-        if (time - last_output_time_ >= oi_(VMax)) {
+        double delta_time = time - last_output_time_;
+        if (oi_(delta_time, last_output_VMax_, VMax)) {
             write_step(time, state);
             ++output_step_;
             last_output_time_ = time;
+            last_output_VMax_ = VMax;
         }
     }
 
@@ -50,6 +52,7 @@ protected:
     PVDWriter pvd_;
     std::size_t output_step_ = 0;
     double last_output_time_ = std::numeric_limits<double>::lowest();
+    double last_output_VMax_ = 0.0;
 };
 
 template <std::size_t D, class SeasOperator> class SeasFaultProbeWriter : public SeasWriter {

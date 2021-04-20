@@ -24,8 +24,6 @@ Sinit = "Sinit"
 
 [fault_probe_output]
 prefix = "fltst_"
-V_ref = 0.001
-t_min = 0.05
 t_max = 9460800
 probes = [
     { name = "dp000", x = [0.0, -0.0] },

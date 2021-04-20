@@ -18,13 +18,13 @@ namespace tndm {
 
 struct OutputConfig {
     std::string prefix;
-    double V_ref;
+    double atol;
+    double rtol;
     double t_min;
     double t_max;
-    AdaptiveOutputStrategy strategy;
 
     AdaptiveOutputInterval make_adaptive_output_interval() const {
-        return AdaptiveOutputInterval(V_ref, t_min, t_max, strategy);
+        return AdaptiveOutputInterval(atol, rtol, t_min, t_max);
     }
 };
 
@@ -38,33 +38,22 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         return static_cast<type Derived::*>(ptr);
     };
     outputSchema.add_value("prefix", cast(&Derived::prefix)).help("Output file name prefix");
-    outputSchema.add_value("V_ref", cast(&Derived::V_ref))
-        .validator([](auto&& x) { return x > 0; })
-        .default_value(0.1)
-        .help("Output is written every t_min if this slip-rate is reached");
+    outputSchema.add_value("atol", cast(&Derived::atol))
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(1e-50)
+        .help("Absolute tolerance for VMax");
+    outputSchema.add_value("rtol", cast(&Derived::rtol))
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(0.01)
+        .help("Relative tolerance for VMax");
     outputSchema.add_value("t_min", cast(&Derived::t_min))
-        .validator([](auto&& x) { return x > 0; })
-        .default_value(0.1)
-        .help("Minimum output interval");
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(0.0)
+        .help("Minimum time difference between samples");
     outputSchema.add_value("t_max", cast(&Derived::t_max))
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
-        .help("Maximum output interval");
-    outputSchema.add_value("strategy", cast(&Derived::strategy))
-        .default_value(AdaptiveOutputStrategy::Threshold)
-        .help("Adaptive output strategy")
-        .converter([](std::string_view value) {
-            if (iEquals(value, "threshold")) {
-                return AdaptiveOutputStrategy::Threshold;
-            } else if (iEquals(value, "exponential")) {
-                return AdaptiveOutputStrategy::Exponential;
-            } else {
-                return AdaptiveOutputStrategy::Unknown;
-            }
-        })
-        .validator([](AdaptiveOutputStrategy const& type) {
-            return type != AdaptiveOutputStrategy::Unknown;
-        });
+        .help("Maximum time difference between samples");
 };
 
 template <typename Derived> void setProbeOutputConfigSchema(TableSchema<Derived>& outputSchema) {

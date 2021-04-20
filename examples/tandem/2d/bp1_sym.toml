@@ -23,6 +23,4 @@ Vinit = "Vinit"
 
 [fault_output]
 prefix = "bp1_sym-fault"
-V_ref = 0.001
-t_min = 0.05
 t_max = 9460800
