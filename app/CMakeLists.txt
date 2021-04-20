@@ -197,6 +197,7 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 ## Tandem
 
 add_executable(tandem
+    tandem/Config.cpp
     tandem/RateAndStateBase.cpp
     tandem/SeasAdapterBase.cpp
     tandem/SeasElasticityAdapter.cpp

@@ -6,9 +6,9 @@
 #include "config.h"
 #include "io/Probe.h"
 #include "tandem/AdaptiveOutputStrategy.h"
-#include "tandem/FrictionConfig.h"
-#include "tandem/SeasScenario.h"
+#include "tandem/SeasType.h"
 #include "util/Schema.h"
+#include "util/SchemaHelper.h"
 
 #include <optional>
 #include <string>
@@ -70,17 +70,26 @@ struct Config {
     std::optional<double> resolution;
     double final_time;
     std::optional<std::string> mesh_file;
+
+    SeasType type;
+    std::string lib;
+    std::string scenario;
+    std::array<double, DomainDimension> up;
+    std::array<double, DomainDimension> ref_normal;
+
     bool discrete_green;
     bool matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
-    SeasScenarioConfig seas;
-    DieterichRuinaAgeingConfig friction;
+
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> domain_output;
     std::optional<OutputConfig> fault_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
 };
+
+void setConfigSchema(TableSchema<Config>& schema,
+                     MakePathRelativeToOtherPath const& path_converter);
 
 } // namespace tndm
 

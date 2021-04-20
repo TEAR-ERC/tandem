@@ -43,8 +43,8 @@ template <> struct adapter<SeasType::Poisson> {
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
         auto lop = std::make_unique<Poisson>(cl, scenario.mu(), DGMethod::IP);
         return std::make_unique<SeasPoissonAdapter>(
-            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
-            cfg.seas.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.up,
+            cfg.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 template <> struct adapter<SeasType::Elasticity> {
@@ -55,8 +55,8 @@ template <> struct adapter<SeasType::Elasticity> {
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
         auto lop = std::make_unique<Elasticity>(cl, scenario.lam(), scenario.mu(), DGMethod::IP);
         return std::make_unique<SeasElasticityAdapter>(
-            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.seas.up,
-            cfg.seas.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.up,
+            cfg.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 
@@ -84,8 +84,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     using seas_domain_writer_t = SeasDomainWriter<DomainDimension, seas_op_t>;
     using seas_monitor_t = SeasMonitor<seas_op_t>;
 
-    auto scenario = SeasScenario<adapter_lop_t>(cfg.seas);
-    auto friction_scenario = DieterichRuinaAgeingScenario(cfg.friction);
+    auto scenario = SeasScenario<adapter_lop_t>(cfg.lib, cfg.scenario);
+    auto friction_scenario = DieterichRuinaAgeingScenario(cfg.lib, cfg.scenario);
 
     auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
                                                              PolynomialDegree);
@@ -180,13 +180,13 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    if (cfg.seas.type == SeasType::Poisson) {
+    if (cfg.type == SeasType::Poisson) {
         if (cfg.discrete_green) {
             detail::solve_seas_problem<SeasType::Poisson, true>(mesh, cfg);
         } else {
             detail::solve_seas_problem<SeasType::Poisson, false>(mesh, cfg);
         }
-    } else if (cfg.seas.type == SeasType::Elasticity) {
+    } else if (cfg.type == SeasType::Elasticity) {
         if (cfg.discrete_green) {
             detail::solve_seas_problem<SeasType::Elasticity, true>(mesh, cfg);
         } else {

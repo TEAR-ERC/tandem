@@ -15,39 +15,6 @@
 
 namespace tndm {
 
-struct DieterichRuinaAgeingConfig {
-    using Constant = DieterichRuinaAgeing::ConstantParams;
-    std::string lib;
-    std::string a;
-    std::string eta;
-    std::optional<std::string> sn_pre;
-    std::optional<std::string> tau_pre;
-    std::string Vinit;
-    std::optional<std::string> Sinit;
-    std::optional<std::string> source;
-    Constant constant;
-
-    template <typename PathConverter>
-    static void setSchema(TableSchema<DieterichRuinaAgeingConfig>& schema,
-                          PathConverter path_converter) {
-        schema.add_value("lib", &DieterichRuinaAgeingConfig::lib)
-            .converter(path_converter)
-            .validator(PathExists());
-        schema.add_value("a", &DieterichRuinaAgeingConfig::a);
-        schema.add_value("eta", &DieterichRuinaAgeingConfig::eta);
-        schema.add_value("sn_pre", &DieterichRuinaAgeingConfig::sn_pre);
-        schema.add_value("tau_pre", &DieterichRuinaAgeingConfig::tau_pre);
-        schema.add_value("Vinit", &DieterichRuinaAgeingConfig::Vinit);
-        schema.add_value("Sinit", &DieterichRuinaAgeingConfig::Sinit);
-        schema.add_value("source", &DieterichRuinaAgeingConfig::source);
-        auto& cs = schema.add_table("constant", &DieterichRuinaAgeingConfig::constant);
-        cs.add_value("V0", &Constant::V0);
-        cs.add_value("b", &Constant::b);
-        cs.add_value("L", &Constant::L);
-        cs.add_value("f0", &Constant::f0);
-    }
-};
-
 class DieterichRuinaAgeingScenario {
 public:
     template <std::size_t D>
@@ -57,28 +24,48 @@ public:
         std::function<std::array<double, DieterichRuinaAgeing::TangentialComponents>(
             std::array<double, D> const&)>;
 
-    DieterichRuinaAgeingScenario(DieterichRuinaAgeingConfig const& cfg) : cp_(cfg.constant) {
-        lib_.loadFile(cfg.lib);
+    constexpr static char A[] = "a";
+    constexpr static char B[] = "b";
+    constexpr static char V0[] = "V0";
+    constexpr static char L[] = "L";
+    constexpr static char F0[] = "f0";
+    constexpr static char Eta[] = "eta";
+    constexpr static char SnPre[] = "sn_pre";
+    constexpr static char TauPre[] = "tau_pre";
+    constexpr static char Vinit[] = "Vinit";
+    constexpr static char Sinit[] = "Sinit";
+    constexpr static char Source[] = "source";
 
-        a_ = lib_.getFunction<DomainDimension, 1>(cfg.a);
-        eta_ = lib_.getFunction<DomainDimension, 1>(cfg.eta);
-        if (cfg.sn_pre) {
-            sn_pre_ = lib_.getFunction<DomainDimension, 1>(*cfg.sn_pre);
+    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
+        lib_.loadFile(lib);
+
+        a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
+        eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Eta);
+        if (lib_.hasMember(scenario, SnPre)) {
+            sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
         }
-        if (cfg.tau_pre) {
+        if (lib_.hasMember(scenario, TauPre)) {
             tau_pre_ =
-                lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
-                    *cfg.tau_pre);
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                    scenario, TauPre);
         }
-        Vinit_ = lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
-            cfg.Vinit);
-        if (cfg.Sinit) {
-            Sinit_ = lib_.getFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
-                *cfg.Sinit);
+        Vinit_ =
+            lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                scenario, Vinit);
+        if (lib_.hasMember(scenario, Sinit)) {
+            Sinit_ =
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                    scenario, Sinit);
         }
-        if (cfg.source) {
-            source_ = std::make_optional(lib_.getFunction<DomainDimension + 1, 1>(*cfg.source));
+        if (lib_.hasMember(scenario, Source)) {
+            source_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension + 1, 1>(scenario, Source));
         }
+
+        cp_.V0 = lib_.getMemberConstant(scenario, V0);
+        cp_.b = lib_.getMemberConstant(scenario, B);
+        cp_.L = lib_.getMemberConstant(scenario, L);
+        cp_.f0 = lib_.getMemberConstant(scenario, F0);
     }
 
     auto const& constant_params() const { return cp_; }

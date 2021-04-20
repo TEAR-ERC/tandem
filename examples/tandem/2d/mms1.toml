@@ -1,27 +1,9 @@
 final_time = 2207520000
 resolution = 1
-
-[seas]
 type = "poisson"
 lib = "mms1.lua"
-boundary = "u_star"
-mu = "mu"
-solution = "u_star"
+scenario = "mms1"
 ref_normal = [1, 0]
-
-[friction]
-lib = "mms1.lua"
-a = "a"
-eta = "eta"
-sn_pre = "sn_pre"
-Vinit = "Vinit"
-Sinit = "Sinit"
-source = "source"
-    [friction.constant]
-    b = 0.02
-    V0 = 1.0e-6
-    L = 0.2
-    f0 = 0.6
 
 [generate_mesh]
 intercepts = [

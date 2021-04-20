@@ -8,11 +8,15 @@ BP3.h = 3.0
 BP3.rho = 2.670
 BP3.cs = 3.464
 BP3.nu = 0.25
+BP3.b = 0.015
+BP3.V0 = 1.0e-6
+BP3.L = 0.008
+BP3.f0 = 0.6
 
-function BP3.new(dip, Vp)
+function BP3.new(params)
     local self = setmetatable({}, BP3)
-    self.dip = dip * math.pi / 180.0
-    self.Vp = Vp
+    self.dip = params.dip * math.pi / 180.0
+    self.Vp = params.Vp
     return self
 end
 
@@ -64,13 +68,10 @@ function BP3:sn_pre(x, y)
 end
 
 function BP3:tau_pre(x, y)
-    local f0 = 0.6
-    local b = 0.015
-    local V0 = 1e-6
     local Vi = self:Vinit(x, y)
     local sn = self:sn_pre(x, y)
-    local e = math.exp((f0 + b * math.log(V0 / math.abs(Vi))) / self.amax)
-    return -(sn * self.amax * math.asinh((Vi / (2.0 * V0)) * e) + self:eta(x, y) * Vi)
+    local e = math.exp((self.f0 + self.b * math.log(self.V0 / math.abs(Vi))) / self.amax)
+    return -(sn * self.amax * math.asinh((Vi / (2.0 * self.V0)) * e) + self:eta(x, y) * Vi)
 end
 
 return BP3
