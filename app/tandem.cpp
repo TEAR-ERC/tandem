@@ -96,40 +96,14 @@ int main(int argc, char** argv) {
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
-    auto const setupOutputSchema = [](auto& outputSchema) {
-        outputSchema.add_value("prefix", &OutputConfig::prefix).help("Output file name prefix");
-        outputSchema.add_value("V_ref", &OutputConfig::V_ref)
-            .validator([](auto&& x) { return x > 0; })
-            .default_value(0.1)
-            .help("Output is written every t_min if this slip-rate is reached");
-        outputSchema.add_value("t_min", &OutputConfig::t_min)
-            .validator([](auto&& x) { return x > 0; })
-            .default_value(0.1)
-            .help("Minimum output interval");
-        outputSchema.add_value("t_max", &OutputConfig::t_max)
-            .validator([](auto&& x) { return x > 0; })
-            .default_value(365 * 24 * 3600)
-            .help("Maximum output interval");
-        outputSchema.add_value("strategy", &OutputConfig::strategy)
-            .default_value(AdaptiveOutputStrategy::Threshold)
-            .help("Adaptive output strategy")
-            .converter([](std::string_view value) {
-                if (iEquals(value, "threshold")) {
-                    return AdaptiveOutputStrategy::Threshold;
-                } else if (iEquals(value, "exponential")) {
-                    return AdaptiveOutputStrategy::Exponential;
-                } else {
-                    return AdaptiveOutputStrategy::Unknown;
-                }
-            })
-            .validator([](AdaptiveOutputStrategy const& type) {
-                return type != AdaptiveOutputStrategy::Unknown;
-            });
-    };
     auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
-    setupOutputSchema(faultOutputSchema);
+    setOutputConfigSchema(faultOutputSchema);
     auto& domainOutputSchema = schema.add_table("domain_output", &Config::domain_output);
-    setupOutputSchema(domainOutputSchema);
+    setOutputConfigSchema(domainOutputSchema);
+    auto& faultProbeOutputSchema =
+        schema.add_table("fault_probe_output", &Config::fault_probe_output);
+    setOutputConfigSchema(faultProbeOutputSchema);
+    setProbeOutputConfigSchema(faultProbeOutputSchema);
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {

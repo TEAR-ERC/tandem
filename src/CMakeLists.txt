@@ -30,6 +30,7 @@ add_library(tandem-lib
     form/DGCurvilinearCommon.cpp
     form/DGOperatorTopo.cpp
     form/Error.cpp
+    io/BoundaryProbeWriter.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
     io/PVDWriter.cpp

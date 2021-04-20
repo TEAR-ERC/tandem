@@ -9,6 +9,7 @@
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
+#include "util/Range.h"
 #include "util/Scratch.h"
 
 #include <mpi.h>
@@ -101,24 +102,33 @@ public:
         result.end_access(out_handle);
     }
 
-    auto state(BlockVector const& vector) {
-        auto soln = lop_->state_prototype(numLocalElements());
+    template <typename Iterator>
+    auto state(BlockVector const& vector, Iterator first, Iterator last) {
+        auto num_elements = std::distance(first, last);
+        auto soln = lop_->state_prototype(num_elements);
         auto& values = soln.values();
 
         auto in_handle = vector.begin_access_readonly();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
         adapter_->begin_traction(in_handle);
         scratch_.reset();
-        for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
+        std::size_t out_no = 0;
+        for (; first != last; ++first) {
+            std::size_t faultNo = *first;
             adapter_->traction(faultNo, traction, scratch_);
 
-            auto value_matrix = values.subtensor(slice{}, slice{}, faultNo);
+            auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
             auto state_block = in_handle.subtensor(slice{}, faultNo);
             lop_->state(faultNo, traction, state_block, value_matrix, scratch_);
         }
         adapter_->end_traction();
         vector.end_access_readonly(in_handle);
         return soln;
+    }
+
+    auto state(BlockVector const& vector) {
+        auto range = Range<std::size_t>(0, numLocalElements());
+        return state(vector, range.begin(), range.end());
     }
 
     void set_boundary(time_functional_t fun) { adapter_->set_boundary(std::move(fun)); }

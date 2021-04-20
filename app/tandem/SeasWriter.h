@@ -5,6 +5,7 @@
 
 #include "geometry/Curvilinear.h"
 #include "interface/BlockVector.h"
+#include "io/BoundaryProbeWriter.h"
 #include "io/PVDWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
@@ -49,6 +50,25 @@ protected:
     PVDWriter pvd_;
     std::size_t output_step_ = 0;
     double last_output_time_ = std::numeric_limits<double>::lowest();
+};
+
+template <std::size_t D, class SeasOperator> class SeasFaultProbeWriter : public SeasWriter {
+public:
+    SeasFaultProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
+                         AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
+                         std::shared_ptr<Curvilinear<D>> cl, std::shared_ptr<SeasOperator> seasop)
+        : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
+          writer_(prefix, probes, mesh, std::move(cl), seasop_->faultMap(), seasop_->comm()) {}
+
+    void write_step(double time, BlockVector const& state) {
+        if (writer_.num_probes() > 0) {
+            writer_.write(time, "state", seasop_->state(state, writer_.begin(), writer_.end()));
+        }
+    }
+
+private:
+    std::shared_ptr<SeasOperator> seasop_;
+    BoundaryProbeWriter<D> writer_;
 };
 
 template <std::size_t D, class SeasOperator> class SeasFaultWriter : public SeasWriter {

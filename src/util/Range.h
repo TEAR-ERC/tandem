@@ -24,7 +24,7 @@ template <typename IntT> struct Range {
 
 template <typename IntT> class RangeIterator {
 public:
-    using iterator_category = std::bidirectional_iterator_tag;
+    using iterator_category = std::random_access_iterator_tag;
     using value_type = IntT;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
@@ -55,6 +55,25 @@ public:
     }
 
     value_type operator*() { return pos; }
+    value_type operator[](difference_type n) { return pos + n; }
+
+    auto& operator+=(difference_type n) {
+        pos += n;
+        return *this;
+    }
+    auto operator+(difference_type n) { return RangeIterator<IntT>(pos + n); }
+
+    auto& operator-=(difference_type n) {
+        pos -= n;
+        return *this;
+    }
+    auto operator-(difference_type n) { return RangeIterator<IntT>(pos - n); }
+    difference_type operator-(RangeIterator const& other) { return pos - other.pos; }
+
+    bool operator<(RangeIterator const& other) { return pos < other.pos; }
+    bool operator>(RangeIterator const& other) { return pos > other.pos; }
+    bool operator<=(RangeIterator const& other) { return pos <= other.pos; }
+    bool operator>=(RangeIterator const& other) { return pos >= other.pos; }
 
 private:
     IntT pos;

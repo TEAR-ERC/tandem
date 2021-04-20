@@ -79,6 +79,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     using adapter_t = typename discrete_green<base_adapter_t, MakeGreen>::type;
     using fault_op_t = RateAndState<DieterichRuinaAgeing>;
     using seas_op_t = SeasOperator<fault_op_t, adapter_t>;
+    using seas_fault_probe_writer_t = SeasFaultProbeWriter<DomainDimension, seas_op_t>;
     using seas_fault_writer_t = SeasFaultWriter<DomainDimension, seas_op_t>;
     using seas_domain_writer_t = SeasDomainWriter<DomainDimension, seas_op_t>;
     using seas_monitor_t = SeasMonitor<seas_op_t>;
@@ -114,6 +115,11 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                 throw std::runtime_error(
                     "Fault output prefix and domain output prefix must not be identical");
             }
+        }
+        if (cfg.fault_probe_output) {
+            writers.emplace_back(std::make_unique<seas_fault_probe_writer_t>(
+                cfg.fault_probe_output->prefix, cfg.fault_probe_output->probes,
+                cfg.fault_probe_output->make_adaptive_output_interval(), mesh, cl, seasop));
         }
         if (cfg.fault_output) {
             writers.emplace_back(std::make_unique<seas_fault_writer_t>(

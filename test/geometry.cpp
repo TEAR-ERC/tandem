@@ -234,7 +234,7 @@ TEST_CASE("Point locator") {
             auto r = bpl.locate({X(0, 0), X(1, 0)});
             REQUIRE(r.no == original_fct_no);
             CHECK(r.dist == doctest::Approx(0.0));
-            CHECK(r.xi[0] == doctest::Approx(original_chi[0]));
+            CHECK(r.chi[0] == doctest::Approx(original_chi[0]));
         }
     }
 }
