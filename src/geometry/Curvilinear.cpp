@@ -207,6 +207,8 @@ void Curvilinear<D>::facetBasis(std::array<double, D> const& up, Matrix<double> 
                                 Tensor<double, 3u>& result) const {
     assert(result.shape(2) == normal.shape(1));
 
+    constexpr double colinear_tol = 10000.0 * std::numeric_limits<double>::epsilon();
+
     for (std::ptrdiff_t i = 0; i < result.shape(2); ++i) {
         auto n_in = normal.subtensor(slice{}, i);
         auto n_in_eigen = EigenMap<Vector<double>, D>(n_in);
@@ -216,8 +218,8 @@ void Curvilinear<D>::facetBasis(std::array<double, D> const& up, Matrix<double> 
 
         if constexpr (D == 2u) {
             double s = sgn(up[0] * n(1) - up[1] * n(0));
-            if (s == 0.0) {
-                throw std::logic_error("Up vector and normal are colinear.");
+            if (std::fabs(s) < colinear_tol) {
+                throw std::logic_error("Up vector and normal are almost colinear.");
             }
             auto d = result.subtensor(slice{}, 1, i);
             d(0) = -s * n(1);
@@ -229,8 +231,8 @@ void Curvilinear<D>::facetBasis(std::array<double, D> const& up, Matrix<double> 
             auto s = result.subtensor(slice{}, 2, i);
             auto s_eigen = EigenMap<Vector<double>, D>(s);
             s_eigen = u.cross(n_eigen).normalized();
-            if (s_eigen.norm() == 0.0) {
-                throw std::logic_error("Up vector and normal are colinear.");
+            if (s_eigen.norm() < colinear_tol) {
+                throw std::logic_error("Up vector and normal are almost colinear.");
             }
             d_eigen = s_eigen.cross(n_eigen).normalized();
         }

@@ -3,6 +3,7 @@ mesh_file = "bp3.msh"
 lib = "bp3.lua"
 scenario = "bp3_d60_normal"
 type = "elasticity"
+ref_normal = [1, 0]
 
 [fault_probe_output]
 prefix = "fltst_"

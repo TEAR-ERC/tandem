@@ -30,11 +30,7 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto default_up = std::array<double, DomainDimension>{};
     default_up.back() = 1.0;
     schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values();
-    auto default_ref_normal = std::array<double, DomainDimension>{};
-    default_ref_normal[0] = 1.0;
-    schema.add_array("ref_normal", &Config::ref_normal)
-        .default_value(std::move(default_ref_normal))
-        .of_values();
+    schema.add_array("ref_normal", &Config::ref_normal).of_values();
 
     schema.add_value("discrete_green", &Config::discrete_green)
         .default_value(false)

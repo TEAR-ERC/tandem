@@ -55,12 +55,11 @@ void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scra
     for (std::size_t i = 0; i < nq_; ++i) {
         auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
         auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
-        auto up_dot_n = dot(up_, normal_i);
-        if (std::fabs(up_dot_n) > 1000.0 * std::numeric_limits<double>::epsilon()) {
-            sign_flipped = up_dot_n < 0;
-        } else {
-            sign_flipped = dot(ref_normal_, normal_i) < 0;
+        auto n_ref_dot_n = dot(ref_normal_, normal_i);
+        if (std::fabs(n_ref_dot_n) < 10000.0 * std::numeric_limits<double>::epsilon()) {
+            throw std::logic_error("Normal and reference normal are almost colinear.");
         }
+        sign_flipped = n_ref_dot_n < 0;
         if (sign_flipped) {
             normal_i = -1.0 * normal_i;
         }
