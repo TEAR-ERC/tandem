@@ -14,6 +14,7 @@
 #include <mpi.h>
 
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -143,18 +144,34 @@ public:
         : seasop_(std::move(seasop)), writers_(std::move(writers)) {}
 
     void monitor(double time, BlockVector const& state) {
-        double VMax_local = seasop_->VMax_local();
-        double VMax;
-        MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
+        if (!writers_.empty()) {
+            double VMax_local = seasop_->VMax_local();
+            double VMax;
+            MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
 
-        for (auto const& writer : writers_) {
-            writer->monitor(time, state, VMax);
+            for (auto const& writer : writers_) {
+                writer->monitor(time, state, VMax);
+            }
         }
+
+        if (last_time_ != std::numeric_limits<double>::lowest()) {
+            double dt = time - last_time_;
+            dt_min_ = std::min(dt_min_, dt);
+            dt_max_ = std::max(dt_max_, dt);
+        }
+        last_time_ = time;
     }
+
+    auto min_time_step() const { return dt_min_; }
+    auto max_time_step() const { return dt_max_; }
 
 private:
     std::shared_ptr<SeasOperator> seasop_;
     std::vector<std::unique_ptr<SeasWriter>> writers_;
+
+    double last_time_ = std::numeric_limits<double>::lowest();
+    double dt_min_ = std::numeric_limits<double>::max();
+    double dt_max_ = std::numeric_limits<double>::lowest();
 };
 
 } // namespace tndm

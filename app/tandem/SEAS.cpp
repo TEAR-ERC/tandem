@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <array>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -107,9 +108,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto ts = PetscTimeSolver(*seasop);
 
-    std::unique_ptr<seas_monitor_t> monitor;
+    std::vector<std::unique_ptr<SeasWriter>> writers;
     {
-        std::vector<std::unique_ptr<SeasWriter>> writers;
         if (cfg.fault_output && cfg.domain_output) {
             if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
                 throw std::runtime_error(
@@ -131,11 +131,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                 cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh,
                 cl, seasop, PolynomialDegree));
         }
-        if (!writers.empty()) {
-            monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers));
-            ts.set_monitor(*monitor);
-        }
     }
+    auto monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers));
+    ts.set_monitor(*monitor);
 
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
@@ -159,9 +157,18 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     double time = sw.stop();
 
     if (rank == 0) {
-        std::cout << "Solve time: " << time << std::endl;
-        std::cout << "Steps: " << ts.get_step_number() << std::endl;
-        std::cout << "Step rejections: " << ts.get_step_rejections() << std::endl;
+        auto date_time = std::time(nullptr);
+        std::cout << "========= Summary =========" << std::endl;
+        std::cout << "date_time=" << std::ctime(&date_time);
+        std::cout << "code_version=" << VersionString << std::endl;
+        std::cout << "solve_time=" << time << std::endl;
+        std::cout << "time_steps=" << ts.get_step_number() << std::endl;
+        std::cout << "step_rejections=" << ts.get_step_rejections() << std::endl;
+        std::cout << "min_time_step=" << monitor->min_time_step() << std::endl;
+        std::cout << "max_time_step=" << monitor->max_time_step() << std::endl;
+        std::cout << "dofs_domain=" << num_dofs_domain << std::endl;
+        std::cout << "dofs_fault=" << num_dofs_fault << std::endl;
+        std::cout << "===========================" << std::endl;
     }
 
     auto solution = scenario.solution(cfg.final_time);
