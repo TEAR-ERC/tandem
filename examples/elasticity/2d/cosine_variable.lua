@@ -1,8 +1,7 @@
 require "cosine"
 
 function warp(x, y)
-    xp, yp = partialAnnulus(x, y)
-    return math.exp(xp) * math.sin(xp) * xp, math.exp(yp) * yp
+    return partialAnnulus(x, y)
 end
 
 function mu(x, y)
