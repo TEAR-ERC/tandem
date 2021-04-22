@@ -168,7 +168,6 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         std::cout << "max_time_step=" << monitor->max_time_step() << std::endl;
         std::cout << "dofs_domain=" << num_dofs_domain << std::endl;
         std::cout << "dofs_fault=" << num_dofs_fault << std::endl;
-        std::cout << "===========================" << std::endl;
     }
 
     auto solution = scenario.solution(cfg.final_time);
@@ -177,8 +176,11 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         double error =
             tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
-            std::cout << "L2 error: " << error << std::endl;
+            std::cout << "L2_error=" << error << std::endl;
         }
+    }
+    if (rank == 0) {
+        std::cout << "===========================" << std::endl;
     }
 }
 
