@@ -77,6 +77,17 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto dgop = DGOperator(topo, std::move(lop));
 
+    const auto reduce_number = [&topo](std::size_t number) {
+        std::size_t number_global;
+        MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, topo->comm());
+        return number_global;
+    };
+    std::size_t num_dofs_domain = reduce_number(dgop.number_of_local_dofs());
+
+    if (rank == 0) {
+        std::cout << "DOFs: " << num_dofs_domain << std::endl;
+    }
+
     sw.start();
     auto solver =
         PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));

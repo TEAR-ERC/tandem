@@ -7,6 +7,7 @@
 #include "form/DGOperator.h"
 
 #include <petscmat.h>
+#include <petscsystypes.h>
 
 namespace tndm {
 
@@ -30,12 +31,13 @@ public:
     Mat mat() const { return A_; };
 
 private:
-    template <typename DGOp> static void apply(Mat A, Vec x, Vec y) {
+    template <typename DGOp> static PetscErrorCode apply(Mat A, Vec x, Vec y) {
         DGOp* dgop;
         MatShellGetContext(A, &dgop);
         const auto xv = PetscVectorView(x);
         auto yv = PetscVectorView(y);
         dgop->apply(xv, yv);
+        return 0;
     }
 
     Mat A_;
