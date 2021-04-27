@@ -65,6 +65,8 @@ public:
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
 
+    std::size_t flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const;
+
     TensorBase<Matrix<double>> tractionResultInfo() const;
     void traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
                            Vector<double const>& u1, Matrix<double>& result) const;

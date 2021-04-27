@@ -29,6 +29,7 @@
 #include <argparse.hpp>
 #include <mpi.h>
 #include <petscksp.h>
+#include <petscmat.h>
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <stdexcept>
@@ -49,6 +50,7 @@ struct Config {
     std::optional<double> resolution;
     DGMethod method;
     bool matrix_free;
+    bool test_matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
     std::optional<std::string> output;
@@ -82,6 +84,36 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, topo->comm());
         return number_global;
     };
+
+    if (cfg.test_matrix_free) {
+        auto A = std::make_unique<PetscDGShell>(dgop);
+        Vec x, y;
+        CHKERRTHROW(MatCreateVecs(A->mat(), &x, &y));
+        PetscRandom rctx;
+        CHKERRTHROW(PetscRandomCreate(PETSC_COMM_WORLD, &rctx));
+        CHKERRTHROW(VecSetRandom(x, rctx));
+        CHKERRTHROW(PetscRandomDestroy(&rctx));
+
+        std::size_t flops = dgop.flops_apply();
+        auto flops_global = reduce_number(flops);
+
+        constexpr int nrepeat = 100;
+        Stopwatch sw;
+        sw.start();
+        for (int i = 0; i < nrepeat; ++i) {
+            MatMult(A->mat(), x, y);
+        }
+        auto time = sw.stop();
+        if (rank == 0) {
+            time /= nrepeat;
+            std::cout << "Shell time: " << time << " s" << std::endl;
+            std::cout << "Shell flops: " << flops_global << std::endl;
+            std::cout << "Shell GFLOPS: " << flops_global / time * 1e-9 << std::endl;
+        }
+        CHKERRTHROW(VecDestroy(&x));
+        CHKERRTHROW(VecDestroy(&y));
+    }
+
     std::size_t num_dofs_domain = reduce_number(dgop.number_of_local_dofs());
 
     if (rank == 0) {
@@ -184,6 +216,7 @@ int main(int argc, char** argv) {
         .default_value(DGMethod::IP)
         .validator([](DGMethod const& type) { return type != DGMethod::Unknown; });
     schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
+    schema.add_value("test_matrix_free", &Config::test_matrix_free).default_value(false);
     schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
     schema.add_value("mg_strategy", &Config::mg_strategy)
         .converter([](std::string_view value) {
