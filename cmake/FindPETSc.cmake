@@ -1,0 +1,17 @@
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PETSc REQUIRED IMPORTED_TARGET GLOBAL PETSc)
+add_library(PETSc::PETSc ALIAS PkgConfig::PETSc)
+
+set(PETSC_MEMALIGN "PETSC_MEMALIGN-NOTFOUND")
+find_file(PETSC_CONF_H "petscconf.h" HINTS ${PETSc_INCLUDE_DIRS})
+if(NOT ${PETSC_CONF_H} MATCHES "PETSC_CONF_H-NOTFOUND")
+    file(READ ${PETSC_CONF_H} PETSC_CONF_CONTENT)
+    if(${PETSC_CONF_CONTENT} MATCHES "#[ \t]*define[ \t]+PETSC_MEMALIGN[ \t]+([0-9]+)")
+        set(PETSC_MEMALIGN ${CMAKE_MATCH_1})
+    endif()
+endif()
+if(PETSC_MEMALIGN MATCHES "PETSC_MEMALIGN-NOTFOUND")
+    message(STATUS "Could not determine PETSC_MEMALIGN. Default to 8.")
+    set(PETSC_MEMALIGN 8)
+endif()
+

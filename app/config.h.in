@@ -9,5 +9,6 @@ static constexpr unsigned MinQuadOrder() {
     unsigned minQuadOrder = @MIN_QUADRATURE_ORDER@;
     return (minQuadOrder == 0u) ? 2u * PolynomialDegree + 1u : minQuadOrder;
 }
+static constexpr char VersionString[] = "@PACKAGE_GIT_VERSION@";
 
 #endif // CONFIG_H_20200617_H

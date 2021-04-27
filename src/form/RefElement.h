@@ -23,12 +23,24 @@ template <std::size_t D> class NodesFactory;
  */
 template <std::size_t D> class RefElement {
 public:
-    RefElement(unsigned degree) : degree_(degree) {}
+    static constexpr std::size_t Dim = D;
+    static constexpr std::size_t DefaultAlignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
+
+    /**
+     * @brief Constructor
+     *
+     * @param degree Maximum polynomial degree
+     * @param alignment Tensors returned by this class will respect this memory alignment.
+     */
+    RefElement(unsigned degree, std::size_t alignment = DefaultAlignment)
+        : degree_(degree), alignment_(alignment) {}
     virtual ~RefElement() {}
     virtual std::unique_ptr<RefElement<D>> clone() const = 0;
 
     /**
      * @brief Computes int phi_i phi_j dV
+     *
+     * Only for linear elements!
      */
     virtual Managed<Matrix<double>> massMatrix() const = 0;
     virtual Managed<Matrix<double>> inverseMassMatrix() const = 0;
@@ -69,10 +81,12 @@ public:
                        std::array<unsigned, 3> const& permutation) const = 0;
 
     unsigned degree() const { return degree_; }
+    std::size_t alignment() const { return alignment_; }
     std::size_t numBasisFunctions() const { return binom(degree_ + D, D); }
 
 private:
     unsigned degree_;
+    std::size_t alignment_;
 };
 
 template <std::size_t D> class ModalRefElement : public RefElement<D> {
@@ -102,7 +116,8 @@ public:
     using RefElement<D>::evaluateBasisAt;
     using RefElement<D>::evaluateGradientAt;
 
-    NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory);
+    NodalRefElement(unsigned degree, NodesFactory<D> const& nodesFactory,
+                    std::size_t alignment = RefElement<D>::DefaultAlignment);
     std::unique_ptr<RefElement<D>> clone() const override {
         return std::make_unique<NodalRefElement<D>>(*this);
     }
@@ -119,6 +134,9 @@ public:
                        std::array<unsigned, 3> const& permutation) const override;
 
     auto const& refNodes() const { return refNodes_; }
+
+    auto const& vandermonde() const { return vandermonde_; }
+    auto const& vandermondeInv() const { return vandermondeInv_; }
 
 private:
     std::vector<std::array<double, D>> refNodes_;

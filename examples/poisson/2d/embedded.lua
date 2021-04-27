@@ -5,3 +5,7 @@ function solution(x, y)
         return 2.0
     end
 end
+
+function slip(x, y)
+    return 1.0
+end

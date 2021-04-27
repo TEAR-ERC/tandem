@@ -1,13 +1,18 @@
 #include "doctest.h"
+#include "util/Algorithm.h"
 #include "util/Combinatorics.h"
+#include "util/LinearAllocator.h"
 #include "util/Zero.h"
 
 #include <array>
 #include <cmath>
+#include <new>
 
 using tndm::AllIntegerSums;
 using tndm::binom;
 using tndm::Choose;
+using tndm::find_blocks;
+using tndm::LinearAllocator;
 using tndm::zeroIn;
 
 TEST_CASE("Combinatorics") {
@@ -140,11 +145,55 @@ TEST_CASE("Root finding") {
     CHECK(zeroIn(2.0, 3.0, F1) == doctest::Approx(2.0945514815));
 
     auto F2 = [](double x) { return 1.0 / (x - 3.0) - 6.0; };
-    CHECK(zeroIn(3.0, 4.0, F2) == doctest::Approx(3.0 + 1.0 / 6.0));
+    CHECK(zeroIn(3.0 + 1.0 / 100.0, 4.0, F2) == doctest::Approx(3.0 + 1.0 / 6.0));
 
     auto F3 = [](double x) { return x; };
     CHECK(zeroIn(-1.0, 0.0, F3) == 0.0);
 
     auto F4 = [](double x) { return 1.0 - std::asinh(x) - x; };
     CHECK(zeroIn(-1.0, 1.0, F4) == doctest::Approx(0.50992693151945222578));
+}
+
+TEST_CASE("Allocator") {
+    alignas(32) double test[16];
+    auto allocator = LinearAllocator<double>(test, test + 16, 32);
+
+    double* mem = allocator.allocate(4);
+    CHECK(mem == &test[0]);
+
+    mem = allocator.allocate(2);
+    CHECK(mem == &test[4]);
+
+    mem = allocator.allocate(1);
+    CHECK(mem == reinterpret_cast<void*>(&test[8]));
+
+    bool except = false;
+    try {
+        mem = allocator.allocate(1000);
+    } catch (std::bad_alloc const&) {
+        except = true;
+    }
+    REQUIRE(except);
+
+    allocator.reset();
+    mem = allocator.allocate(16);
+    CHECK(mem == &test[0]);
+
+    try {
+        mem = allocator.allocate(1);
+    } catch (std::bad_alloc const&) {
+        except = true;
+    }
+    REQUIRE(except);
+}
+
+TEST_CASE("Algorithm") {
+    auto indices = std::array<std::size_t, 10>{5, 6, 7, 3, 1, 45, 46, 47, 49, 50};
+    auto [block_lengths, displacements] = find_blocks(indices);
+
+    CHECK(block_lengths.size() == 5);
+    CHECK(displacements.size() == block_lengths.size());
+
+    auto ref_displs = std::vector<std::size_t>{5, 3, 1, 45, 49};
+    CHECK(std::equal(ref_displs.begin(), ref_displs.end(), displacements.begin()));
 }

@@ -1,4 +1,6 @@
+#include "form/BC.h"
 #include "geometry/Curvilinear.h"
+#include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
 #include "mesh/LocalFaces.h"
@@ -25,6 +27,7 @@
 using tndm::BC;
 using tndm::BoundaryData;
 using tndm::Curvilinear;
+using tndm::CurvilinearVTUAdapter;
 using tndm::GenMesh;
 using tndm::LocalSimplexMesh;
 using tndm::Range;
@@ -40,7 +43,6 @@ void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun trans
     auto mesh = globalMesh->getLocalMesh(ghostLevels);
 
     unsigned degree = 1;
-    Curvilinear<D> cl(*mesh, *transform, degree);
 
     auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
     if (!boundaryData) {
@@ -60,7 +62,9 @@ void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun trans
     }
 
     VTUWriter<D> writer(degree);
-    auto piece = writer.addPiece(cl, mesh->elements().localSize());
+    auto adapter = CurvilinearVTUAdapter(
+        std::make_shared<Curvilinear<D>>(*mesh, *transform, degree), mesh->elements().localSize());
+    auto piece = writer.addPiece(adapter);
     piece.addCellData("BC", bc);
     piece.addCellData("shared", shared);
     writer.write(baseName);

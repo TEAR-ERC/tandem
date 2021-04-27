@@ -4,6 +4,7 @@
 #include "TensorBase.h"
 #include "util/Sequence.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <type_traits>
@@ -21,6 +22,8 @@ public:
     using real_t = RealT;
 
     template <typename T> using is_slice = std::is_same<slice, T>;
+
+    Tensor() : Base(), data_(nullptr) {}
 
     Tensor(real_t* memory, multi_index_t const& shape) : Base(shape), data_(memory) {
         static_assert(Packed);
@@ -70,6 +73,34 @@ public:
 
     multi_index_t const& stride() const { return stride_; }
     index_t stride(index_t pos) const { return stride_[pos]; }
+
+    void set_zero() { std::fill(data_, data_ + size(), RealT(0.0)); }
+
+    template <typename OtherRealT, bool OtherPacked>
+    void copy_values(Tensor<OtherRealT, D, OtherPacked> const& other) {
+        multi_index_t entry{};
+        auto stop0 = this->shape(0);
+        while (entry[D - 1] != this->shape(D - 1)) {
+            OtherRealT const* source = &other(entry);
+            real_t* target = &operator()(entry);
+            for (index_t i = 0; i < stop0; ++i) {
+                *target = *source;
+                target += stride_[0];
+                source += other.stride(0);
+            }
+
+            if (D == 1) {
+                break;
+            }
+
+            index_t d = 0;
+            do {
+                entry[d] = 0;
+                d++;
+                ++entry[d];
+            } while (entry[d] == this->shape(d) && d < D - 1);
+        }
+    }
 
 protected:
     void computeStride() {

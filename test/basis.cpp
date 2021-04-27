@@ -1,5 +1,6 @@
 #include "basis/Equidistant.h"
 #include "basis/Functions.h"
+#include "basis/GaussLegendre.h"
 #include "basis/Nodal.h"
 #include "basis/WarpAndBlend.h"
 
@@ -29,7 +30,7 @@ TEST_CASE("Basis") {
                 for (unsigned b = 0; b < 4; ++b) {
                     for (auto& point : testPoints1) {
                         CHECK(JacobiP(n, a, b, point / divisor) * std::pow(divisor, n) ==
-                              SingularityFreeJacobiP(n, a, b, point, divisor));
+                              doctest::Approx(SingularityFreeJacobiP(n, a, b, point, divisor)));
                     }
                 }
             }
@@ -237,6 +238,30 @@ TEST_CASE("Nodes") {
         CHECK(glPoints5[4] == doctest::Approx(1.0));
     }
 
+    SUBCASE("Gauss-Legendre nodes") {
+        auto factory = GaussLegendreFactory();
+
+        auto points0 = factory(0);
+        CHECK(points0.size() == 1);
+        CHECK(points0[0][0] == doctest::Approx(0.5));
+
+        auto points1 = factory(1);
+        CHECK(points1.size() == 2);
+        CHECK(points1[0][0] == doctest::Approx(0.5 * sqrt(1.0 / 3.0) + 0.5));
+        CHECK(points1[1][0] == doctest::Approx(-0.5 * sqrt(1.0 / 3.0) + 0.5));
+
+        auto points3 = factory(3);
+        CHECK(points3.size() == 4);
+        CHECK(points3[0][0] ==
+              doctest::Approx(0.5 * sqrt(3.0 / 7.0 + 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[1][0] ==
+              doctest::Approx(0.5 * sqrt(3.0 / 7.0 - 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[2][0] ==
+              doctest::Approx(-0.5 * sqrt(3.0 / 7.0 - 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+        CHECK(points3[3][0] ==
+              doctest::Approx(-0.5 * sqrt(3.0 / 7.0 + 2.0 * sqrt(6.0 / 5.0) / 7.0) + 0.5));
+    }
+
     auto checkNodes = [](auto const& nodes, auto const& refNodes) {
         REQUIRE(nodes.size() == refNodes.size());
         for (std::size_t i = 0; i < nodes.size(); ++i) {
@@ -246,8 +271,19 @@ TEST_CASE("Nodes") {
         }
     };
 
+    auto wab1 = WarpAndBlendFactory<1>();
     auto wab2 = WarpAndBlendFactory<2>();
     auto wab3 = WarpAndBlendFactory<3>();
+
+    SUBCASE("Line nodes P0") {
+        std::vector<std::array<double, 1>> refNodes{{0.5}};
+        checkNodes(wab1(0), refNodes);
+    }
+
+    SUBCASE("Triangle nodes P0") {
+        std::vector<std::array<double, 2>> refNodes{{1.0 / 3.0, 1.0 / 3.0}};
+        checkNodes(wab2(0), refNodes);
+    }
 
     SUBCASE("Triangle nodes P1") {
         std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
@@ -293,6 +329,11 @@ TEST_CASE("Nodes") {
             {0.17267316464601140114, 0.82732683535398865438},
             {0.00000000000000000000, 1.00000000000000000000}};
         checkNodes(wab2(4), refNodes);
+    }
+
+    SUBCASE("Tet nodes P0") {
+        std::vector<std::array<double, 3>> refNodes{{1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0}};
+        checkNodes(wab3(0), refNodes);
     }
 
     SUBCASE("Tet nodes P1") {

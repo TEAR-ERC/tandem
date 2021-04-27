@@ -1,0 +1,14 @@
+# IDE
+.clangd
+compile_commands.json
+
+# Build folders
+build*/
+docs/_build/
+
+# Python stuff
+**/__pycache__/
+**/.ipynb_checkpoints/
+
+# Mesh files
+examples/**/*.msh

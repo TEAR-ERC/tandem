@@ -1,0 +1,30 @@
+final_time = 56764800000
+mesh_file = "bp5.msh"
+
+[seas]
+type = "elasticity"
+lib = "bp5.lua"
+boundary = "boundary"
+lam = "lam"
+mu = "mu"
+ref_normal = [0, -1, 0]
+
+[friction]
+lib = "bp5.lua"
+a = "a"
+eta = "eta"
+sn_pre = "sn_pre"
+tau_pre = "tau_pre"
+Vinit = "Vinit"
+Sinit = "Sinit"
+    [friction.constant]
+    b = 0.015
+    V0 = 1.0e-6
+    L = 0.008
+    f0 = 0.6
+
+[fault_output]
+prefix = "bp5-fault"
+V_ref = 0.001
+t_min = 0.05
+t_max = 9460800

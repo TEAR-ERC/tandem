@@ -5,10 +5,11 @@
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace tndm {
@@ -17,19 +18,15 @@ template <std::size_t D> class RefElement;
 
 template <std::size_t D> class FiniteElementFunction {
 public:
-    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement, double const* data,
-                          std::size_t numberOfBasisFunctions, std::size_t numberOfQuantities,
+    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement, std::vector<std::string> names,
                           std::size_t numberOfElements)
-        : refElement_(std::move(refElement)),
-          data_(numberOfBasisFunctions, numberOfQuantities, numberOfElements) {
-        std::copy(data, data + data_.size(), data_.data());
-    }
+        : refElement_(std::move(refElement)), names_(std::move(names)),
+          data_(refElement_->numBasisFunctions(), names_.size(), numberOfElements) {}
 
-    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement,
-                          std::size_t numberOfBasisFunctions, std::size_t numberOfQuantities,
+    FiniteElementFunction(std::unique_ptr<RefElement<D>> refElement, std::size_t numberOfQuantities,
                           std::size_t numberOfElements)
         : refElement_(std::move(refElement)),
-          data_(numberOfBasisFunctions, numberOfQuantities, numberOfElements) {}
+          data_(refElement_->numBasisFunctions(), numberOfQuantities, numberOfElements) {}
 
     Managed<Matrix<double>>
     evaluationMatrix(std::vector<std::array<double, D>> const& points) const;
@@ -43,9 +40,12 @@ public:
     std::size_t numElements() const { return data_.shape(2); }
 
     auto& values() { return data_; }
+    auto const& values() const { return data_; }
+    std::string name(std::size_t q) const;
 
 private:
     std::unique_ptr<RefElement<D>> refElement_;
+    std::vector<std::string> names_;
     Managed<Tensor<double, 3u>> data_;
 };
 

@@ -1,0 +1,16 @@
+final_time = 2207520000
+resolution = 1
+type = "poisson"
+lib = "mms1.lua"
+scenario = "mms1"
+ref_normal = [1, 0]
+
+[generate_mesh]
+intercepts = [
+    [0, 40],
+    [-40, 0]
+]
+bcs = [
+    [{bc = "f", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]

@@ -1,8 +1,9 @@
 #ifndef GENMESH_H
 #define GENMESH_H
 
-#include "GlobalSimplexMesh.h"
-#include "MeshData.h"
+#include "form/BC.h"
+#include "mesh/GlobalSimplexMesh.h"
+#include "mesh/MeshData.h"
 
 #include <mpi.h>
 

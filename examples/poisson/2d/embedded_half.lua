@@ -29,3 +29,11 @@ function solution(x, y)
         return 0.0
     end
 end
+
+function slip(x, y)
+    if y > 0.0 then
+        return 2.0 * smoothstep(y)
+    else
+        return 0.0
+    end
+end

@@ -2,8 +2,20 @@
 #define ZERO_20200826_H
 
 #include <functional>
+#include <stdexcept>
 
 namespace tndm {
+
+class function_nan_inf : public std::exception {
+public:
+    function_nan_inf(double x, double Fx) noexcept;
+    virtual ~function_nan_inf() {}
+    virtual const char* what() const noexcept { return what_; }
+
+private:
+    static constexpr std::size_t MaxLen = 128;
+    char what_[MaxLen];
+};
 
 /**
  * @brief Find zero of function F in the interval [a,b].

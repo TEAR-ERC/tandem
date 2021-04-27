@@ -1,0 +1,21 @@
+resolution = 0.125
+
+[elasticity]
+lib = "embedded_half.lua"
+force = "force"
+boundary = "solution"
+slip = "slip"
+solution = "solution"
+lam = "lam"
+ref_normal = [1, 0]
+
+[generate_mesh]
+intercepts = [
+    [-1, 0.5, 1],
+    [-1, 0.0, 1]
+]
+bcs = [
+    [{bc = "n", plane = 0}, {bc = "f", plane = 1, region = [1]}, {bc = "n", plane = 2}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 2}]
+]
+

@@ -4,6 +4,7 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 add_library(tandem-fem-lib
     basis/Equidistant.cpp
     basis/Functions.cpp
+    basis/GaussLegendre.cpp
     basis/Nodal.cpp
     basis/WarpAndBlend.cpp
     form/FiniteElementFunction.cpp
@@ -17,6 +18,7 @@ add_library(tandem-fem-lib
 )
 
 target_compile_features(tandem-fem-lib PUBLIC cxx_std_17)
+target_compile_options(tandem-fem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-fem-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(tandem-fem-lib PUBLIC
     Eigen3::Eigen
@@ -24,17 +26,24 @@ target_link_libraries(tandem-fem-lib PUBLIC
 
 # Add everything else here
 add_library(tandem-lib
-    form/DG.cpp
+    form/BoundaryMap.cpp
+    form/DGCurvilinearCommon.cpp
+    form/DGOperatorTopo.cpp
     form/Error.cpp
+    io/BoundaryProbeWriter.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
+    io/PVDWriter.cpp
     io/VTUWriter.cpp
     io/VTUWriter.cpp
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
+    geometry/PointLocator.cpp
+    parallel/Affinity.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
+    parallel/ScatterPlan.cpp
     parallel/SortedDistribution.cpp
     script/LuaLib.cpp
     util/Zero.cpp
@@ -47,6 +56,7 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
+target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
     ../submodules/
     ../submodules/mneme/include/

@@ -3,7 +3,6 @@
 
 #include "DataType.h"
 #include "basis/Equidistant.h"
-#include "util/Range.h"
 
 #include <mpi.h>
 #include <tinyxml2.h>
@@ -18,8 +17,8 @@
 
 namespace tndm {
 
-template <std::size_t D> class Curvilinear;
 template <std::size_t D> class FiniteElementFunction;
+template <std::size_t D> class VTUAdapter;
 template <std::size_t D> class VTUPiece;
 
 template <std::size_t D> class VTUWriter {
@@ -36,7 +35,7 @@ public:
         doc_.InsertFirstChild(grid);
     }
 
-    VTUPiece<D> addPiece(Curvilinear<D>& cl, Range<std::size_t> elementRange);
+    VTUPiece<D> addPiece(VTUAdapter<D>& adapter);
 
     /**
      * @brief Write VTU to disk.
@@ -46,8 +45,28 @@ public:
      * @return True if write was successful.
      */
     bool write(std::string const& baseName);
+    std::string pvtuFileName(std::string const& baseName) const { return baseName + ".pvtu"; }
 
     std::vector<std::array<double, D>> const& refNodes() const { return refNodes_; }
+
+    /**
+     * @brief Adds field data with name "name" to VTU file.
+     */
+    template <typename T>
+    void addFieldData(std::string const& name, T const* data, std::size_t numElements) {
+        auto cdata = doc_.RootElement()->LastChildElement("FieldData");
+        if (!cdata) {
+            cdata = doc_.RootElement()->InsertNewChildElement("FieldData");
+        }
+        auto da = addDataArray<T>(cdata, name, 1, data, numElements);
+        da->SetAttribute("NumberOfTuples", 1);
+    }
+    /**
+     * @brief Wrapper for addFieldData(std::string const&, double const*, std::size_t)
+     */
+    template <typename T> void addFieldData(std::string const& name, std::vector<T> const& data) {
+        addFieldData(name, data.data(), data.size());
+    }
 
 private:
     friend class VTUPiece<D>;
@@ -111,9 +130,9 @@ public:
     VTUPiece(tinyxml2::XMLElement* piece, VTUWriter<D>& writer) : piece_(piece), writer_(writer) {}
 
     /**
-     * @brief Samples FiniteElementFunction and adds point data with name "name" to VTU file.
+     * @brief Samples FiniteElementFunction and adds point data to VTU file.
      */
-    void addPointData(std::string const& name, FiniteElementFunction<D> const& function);
+    void addPointData(FiniteElementFunction<D> const& function);
     /**
      * @brief Adds cell data with name "name" to VTU file.
      *

@@ -1,6 +1,7 @@
 #ifndef MESHDATA_H
 #define MESHDATA_H
 
+#include "form/BC.h"
 #include "parallel/CommPattern.h"
 #include "parallel/MPITraits.h"
 #include "util/Algorithm.h"
@@ -56,8 +57,6 @@ public:
 private:
     std::vector<vertex_t> vertices;
 };
-
-enum class BC : int { None = 0, Natural = 1, Fault = 3, Dirichlet = 5 };
 
 class BoundaryData : public MeshData {
 public:

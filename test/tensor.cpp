@@ -68,4 +68,30 @@ TEST_CASE("Subtensor") {
             CHECK(subtensor4(i) == tensor(1, 5, 2, i));
         }
     }
+
+    SUBCASE("Full copy ok") {
+        auto new_tensor = Managed<Tensor<double, 4u>>(tensor.shape());
+        new_tensor.copy_values(tensor);
+        for (std::ptrdiff_t i = 0; i < tensor.size(); ++i) {
+            CHECK(new_tensor.data()[i] == tensor.data()[i]);
+        }
+    }
+
+    SUBCASE("Slice copy ok") {
+        auto new_tensor = Managed<Matrix<double>>(tensor.shape(1), tensor.shape(3));
+        new_tensor.copy_values(tensor.subtensor(1, slice{}, 2, slice{}));
+        for (std::ptrdiff_t i = 0; i < new_tensor.shape(0); ++i) {
+            for (std::ptrdiff_t j = 0; j < new_tensor.shape(1); ++j) {
+                CHECK(new_tensor(i, j) == tensor(1, i, 2, j));
+            }
+        }
+    }
+
+    SUBCASE("Vector copy ok") {
+        auto new_tensor = Managed<Vector<double>>(tensor.shape(3));
+        new_tensor.copy_values(tensor.subtensor(1, 0, 2, slice{}));
+        for (std::ptrdiff_t i = 0; i < new_tensor.shape(0); ++i) {
+            CHECK(new_tensor(i) == tensor(1, 0, 2, i));
+        }
+    }
 }

@@ -15,6 +15,7 @@ public:
     using index_t = std::ptrdiff_t;
     using multi_index_t = std::array<index_t, detail::traits<Derived>::Dim>;
 
+    TensorBase() {}
     TensorBase(multi_index_t const& shape) : shape_(shape) {}
 
     template <typename... Shape>
@@ -32,7 +33,7 @@ public:
     index_t shape(index_t pos) const { return shape_[pos]; }
 
 protected:
-    multi_index_t shape_;
+    multi_index_t shape_ = {};
 };
 
 } // namespace tndm

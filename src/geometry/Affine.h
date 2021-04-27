@@ -4,6 +4,7 @@
 #include "Vector.h"
 
 #include <Eigen/Core>
+#include <Eigen/QR>
 
 #include <array>
 #include <numeric>
