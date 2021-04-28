@@ -47,6 +47,17 @@ BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
     }
 
     MPI_Allreduce(MPI_IN_PLACE, min_rank.data(), min_rank.size(), MPI_INT, MPI_MIN, comm);
+    for (std::size_t i = 0; i < min_rank.size(); ++i) {
+        if (min_dist[i] == std::numeric_limits<double>::max() ||
+            min_rank[i] == std::numeric_limits<int>::max()) {
+            std::stringstream ss;
+            ss << "Could not closest face for probe at ";
+            for (auto x : probes[i].x) {
+                ss << x << " ";
+            }
+            throw std::runtime_error(ss.str());
+        }
+    }
 
     for (auto it = located_probes.begin(); it != located_probes.end();) {
         if (rank != min_rank[it->first]) {

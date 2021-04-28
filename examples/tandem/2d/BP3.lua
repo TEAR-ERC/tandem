@@ -10,7 +10,6 @@ BP3.cs = 3.464
 BP3.nu = 0.25
 BP3.b = 0.015
 BP3.V0 = 1.0e-6
-BP3.L = 0.008
 BP3.f0 = 0.6
 
 function BP3.new(params)
@@ -41,6 +40,10 @@ end
 
 function BP3:eta(x, y)
     return self.cs * self.rho / 2.0
+end
+
+function BP3:L(x, y)
+    return 0.008
 end
 
 function BP3:Sinit(x, y)

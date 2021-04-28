@@ -18,12 +18,12 @@ public:
     struct ConstantParams {
         double V0;
         double b;
-        double L;
         double f0;
     };
     struct Params {
         double a;
         double eta;
+        double L;
         double sn_pre;
         std::array<double, TangentialComponents> tau_pre;
         std::array<double, TangentialComponents> Vinit;
@@ -35,6 +35,7 @@ public:
     void set_params(std::size_t index, Params const& params) {
         p_[index].get<A>() = params.a;
         p_[index].get<Eta>() = params.eta;
+        p_[index].get<L>() = params.L;
         p_[index].get<SnPre>() = params.sn_pre;
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
@@ -77,7 +78,8 @@ public:
     }
 
     double state_rhs(std::size_t index, double V, double psi) const {
-        return cp_.b * cp_.V0 / cp_.L * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
+        double myL = p_[index].get<L>();
+        return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
     }
 
 private:
@@ -102,13 +104,16 @@ private:
     struct Eta {
         using type = double;
     };
+    struct L {
+        using type = double;
+    };
     struct Vinit {
         using type = std::array<double, TangentialComponents>;
     };
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
 };
 
 } // namespace tndm

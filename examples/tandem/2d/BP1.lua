@@ -8,7 +8,6 @@ BP1.Vp = 1e-9
 BP1.rho = 2.670
 BP1.b = 0.015
 BP1.V0 = 1.0e-6
-BP1.L = 0.008
 BP1.f0 = 0.6
 
 function BP1:new(o)
@@ -34,6 +33,10 @@ end
 
 function BP1:eta(x, y)
     return math.sqrt(self:mu(x, y) * self.rho) / 2.0
+end
+
+function BP1:L(x, y)
+    return 0.008
 end
 
 function BP1:sn_pre(x, y)

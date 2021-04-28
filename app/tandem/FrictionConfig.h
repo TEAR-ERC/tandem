@@ -41,6 +41,7 @@ public:
 
         a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
         eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Eta);
+        L_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, L);
         if (lib_.hasMember(scenario, SnPre)) {
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
         }
@@ -64,7 +65,6 @@ public:
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
         cp_.b = lib_.getMemberConstant(scenario, B);
-        cp_.L = lib_.getMemberConstant(scenario, L);
         cp_.f0 = lib_.getMemberConstant(scenario, F0);
     }
 
@@ -74,6 +74,7 @@ public:
             DieterichRuinaAgeing::Params p;
             p.a = this->a_(x)[0];
             p.eta = this->eta_(x)[0];
+            p.L = this->L_(x)[0];
             p.sn_pre = this->sn_pre_(x)[0];
             p.tau_pre = this->tau_pre_(x);
             p.Vinit = this->Vinit_(x);
@@ -86,7 +87,7 @@ public:
 protected:
     DieterichRuinaAgeing::ConstantParams cp_;
     LuaLib lib_;
-    functional_t<DomainDimension> a_, eta_;
+    functional_t<DomainDimension> a_, eta_, L_;
     functional_t<DomainDimension> sn_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)

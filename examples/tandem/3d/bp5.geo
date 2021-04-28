@@ -1,4 +1,4 @@
-DefineConstant[ res =   {25, Min 0, Max 1000, Name "Resolution" } ];
+DefineConstant[ res =   {40, Min 0, Max 1000, Name "Resolution" } ];
 DefineConstant[ res_f = {1, Min 0, Max 1000, Name "Fault resolution" } ];
 
 h_s = 2;
@@ -34,7 +34,11 @@ nuc2 = news;
 Rectangle(nuc2) = {-l/2, 0, -h_s-h_t, l, H};
 Rotate{ {1, 0, 0}, {0, 0, -h_s-h_t}, -Pi/2} { Surface{nuc2}; }
 
-v() = BooleanFragments{ Volume{1,2}; Delete; }{ Surface{fault,nuc1,nuc2}; Delete; }; 
+nuc3 = news;
+Rectangle(nuc3) = {-l/2, 0, -h_s-h_t, w, H};
+Rotate{ {1, 0, 0}, {0, 0, -h_s-h_t}, -Pi/2} { Surface{nuc3}; }
+
+v() = BooleanFragments{ Volume{1,2}; Delete; }{ Surface{fault,nuc1,nuc2,nuc3}; Delete; }; 
 
 fault() = Surface In BoundingBox{-l_f/2-eps, -eps, -W_f-eps, l_f/2+eps, eps, W_f+eps};
 top() = Surface In BoundingBox{X0-eps, Y0-eps, -eps, X1+eps, Y1+eps, eps};

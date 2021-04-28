@@ -1,30 +1,22 @@
 final_time = 56764800000
 mesh_file = "bp5.msh"
-
-[seas]
-type = "elasticity"
 lib = "bp5.lua"
-boundary = "boundary"
-lam = "lam"
-mu = "mu"
+scenario = "bp5"
+type = "elasticity"
 ref_normal = [0, -1, 0]
 
-[friction]
-lib = "bp5.lua"
-a = "a"
-eta = "eta"
-sn_pre = "sn_pre"
-tau_pre = "tau_pre"
-Vinit = "Vinit"
-Sinit = "Sinit"
-    [friction.constant]
-    b = 0.015
-    V0 = 1.0e-6
-    L = 0.008
-    f0 = 0.6
-
-[fault_output]
-prefix = "bp5-fault"
-V_ref = 0.001
-t_min = 0.05
+[fault_probe_output]
+prefix = "fltst_"
 t_max = 9460800
+probes = [
+    { name = "strk-36dp+00", x = [-36, 0,   0] },
+    { name = "strk-16dp+00", x = [-16, 0,   0] },
+    { name = "strk+00dp+00", x = [  0, 0,   0] },
+    { name = "strk+16dp+00", x = [ 16, 0,   0] },
+    { name = "strk+36dp+00", x = [ 36, 0,   0] },
+    { name = "strk-24dp+10", x = [-24, 0, -10] },
+    { name = "strk-16dp+10", x = [-16, 0, -10] },
+    { name = "strk+00dp+10", x = [  0, 0, -10] },
+    { name = "strk+16dp+10", x = [ 16, 0, -10] },
+    { name = "strk+00dp+22", x = [  0, 0, -22] }
+]

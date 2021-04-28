@@ -11,7 +11,6 @@ mms1.tau_inf = 31.73
 mms1.rho = 3.0
 mms1.b = 0.02
 mms1.V0 = 1.0e-6
-mms1.L = 0.2
 mms1.f0 = 0.6
 
 function mms1:mu(x, y)
@@ -20,6 +19,10 @@ end
 
 function mms1:eta(x, y)
     return math.sqrt(self:mu(x, y) * self.rho) / 2.0
+end
+
+function mms1:L(x, y)
+    return 0.2
 end
 
 function mms1:sn_pre(s, y)
@@ -114,5 +117,5 @@ end
 function mms1:source(x, y, t)
     local ps = self:psi_star(x, y, t)
     local Vs = self:V_star(x, y, t)
-    return - self.b * self.V0 / self.L * (math.exp((self.f0 - ps) / self.b) - Vs / self.V0) + self:dpsi_stardt(x, y, t)
+    return - self.b * self.V0 / self:L(x, y) * (math.exp((self.f0 - ps) / self.b) - Vs / self.V0) + self:dpsi_stardt(x, y, t)
 end
