@@ -94,7 +94,7 @@ function BP5:tau_pre(x, y, z)
     local Vi = math.sqrt(Vi1^2 + Vi2^2)
     local sn = self:sn_pre(x, y, z)
     local ax = self:a(x, y, z)
-    local e = math.exp((self.f0 + self.b * math.log(self.V0 / Vi2)) / ax)
+    local e = math.exp((self.f0 + self.b * math.log(self.V0 / self.Vp)) / ax)
     local tau0 = sn * ax * math.asinh((Vi2 / (2.0 * self.V0)) * e)
                  + self:eta(x, y, z) * Vi2
     return -tau0 * Vi1 / Vi, -tau0 * Vi2 / Vi
