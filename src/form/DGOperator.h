@@ -4,6 +4,7 @@
 #include "form/DGOperatorTopo.h"
 #include "form/FiniteElementFunction.h"
 #include "interface/BlockVector.h"
+#include "parallel/LocalGhostCompositeView.h"
 #include "parallel/Scatter.h"
 #include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
@@ -208,29 +209,16 @@ public:
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
             auto copy_first = topo_->numInteriorElements();
             auto ghost_first = topo_->numLocalElements();
+            auto block_view = LocalGhostCompositeView(x_handle, ghost_);
 
-            auto const get_interior_copy = [&](std::size_t elNo) {
-                assert(elNo < ghost_first);
-                return x_handle.subtensor(slice{}, elNo);
-            };
-
-            auto const get_general = [&](std::size_t elNo) {
-                if (elNo < ghost_first) {
-                    return x_handle.subtensor(slice{}, elNo);
-                } else {
-                    const auto& const_ghost = ghost_;
-                    return const_ghost.get_block(elNo);
-                }
-            };
-
-            const auto lop_apply = [&](std::size_t elNo, auto get) {
+            const auto lop_apply = [&](std::size_t elNo) {
                 auto y_0 = y_handle.subtensor(slice{}, elNo);
                 auto x_0 = x_handle.subtensor(slice{}, elNo);
                 auto info = topo_->neighbours(elNo);
                 assert(info.size() == NumFacets);
                 std::array<decltype(x_0), NumFacets> x_n;
                 for (std::size_t d = 0; d < NumFacets; ++d) {
-                    x_n[d] = get(info[d].lid);
+                    x_n[d] = block_view.get_block(info[d].lid);
                 }
                 lop_->apply(elNo, info, x_0, x_n, y_0);
             };
@@ -238,13 +226,13 @@ public:
             scatter_.begin_scatter(x, ghost_);
 
             for (std::size_t elNo = 0; elNo < copy_first; ++elNo) {
-                lop_apply(elNo, get_interior_copy);
+                lop_apply(elNo);
             }
 
             scatter_.wait_scatter();
 
             for (std::size_t elNo = copy_first; elNo < ghost_first; ++elNo) {
-                lop_apply(elNo, get_general);
+                lop_apply(elNo);
             }
         }
         x.end_access_readonly(x_handle);
