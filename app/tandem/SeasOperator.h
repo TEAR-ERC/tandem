@@ -6,6 +6,9 @@
 #include "tandem/RateAndStateBase.h"
 
 #include "interface/BlockVector.h"
+#include "parallel/LocalGhostCompositeView.h"
+#include "parallel/Scatter.h"
+#include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
@@ -27,11 +30,13 @@ public:
     SeasOperator(std::unique_ptr<LocalOperator> localOperator,
                  std::unique_ptr<SeasAdapter> seas_adapter)
         : lop_(std::move(localOperator)), adapter_(std::move(seas_adapter)),
-          scratch_(lop_->scratch_mem_size() + adapter_->scratch_mem_size(), ALIGNMENT) {
+          scratch_(lop_->scratch_mem_size() + adapter_->scratch_mem_size(), ALIGNMENT),
+          scatter_(adapter_->faultMap().scatter_plan()),
+          ghost_(scatter_.recv_prototype<double>(lop_->block_size(), ALIGNMENT)) {
 
         scratch_.reset();
-        adapter_->begin_preparation(numLocalElements());
-        for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
+        adapter_->begin_preparation(numElements());
+        for (std::size_t faultNo = 0, num = numElements(); faultNo < num; ++faultNo) {
             adapter_->prepare(faultNo, scratch_);
         }
         adapter_->end_preparation();
@@ -46,7 +51,8 @@ public:
     }
 
     std::size_t block_size() const { return lop_->block_size(); }
-    std::size_t numLocalElements() const { return adapter_->faultMap().size(); }
+    std::size_t numElements() const { return adapter_->faultMap().size(); }
+    std::size_t numLocalElements() const { return adapter_->faultMap().local_size(); }
     MPI_Comm comm() const { return adapter_->topo().comm(); }
     BoundaryMap const& faultMap() const { return adapter_->faultMap(); }
     SeasAdapter& adapter() { return *adapter_; }
@@ -59,14 +65,15 @@ public:
             auto B = access_handle.subtensor(slice{}, faultNo);
             lop_->pre_init(faultNo, B, scratch_);
         }
-        vector.end_access(access_handle);
+        scatter_.begin_scatter(vector, ghost_);
+        scatter_.wait_scatter();
 
-        adapter_->solve(0.0, vector);
-
-        access_handle = vector.begin_access();
         auto access_handle_readonly = vector.begin_access_readonly();
+        auto block_view = LocalGhostCompositeView(access_handle_readonly, ghost_);
+        adapter_->solve(0.0, block_view);
+
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction(access_handle_readonly);
+        adapter_->begin_traction(block_view);
         scratch_.reset();
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch_);
@@ -80,12 +87,16 @@ public:
     }
 
     void rhs(double time, BlockVector const& state, BlockVector& result) {
-        adapter_->solve(time, state);
+        scatter_.begin_scatter(state, ghost_);
+        scatter_.wait_scatter();
 
         auto in_handle = state.begin_access_readonly();
+        auto block_view = LocalGhostCompositeView(in_handle, ghost_);
+        adapter_->solve(time, block_view);
+
         auto out_handle = result.begin_access();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction(in_handle);
+        adapter_->begin_traction(block_view);
         VMax_ = 0.0;
         scratch_.reset();
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
@@ -102,6 +113,15 @@ public:
         result.end_access(out_handle);
     }
 
+    void full_solve(double time, BlockVector const& state) {
+        scatter_.begin_scatter(state, ghost_);
+        scatter_.wait_scatter();
+
+        auto in_handle = state.begin_access_readonly();
+        adapter_->full_solve(time, LocalGhostCompositeView(in_handle, ghost_), false);
+        state.end_access_readonly(in_handle);
+    }
+
     template <typename Iterator>
     auto state(BlockVector const& vector, Iterator first, Iterator last) {
         auto num_elements = std::distance(first, last);
@@ -110,11 +130,12 @@ public:
 
         auto in_handle = vector.begin_access_readonly();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction(in_handle);
+        adapter_->begin_traction(LocalGhostCompositeView(in_handle, ghost_));
         scratch_.reset();
         std::size_t out_no = 0;
         for (; first != last; ++first) {
             std::size_t faultNo = *first;
+            assert(faultNo < numLocalElements());
             adapter_->traction(faultNo, traction, scratch_);
 
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
@@ -141,6 +162,8 @@ private:
     std::unique_ptr<SeasAdapter> adapter_;
     Scratch<double> scratch_;
     double VMax_ = 0.0;
+    Scatter scatter_;
+    SparseBlockVector<double> ghost_;
 };
 
 } // namespace tndm

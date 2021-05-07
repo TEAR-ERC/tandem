@@ -6,6 +6,7 @@
 
 #include "form/FacetInfo.h"
 #include "form/RefElement.h"
+#include "parallel/LocalGhostCompositeView.h"
 #include "tandem/SeasAdapterBase.h"
 #include "tensor/Managed.h"
 #include "tensor/Utility.h"
@@ -49,17 +50,11 @@ void SeasPoissonAdapter::traction(std::size_t faultNo, Matrix<double>& traction,
     auto grad_u = Matrix<double>(grad_u_raw, dgop_->lop().tractionResultInfo());
     assert(grad_u.size() == poisson::tensor::grad_u::Size);
 
-    auto fctNo = faultMap_.fctNo(faultNo);
+    auto fctNo = faultMap_->fctNo(faultNo);
     auto const& info = dgop_->topo().info(fctNo);
-    const auto get = [&](std::size_t elNo) {
-        if (elNo < dgop_->numLocalElements()) {
-            return handle_.subtensor(slice{}, elNo);
-        } else {
-            return ghost_.get_block(elNo);
-        }
-    };
-    auto u0 = get(info.up[0]);
-    auto u1 = get(info.up[1]);
+    auto block_view = LocalGhostCompositeView(handle_, ghost_);
+    auto u0 = block_view.get_block(info.up[0]);
+    auto u1 = block_view.get_block(info.up[1]);
     if (info.up[0] == info.up[1]) {
         dgop_->lop().traction_boundary(fctNo, info, u0, grad_u);
     } else {

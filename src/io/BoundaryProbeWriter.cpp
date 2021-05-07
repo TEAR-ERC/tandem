@@ -2,7 +2,6 @@
 
 #include "geometry/PointLocator.h"
 
-#include <cassert>
 #include <iomanip>
 #include <ios>
 #include <mpi.h>
@@ -18,7 +17,7 @@ BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
                                             std::shared_ptr<Curvilinear<D>> cl,
                                             BoundaryMap const& bnd_map, MPI_Comm comm) {
     auto bpl =
-        BoundaryPointLocator<D>(std::make_shared<PointLocator<D>>(cl), mesh, bnd_map.fctNos());
+        BoundaryPointLocator<D>(std::make_shared<PointLocator<D>>(cl), mesh, bnd_map.localFctNos());
 
     std::vector<std::pair<std::size_t, BoundaryPointLocatorResult<D>>> located_probes;
     located_probes.reserve(probes.size());
@@ -109,8 +108,6 @@ void BoundaryProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& 
 template <std::size_t D>
 void BoundaryProbeWriter<D>::write(double time,
                                    FiniteElementFunction<D - 1> const& function) const {
-    assert(function.numElements() == probes_.size());
-
     auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
     for (auto const& probe : probes_) {
         std::ofstream file;

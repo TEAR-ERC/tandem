@@ -1,6 +1,7 @@
 #include "SEAS.h"
 #include "common/PetscTimeSolver.h"
 #include "config.h"
+#include "form/BoundaryMap.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "tandem/Config.h"
@@ -39,25 +40,30 @@ template <SeasType Type> struct adapter;
 template <> struct adapter<SeasType::Poisson> {
     using type = SeasPoissonAdapter;
     static auto make(Config const& cfg, SeasScenario<Poisson> const& scenario,
+                     std::unique_ptr<BoundaryMap> fault_map,
                      std::shared_ptr<Curvilinear<DomainDimension>> cl,
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
-        auto lop = std::make_unique<Poisson>(cl, scenario.mu(), DGMethod::IP);
+        auto lop = std::make_unique<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
+        auto dgop = std::make_unique<DGOperator<Poisson>>(std::move(topo), std::move(lop));
         return std::make_unique<SeasPoissonAdapter>(
-            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.up,
-            cfg.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(fault_map), std::move(space), std::move(dgop), cfg.up, cfg.ref_normal,
+            cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 template <> struct adapter<SeasType::Elasticity> {
     using type = SeasElasticityAdapter;
     static auto make(Config const& cfg, SeasScenario<Elasticity> const& scenario,
+                     std::unique_ptr<BoundaryMap> fault_map,
                      std::shared_ptr<Curvilinear<DomainDimension>> cl,
                      std::shared_ptr<DGOperatorTopo> topo,
                      std::unique_ptr<RefElement<DomainDimension - 1u>> space) {
-        auto lop = std::make_unique<Elasticity>(cl, scenario.lam(), scenario.mu(), DGMethod::IP);
+        auto lop = std::make_unique<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
+                                                DGMethod::IP);
+        auto dgop = std::make_unique<DGOperator<Elasticity>>(std::move(topo), std::move(lop));
         return std::make_unique<SeasElasticityAdapter>(
-            std::move(cl), std::move(topo), std::move(space), std::move(lop), cfg.up,
-            cfg.ref_normal, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(fault_map), std::move(space), std::move(dgop), cfg.up, cfg.ref_normal,
+            cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     }
 };
 
@@ -93,8 +99,10 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto fop = std::make_unique<fault_op_t>(cl);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+    auto fault_map = std::make_unique<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
     auto adapt = discrete_green<base_adapter_t, MakeGreen>::wrap(
-        adapter<Type>::make(cfg, scenario, cl, topo, fop->space().clone()), fop->slip_block_size());
+        adapter<Type>::make(cfg, scenario, std::move(fault_map), cl, topo, fop->space().clone()),
+        fop->slip_block_size());
 
     auto seasop = std::make_shared<seas_op_t>(std::move(fop), std::move(adapt));
     seasop->lop().set_constant_params(friction_scenario.constant_params());

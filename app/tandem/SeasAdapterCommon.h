@@ -9,6 +9,8 @@
 #include "form/DGOperatorTopo.h"
 #include "geometry/Curvilinear.h"
 #include "interface/BlockVector.h"
+#include "interface/BlockView.h"
+#include "parallel/SparseBlockVector.h"
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
 #include "util/LinearAllocator.h"
@@ -29,28 +31,26 @@ public:
     using time_functional_t =
         std::function<std::array<double, NumQuantities>(std::array<double, Dim + 1u> const&)>;
 
-    SeasAdapterCommon(std::shared_ptr<Curvilinear<Dim>> cl, std::shared_ptr<DGOperatorTopo> topo,
+    SeasAdapterCommon(std::unique_ptr<BoundaryMap> fault_map,
                       std::unique_ptr<RefElement<Dim - 1u>> space,
-                      std::unique_ptr<local_operator_t> local_operator,
+                      std::unique_ptr<DGOperator<local_operator_t>> dgop,
                       std::array<double, Dim> const& up, std::array<double, Dim> const& ref_normal,
                       bool matrix_free = false, MGConfig const& mg_config = MGConfig())
-        : SeasAdapterBase(std::move(cl), topo, std::move(space),
-                          local_operator->facetQuadratureRule().points(), up, ref_normal),
-          dgop_(std::make_unique<DGOperator<local_operator_t>>(std::move(topo),
-                                                               std::move(local_operator))),
-          linear_solver_(*dgop_, matrix_free, mg_config), scatter_(topo_->elementScatterPlan()),
+        : SeasAdapterBase(std::move(fault_map), std::move(dgop->lop().cl_ptr()),
+                          std::move(dgop->topo_ptr()), std::move(space),
+                          dgop->lop().facetQuadratureRule().points(), up, ref_normal),
+          dgop_(std::move(dgop)), linear_solver_(*dgop_, matrix_free, mg_config),
+          scatter_(topo_->elementScatterPlan()),
           ghost_(scatter_.recv_prototype<double>(dgop_->block_size(), dgop_->lop().alignment())) {}
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
-    void solve(double time, BlockVector const& state) {
-        auto in_handle = state.begin_access_readonly();
-        dgop_->lop().set_slip(
-            [this, &state, &in_handle](std::size_t fctNo, Matrix<double>& f_q, bool) {
-                auto faultNo = this->faultMap_.bndNo(fctNo);
-                auto state_block = in_handle.subtensor(slice{}, faultNo);
-                static_cast<Derived*>(this)->slip(faultNo, state_block, f_q);
-            });
+    void solve(double time, BlockView const& state) {
+        dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
+            auto faultNo = this->faultMap_->bndNo(fctNo);
+            auto state_block = state.get_block(faultNo);
+            static_cast<Derived*>(this)->slip(faultNo, state_block, f_q);
+        });
         dgop_->lop().set_dirichlet(
             [this, time](std::array<double, Dim> const& x) {
                 std::array<double, Dim + 1u> xt;
@@ -61,22 +61,21 @@ public:
             ref_normal_);
         linear_solver_.update_rhs(*dgop_);
         linear_solver_.solve();
-        state.end_access_readonly(in_handle);
         scatter_.begin_scatter(linear_solver_.x(), ghost_);
         scatter_.wait_scatter();
     }
 
-    void full_solve(double time, BlockVector const& state, bool reuse_last_solve) {
+    void full_solve(double time, BlockView const& state, bool reuse_last_solve) {
         if (!reuse_last_solve) {
             solve(time, state);
         }
     }
 
-    void begin_traction(Matrix<const double> state_access) {
+    void begin_traction(BlockView const& state) {
         handle_ = linear_solver_.x().begin_access_readonly();
-        dgop_->lop().set_slip([this, state_access](std::size_t fctNo, Matrix<double>& f_q, bool) {
-            auto faultNo = this->faultMap_.bndNo(fctNo);
-            auto state_block = state_access.subtensor(slice{}, faultNo);
+        dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
+            auto faultNo = this->faultMap_->bndNo(fctNo);
+            auto state_block = state.get_block(faultNo);
             static_cast<Derived*>(this)->slip(faultNo, state_block, f_q);
         });
     }

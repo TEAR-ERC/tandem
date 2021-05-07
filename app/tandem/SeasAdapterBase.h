@@ -24,7 +24,8 @@ namespace tndm {
 
 class SeasAdapterBase {
 public:
-    SeasAdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+    SeasAdapterBase(std::unique_ptr<BoundaryMap> fault_map,
+                    std::shared_ptr<Curvilinear<DomainDimension>> cl,
                     std::shared_ptr<DGOperatorTopo> topo,
                     std::unique_ptr<RefElement<DomainDimension - 1u>> space,
                     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
@@ -40,13 +41,13 @@ public:
     void end_preparation() {}
 
     auto const& topo() const { return *topo_; }
-    auto const& faultMap() const { return faultMap_; }
+    auto const& faultMap() const { return *faultMap_; }
 
 protected:
+    std::unique_ptr<BoundaryMap> faultMap_;
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;
     std::shared_ptr<DGOperatorTopo> topo_;
     std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
-    BoundaryMap faultMap_;
     std::array<double, DomainDimension> up_;
     std::array<double, DomainDimension> ref_normal_;
     std::size_t nq_;

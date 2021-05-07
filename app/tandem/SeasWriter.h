@@ -81,7 +81,7 @@ public:
                     LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                     std::shared_ptr<SeasOperator> seasop, unsigned degree)
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
-          adapter_(mesh, std::move(cl), seasop_->faultMap().fctNos()), degree_(degree) {}
+          adapter_(mesh, std::move(cl), seasop_->faultMap().localFctNos()), degree_(degree) {}
 
     void write_step(double time, BlockVector const& state) {
         int rank;
@@ -117,7 +117,7 @@ public:
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 
-        seasop_->adapter().full_solve(time, state, true);
+        seasop_->full_solve(time, state);
         auto displacement = seasop_->adapter().displacement();
         auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
         writer.addFieldData("time", &time, 1);

@@ -14,13 +14,13 @@
 namespace tndm {
 
 SeasAdapterBase::SeasAdapterBase(
-    std::shared_ptr<Curvilinear<DomainDimension>> cl, std::shared_ptr<DGOperatorTopo> topo,
-    std::unique_ptr<RefElement<DomainDimension - 1u>> space,
+    std::unique_ptr<BoundaryMap> fault_map, std::shared_ptr<Curvilinear<DomainDimension>> cl,
+    std::shared_ptr<DGOperatorTopo> topo, std::unique_ptr<RefElement<DomainDimension - 1u>> space,
     std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
     std::array<double, DomainDimension> const& up,
     std::array<double, DomainDimension> const& ref_normal)
     : cl_(std::move(cl)), topo_(std::move(topo)), space_(std::move(space)),
-      faultMap_(*topo_, BC::Fault), up_(up), ref_normal_(ref_normal), nq_(quadPoints.size()) {
+      faultMap_(std::move(fault_map)), up_(up), ref_normal_(ref_normal), nq_(quadPoints.size()) {
 
     e_q = space_->evaluateBasisAt(quadPoints);
     e_q_T = space_->evaluateBasisAt(quadPoints, {1, 0});
@@ -37,7 +37,7 @@ void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces) {
 }
 
 void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scratch) {
-    auto const fctNo = faultMap_.fctNo(faultNo);
+    auto const fctNo = faultMap_->fctNo(faultNo);
     auto const& info = topo_->info(fctNo);
 
     auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq_));

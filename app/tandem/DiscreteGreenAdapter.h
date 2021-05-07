@@ -4,6 +4,10 @@
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
 
+#include "interface/BlockView.h"
+#include "parallel/LocalGhostCompositeView.h"
+#include "parallel/Scatter.h"
+#include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "tensor/TensorBase.h"
@@ -40,7 +44,6 @@ public:
 
     void begin_preparation(std::size_t numFaultFaces) {
         adapter_->begin_preparation(numFaultFaces);
-        numFaultFaces_ = numFaultFaces;
     }
     void prepare(std::size_t faultNo, LinearAllocator<double>& scratch) {
         adapter_->prepare(faultNo, scratch);
@@ -50,30 +53,25 @@ public:
         compute_discrete_greens_function();
     }
 
-    void solve(double time, BlockVector const& state) {
-        auto in_handle = state.begin_access_readonly();
-        for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
-            auto state_block = in_handle.subtensor(slice{}, faultNo);
-            S_->insert_block(faultNo, state_block);
+    void solve(double time, BlockView const& state) {
+        for (std::size_t faultNo = 0, num = adapter_->faultMap().local_size(); faultNo < num;
+             ++faultNo) {
+            S_->insert_block(faultNo, state.get_block(faultNo));
         }
         S_->begin_assembly();
         S_->end_assembly();
-        state.end_access_readonly(in_handle);
 
         CHKERRTHROW(MatMult(T_, S_->vec(), t_->vec()));
         CHKERRTHROW(VecAXPY(t_->vec(), time, t_boundary_->vec()));
     }
 
-    void full_solve(double time, BlockVector const& state, bool reuse_last_solve) {
+    void full_solve(double time, BlockView const& state, bool reuse_last_solve) {
         adapter_->solve(time, state);
     }
 
     TensorBase<Matrix<double>> traction_info() const { return adapter_->traction_info(); }
-    void begin_traction(Matrix<const double> state_access) {
-        handle_ = t_->begin_access_readonly();
-    }
-    void traction(std::size_t faultNo, Matrix<double>& traction,
-                  LinearAllocator<double>& blabla) const {
+    void begin_traction(BlockView const&) { handle_ = t_->begin_access_readonly(); }
+    void traction(std::size_t faultNo, Matrix<double>& traction, LinearAllocator<double>&) const {
         auto block = handle_.subtensor(slice{}, faultNo);
         assert(block.size() == traction.size());
 
@@ -94,7 +92,6 @@ private:
     std::unique_ptr<Adapter> adapter_;
     std::size_t slip_block_size_;
 
-    std::size_t numFaultFaces_ = 0;
     Mat T_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;
@@ -106,10 +103,11 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
     auto scratch = Scratch<double>(adapter_->scratch_mem_size(), ALIGNMENT);
     auto traction = Managed<Matrix<double>>(adapter_->traction_info());
 
+    PetscInt numFaultFaces = adapter_->faultMap().local_size();
     PetscInt m_bs = traction.size();
     PetscInt n_bs = 1;
-    PetscInt m = numFaultFaces_ * m_bs;
-    PetscInt n = numFaultFaces_ * slip_block_size_ * n_bs;
+    PetscInt m = numFaultFaces * m_bs;
+    PetscInt n = numFaultFaces * slip_block_size_ * n_bs;
 
     MPI_Comm comm = topo().comm();
 
@@ -118,17 +116,20 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
 
     PetscInt mb_offset = 0;
     PetscInt nb_offset = 0;
-    MPI_Scan(&numFaultFaces_, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    mb_offset -= numFaultFaces_;
+    MPI_Scan(&numFaultFaces, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
+    mb_offset -= numFaultFaces;
     MPI_Scan(&n, &nb_offset, 1, MPIU_INT, MPI_SUM, comm);
     nb_offset -= n;
 
     CHKERRTHROW(MatCreateDense(comm, m, n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &T_));
     CHKERRTHROW(MatSetBlockSizes(T_, m_bs, n_bs));
 
-    S_ = std::make_unique<PetscVector>(slip_block_size_, numFaultFaces_, comm);
-    t_ = std::make_unique<PetscVector>(m_bs, numFaultFaces_, comm);
-    t_boundary_ = std::make_unique<PetscVector>(m_bs, numFaultFaces_, comm);
+    auto scatter = Scatter(adapter_->faultMap().scatter_plan());
+    auto ghost = scatter.template recv_prototype<double>(slip_block_size_, ALIGNMENT);
+    S_ = std::make_unique<PetscVector>(slip_block_size_, numFaultFaces, comm);
+
+    t_ = std::make_unique<PetscVector>(m_bs, numFaultFaces, comm);
+    t_boundary_ = std::make_unique<PetscVector>(m_bs, numFaultFaces, comm);
 
     PetscInt N;
     CHKERRTHROW(VecGetSize(S_->vec(), &N));
@@ -145,11 +146,15 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
         S_->begin_assembly();
         S_->end_assembly();
 
-        adapter_->solve(0.0, *S_);
+        scatter.begin_scatter(*S_, ghost);
+        scatter.wait_scatter();
 
         auto S_handle = S_->begin_access_readonly();
-        adapter_->begin_traction(S_handle);
-        for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
+        auto block_view = LocalGhostCompositeView(S_handle, ghost);
+        adapter_->solve(0.0, block_view);
+
+        adapter_->begin_traction(block_view);
+        for (std::size_t faultNo = 0; faultNo < numFaultFaces; ++faultNo) {
             scratch.reset();
             adapter_->traction(faultNo, traction, scratch);
             PetscInt g_m = mb_offset + faultNo;
@@ -175,12 +180,20 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_boundary
     auto scratch = Scratch<double>(adapter_->scratch_mem_size(), ALIGNMENT);
     auto traction = Managed<Matrix<double>>(adapter_->traction_info());
 
+    auto scatter = Scatter(adapter_->faultMap().scatter_plan());
+    auto ghost = scatter.template recv_prototype<double>(slip_block_size_, ALIGNMENT);
+
     CHKERRTHROW(VecZeroEntries(S_->vec()));
-    adapter_->solve(1.0, *S_);
+    scatter.begin_scatter(*S_, ghost);
+    scatter.wait_scatter();
 
     auto S_handle = S_->begin_access_readonly();
-    adapter_->begin_traction(S_handle);
-    for (std::size_t faultNo = 0; faultNo < numFaultFaces_; ++faultNo) {
+    auto block_view = LocalGhostCompositeView(S_handle, ghost);
+    adapter_->solve(1.0, block_view);
+
+    adapter_->begin_traction(block_view);
+    for (std::size_t faultNo = 0, num = adapter_->faultMap().local_size(); faultNo < num;
+         ++faultNo) {
         scratch.reset();
         adapter_->traction(faultNo, traction, scratch);
         PetscInt l_m = faultNo;

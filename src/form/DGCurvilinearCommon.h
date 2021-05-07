@@ -36,6 +36,9 @@ public:
 
     DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
 
+    Curvilinear<D> const& cl() const { return *cl_; }
+    std::shared_ptr<Curvilinear<D>> cl_ptr() const { return cl_; }
+
     std::size_t scratch_mem_size() const {
         return std::max(volRule.size(), fctRule.size()) * (D * D + 1);
     }

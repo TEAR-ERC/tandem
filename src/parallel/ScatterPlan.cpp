@@ -2,8 +2,8 @@
 
 namespace tndm {
 
-void ScatterPlan::setup(std::unordered_map<int, std::vector<std::size_t>> send_map,
-                        std::unordered_map<int, std::vector<std::size_t>> recv_map) {
+void ScatterPlan::setup(std::unordered_map<int, std::vector<std::size_t>> const& send_map,
+                        std::unordered_map<int, std::vector<std::size_t>> const& recv_map) {
     const auto make_indices = [](auto const& map) {
         std::size_t size = 0;
         for (auto& [key, value] : map) {

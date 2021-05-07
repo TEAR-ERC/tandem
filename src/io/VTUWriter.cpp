@@ -96,6 +96,9 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapt
 }
 
 template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D> const& function) {
+    if (function.numElements() == 0) {
+        return;
+    }
     auto pointsPerElement = writer_.refNodes().size();
 
     XMLElement* pdata = piece_->LastChildElement("PointData");

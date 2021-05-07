@@ -45,17 +45,11 @@ void SeasElasticityAdapter::traction(std::size_t faultNo, Matrix<double>& tracti
     auto traction_q = Matrix<double>(traction_q_raw, dgop_->lop().tractionResultInfo());
     assert(traction_q.size() == elasticity::tensor::traction_q::Size);
 
-    auto fctNo = faultMap_.fctNo(faultNo);
+    auto fctNo = faultMap_->fctNo(faultNo);
     auto const& info = dgop_->topo().info(fctNo);
-    const auto get = [&](std::size_t elNo) {
-        if (elNo < dgop_->numLocalElements()) {
-            return handle_.subtensor(slice{}, elNo);
-        } else {
-            return ghost_.get_block(elNo);
-        }
-    };
-    auto u0 = get(info.up[0]);
-    auto u1 = get(info.up[1]);
+    auto block_view = LocalGhostCompositeView(handle_, ghost_);
+    auto u0 = block_view.get_block(info.up[0]);
+    auto u1 = block_view.get_block(info.up[1]);
     if (info.up[0] == info.up[1]) {
         dgop_->lop().traction_boundary(fctNo, info, u0, traction_q);
     } else {

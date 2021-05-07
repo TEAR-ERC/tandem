@@ -82,6 +82,7 @@ public:
     std::size_t block_size() const { return lop_->block_size(); }
     std::size_t numLocalElements() const { return topo_->numLocalElements(); }
     DGOperatorTopo const& topo() const { return *topo_; }
+    std::shared_ptr<DGOperatorTopo> topo_ptr() const { return topo_; }
     std::size_t number_of_local_dofs() const { return block_size() * numLocalElements(); }
 
     template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {

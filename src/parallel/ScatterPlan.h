@@ -42,6 +42,13 @@ public:
         setup(send_map, recv_map);
     }
 
+    ScatterPlan(std::unordered_map<int, std::vector<std::size_t>> const& send_map,
+                std::unordered_map<int, std::vector<std::size_t>> const& recv_map,
+                MPI_Comm comm = MPI_COMM_WORLD)
+        : comm_(comm) {
+        setup(send_map, recv_map);
+    }
+
     MPI_Comm comm() const { return comm_; }
     std::vector<std::size_t> const& send_indices() const { return send_indices_; }
     std::vector<std::size_t> const& recv_indices() const { return recv_indices_; }
@@ -49,8 +56,8 @@ public:
     std::vector<CommBlock> const& recv_blocks() const { return recv_blocks_; }
 
 private:
-    void setup(std::unordered_map<int, std::vector<std::size_t>> send_map,
-               std::unordered_map<int, std::vector<std::size_t>> recv_map);
+    void setup(std::unordered_map<int, std::vector<std::size_t>> const& send_map,
+               std::unordered_map<int, std::vector<std::size_t>> const& recv_map);
 
     MPI_Comm comm_;
 
