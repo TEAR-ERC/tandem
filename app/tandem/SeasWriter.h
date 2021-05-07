@@ -25,7 +25,8 @@ namespace tndm {
 
 class SeasWriter {
 public:
-    SeasWriter(std::string_view prefix, AdaptiveOutputInterval oi) : prefix_(prefix), oi_(oi) {}
+    SeasWriter(std::string_view prefix, AdaptiveOutputInterval oi)
+        : prefix_(prefix), oi_(oi), pvd_(prefix) {}
     virtual ~SeasWriter() {}
 
     void monitor(double time, BlockVector const& state, double VMax) {
@@ -95,7 +96,7 @@ public:
         writer.write(base_step);
         if (rank == 0) {
             pvd_.addTimestep(time, writer.pvtuFileName(base_step));
-            pvd_.write(prefix_);
+            pvd_.write();
         }
     }
 
@@ -127,7 +128,7 @@ public:
         writer.write(base_step);
         if (rank == 0) {
             pvd_.addTimestep(time, writer.pvtuFileName(base_step));
-            pvd_.write(prefix_);
+            pvd_.write();
         }
     }
 

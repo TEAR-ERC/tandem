@@ -7,12 +7,25 @@
 #include <string>
 #include <string_view>
 
+#include <iostream>
+
 namespace tndm {
 
 class PathExists {
 public:
     bool operator()(std::string const& path) {
         return std::filesystem::exists(std::filesystem::path(path));
+    }
+};
+
+class ParentPathExists {
+public:
+    bool operator()(std::string const& path) {
+        auto p = std::filesystem::path(path);
+        if (!p.has_parent_path()) {
+            return true;
+        }
+        return std::filesystem::exists(p.parent_path());
     }
 };
 

@@ -37,7 +37,9 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         using type = std::remove_reference_t<decltype(std::declval<OutputConfig>().*ptr)>;
         return static_cast<type Derived::*>(ptr);
     };
-    outputSchema.add_value("prefix", cast(&Derived::prefix)).help("Output file name prefix");
+    outputSchema.add_value("prefix", cast(&Derived::prefix))
+        .validator(ParentPathExists())
+        .help("Output file name prefix");
     outputSchema.add_value("atol", cast(&Derived::atol))
         .validator([](auto&& x) { return x >= 0; })
         .default_value(1e-50)

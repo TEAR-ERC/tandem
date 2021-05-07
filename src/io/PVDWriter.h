@@ -3,18 +3,19 @@
 
 #include <tinyxml2.h>
 
-#include <string>
+#include <filesystem>
+#include <string_view>
 
 namespace tndm {
 
 class PVDWriter {
 public:
-    PVDWriter();
+    PVDWriter(std::string_view baseName);
 
     /**
      * @brief Add a pvtu file to the time series.
      */
-    void addTimestep(double time, std::string const& fileName);
+    void addTimestep(double time, std::string_view fileName);
 
     /**
      * @brief Write PVD to disk on rank 0.
@@ -23,9 +24,10 @@ public:
      *
      * @return True if write was successful.
      */
-    bool write(std::string const& baseName);
+    bool write();
 
 private:
+    std::filesystem::path base_;
     tinyxml2::XMLDocument doc_;
     tinyxml2::XMLElement* collection_;
 };

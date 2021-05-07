@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <sstream>
 
 using tinyxml2::XMLAttribute;
@@ -96,9 +97,6 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapt
 }
 
 template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D> const& function) {
-    if (function.numElements() == 0) {
-        return;
-    }
     auto pointsPerElement = writer_.refNodes().size();
 
     XMLElement* pdata = piece_->LastChildElement("PointData");
@@ -127,13 +125,13 @@ template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D>
 template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     int rank;
     MPI_Comm_rank(comm_, &rank);
-    auto formatName = [&baseName](int rk) {
+    auto formatName = [](std::string const& baseName, int rk) {
         std::stringstream nameS;
         nameS << baseName << "_" << rk << ".vtu";
         return nameS.str();
     };
 
-    std::string fileName = formatName(rank);
+    std::string fileName = formatName(baseName, rank);
     FILE* fp = std::fopen(fileName.c_str(), "w");
     if (!fp) {
         std::perror("Could not open file for writing");
@@ -168,6 +166,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     std::fclose(fp);
 
     if (rank == 0) {
+        auto relative_base = std::filesystem::path(baseName).filename().string();
         std::string pvtuName = pvtuFileName(baseName);
         fp = std::fopen(pvtuName.c_str(), "w");
         if (!fp) {
@@ -186,7 +185,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
             MPI_Comm_size(comm_, &commSize);
             for (int rk = 0; rk < commSize; ++rk) {
                 auto piece = grid->InsertNewChildElement("Piece");
-                piece->SetAttribute("Source", formatName(rk).c_str());
+                piece->SetAttribute("Source", formatName(relative_base, rk).c_str());
             }
         }
         pdoc.Print(&printer);
