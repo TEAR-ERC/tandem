@@ -31,6 +31,9 @@ void setConfigSchema(TableSchema<Config>& schema,
     default_up.back() = 1.0;
     schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values();
     schema.add_array("ref_normal", &Config::ref_normal).of_values();
+    schema.add_value("boundary_linear", &Config::boundary_linear)
+        .default_value(false)
+        .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
 
     schema.add_value("discrete_green", &Config::discrete_green)
         .default_value(false)

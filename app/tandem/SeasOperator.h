@@ -118,7 +118,8 @@ public:
         scatter_.wait_scatter();
 
         auto in_handle = state.begin_access_readonly();
-        adapter_->full_solve(time, LocalGhostCompositeView(in_handle, ghost_), false);
+        auto block_view = LocalGhostCompositeView(in_handle, ghost_);
+        adapter_->full_solve(time, block_view);
         state.end_access_readonly(in_handle);
     }
 
@@ -130,7 +131,8 @@ public:
 
         auto in_handle = vector.begin_access_readonly();
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
-        adapter_->begin_traction(LocalGhostCompositeView(in_handle, ghost_));
+        auto block_view = LocalGhostCompositeView(in_handle, ghost_);
+        adapter_->begin_traction(block_view);
         scratch_.reset();
         std::size_t out_no = 0;
         for (; first != last; ++first) {

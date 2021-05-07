@@ -53,7 +53,7 @@ public:
         compute_discrete_greens_function();
     }
 
-    void solve(double time, BlockView const& state) {
+    void solve(double time, BlockView& state) {
         for (std::size_t faultNo = 0, num = adapter_->faultMap().local_size(); faultNo < num;
              ++faultNo) {
             S_->insert_block(faultNo, state.get_block(faultNo));
@@ -65,12 +65,10 @@ public:
         CHKERRTHROW(VecAXPY(t_->vec(), time, t_boundary_->vec()));
     }
 
-    void full_solve(double time, BlockView const& state, bool reuse_last_solve) {
-        adapter_->solve(time, state);
-    }
+    void full_solve(double time, BlockView& state) { adapter_->solve(time, state); }
 
     TensorBase<Matrix<double>> traction_info() const { return adapter_->traction_info(); }
-    void begin_traction(BlockView const&) { handle_ = t_->begin_access_readonly(); }
+    void begin_traction(BlockView&) { handle_ = t_->begin_access_readonly(); }
     void traction(std::size_t faultNo, Matrix<double>& traction, LinearAllocator<double>&) const {
         auto block = handle_.subtensor(slice{}, faultNo);
         assert(block.size() == traction.size());

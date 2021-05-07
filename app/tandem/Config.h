@@ -76,6 +76,7 @@ struct Config {
     std::string scenario;
     std::array<double, DomainDimension> up;
     std::array<double, DomainDimension> ref_normal;
+    bool boundary_linear;
 
     bool discrete_green;
     bool matrix_free;

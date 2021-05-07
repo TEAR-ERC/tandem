@@ -45,7 +45,7 @@ public:
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
-    void solve(double time, BlockView const& state) {
+    void solve(double time, BlockView& state) {
         dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
             auto faultNo = this->faultMap_->bndNo(fctNo);
             auto state_block = state.get_block(faultNo);
@@ -65,13 +65,9 @@ public:
         scatter_.wait_scatter();
     }
 
-    void full_solve(double time, BlockView const& state, bool reuse_last_solve) {
-        if (!reuse_last_solve) {
-            solve(time, state);
-        }
-    }
+    void full_solve(double time, BlockView& state) { solve(time, state); }
 
-    void begin_traction(BlockView const& state) {
+    void begin_traction(BlockView& state) {
         handle_ = linear_solver_.x().begin_access_readonly();
         dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
             auto faultNo = this->faultMap_->bndNo(fctNo);

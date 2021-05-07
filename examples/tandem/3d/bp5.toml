@@ -4,6 +4,7 @@ lib = "bp5.lua"
 scenario = "bp5"
 type = "elasticity"
 ref_normal = [0, -1, 0]
+boundary_linear = true
 
 [fault_probe_output]
 prefix = "fltst_"
