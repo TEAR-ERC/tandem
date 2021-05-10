@@ -60,11 +60,17 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
         bndNos_[fctNo] = bndNo;
         fctNos_.push_back(fctNo);
         if (rank <= other_rank) {
-            send_map[other_rank].push_back(bndNo);
             ++local_size_;
-            assert(fctNos_.size() == local_size_);
-        } else {
-            recv_map[other_rank].push_back(bndNo);
+            if (fctNos_.size() != local_size_) {
+                throw std::logic_error("BoundaryMap: That was not supposed to happen.");
+            }
+        }
+        if (rank != other_rank) {
+            if (rank < other_rank) {
+                send_map[other_rank].push_back(bndNo);
+            } else {
+                recv_map[other_rank].push_back(bndNo);
+            }
         }
     }
 
