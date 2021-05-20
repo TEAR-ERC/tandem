@@ -4,6 +4,7 @@ type = "poisson"
 lib = "bp1.lua"
 scenario = "bp1_sym"
 ref_normal = [-1, 0]
+boundary_linear = true
 
 [fault_probe_output]
 prefix = "fltst_"
