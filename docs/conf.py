@@ -30,7 +30,8 @@ author = 'Carsten Uphoff'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.mathjax'
+    'sphinxcontrib.katex',
+    'matplotlib.sphinxext.plot_directive'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -41,6 +42,15 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# -- Plot options ------------------------------------------------------------
+
+plot_rcparams = {
+    'savefig.bbox': 'tight',
+    'axes.spines.top': False,
+    'axes.spines.left': False,
+    'axes.spines.bottom': False,
+    'axes.spines.right': False,
+}
 
 # -- Options for HTML output -------------------------------------------------
 

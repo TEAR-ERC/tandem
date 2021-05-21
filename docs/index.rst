@@ -22,4 +22,5 @@ Table of contents
    :maxdepth: 1
 
    getting-started/index
-   modelling/index
+   first-model/index
+   reference/index

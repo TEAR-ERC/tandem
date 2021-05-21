@@ -1,1 +1,3 @@
 furo
+sphinxcontrib-katex
+matplotlib

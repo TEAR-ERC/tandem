@@ -1,0 +1,28 @@
+Run model
+=========
+
+.. warning::
+
+   This page is under construction.
+
+Petsc options
+
+.. code:: bash
+   
+   -ksp_type preonly
+   -pc_type lu
+   -pc_factor_mat_solver_type mumps
+
+   -ts_type rk
+   -ts_rk_type 5dp
+   -ts_rtol 1e-8
+   -ts_atol 1e-50
+   -ts_adapt_wnormtype infinity
+
+   -ts_dt 0.0001
+   -ts_monitor
+
+
+.. code:: console
+
+   $ ./tandem tutorial.toml --discrete_green yes --petsc -options_file solver.cfg
