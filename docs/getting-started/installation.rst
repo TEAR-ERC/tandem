@@ -85,3 +85,10 @@ Compile tandem
    $ cd build
    $ cmake .. -DPOLYNOMIAL_DEGREE=6
    $ make -j
+
+If you installed libraries to a folder different from :code:`/usr` or :code:`/usr/local` and CMake
+cannot find your libraries, try to set the `CMAKE_PREFIX_PATH <https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html>`_, e.g.
+
+.. code:: console
+
+   $ cmake .. -DPOLYNOMIAL_DEGREE=6 -DCMAKE_PREFIX_PATH=/path/to/your/libs
