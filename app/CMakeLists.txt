@@ -71,9 +71,9 @@ function(generate_code APP)
     if("${YATETO_ARCH}" MATCHES "skl|naples|rome")
         set(YATETO_ARCH "hsw")
     endif()
-    set(WITH_LIBXSMM "no")
+    set(WITH_LIBXSMM "")
     if(${LibxsmmGenerator_FOUND})
-        set(WITH_LIBXSMM "yes")
+        set(WITH_LIBXSMM ${LibxsmmGeneratorExecutable})
     endif()
     add_custom_command(
         COMMAND
