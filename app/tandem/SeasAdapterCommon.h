@@ -45,6 +45,8 @@ public:
 
     void set_boundary(time_functional_t fun) { fun_boundary = std::move(fun); }
 
+    void warmup() { linear_solver_.warmup(); }
+
     void solve(double time, BlockView& state) {
         dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
             auto faultNo = this->faultMap_->bndNo(fctNo);

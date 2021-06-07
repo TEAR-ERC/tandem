@@ -13,6 +13,7 @@
 #include "tensor/TensorBase.h"
 #include "util/LinearAllocator.h"
 #include "util/Scratch.h"
+#include "util/Stopwatch.h"
 
 #include <petscmat.h>
 
@@ -52,6 +53,8 @@ public:
         adapter_->end_preparation();
         compute_discrete_greens_function();
     }
+
+    void warmup() { adapter_->warmup(); }
 
     void solve(double time, BlockView& state) {
         for (std::size_t faultNo = 0, num = adapter_->faultMap().local_size(); faultNo < num;
@@ -132,10 +135,14 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
     PetscInt N;
     CHKERRTHROW(VecGetSize(S_->vec(), &N));
 
+    Stopwatch sw;
+    double solve_time = 0.0;
     for (PetscInt i = 0; i < N; ++i) {
+
         if (rank == 0) {
-            std::cout << "Computing Green's function " << (i + 1) << "/" << N << std::endl;
+            std::cout << "Computing Green's function " << (i + 1) << "/" << N;
         }
+        sw.start();
         CHKERRTHROW(VecZeroEntries(S_->vec()));
         if (i >= nb_offset && i < nb_offset + m) {
             PetscScalar one = 1.0;
@@ -161,6 +168,22 @@ template <typename Adapter> void DiscreteGreenAdapter<Adapter>::compute_discrete
         }
         adapter_->end_traction();
         S_->end_access_readonly(S_handle);
+        solve_time += sw.stop();
+        if (rank == 0) {
+            constexpr double Days = 3600.0 * 24.0;
+            constexpr double Hours = 3600.0;
+            constexpr double Minutes = 60.0;
+            double avg_time = solve_time / (i + 1);
+            double etl = avg_time * (N - i - 1);
+            double etl_d = std::floor(etl / Days);
+            etl -= etl_d * Days;
+            double etl_h = std::floor(etl / Hours);
+            etl -= etl_h * Hours;
+            double etl_m = std::floor(etl / Minutes);
+            etl -= etl_m * Minutes;
+            std::cout << " (" << etl_d << "d " << etl_h << "h " << etl_m << "m " << std::floor(etl)
+                      << "s left)" << std::endl;
+        }
     }
 
     CHKERRTHROW(MatAssemblyBegin(T_, MAT_FINAL_ASSEMBLY));

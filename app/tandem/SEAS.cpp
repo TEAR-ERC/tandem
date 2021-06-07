@@ -103,6 +103,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     auto adapt = discrete_green<base_adapter_t, MakeGreen>::wrap(
         adapter<Type>::make(cfg, scenario, std::move(fault_map), cl, topo, fop->space().clone()),
         fop->slip_block_size());
+    adapt->warmup();
 
     auto seasop = std::make_shared<seas_op_t>(std::move(fop), std::move(adapt));
     seasop->lop().set_constant_params(friction_scenario.constant_params());
