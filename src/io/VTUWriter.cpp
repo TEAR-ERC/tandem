@@ -48,8 +48,8 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapt
     std::size_t pointDim = adapter.pointDim();
     adapter.setRefNodes(refNodes_);
     auto piece = doc_.RootElement()->InsertNewChildElement("Piece");
-    piece->SetAttribute("NumberOfPoints", pointsPerElement * numElements);
-    piece->SetAttribute("NumberOfCells", numElements);
+    piece->SetAttribute("NumberOfPoints", static_cast<uint64_t>(pointsPerElement * numElements));
+    piece->SetAttribute("NumberOfCells", static_cast<uint64_t>(numElements));
     {
         auto points = piece->InsertNewChildElement("Points");
         auto vertices = std::vector<double>(numElements * pointsPerElement * PointDim);

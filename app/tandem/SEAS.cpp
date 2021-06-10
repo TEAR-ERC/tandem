@@ -4,7 +4,6 @@
 #include "form/BoundaryMap.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
-#include "tandem/Config.h"
 #include "tandem/DieterichRuinaAgeing.h"
 #include "tandem/DiscreteGreenAdapter.h"
 #include "tandem/FrictionConfig.h"

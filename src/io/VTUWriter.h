@@ -79,11 +79,11 @@ private:
         auto dataType = DataType(T{});
         da->SetAttribute("type", dataType.vtkIdentifier().c_str());
         da->SetAttribute("Name", name.c_str());
-        da->SetAttribute("NumberOfComponents", numComponents);
+        da->SetAttribute("NumberOfComponents", static_cast<uint64_t>(numComponents));
         da->SetAttribute("format", "appended");
 
         auto offset = appended_.size();
-        da->SetAttribute("offset", offset);
+        da->SetAttribute("offset", static_cast<uint64_t>(offset));
 
         header_t size = dataSize * sizeof(T);
 

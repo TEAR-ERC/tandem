@@ -1,3 +1,5 @@
+#ifdef __linux__
+
 #include "Affinity.h"
 #include "MPITraits.h"
 
@@ -72,3 +74,5 @@ cpu_set_t Affinity::worker_mask_on_node(MPI_Comm comm) const {
 }
 
 } // namespace tndm
+
+#endif // __linux__

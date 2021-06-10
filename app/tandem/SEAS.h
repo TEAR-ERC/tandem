@@ -2,7 +2,7 @@
 #define SEAS_20200825_H
 
 #include "config.h"
-#include "tandem/Config.h"
+#include "tandem/SeasConfig.h"
 
 #include "mesh/LocalSimplexMesh.h"
 

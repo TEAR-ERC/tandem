@@ -1,4 +1,4 @@
-#include "Config.h"
+#include "SeasConfig.h"
 
 namespace tndm {
 

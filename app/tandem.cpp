@@ -4,7 +4,7 @@
 #include "config.h"
 #include "pc/register.h"
 #include "tandem/AdaptiveOutputStrategy.h"
-#include "tandem/Config.h"
+#include "tandem/SeasConfig.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/SEAS.h"
 #include "tandem/SeasScenario.h"

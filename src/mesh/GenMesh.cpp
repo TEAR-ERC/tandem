@@ -57,7 +57,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     MPI_Comm_rank(comm_, &rank);
     MPI_Comm_size(comm_, &size);
 
-    std::size_t numVertsGlobal = 1u;
+    uint64_t numVertsGlobal = 1u;
     for (auto& np1 : Np1) {
         numVertsGlobal *= np1;
     }

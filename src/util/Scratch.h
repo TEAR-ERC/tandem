@@ -22,8 +22,10 @@ private:
     };
 
     std::unique_ptr<T[], Deleter> make_storage(std::size_t num_T, std::size_t alignment) const {
+	std::size_t size = sizeof(T) * num_T;
+	size = (1 + (size - 1) / alignment) * alignment;
         return std::unique_ptr<T[], Deleter>(
-            static_cast<T*>(std::aligned_alloc(alignment, sizeof(T) * num_T)), Deleter{});
+            static_cast<T*>(std::aligned_alloc(alignment, size)), Deleter{});
     }
 
     std::unique_ptr<T[], Deleter> mem_;

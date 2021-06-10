@@ -49,8 +49,10 @@ protected:
 
     std::unique_ptr<real_t[], Deleter> make_storage(std::size_t num_reals,
                                                     std::size_t alignment) const {
+	std::size_t size = sizeof(real_t) * num_reals;
+	size = (1 + (size - 1) / alignment) * alignment;
         return std::unique_ptr<real_t[], Deleter>(
-            static_cast<real_t*>(std::aligned_alloc(alignment, sizeof(real_t) * num_reals)),
+            static_cast<real_t*>(std::aligned_alloc(alignment, size)),
             Deleter{});
     }
 
