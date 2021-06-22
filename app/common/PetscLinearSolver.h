@@ -53,10 +53,10 @@ public:
             CHKERRTHROW(KSPSetOperators(ksp_, P_->mat(), P_->mat()));
         }
         CHKERRTHROW(KSPSetTolerances(ksp_, 1.0e-12, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
-        CHKERRTHROW(KSPSetFromOptions(ksp_));
 
         PC pc;
         CHKERRTHROW(KSPGetPC(ksp_, &pc));
+        CHKERRTHROW(PCSetFromOptions(pc));
         PCType type;
         PCGetType(pc, &type);
         switch (fnv1a(type)) {
@@ -66,6 +66,8 @@ public:
         default:
             break;
         };
+
+        CHKERRTHROW(KSPSetFromOptions(ksp_));
     }
     ~PetscLinearSolver() {
         for (auto&& A : mat_cleanup) {
