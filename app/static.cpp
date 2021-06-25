@@ -27,6 +27,7 @@
 #include "util/Stopwatch.h"
 
 #include <argparse.hpp>
+#include <limits>
 #include <mpi.h>
 #include <petscksp.h>
 #include <petscmat.h>
@@ -53,6 +54,7 @@ struct Config {
     bool test_matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
+    int profile;
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<PoissonScenarioConfig> poisson;
@@ -129,18 +131,42 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     }
 
     sw.start();
-    solver.warmup();
+    if (cfg.profile > 0) {
+        solver.solve();
+    } else {
+        solver.warmup();
+    }
     time = sw.stop();
     if (rank == 0) {
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
 
     PetscLogStagePush(solve);
-    sw.start();
-    solver.solve();
-    time = sw.stop();
-    if (rank == 0) {
-        std::cout << "Solve: " << time << " s" << std::endl;
+    if (cfg.profile > 0) {
+        double avg_time = 0.0;
+        double max_time = 0.0;
+        double min_time = std::numeric_limits<double>::max();
+        for (int p = 0; p < cfg.profile; ++p) {
+            sw.start();
+            solver.solve();
+            time = sw.stop();
+            avg_time += time;
+            max_time = std::max(max_time, time);
+            min_time = std::min(min_time, time);
+        }
+        avg_time /= cfg.profile;
+        if (rank == 0) {
+            std::cout << "Solve (min): " << min_time << " s" << std::endl;
+            std::cout << "Solve (avg): " << avg_time << " s" << std::endl;
+            std::cout << "Solve (max): " << max_time << " s" << std::endl;
+        }
+    } else {
+        sw.start();
+        solver.solve();
+        time = sw.stop();
+        if (rank == 0) {
+            std::cout << "Solve: " << time << " s" << std::endl;
+        }
     }
     PetscLogStagePop();
     if (!solver.is_converged()) {
@@ -232,6 +258,10 @@ int main(int argc, char** argv) {
         })
         .default_value(MGStrategy::TwoLevel)
         .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; });
+    schema.add_value("profile", &Config::profile)
+        .default_value(0)
+        .validator([](auto&& x) { return x >= 0; })
+        .help("Run static in profile mode. The parameter controls the amount of repetitions.");
     schema.add_value("output", &Config::output).help("Output file name");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
