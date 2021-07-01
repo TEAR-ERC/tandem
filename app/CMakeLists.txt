@@ -168,6 +168,7 @@ set(APP_COMMON_SRCS
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
+    pc/lspoly.c
     pc/register.cpp
 )
 if(${LAPACK_FOUND})

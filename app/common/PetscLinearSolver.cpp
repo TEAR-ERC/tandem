@@ -58,7 +58,7 @@ void PetscLinearSolver::dump() const {
     CHKERRTHROW(PetscViewerFileSetMode(viewer, FILE_MODE_WRITE));
 
     CHKERRTHROW(PetscViewerFileSetName(viewer, "A.bin"));
-    CHKERRTHROW(MatView(A_->mat(), viewer));
+    CHKERRTHROW(MatView(P_->mat(), viewer));
 
     CHKERRTHROW(PetscViewerFileSetName(viewer, "b.bin"));
     CHKERRTHROW(VecView(b_->vec(), viewer));

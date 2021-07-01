@@ -280,6 +280,7 @@ int main(int argc, char** argv) {
 
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
     CHKERRQ(register_PCs());
+    CHKERRQ(register_KSPs());
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);

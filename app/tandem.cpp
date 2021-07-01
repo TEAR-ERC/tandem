@@ -4,9 +4,9 @@
 #include "config.h"
 #include "pc/register.h"
 #include "tandem/AdaptiveOutputStrategy.h"
-#include "tandem/SeasConfig.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/SEAS.h"
+#include "tandem/SeasConfig.h"
 #include "tandem/SeasScenario.h"
 
 #include "io/GMSHParser.h"
@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
 
     CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
     CHKERRQ(register_PCs());
+    CHKERRQ(register_KSPs());
 
     int rank, procs;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
