@@ -31,8 +31,15 @@ public:
     Managed<Matrix<double>>
     evaluationMatrix(std::vector<std::array<double, D>> const& points) const;
 
+    Managed<Tensor<double, 3u>>
+    gradientEvaluationTensor(std::vector<std::array<double, D>> const& points) const;
+
     TensorBase<Matrix<double>> mapResultInfo(std::size_t numPoints) const;
     void map(std::size_t eleNo, Matrix<double> const& evalMatrix, Tensor<double, 2u>& result) const;
+
+    TensorBase<Tensor<double, 3u>> gradientResultInfo(std::size_t numPoints) const;
+    void gradient(std::size_t eleNo, Tensor<double, 3u> const& evalTensor,
+                  Tensor<double, 3u> const& jInvAtP, Tensor<double, 3u>& result) const;
 
     RefElement<D> const& refElement() const { return *refElement_; }
     std::size_t numBasisFunctions() const { return data_.shape(0); }

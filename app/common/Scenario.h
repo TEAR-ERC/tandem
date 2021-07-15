@@ -23,6 +23,7 @@ struct ScenarioConfig {
     std::optional<std::string> boundary;
     std::optional<std::string> slip;
     std::optional<std::string> solution;
+    std::optional<std::string> solution_jacobian;
     std::optional<std::array<double, DomainDimension>> ref_normal;
 
     template <typename Derived, typename PathConverter>
@@ -39,6 +40,7 @@ struct ScenarioConfig {
         schema.add_value("boundary", cast(&Derived::boundary));
         schema.add_value("slip", cast(&Derived::slip));
         schema.add_value("solution", cast(&Derived::solution));
+        schema.add_value("solution_jacobian", cast(&Derived::solution_jacobian));
         schema.add_array("ref_normal", cast(&Derived::ref_normal)).of_values();
     }
 };
@@ -47,6 +49,8 @@ template <class LocalOperator> class Scenario {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using solution_t = std::function<std::array<double, NumQuantities>(Vector<double> const&)>;
+    using solution_jacobian_t =
+        std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
 
@@ -76,6 +80,18 @@ public:
                 return myF(x);
             };
         }
+        if (problem.solution_jacobian) {
+            auto myF = lib_.getFunction<DomainDimension, NumQuantities * DomainDimension>(
+                *problem.solution_jacobian);
+            solution_jacobian_ = [myF](Vector<double> const& v)
+                -> std::array<double, NumQuantities * DomainDimension> {
+                std::array<double, DomainDimension> x;
+                for (std::size_t i = 0; i < DomainDimension; ++i) {
+                    x[i] = v(i);
+                }
+                return myF(x);
+            };
+        }
     }
 
     auto const& transform() const { return warp_; }
@@ -85,6 +101,13 @@ public:
     std::unique_ptr<SolutionInterface> solution() const {
         if (solution_) {
             return std::make_unique<LambdaSolution<decltype(*solution_)>>(*solution_);
+        }
+        return nullptr;
+    }
+    std::unique_ptr<SolutionInterface> solution_jacobian() const {
+        if (solution_jacobian_) {
+            return std::make_unique<LambdaSolution<decltype(*solution_jacobian_)>>(
+                *solution_jacobian_);
         }
         return nullptr;
     }
@@ -111,6 +134,7 @@ protected:
     std::optional<functional_t<NumQuantities>> boundary_ = std::nullopt;
     std::optional<functional_t<NumQuantities>> slip_ = std::nullopt;
     std::optional<solution_t> solution_ = std::nullopt;
+    std::optional<solution_jacobian_t> solution_jacobian_ = std::nullopt;
 };
 
 } // namespace tndm

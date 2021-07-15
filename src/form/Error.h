@@ -59,6 +59,7 @@ private:
 
 template <std::size_t D> class Error {
 public:
+    static constexpr unsigned MinQuadratureOrder = 20;
     /**
      * @brief Computes \sum_i ||numeric_i(x) - reference_i(x)||_2
      *
@@ -71,6 +72,23 @@ public:
     static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
                      SolutionInterface const& reference, int targetRank = 0,
                      MPI_Comm = MPI_COMM_WORLD);
+
+    /**
+     * @brief Computes \sum_i \sum_j ||numeric_{i,j}(x) - reference_{i,j}(x)||_2
+     *
+     * Here, {.,j} denotes the derivative w.r.t. x_j.
+     * Reference r is the Jacobian in row-major order, i.e.:
+     * r_{1,1}, r_{1,2}, ..., r_{2, 1}, r_{2, 2}, ...
+     *
+     * @param cl Curvilinear transformation
+     * @param numeric Finite element function
+     * @param reference Reference solution
+     *
+     * @return Error measured in H1 semi-norm
+     */
+    static double H1_semi(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+                          SolutionInterface const& reference, int targetRank = 0,
+                          MPI_Comm = MPI_COMM_WORLD);
 };
 
 } // namespace tndm

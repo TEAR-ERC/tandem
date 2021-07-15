@@ -192,6 +192,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
             std::cout << "L2 error: " << error << std::endl;
         }
     }
+    auto solution_jacobian = scenario.solution_jacobian();
+    if (solution_jacobian) {
+        double error = tndm::Error<DomainDimension>::H1_semi(*cl, numeric, *solution_jacobian, 0,
+                                                             PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "H1-semi error: " << error << std::endl;
+        }
+    }
 
     if (cfg.output) {
         auto coeffs = dgop.coefficients();

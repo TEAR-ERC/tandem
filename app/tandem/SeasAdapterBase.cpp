@@ -57,7 +57,7 @@ void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scra
         auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
         auto n_ref_dot_n = dot(ref_normal_, normal_i);
         if (std::fabs(n_ref_dot_n) < 10000.0 * std::numeric_limits<double>::epsilon()) {
-            throw std::logic_error("Normal and reference normal are almost colinear.");
+            throw std::logic_error("Normal and reference normal are almost perpendicular.");
         }
         sign_flipped = n_ref_dot_n < 0;
         if (sign_flipped) {

@@ -12,7 +12,7 @@ namespace tndm {
 template <std::size_t D>
 double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
                     SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
-    auto rule = simplexQuadratureRule<D>(20);
+    auto rule = simplexQuadratureRule<D>(MinQuadratureOrder);
 
     auto evalMatrix = numeric.evaluationMatrix(rule.points());
     auto numAtQp = Managed(numeric.mapResultInfo(rule.size()));
@@ -38,6 +38,51 @@ double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
             for (std::size_t q = 0; q < rule.size(); ++q) {
                 double e = ref(q, j) - numAtQp(q, j);
                 localError += rule.weights()[q] * absDetJ(q) * e * e;
+            }
+        }
+        error += localError;
+    }
+
+    double globalError;
+    MPI_Reduce(&error, &globalError, 1, mpi_type_t<double>(), MPI_SUM, targetRank, comm);
+
+    return sqrt(globalError);
+}
+
+template <std::size_t D>
+double Error<D>::H1_semi(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+                         SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
+    auto rule = simplexQuadratureRule<D>(MinQuadratureOrder);
+
+    auto evalTensor = numeric.gradientEvaluationTensor(rule.points());
+    auto gradAtQp = Managed(numeric.gradientResultInfo(rule.size()));
+
+    auto geoE = cl.evaluateBasisAt(rule.points());
+    auto geoD_xi = cl.evaluateGradientAt(rule.points());
+    auto J = Managed(cl.jacobianResultInfo(rule.size()));
+    auto Jinv = Managed(cl.jacobianResultInfo(rule.size()));
+    auto absDetJ = Managed(cl.detJResultInfo(rule.size()));
+    auto coords = Managed(cl.mapResultInfo(rule.size()));
+
+    assert(reference.numQuantities() == numeric.numQuantities() * D);
+    auto ref = Managed<Matrix<double>>(rule.size(), reference.numQuantities());
+
+    auto Q = numeric.numQuantities();
+    double error = 0.0;
+    for (std::size_t elNo = 0; elNo < numeric.numElements(); ++elNo) {
+        cl.jacobian(elNo, geoD_xi, J);
+        cl.jacobianInv(J, Jinv);
+        cl.absDetJ(elNo, J, absDetJ);
+        cl.map(elNo, geoE, coords);
+        reference(coords, ref);
+        numeric.gradient(elNo, evalTensor, Jinv, gradAtQp);
+        double localError = 0;
+        for (std::size_t i = 0; i < Q; ++i) {
+            for (std::size_t j = 0; j < D; ++j) {
+                for (std::size_t q = 0; q < rule.size(); ++q) {
+                    double e = ref(q, i * Q + j) - gradAtQp(q, i, j);
+                    localError += rule.weights()[q] * absDetJ(q) * e * e;
+                }
             }
         }
         error += localError;

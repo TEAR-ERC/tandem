@@ -21,3 +21,9 @@ function solution(x, y)
     return math.cos(math.pi * x) * math.cos(math.pi * y), 0
 end
 
+function solution_jacobian(x, y)
+    return -math.pi * math.sin(math.pi * x) * math.cos(math.pi * y),
+           -math.pi * math.cos(math.pi * x) * math.sin(math.pi * y),
+            0, 0
+end
+
