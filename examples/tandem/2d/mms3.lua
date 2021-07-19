@@ -62,6 +62,12 @@ function mms3:solution(x, y, t)
     return self:u_star(x, y, t)
 end
 
+function mms3:fault_solution(x, y, t)
+    local S = self:S_star(x, y, t)
+    local psi = self:psi_star(x, y, t)
+    return S, psi
+end
+
 function mms3:psi_star(x, y, t)
     local a = self:a(x, y)
     local Vs = self:V_star(x, y, t)

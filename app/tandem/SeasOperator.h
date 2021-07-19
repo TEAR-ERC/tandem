@@ -124,6 +124,37 @@ public:
     }
 
     template <typename Iterator>
+    auto raw_state(BlockVector const& vector, Iterator first, Iterator last) {
+        auto num_elements = std::distance(first, last);
+        auto soln = FiniteElementFunction<DomainDimension - 1u>(
+            lop_->space().clone(), LocalOperator::NumQuantities, num_elements);
+        auto& values = soln.values();
+
+        auto in_handle = vector.begin_access_readonly();
+        std::size_t out_no = 0;
+        for (; first != last; ++first) {
+            std::size_t faultNo = *first;
+            assert(faultNo < numLocalElements());
+
+            auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
+            auto state_block = in_handle.subtensor(slice{}, faultNo);
+            std::ptrdiff_t k = 0;
+            for (std::ptrdiff_t j = 0; j < value_matrix.shape(1); ++j) {
+                for (std::ptrdiff_t i = 0; i < value_matrix.shape(0); ++i) {
+                    value_matrix(i, j) = state_block(k++);
+                }
+            }
+        }
+        vector.end_access_readonly(in_handle);
+        return soln;
+    }
+
+    auto raw_state(BlockVector const& vector) {
+        auto range = Range<std::size_t>(0, numLocalElements());
+        return raw_state(vector, range.begin(), range.end());
+    }
+
+    template <typename Iterator>
     auto state(BlockVector const& vector, Iterator first, Iterator last) {
         auto num_elements = std::distance(first, last);
         auto soln = lop_->state_prototype(num_elements);

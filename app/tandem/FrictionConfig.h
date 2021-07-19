@@ -3,7 +3,10 @@
 
 #include "config.h"
 #include "tandem/DieterichRuinaAgeing.h"
+#include "tandem/RateAndStateBase.h"
+#include "tandem/SeasSolution.h"
 
+#include "form/Error.h"
 #include "script/LuaLib.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
@@ -23,6 +26,7 @@ public:
     using vector_functional_t =
         std::function<std::array<double, DieterichRuinaAgeing::TangentialComponents>(
             std::array<double, D> const&)>;
+    static constexpr std::size_t NumQuantities = RateAndStateBase::NumQuantities;
 
     constexpr static char A[] = "a";
     constexpr static char B[] = "b";
@@ -35,6 +39,7 @@ public:
     constexpr static char Vinit[] = "Vinit";
     constexpr static char Sinit[] = "Sinit";
     constexpr static char Source[] = "source";
+    constexpr static char FaultSolution[] = "fault_solution";
 
     DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
@@ -66,6 +71,12 @@ public:
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
         cp_.b = lib_.getMemberConstant(scenario, B);
         cp_.f0 = lib_.getMemberConstant(scenario, F0);
+
+        if (lib_.hasMember(scenario, FaultSolution)) {
+            solution_ = std::make_optional(SeasSolution<NumQuantities>(
+                lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario,
+                                                                           FaultSolution)));
+        }
     }
 
     auto const& constant_params() const { return cp_; }
@@ -83,6 +94,14 @@ public:
         };
     }
     auto const& source_fun() const { return source_; }
+    std::unique_ptr<SolutionInterface> solution(double time) const {
+        if (solution_) {
+            auto sol = *solution_;
+            sol.set_time(time);
+            return std::make_unique<LambdaSolution<decltype(sol)>>(std::move(sol));
+        }
+        return nullptr;
+    }
 
 protected:
     DieterichRuinaAgeing::ConstantParams cp_;
@@ -96,6 +115,7 @@ protected:
     vector_functional_t<DomainDimension> Sinit_ = [](std::array<double, DomainDimension> const& x)
         -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_;
+    std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
 };
 
 } // namespace tndm

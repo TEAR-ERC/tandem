@@ -184,7 +184,17 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         double error =
             tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
         if (rank == 0) {
-            std::cout << "L2_error=" << error << std::endl;
+            std::cout << "L2_error_domain=" << error << std::endl;
+        }
+    }
+    auto fault_solution = friction_scenario.solution(cfg.final_time);
+    if (fault_solution) {
+        auto numeric = seasop->raw_state(ts.state());
+        double error =
+            tndm::Error<DomainDimension>::L2(mesh, *cl, numeric, seasop->faultMap().localFctNos(),
+                                             *fault_solution, 0, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "L2_error_fault=" << error << std::endl;
         }
     }
     if (rank == 0) {

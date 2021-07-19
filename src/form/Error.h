@@ -1,6 +1,7 @@
 #ifndef ERROR_20200625_H
 #define ERROR_20200625_H
 
+#include "mesh/LocalSimplexMesh.h"
 #include "tensor/Tensor.h"
 
 #include <mpi.h>
@@ -8,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <type_traits>
+#include <vector>
 
 namespace tndm {
 
@@ -66,12 +68,32 @@ public:
      * @param cl Curvilinear transformation
      * @param numeric Finite element function
      * @param reference Reference solution
+     * @param targetRank Error will be reduced on this rank
+     * @param MPI_Comm MPI communicator
      *
      * @return L2 error
      */
     static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
                      SolutionInterface const& reference, int targetRank = 0,
-                     MPI_Comm = MPI_COMM_WORLD);
+                     MPI_Comm comm = MPI_COMM_WORLD);
+
+    /**
+     * @brief Computes \sum_i ||numeric_i(x) - reference_i(x)||_2 on facets
+     *
+     * @param mesh Mesh
+     * @param cl Curvilinear transformation
+     * @param numeric Finite element function
+     * @param reference Reference solution
+     * @param fctNos Facets for which numeric is defined
+     * @param targetRank Error will be reduced on this rank
+     * @param MPI_Comm MPI communicator
+     *
+     * @return L2 error
+     */
+    static double L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
+                     FiniteElementFunction<D - 1> const& numeric,
+                     std::vector<std::size_t> const& fctNos, SolutionInterface const& reference,
+                     int targetRank, MPI_Comm comm);
 
     /**
      * @brief Computes \sum_i \sum_j ||numeric_{i,j}(x) - reference_{i,j}(x)||_2
