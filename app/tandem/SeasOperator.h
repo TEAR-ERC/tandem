@@ -10,6 +10,7 @@
 #include "parallel/Scatter.h"
 #include "parallel/SparseBlockVector.h"
 #include "tensor/Managed.h"
+#include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
 #include "util/Range.h"
@@ -138,12 +139,8 @@ public:
 
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
             auto state_block = in_handle.subtensor(slice{}, faultNo);
-            std::ptrdiff_t k = 0;
-            for (std::ptrdiff_t j = 0; j < value_matrix.shape(1); ++j) {
-                for (std::ptrdiff_t i = 0; i < value_matrix.shape(0); ++i) {
-                    value_matrix(i, j) = state_block(k++);
-                }
-            }
+            auto state_matrix = reshape(state_block, value_matrix.shape(0), value_matrix.shape(1));
+            value_matrix.copy_values(state_matrix);
         }
         vector.end_access_readonly(in_handle);
         return soln;
