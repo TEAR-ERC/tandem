@@ -250,15 +250,32 @@ public:
         return flops;
     }
 
-    auto solution(BlockVector const& vector) const {
-        auto soln = lop_->solution_prototype(topo_->numLocalElements());
+    template <typename Iterator>
+    auto solution(BlockVector const& vector, Iterator first, Iterator last) const {
+        auto num_elements = std::distance(first, last);
+        auto soln = lop_->solution_prototype(num_elements);
         auto& values = soln.values();
-        auto value_matrix = reshape(values, lop_->block_size(), topo_->numLocalElements());
+        auto value_matrix = reshape(values, lop_->block_size(), num_elements);
 
         auto access_handle = vector.begin_access_readonly();
-        value_matrix.copy_values(access_handle);
+        std::size_t out_no = 0;
+        for (; first != last; ++first) {
+            std::size_t elNo = *first;
+            assert(elNo < numLocalElements());
+
+            auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
+            auto state_block = access_handle.subtensor(slice{}, elNo);
+            auto state_matrix = reshape(state_block, value_matrix.shape(0), value_matrix.shape(1));
+            value_matrix.copy_values(state_matrix);
+        }
         vector.end_access_readonly(access_handle);
+
         return soln;
+    }
+
+    auto solution(BlockVector const& vector) const {
+        auto range = Range<std::size_t>(0, topo_->numLocalElements());
+        return solution(vector, range.begin(), range.end());
     }
 
     auto coefficients() const {

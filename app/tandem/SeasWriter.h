@@ -7,6 +7,7 @@
 #include "interface/BlockVector.h"
 #include "io/BoundaryProbeWriter.h"
 #include "io/PVDWriter.h"
+#include "io/ProbeWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/LocalSimplexMesh.h"
@@ -29,14 +30,18 @@ public:
         : prefix_(prefix), oi_(oi), pvd_(prefix) {}
     virtual ~SeasWriter() {}
 
-    void monitor(double time, BlockVector const& state, double VMax) {
+    virtual bool requires_full_solve() const = 0;
+
+    bool is_monitor_required(double time, double VMax) const {
         double delta_time = time - last_output_time_;
-        if (oi_(delta_time, last_output_VMax_, VMax)) {
-            write_step(time, state);
-            ++output_step_;
-            last_output_time_ = time;
-            last_output_VMax_ = VMax;
-        }
+        return oi_(delta_time, last_output_VMax_, VMax);
+    }
+
+    void monitor(double time, BlockVector const& state, double VMax) {
+        write_step(time, state);
+        ++output_step_;
+        last_output_time_ = time;
+        last_output_VMax_ = VMax;
     }
 
 protected:
@@ -65,6 +70,8 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           writer_(prefix, probes, mesh, std::move(cl), seasop_->faultMap(), seasop_->comm()) {}
 
+    bool requires_full_solve() const { return false; }
+
     void write_step(double time, BlockVector const& state) {
         if (writer_.num_probes() > 0) {
             writer_.write(time, seasop_->state(state, writer_.begin(), writer_.end()));
@@ -76,6 +83,28 @@ private:
     BoundaryProbeWriter<D> writer_;
 };
 
+template <std::size_t D, class SeasOperator> class SeasDomainProbeWriter : public SeasWriter {
+public:
+    SeasDomainProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
+                          AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
+                          std::shared_ptr<Curvilinear<D>> cl, std::shared_ptr<SeasOperator> seasop)
+        : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
+          writer_(prefix, probes, mesh, std::move(cl), seasop_->comm()) {}
+
+    bool requires_full_solve() const { return true; }
+
+    void write_step(double time, BlockVector const&) {
+        if (writer_.num_probes() > 0) {
+            auto displacement = seasop_->adapter().displacement(writer_.begin(), writer_.end());
+            writer_.write(time, displacement);
+        }
+    }
+
+private:
+    std::shared_ptr<SeasOperator> seasop_;
+    ProbeWriter<D> writer_;
+};
+
 template <std::size_t D, class SeasOperator> class SeasFaultWriter : public SeasWriter {
 public:
     SeasFaultWriter(std::string_view prefix, AdaptiveOutputInterval oi,
@@ -83,6 +112,8 @@ public:
                     std::shared_ptr<SeasOperator> seasop, unsigned degree)
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           adapter_(mesh, std::move(cl), seasop_->faultMap().localFctNos()), degree_(degree) {}
+
+    bool requires_full_solve() const { return false; }
 
     void write_step(double time, BlockVector const& state) {
         int rank;
@@ -114,11 +145,12 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           adapter_(std::move(cl), seasop_->adapter().numLocalElements()), degree_(degree) {}
 
-    void write_step(double time, BlockVector const& state) {
+    bool requires_full_solve() const { return true; }
+
+    void write_step(double time, BlockVector const&) {
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 
-        seasop_->full_solve(time, state);
         auto displacement = seasop_->adapter().displacement();
         auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
         writer.addFieldData("time", &time, 1);
@@ -150,8 +182,15 @@ public:
             double VMax;
             MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
 
+            bool i_did_a_full_solve = false;
             for (auto const& writer : writers_) {
-                writer->monitor(time, state, VMax);
+                if (writer->is_monitor_required(time, VMax)) {
+                    if (!i_did_a_full_solve && writer->requires_full_solve()) {
+                        seasop_->full_solve(time, state);
+                        i_did_a_full_solve = true;
+                    }
+                    writer->monitor(time, state, VMax);
+                }
             }
         }
 

@@ -82,6 +82,9 @@ public:
     }
     void end_traction() { t_->end_access_readonly(handle_); }
 
+    template <typename Iterator> auto displacement(Iterator first, Iterator last) const {
+        return adapter_->displacement(std::forward<Iterator>(first), std::forward<Iterator>(last));
+    }
     auto displacement() const { return adapter_->displacement(); }
     std::size_t numLocalElements() const { return adapter_->numLocalElements(); }
     std::size_t number_of_local_dofs() const { return adapter_->number_of_local_dofs(); }

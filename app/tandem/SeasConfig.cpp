@@ -71,6 +71,10 @@ void setConfigSchema(TableSchema<Config>& schema,
         schema.add_table("fault_probe_output", &Config::fault_probe_output);
     setOutputConfigSchema(faultProbeOutputSchema);
     setProbeOutputConfigSchema(faultProbeOutputSchema);
+    auto& domainProbeOutputSchema =
+        schema.add_table("domain_probe_output", &Config::domain_probe_output);
+    setOutputConfigSchema(domainProbeOutputSchema);
+    setProbeOutputConfigSchema(domainProbeOutputSchema);
 }
 
 } // namespace tndm

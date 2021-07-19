@@ -31,6 +31,7 @@ add_library(tandem-lib
     form/DGOperatorTopo.cpp
     form/Error.cpp
     io/BoundaryProbeWriter.cpp
+    io/ProbeWriter.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
     io/PVDWriter.cpp
