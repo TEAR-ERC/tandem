@@ -146,7 +146,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                 cl, seasop, PolynomialDegree));
         }
     }
-    auto monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers));
+    auto monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers), ts.fsal());
     ts.set_monitor(*monitor);
 
     int rank;

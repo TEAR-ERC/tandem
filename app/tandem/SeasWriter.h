@@ -30,7 +30,8 @@ public:
         : prefix_(prefix), oi_(oi), pvd_(prefix) {}
     virtual ~SeasWriter() {}
 
-    virtual bool requires_full_solve() const = 0;
+    virtual bool require_displacement() const = 0;
+    virtual bool require_traction() const = 0;
 
     bool is_monitor_required(double time, double VMax) const {
         double delta_time = time - last_output_time_;
@@ -38,10 +39,12 @@ public:
     }
 
     void monitor(double time, BlockVector const& state, double VMax) {
-        write_step(time, state);
-        ++output_step_;
-        last_output_time_ = time;
-        last_output_VMax_ = VMax;
+        if (is_monitor_required(time, VMax)) {
+            write_step(time, state);
+            ++output_step_;
+            last_output_time_ = time;
+            last_output_VMax_ = VMax;
+        }
     }
 
 protected:
@@ -70,7 +73,8 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           writer_(prefix, probes, mesh, std::move(cl), seasop_->faultMap(), seasop_->comm()) {}
 
-    bool requires_full_solve() const { return false; }
+    bool require_displacement() const { return false; }
+    bool require_traction() const { return true; }
 
     void write_step(double time, BlockVector const& state) {
         if (writer_.num_probes() > 0) {
@@ -91,7 +95,8 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           writer_(prefix, probes, mesh, std::move(cl), seasop_->comm()) {}
 
-    bool requires_full_solve() const { return true; }
+    bool require_displacement() const { return true; }
+    bool require_traction() const { return false; }
 
     void write_step(double time, BlockVector const&) {
         if (writer_.num_probes() > 0) {
@@ -113,7 +118,8 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           adapter_(mesh, std::move(cl), seasop_->faultMap().localFctNos()), degree_(degree) {}
 
-    bool requires_full_solve() const { return false; }
+    bool require_displacement() const { return false; }
+    bool require_traction() const { return true; }
 
     void write_step(double time, BlockVector const& state) {
         int rank;
@@ -145,7 +151,8 @@ public:
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
           adapter_(std::move(cl), seasop_->adapter().numLocalElements()), degree_(degree) {}
 
-    bool requires_full_solve() const { return true; }
+    bool require_displacement() const { return true; }
+    bool require_traction() const { return false; }
 
     void write_step(double time, BlockVector const&) {
         int rank;
@@ -172,25 +179,43 @@ private:
 
 template <class SeasOperator> class SeasMonitor {
 public:
+    /**
+     * @brief Construct a SeasMonitor
+     *
+     * @param seasop Seas operator
+     * @param writers Vector of writers that shall be called on monitor
+     * @param fsal Flag indicating whether time integrator has First Same As Last property
+     */
     SeasMonitor(std::shared_ptr<SeasOperator> seasop,
-                std::vector<std::unique_ptr<SeasWriter>> writers)
-        : seasop_(std::move(seasop)), writers_(std::move(writers)) {}
+                std::vector<std::unique_ptr<SeasWriter>> writers, bool fsal)
+        : seasop_(std::move(seasop)), writers_(std::move(writers)), fsal_(fsal) {}
 
+    /**
+     * @brief Monitor function called by time integrator
+     *
+     * @param time Current time
+     * @param state Quantities of time integrator
+     */
     void monitor(double time, BlockVector const& state) {
         if (!writers_.empty()) {
             double VMax_local = seasop_->VMax_local();
             double VMax;
             MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
 
-            bool i_did_a_full_solve = false;
+            bool require_traction = false;
+            bool require_displacement = false;
             for (auto const& writer : writers_) {
                 if (writer->is_monitor_required(time, VMax)) {
-                    if (!i_did_a_full_solve && writer->requires_full_solve()) {
-                        seasop_->full_solve(time, state);
-                        i_did_a_full_solve = true;
-                    }
-                    writer->monitor(time, state, VMax);
+                    require_displacement = require_displacement || writer->require_displacement();
+                    require_traction = require_traction || writer->require_traction();
                 }
+            }
+
+            seasop_->update_internal_state(time, state, !fsal_, require_traction,
+                                           require_displacement);
+
+            for (auto const& writer : writers_) {
+                writer->monitor(time, state, VMax);
             }
         }
 
@@ -212,6 +237,7 @@ private:
     double last_time_ = std::numeric_limits<double>::lowest();
     double dt_min_ = std::numeric_limits<double>::max();
     double dt_max_ = std::numeric_limits<double>::lowest();
+    bool fsal_;
 };
 
 } // namespace tndm

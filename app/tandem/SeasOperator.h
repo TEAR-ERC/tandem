@@ -19,6 +19,7 @@
 #include <mpi.h>
 
 #include <cstddef>
+#include <experimental/type_traits>
 #include <memory>
 #include <utility>
 
@@ -27,6 +28,7 @@ namespace tndm {
 template <typename LocalOperator, typename SeasAdapter> class SeasOperator {
 public:
     using time_functional_t = typename SeasAdapter::time_functional_t;
+    template <class T> using solve_domain_t = decltype(&T::solve_domain);
 
     SeasOperator(std::unique_ptr<LocalOperator> localOperator,
                  std::unique_ptr<SeasAdapter> seas_adapter)
@@ -114,13 +116,31 @@ public:
         result.end_access(out_handle);
     }
 
-    void full_solve(double time, BlockVector const& state) {
+    void update_internal_state(double time, BlockVector const& state,
+                               bool state_changed_since_last_rhs, bool require_traction,
+                               bool require_displacement) {
+        constexpr bool solve_domain_different_from_solve =
+            std::experimental::is_detected_v<solve_domain_t, SeasAdapter>;
+
+        bool needs_to_update_something =
+            (state_changed_since_last_rhs && require_traction) ||
+            (require_displacement && solve_domain_different_from_solve);
+        if (!needs_to_update_something) {
+            return;
+        }
+
         scatter_.begin_scatter(state, ghost_);
         scatter_.wait_scatter();
-
         auto in_handle = state.begin_access_readonly();
         auto block_view = LocalGhostCompositeView(in_handle, ghost_);
-        adapter_->full_solve(time, block_view);
+        if (state_changed_since_last_rhs && require_traction) {
+            adapter_->solve(time, block_view);
+        }
+        if constexpr (solve_domain_different_from_solve) {
+            if (require_displacement) {
+                adapter_->solve_domain(time, block_view);
+            }
+        }
         state.end_access_readonly(in_handle);
     }
 

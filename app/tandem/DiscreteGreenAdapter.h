@@ -67,8 +67,7 @@ public:
         CHKERRTHROW(MatMult(T_, S_->vec(), t_->vec()));
         CHKERRTHROW(VecAXPY(t_->vec(), time, t_boundary_->vec()));
     }
-
-    void full_solve(double time, BlockView& state) { adapter_->solve(time, state); }
+    void solve_domain(double time, BlockView& state) { adapter_->solve(time, state); }
 
     TensorBase<Matrix<double>> traction_info() const { return adapter_->traction_info(); }
     void begin_traction(BlockView&) { handle_ = t_->begin_access_readonly(); }

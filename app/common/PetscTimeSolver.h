@@ -25,6 +25,23 @@ public:
         CHKERRTHROW(TSSetRHSFunction(ts_, nullptr, RHSFunction<TimeOp>, &timeop));
         CHKERRTHROW(TSSetExactFinalTime(ts_, TS_EXACTFINALTIME_MATCHSTEP));
         CHKERRTHROW(TSSetFromOptions(ts_));
+
+        TSType time_scheme;
+        CHKERRTHROW(TSGetType(ts_, &time_scheme));
+
+        // Check whether time integrator has First Same As Last (FSAL) property
+        switch (fnv1a(time_scheme)) {
+        case HASH_DEF(TSRK): {
+            PetscBool FSAL;
+            CHKERRTHROW(TSRKGetTableau(ts_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                       nullptr, &FSAL));
+            fsal_ = FSAL == PETSC_TRUE;
+            break;
+        }
+        default:
+            fsal_ = false;
+            break;
+        };
     }
     ~PetscTimeSolver() { TSDestroy(&ts_); }
 
@@ -52,6 +69,8 @@ public:
         CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, &monitor, nullptr));
     }
 
+    bool fsal() const { return fsal_; }
+
 private:
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
@@ -72,6 +91,7 @@ private:
 
     std::unique_ptr<PetscVector> state_;
     TS ts_ = nullptr;
+    bool fsal_;
 };
 
 } // namespace tndm

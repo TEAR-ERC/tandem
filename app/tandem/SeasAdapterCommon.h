@@ -67,8 +67,6 @@ public:
         scatter_.wait_scatter();
     }
 
-    void full_solve(double time, BlockView& state) { solve(time, state); }
-
     void begin_traction(BlockView& state) {
         handle_ = linear_solver_.x().begin_access_readonly();
         dgop_->lop().set_slip([this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
