@@ -186,6 +186,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto solution = scenario.solution(cfg.final_time);
     if (solution) {
+        seasop->update_internal_state(cfg.final_time, ts.state(), true, false, true);
         auto numeric = seasop->adapter().displacement();
         double error =
             tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);

@@ -122,10 +122,11 @@ public:
         constexpr bool solve_domain_different_from_solve =
             std::experimental::is_detected_v<solve_domain_t, SeasAdapter>;
 
-        bool needs_to_update_something =
-            (state_changed_since_last_rhs && require_traction) ||
-            (require_displacement && solve_domain_different_from_solve);
-        if (!needs_to_update_something) {
+        bool require_solve =
+            state_changed_since_last_rhs &&
+            (require_traction || require_displacement && !solve_domain_different_from_solve);
+        bool require_solve_domain = require_displacement && solve_domain_different_from_solve;
+        if (!require_solve && !require_solve_domain) {
             return;
         }
 
@@ -133,11 +134,11 @@ public:
         scatter_.wait_scatter();
         auto in_handle = state.begin_access_readonly();
         auto block_view = LocalGhostCompositeView(in_handle, ghost_);
-        if (state_changed_since_last_rhs && require_traction) {
+        if (require_solve) {
             adapter_->solve(time, block_view);
         }
-        if constexpr (solve_domain_different_from_solve) {
-            if (require_displacement) {
+        if (require_solve_domain) {
+            if constexpr (solve_domain_different_from_solve) {
                 adapter_->solve_domain(time, block_view);
             }
         }
