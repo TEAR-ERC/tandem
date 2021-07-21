@@ -86,8 +86,9 @@ struct Config {
     unsigned mg_coarse_level;
 
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
-    std::optional<OutputConfig> domain_output;
     std::optional<OutputConfig> fault_output;
+    std::optional<OutputConfig> fault_scalar_output;
+    std::optional<OutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
 };

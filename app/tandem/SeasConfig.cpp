@@ -65,6 +65,9 @@ void setConfigSchema(TableSchema<Config>& schema,
 
     auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
     setOutputConfigSchema(faultOutputSchema);
+    auto& faultScalarOutputSchema =
+        schema.add_table("fault_scalar_output", &Config::fault_scalar_output);
+    setOutputConfigSchema(faultScalarOutputSchema);
     auto& domainOutputSchema = schema.add_table("domain_output", &Config::domain_output);
     setOutputConfigSchema(domainOutputSchema);
     auto& faultProbeOutputSchema =

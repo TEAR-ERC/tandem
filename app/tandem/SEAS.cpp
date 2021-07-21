@@ -91,6 +91,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     using seas_domain_writer_t = SeasDomainWriter<DomainDimension, seas_op_t>;
     using seas_monitor_t = SeasMonitor<seas_op_t>;
 
+    int rank;
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
+
     auto scenario = SeasScenario<adapter_lop_t>(cfg.lib, cfg.scenario);
     auto friction_scenario = DieterichRuinaAgeingScenario(cfg.lib, cfg.scenario);
 
@@ -140,6 +143,11 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                 cfg.fault_output->prefix, cfg.fault_output->make_adaptive_output_interval(), mesh,
                 cl, seasop, PolynomialDegree));
         }
+        if (cfg.fault_scalar_output) {
+            writers.emplace_back(std::make_unique<SeasFaultScalarWriter<seas_op_t>>(
+                cfg.fault_scalar_output->prefix,
+                cfg.fault_scalar_output->make_adaptive_output_interval(), seasop));
+        }
         if (cfg.domain_output) {
             writers.emplace_back(std::make_unique<seas_domain_writer_t>(
                 cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh,
@@ -148,9 +156,6 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     }
     auto monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers), ts.fsal());
     ts.set_monitor(*monitor);
-
-    int rank;
-    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
     const auto reduce_number = [&topo](std::size_t number) {
         std::size_t number_global;

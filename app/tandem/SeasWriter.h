@@ -8,6 +8,7 @@
 #include "io/BoundaryProbeWriter.h"
 #include "io/PVDWriter.h"
 #include "io/ProbeWriter.h"
+#include "io/ScalarWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/LocalSimplexMesh.h"
@@ -40,7 +41,7 @@ public:
 
     void monitor(double time, BlockVector const& state, double VMax) {
         if (is_monitor_required(time, VMax)) {
-            write_step(time, state);
+            write_step(time, state, VMax);
             ++output_step_;
             last_output_time_ = time;
             last_output_VMax_ = VMax;
@@ -48,7 +49,7 @@ public:
     }
 
 protected:
-    virtual void write_step(double time, BlockVector const& state) = 0;
+    virtual void write_step(double time, BlockVector const& state, double VMax) = 0;
 
     std::string name() const {
         std::stringstream ss;
@@ -76,7 +77,7 @@ public:
     bool require_displacement() const { return false; }
     bool require_traction() const { return true; }
 
-    void write_step(double time, BlockVector const& state) {
+    void write_step(double time, BlockVector const& state, double) {
         if (writer_.num_probes() > 0) {
             writer_.write(time, seasop_->state(state, writer_.begin(), writer_.end()));
         }
@@ -98,7 +99,7 @@ public:
     bool require_displacement() const { return true; }
     bool require_traction() const { return false; }
 
-    void write_step(double time, BlockVector const&) {
+    void write_step(double time, BlockVector const&, double) {
         if (writer_.num_probes() > 0) {
             auto displacement = seasop_->adapter().displacement(writer_.begin(), writer_.end());
             writer_.write(time, displacement);
@@ -121,7 +122,7 @@ public:
     bool require_displacement() const { return false; }
     bool require_traction() const { return true; }
 
-    void write_step(double time, BlockVector const& state) {
+    void write_step(double time, BlockVector const& state, double) {
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 
@@ -143,6 +144,29 @@ private:
     unsigned degree_;
 };
 
+template <class SeasOperator> class SeasFaultScalarWriter : public SeasWriter {
+public:
+    SeasFaultScalarWriter(std::string_view prefix, AdaptiveOutputInterval oi,
+                          std::shared_ptr<SeasOperator> seasop)
+        : SeasWriter(prefix, oi), seasop_(std::move(seasop)), writer_(prefix, {"VMax"}) {}
+
+    bool require_displacement() const { return false; }
+    bool require_traction() const { return false; }
+
+    void write_step(double time, BlockVector const&, double VMax) {
+        int rank;
+        MPI_Comm_rank(seasop_->comm(), &rank);
+
+        if (rank == 0) {
+            writer_.write(time, &VMax, 1);
+        }
+    }
+
+private:
+    std::shared_ptr<SeasOperator> seasop_;
+    ScalarWriter writer_;
+};
+
 template <std::size_t D, class SeasOperator> class SeasDomainWriter : public SeasWriter {
 public:
     SeasDomainWriter(std::string_view prefix, AdaptiveOutputInterval oi,
@@ -154,7 +178,7 @@ public:
     bool require_displacement() const { return true; }
     bool require_traction() const { return false; }
 
-    void write_step(double time, BlockVector const&) {
+    void write_step(double time, BlockVector const&, double) {
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 

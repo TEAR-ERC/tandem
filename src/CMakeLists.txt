@@ -32,6 +32,7 @@ add_library(tandem-lib
     form/Error.cpp
     io/BoundaryProbeWriter.cpp
     io/ProbeWriter.cpp
+    io/ScalarWriter.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
     io/PVDWriter.cpp
