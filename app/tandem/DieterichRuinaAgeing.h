@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <exception>
 
 namespace tndm {
 
@@ -47,6 +48,9 @@ public:
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
         auto Vi = norm(p_[index].get<Vinit>());
+        if (Vi == 0.0) {
+            return cp_.f0;
+        }
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
         double s = sinh((tauAbs - eta * Vi) / (a * snAbs));
@@ -54,8 +58,19 @@ public:
         return a * l;
     }
 
-    double sn_pre(std::size_t index) const { return p_[index].get<SnPre>(); }
-    auto tau_pre(std::size_t index) const { return p_[index].get<TauPre>(); }
+    /**
+     * @brief Absolute normal stress on fault (positive in compression)
+     */
+    double sn_hat(std::size_t index, double sn) const { return -sn + p_[index].get<SnPre>(); }
+    /**
+     * @brief Absolute shear stress on fault.
+     *
+     * Includes radiation damping term. I.e. the returned value is equivalent to -sn_hat f(V, psi).
+     */
+    auto tau_hat(std::size_t index, std::array<double, TangentialComponents> const& tau,
+                 std::array<double, TangentialComponents> const& V) const {
+        return tau + p_[index].get<TauPre>() + p_[index].get<Eta>() * V;
+    }
     auto S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     auto slip_rate(std::size_t index, double sn,
@@ -73,7 +88,19 @@ public:
         auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
             return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
         };
-        double V = zeroIn(a, b, fF);
+        double V = 0.0;
+        try {
+            V = zeroIn(a, b, fF);
+        } catch (std::exception const&) {
+            std::cout << "sigma_n = " << snAbs << std::endl
+                      << "|tau| = " << tauAbs << std::endl
+                      << "psi = " << psi << std::endl
+                      << "L = " << a << std::endl
+                      << "U = " << b << std::endl
+                      << "F(L) = " << fF(a) << std::endl
+                      << "F(U) = " << fF(b) << std::endl;
+            throw;
+        }
         return -(V / (F(index, snAbs, V, psi) + eta * V)) * tauAbsVec;
     }
 

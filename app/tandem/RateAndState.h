@@ -162,19 +162,19 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& tractio
         auto tau = get_tau(node, traction);
         auto psi = s_mat(node, PsiIndex);
         auto V = law_.slip_rate(index + node, sn, tau, psi);
-        auto tauAbs = law_.tau_pre(index + node) + tau;
+        auto tau_hat = law_.tau_hat(index + node, tau, V);
         std::size_t out = 0;
         result(node, out++) = psi;
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             result(node, out++) = s_mat(node, t);
         }
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
-            result(node, out++) = tauAbs[t];
+            result(node, out++) = tau_hat[t];
         }
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             result(node, out++) = V[t];
         }
-        result(node, out++) = law_.sn_pre(index + node) - sn;
+        result(node, out++) = law_.sn_hat(index + node, sn);
     }
 }
 
