@@ -1,10 +1,12 @@
 final_time = 56764800000
 mesh_file = "bp5.msh"
 lib = "bp5.lua"
-scenario = "bp5"
+scenario = "bp5_outside"
 type = "elasticity"
 ref_normal = [0, -1, 0]
 boundary_linear = true
+mg_strategy = "logarithmic"
+matrix_free = true
 
 [fault_probe_output]
 prefix = "fltst_"

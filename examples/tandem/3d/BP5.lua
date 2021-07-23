@@ -18,8 +18,9 @@ BP5.rho = 2.670
 BP5.cs = 3.464
 BP5.nu = 0.25
 
-function BP5.new()
+function BP5.new(params)
     local self = setmetatable({}, BP5)
+    self.eps = params.eps
     return self
 end
 
@@ -48,7 +49,8 @@ end
 function BP5:in_nucleation(x, y, z)
     local d = -z
     local s = x
-    if self.h_s + self.h_t <= d and d <= self.h_s + self.h_t + self.H and -self.l/2.0 <= s and s <= -self.l/2.0 + self.w then
+    local eps = self.eps
+    if self.h_s + self.h_t <= d+eps and d-eps <= self.h_s + self.h_t + self.H and -self.l/2.0 <= s+eps and s-eps <= -self.l/2.0 + self.w then
         return true
     end
     return false
