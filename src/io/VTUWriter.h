@@ -5,6 +5,7 @@
 #include "basis/Equidistant.h"
 
 #include <mpi.h>
+#include <stdexcept>
 #include <tinyxml2.h>
 #include <zlib.h>
 
@@ -86,6 +87,15 @@ private:
         da->SetAttribute("offset", static_cast<uint64_t>(offset));
 
         header_t size = dataSize * sizeof(T);
+
+        T dummy_data = 0;
+        if (data == nullptr) {
+            if (dataSize == 0) {
+                data = &dummy_data;
+            } else {
+                throw std::logic_error("addDataArray got nullptr but dataSize != 0");
+            }
+        }
 
         if (zlibCompress_) {
             struct {

@@ -103,9 +103,6 @@ template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D>
     if (!pdata) {
         pdata = piece_->InsertNewChildElement("PointData");
     }
-    if (function.numElements() == 0) {
-        return;
-    }
 
     auto E = function.evaluationMatrix(writer_.refNodes());
     auto data = Managed<Tensor<double, 3u>>(pointsPerElement, function.numElements(),
@@ -120,7 +117,11 @@ template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D>
         }
     }
     for (std::size_t p = 0; p < function.numQuantities(); ++p) {
-        writer_.addDataArray(pdata, function.name(p), 1, &data(0, 0, p),
+        double* data_ptr = nullptr;
+        if (function.numElements() > 0) {
+            data_ptr = &data(0, 0, p);
+        }
+        writer_.addDataArray(pdata, function.name(p), 1, data_ptr,
                              pointsPerElement * function.numElements());
     }
 }
