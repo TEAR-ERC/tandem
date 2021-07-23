@@ -9,8 +9,8 @@ mg_strategy = "logarithmic"
 
 [generate_mesh]
 intercepts = [
-    [-1, 0, 1],
-    [0, 1],
+    [-0.6, 0, 0.6],
+    [0, 0.6],
     [-0.8, -0.2]
 ]
 bcs = [

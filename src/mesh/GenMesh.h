@@ -146,7 +146,7 @@ public:
             regions[0] = 0;
             for (std::size_t p = 0; p < points.size() - 1u; ++p) {
                 assert(points[p + 1] > points[p]);
-                N += std::ceil((points[p + 1] - points[p]) / h);
+                N += std::lround((points[p + 1] - points[p]) / h);
                 regions[p + 1] = N;
             }
         };
