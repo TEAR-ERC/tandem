@@ -1,0 +1,20 @@
+final_time = 100.0
+resolution = 1
+type = "elasticity"
+lib = "mms5.lua"
+scenario = "mms5"
+ref_normal = [1, 0, 0]
+matrix_free = true
+mg_strategy = "logarithmic"
+
+[generate_mesh]
+intercepts = [
+    [-1, 0, 1],
+    [0, 1],
+    [-0.8, -0.2]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "f", plane = 1}, {bc = "d", plane = 2}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]
