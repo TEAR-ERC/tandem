@@ -123,6 +123,9 @@ public:
     bool require_traction() const { return true; }
 
     void write_step(double time, BlockVector const& state, double) {
+        if (time == 0) {
+            write_params();
+        }
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 
@@ -139,6 +142,13 @@ public:
     }
 
 private:
+    void write_params() {
+        auto writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
+        auto piece = writer.addPiece(adapter_);
+        piece.addPointData(seasop_->params());
+        writer.write(prefix_ + "-params");
+    }
+
     std::shared_ptr<SeasOperator> seasop_;
     CurvilinearBoundaryVTUAdapter<D> adapter_;
     unsigned degree_;

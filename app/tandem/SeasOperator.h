@@ -203,6 +203,28 @@ public:
         return state(vector, range.begin(), range.end());
     }
 
+    template <typename Iterator> auto params(Iterator first, Iterator last) {
+        auto num_elements = std::distance(first, last);
+        auto soln = lop_->params_prototype(num_elements);
+        auto& values = soln.values();
+
+        scratch_.reset();
+        std::size_t out_no = 0;
+        for (; first != last; ++first) {
+            std::size_t faultNo = *first;
+            assert(faultNo < numLocalElements());
+
+            auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
+            lop_->params(faultNo, value_matrix, scratch_);
+        }
+        return soln;
+    }
+
+    auto params() {
+        auto range = Range<std::size_t>(0, numLocalElements());
+        return params(range.begin(), range.end());
+    }
+
     void set_boundary(time_functional_t fun) { adapter_->set_boundary(std::move(fun)); }
 
     double VMax_local() const { return VMax_; }

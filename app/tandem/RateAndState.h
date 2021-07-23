@@ -51,6 +51,8 @@ public:
     auto state_prototype(std::size_t numLocalElements) const;
     void state(std::size_t faultNo, Matrix<double> const& traction, Vector<double const>& state,
                Matrix<double>& result, LinearAllocator<double>&) const;
+    auto params_prototype(std::size_t numLocalElements) const;
+    void params(std::size_t faultNo, Matrix<double>& result, LinearAllocator<double>&) const;
 
 private:
     template <typename T> auto mat(Vector<T>& state) const {
@@ -175,6 +177,23 @@ void RateAndState<Law>::state(std::size_t faultNo, Matrix<double> const& tractio
             result(node, out++) = V[t];
         }
         result(node, out++) = law_.sn_hat(index + node, sn);
+    }
+}
+
+template <class Law> auto RateAndState<Law>::params_prototype(std::size_t numLocalElements) const {
+    return FiniteElementFunction<DomainDimension - 1u>(space_.clone(), law_.param_names(),
+                                                       numLocalElements);
+}
+
+template <class Law>
+void RateAndState<Law>::params(std::size_t faultNo, Matrix<double>& result,
+                               LinearAllocator<double>&) const {
+
+    std::size_t nbf = space_.numBasisFunctions();
+    std::size_t index = faultNo * nbf;
+    for (std::size_t node = 0; node < nbf; ++node) {
+        auto row = result.subtensor(node, slice{});
+        law_.params(index + node, row);
     }
 }
 

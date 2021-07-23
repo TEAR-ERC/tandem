@@ -1,14 +1,19 @@
 #ifndef DIETERICHRUINAAGEING_20201027_H
 #define DIETERICHRUINAAGEING_20201027_H
 
-#include "RateAndState.h"
+#include "config.h"
 
 #include "geometry/Vector.h"
+#include "tensor/Tensor.h"
 #include "util/Zero.h"
+
+#include "mneme/storage.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <exception>
+#include <iostream>
 
 namespace tndm {
 
@@ -107,6 +112,35 @@ public:
     double state_rhs(std::size_t index, double V, double psi) const {
         double myL = p_[index].get<L>();
         return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
+    }
+
+    auto param_names() const {
+        auto names = std::vector<std::string>(4 + TangentialComponents);
+        char buf[100];
+
+        std::size_t i = 0;
+        names[i++] = "a";
+        names[i++] = "eta";
+        names[i++] = "L";
+        names[i++] = "sn_pre";
+        for (std::size_t t = 0; t < TangentialComponents; ++t) {
+            snprintf(buf, sizeof(buf), "tau_pre%lu", t);
+            names[i++] = buf;
+        }
+        return names;
+    }
+
+    template <typename VecT> void params(std::size_t index, VecT& result) const {
+        assert(result.shape(0) == 4 + TangentialComponents);
+        std::ptrdiff_t i = 0;
+        result(i++) = p_[index].get<A>();
+        result(i++) = p_[index].get<Eta>();
+        result(i++) = p_[index].get<L>();
+        result(i++) = p_[index].get<SnPre>();
+        auto const& tau_pre = p_[index].get<TauPre>();
+        for (auto const& t : tau_pre) {
+            result(i++) = t;
+        }
     }
 
 private:
