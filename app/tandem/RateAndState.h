@@ -42,8 +42,8 @@ public:
     void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }
 
     void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator<double>&) const;
-    void init(std::size_t faultNo, Matrix<double> const& traction, Vector<double>& state,
-              LinearAllocator<double>&) const;
+    double init(std::size_t faultNo, Matrix<double> const& traction, Vector<double>& state,
+                LinearAllocator<double>&) const;
 
     double rhs(std::size_t faultNo, double time, Matrix<double> const& traction,
                Vector<double const>& state, Vector<double>& result, LinearAllocator<double>&) const;
@@ -86,15 +86,21 @@ void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
 }
 
 template <class Law>
-void RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& traction,
-                             Vector<double>& state, LinearAllocator<double>&) const {
+double RateAndState<Law>::init(std::size_t faultNo, Matrix<double> const& traction,
+                               Vector<double>& state, LinearAllocator<double>&) const {
+    double VMax = 0.0;
     auto s_mat = mat(state);
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
-        s_mat(node, PsiIndex) =
-            law_.psi_init(index + node, traction(node, 0), get_tau(node, traction));
+        auto sn = traction(node, 0);
+        auto tau = get_tau(node, traction);
+        auto psi = law_.psi_init(index + node, sn, tau);
+        double V = norm(law_.slip_rate(index + node, sn, tau, psi));
+        VMax = std::max(VMax, V);
+        s_mat(node, PsiIndex) = psi;
     }
+    return VMax;
 }
 
 template <class Law>

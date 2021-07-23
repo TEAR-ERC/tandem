@@ -77,12 +77,15 @@ public:
 
         auto traction = Managed<Matrix<double>>(adapter_->traction_info());
         adapter_->begin_traction(block_view);
+        VMax_ = 0.0;
         scratch_.reset();
         for (std::size_t faultNo = 0, num = numLocalElements(); faultNo < num; ++faultNo) {
             adapter_->traction(faultNo, traction, scratch_);
 
             auto B = access_handle.subtensor(slice{}, faultNo);
-            lop_->init(faultNo, traction, B, scratch_);
+            double VMax = lop_->init(faultNo, traction, B, scratch_);
+
+            VMax_ = std::max(VMax_, VMax);
         }
         adapter_->end_traction();
         vector.end_access_readonly(access_handle_readonly);
