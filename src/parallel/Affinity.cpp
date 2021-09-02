@@ -61,7 +61,6 @@ auto Affinity::my_set_to_cpu_set(my_set const& set) const -> cpu_set_t {
 }
 
 cpu_set_t Affinity::worker_mask_on_node(MPI_Comm comm) const {
-    const int np = get_nprocs();
     auto rank_mask = cpu_set_to_my_set(worker_mask());
 
     MPI_Comm comm_shared;

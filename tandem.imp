@@ -1,0 +1,17 @@
+[
+    { include: ["@<Eigen/src/Core/.*>", "private", "<Eigen/Core>", "public"] },
+    { include: ["@<Eigen/src/LU/.*>", "private", "<Eigen/LU>", "public"] },
+    { include: ["@<Eigen/src/QR/.*>", "private", "<Eigen/QR>", "public"] },
+
+    { include: ["<ext/alloc_traits.h>", "private", "<memory>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<condition_variable>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<deque>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<forward_list>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<future>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<map>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<set>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<string>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<unordered_map>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<unordered_set>", "public" ] },
+    { include: ["<ext/alloc_traits.h>", "private", "<vector>", "public" ] },
+]

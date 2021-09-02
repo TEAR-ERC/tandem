@@ -154,7 +154,7 @@ bool GMSHParser::parseElements() {
     auto numElements = lexer.getInteger();
 
     constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
-    long tag;
+    long tag = -1;
     std::array<long, MaxNodes> nodes;
 
     builder->setNumElements(numElements);

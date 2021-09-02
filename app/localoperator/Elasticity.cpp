@@ -114,7 +114,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
     fun_mu(elNo, mu_Q);
 
-    auto nbf = materialSpace_.numBasisFunctions();
     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
     kernel::project_material_lhs krnl_lhs;
     krnl_lhs.matE_Q_T = matE_Q_T.data();

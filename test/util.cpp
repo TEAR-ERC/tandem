@@ -169,7 +169,7 @@ TEST_CASE("Allocator") {
 
     bool except = false;
     try {
-        mem = allocator.allocate(1000);
+        allocator.allocate(1000);
     } catch (std::bad_alloc const&) {
         except = true;
     }
@@ -180,7 +180,7 @@ TEST_CASE("Allocator") {
     CHECK(mem == &test[0]);
 
     try {
-        mem = allocator.allocate(1);
+        allocator.allocate(1);
     } catch (std::bad_alloc const&) {
         except = true;
     }
