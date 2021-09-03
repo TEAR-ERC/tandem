@@ -2,8 +2,8 @@
 #define FRICTIONCONFIG_20201027_H
 
 #include "config.h"
-#include "tandem/DieterichRuinaAgeing.h"
-#include "tandem/RateAndStateBase.h"
+#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/RateAndStateBase.h"
 #include "tandem/SeasSolution.h"
 
 #include "form/Error.h"
