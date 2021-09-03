@@ -1,8 +1,8 @@
 #ifndef RATEANDSTATE_20201026_H
 #define RATEANDSTATE_20201026_H
 
+#include "RateAndStateBase.h"
 #include "config.h"
-#include "tandem/RateAndStateBase.h"
 
 #include "geometry/Vector.h"
 #include "tensor/Reshape.h"
