@@ -168,6 +168,7 @@ set(APP_COMMON_SRCS
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
     localoperator/Poisson.cpp
+    localoperator/RateAndStateBase.cpp
     pc/lspoly.c
     pc/register.cpp
 )
@@ -199,7 +200,6 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 
 add_executable(tandem
     tandem/SeasConfig.cpp
-    tandem/RateAndStateBase.cpp
     tandem/SeasAdapterBase.cpp
     tandem/SeasElasticityAdapter.cpp
     tandem/SeasPoissonAdapter.cpp

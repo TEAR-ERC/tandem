@@ -3,7 +3,6 @@
 
 #include "form/BoundaryMap.h"
 #include "geometry/Curvilinear.h"
-#include "tandem/RateAndStateBase.h"
 
 #include "interface/BlockVector.h"
 #include "parallel/LocalGhostCompositeView.h"
