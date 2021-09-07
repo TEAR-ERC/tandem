@@ -7,17 +7,12 @@
 #include "config.h"
 
 #include "form/BoundaryMap.h"
-#include "form/FiniteElementFunction.h"
-#include "geometry/Curvilinear.h"
 #include "interface/BlockVector.h"
 #include "parallel/LocalGhostCompositeView.h"
 #include "parallel/Scatter.h"
 #include "parallel/SparseBlockVector.h"
-#include "tensor/Managed.h"
-#include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
-#include "util/Range.h"
 #include "util/Scratch.h"
 
 #include <mpi.h>
