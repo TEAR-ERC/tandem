@@ -38,14 +38,14 @@ public:
                    MGConfig const& mg_config = MGConfig())
         : dgop_(std::move(dgop)), linear_solver_(*dgop_, matrix_free, mg_config),
           adapter_(std::move(adapter)), friction_(std::move(friction)),
-          traction_(adapter_->lop().traction_block_size(), adapter_->num_local_elements(),
-                    adapter_->comm()),
           disp_scatter_(dgop_->topo().elementScatterPlan()),
           disp_ghost_(
               disp_scatter_.recv_prototype<double>(dgop_->block_size(), dgop_->lop().alignment())),
           state_scatter_(adapter_->fault_map().scatter_plan()),
           state_ghost_(
-              state_scatter_.recv_prototype<double>(friction_->lop().block_size(), ALIGNMENT)) {}
+              state_scatter_.recv_prototype<double>(friction_->lop().block_size(), ALIGNMENT)),
+          traction_(adapter_->lop().traction_block_size(), adapter_->num_local_elements(),
+                    adapter_->comm()) {}
 
     void warmup() { linear_solver_.warmup(); }
 
@@ -65,15 +65,17 @@ public:
     void initial_condition(BlockVector& state) {
         friction_->pre_init(state);
 
-        solve(0.0, state);
-        update_traction(state);
+        update_ghost_state(state);
+        solve(0.0, make_state_view(state));
+        update_traction(make_state_view(state));
 
         friction_->init(traction_, state);
     }
 
     void rhs(double time, BlockVector const& state, BlockVector& result) {
-        solve(time, state);
-        update_traction(state);
+        update_ghost_state(state);
+        solve(time, make_state_view(state));
+        update_traction(make_state_view(state));
 
         friction_->rhs(time, traction_, state, result);
     }
@@ -87,9 +89,10 @@ public:
             return;
         }
 
-        solve(time, state);
+        update_ghost_state(state);
+        solve(time, make_state_view(state));
         if (require_traction) {
-            update_traction(state);
+            update_traction(make_state_view(state));
         }
     }
 
@@ -105,17 +108,23 @@ public:
     }
     auto state(BlockVector const& state_vec) { return friction_->state(traction_, state_vec); }
 
-private:
+protected:
     auto invalid_slip_bc() {
         return [](std::size_t, Matrix<double>&, bool) {
             throw std::logic_error("Slip boundary condition not set");
         };
     }
 
-    void solve(double time, BlockVector const& state) {
+    void update_ghost_state(BlockVector const& state) {
         state_scatter_.begin_scatter(state, state_ghost_);
         state_scatter_.wait_scatter();
-        auto state_view = LocalGhostCompositeView(state, state_ghost_);
+    }
+
+    auto make_state_view(BlockVector const& state) {
+        return LocalGhostCompositeView(state, state_ghost_);
+    }
+
+    void solve(double time, BlockView const& state_view) {
         dgop_->lop().set_slip(adapter_->slip_bc(state_view));
         dgop_->lop().set_dirichlet(
             [this, time](std::array<double, Dim> const& x) {
@@ -132,20 +141,19 @@ private:
         disp_scatter_.wait_scatter();
     }
 
-    void update_traction(BlockVector const& state) {
+    void update_traction(BlockView const& state_view) {
         auto disp_view = LocalGhostCompositeView(linear_solver_.x(), disp_ghost_);
-        auto state_view = LocalGhostCompositeView(state, state_ghost_);
         dgop_->lop().set_slip(adapter_->slip_bc(state_view));
         adapter_->traction(*dgop_, disp_view, traction_);
         dgop_->lop().set_slip(invalid_slip_bc());
     }
 
+private:
     std::unique_ptr<DomainOperator> dgop_;
     PetscLinearSolver linear_solver_;
     std::unique_ptr<AdapterOperator> adapter_;
     std::unique_ptr<FrictionOperator> friction_;
 
-    PetscVector traction_;
     Scatter disp_scatter_;
     SparseBlockVector<double> disp_ghost_;
 
@@ -156,6 +164,9 @@ private:
         [](std::array<double, Dim + 1u> const& x) -> std::array<double, DomainNumQuantities> {
         return {};
     };
+
+protected:
+    PetscVector traction_;
 };
 
 } // namespace tndm

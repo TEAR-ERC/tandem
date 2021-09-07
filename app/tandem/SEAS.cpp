@@ -4,6 +4,7 @@
 #include "form/AdapterOperator.h"
 #include "form/BoundaryMap.h"
 #include "form/FrictionOperator.h"
+#include "form/SeasQDDiscreteGreenOperator.h"
 #include "form/SeasQDOperator.h"
 #include "localoperator/DieterichRuinaAgeing.h"
 #include "localoperator/Elasticity.h"
@@ -32,6 +33,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -71,18 +73,6 @@ template <> struct make_lop<SeasType::Elasticity> {
     }
 };
 
-// template <class Adapter, bool MakeGreen> struct discrete_green;
-// template <class Adapter> struct discrete_green<Adapter, false> {
-// using type = Adapter;
-// static auto wrap(std::unique_ptr<Adapter> adapter, std::size_t) { return std::move(adapter); }
-//};
-// template <class Adapter> struct discrete_green<Adapter, true> {
-// using type = DiscreteGreenAdapter<Adapter>;
-// static auto wrap(std::unique_ptr<Adapter> adapter, std::size_t slip_block_size) {
-// return std::make_unique<type>(std::move(adapter), slip_block_size);
-//}
-//};
-
 template <SeasType Type, bool MakeGreen>
 void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     using adapter_lop_t = typename make_lop<Type>::adapter_type;
@@ -91,7 +81,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     using dg_t = DGOperator<dg_lop_t>;
     using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
     using friction_t = FrictionOperator<friction_lop_t>;
-    using seas_t = SeasQDOperator<adapter_t, dg_t, friction_t>;
+    using seas_t =
+        std::conditional_t<MakeGreen, SeasQDDiscreteGreenOperator<adapter_t, dg_t, friction_t>,
+                           SeasQDOperator<adapter_t, dg_t, friction_t>>;
     using seas_fault_probe_writer_t = SeasFaultProbeWriter<DomainDimension, seas_t>;
     using seas_domain_probe_writer_t = SeasDomainProbeWriter<DomainDimension, seas_t>;
     using seas_fault_writer_t = SeasFaultWriter<DomainDimension, seas_t>;
