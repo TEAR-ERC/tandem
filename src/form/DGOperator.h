@@ -206,15 +206,14 @@ public:
     void apply(BlockVector const& x, BlockVector& y) {
         constexpr std::size_t NumFacets = LocalOperator::Dim + 1;
         auto y_handle = y.begin_access();
-        auto x_handle = x.begin_access_readonly();
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
             auto copy_first = topo_->numInteriorElements();
             auto ghost_first = topo_->numLocalElements();
-            auto block_view = LocalGhostCompositeView(x_handle, ghost_);
+            auto block_view = LocalGhostCompositeView(x, ghost_);
 
             const auto lop_apply = [&](std::size_t elNo) {
                 auto y_0 = y_handle.subtensor(slice{}, elNo);
-                auto x_0 = x_handle.subtensor(slice{}, elNo);
+                auto x_0 = block_view.get_block(elNo);
                 auto info = topo_->neighbours(elNo);
                 assert(info.size() == NumFacets);
                 std::array<decltype(x_0), NumFacets> x_n;
@@ -236,7 +235,6 @@ public:
                 lop_apply(elNo);
             }
         }
-        x.end_access_readonly(x_handle);
         y.end_access(y_handle);
     }
 

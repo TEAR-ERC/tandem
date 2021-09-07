@@ -72,7 +72,8 @@ public:
                          AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
                          std::shared_ptr<Curvilinear<D>> cl, std::shared_ptr<SeasOperator> seasop)
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
-          writer_(prefix, probes, mesh, std::move(cl), seasop_->faultMap(), seasop_->comm()) {}
+          writer_(prefix, probes, mesh, std::move(cl), seasop_->friction().fault_map(),
+                  seasop_->comm()) {}
 
     bool require_displacement() const { return false; }
     bool require_traction() const { return true; }
@@ -101,7 +102,7 @@ public:
 
     void write_step(double time, BlockVector const&, double) {
         if (writer_.num_probes() > 0) {
-            auto displacement = seasop_->adapter().displacement(writer_.begin(), writer_.end());
+            auto displacement = seasop_->displacement(writer_.begin(), writer_.end());
             writer_.write(time, displacement);
         }
     }
@@ -117,7 +118,8 @@ public:
                     LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                     std::shared_ptr<SeasOperator> seasop, unsigned degree)
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
-          adapter_(mesh, std::move(cl), seasop_->faultMap().localFctNos()), degree_(degree) {}
+          adapter_(mesh, std::move(cl), seasop_->friction().fault_map().localFctNos()),
+          degree_(degree) {}
 
     bool require_displacement() const { return false; }
     bool require_traction() const { return true; }
@@ -145,7 +147,7 @@ private:
     void write_params() {
         auto writer = VTUWriter<D - 1u>(degree_, true, seasop_->comm());
         auto piece = writer.addPiece(adapter_);
-        piece.addPointData(seasop_->params());
+        piece.addPointData(seasop_->friction().params());
         writer.write(prefix_ + "-params");
     }
 
@@ -183,7 +185,7 @@ public:
                      LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                      std::shared_ptr<SeasOperator> seasop, unsigned degree)
         : SeasWriter(prefix, oi), seasop_(std::move(seasop)),
-          adapter_(std::move(cl), seasop_->adapter().numLocalElements()), degree_(degree) {}
+          adapter_(std::move(cl), seasop_->domain().numLocalElements()), degree_(degree) {}
 
     bool require_displacement() const { return true; }
     bool require_traction() const { return false; }
@@ -192,7 +194,7 @@ public:
         int rank;
         MPI_Comm_rank(seasop_->comm(), &rank);
 
-        auto displacement = seasop_->adapter().displacement();
+        auto displacement = seasop_->displacement();
         auto writer = VTUWriter<D>(degree_, true, seasop_->comm());
         writer.addFieldData("time", &time, 1);
         auto piece = writer.addPiece(adapter_);
@@ -232,7 +234,7 @@ public:
      */
     void monitor(double time, BlockVector const& state) {
         if (!writers_.empty()) {
-            double VMax_local = seasop_->VMax_local();
+            double VMax_local = seasop_->friction().VMax_local();
             double VMax;
             MPI_Allreduce(&VMax_local, &VMax, 1, MPI_DOUBLE, MPI_MAX, seasop_->comm());
 

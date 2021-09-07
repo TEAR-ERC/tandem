@@ -38,7 +38,7 @@ public:
      */
     std::size_t numElements() const { return numElems_; }
     std::size_t numLocalFacets() const { return numLocalFacets_; }
-    std::shared_ptr<ScatterPlan> elementScatterPlan() { return elementScatterPlan_; }
+    std::shared_ptr<ScatterPlan> elementScatterPlan() const { return elementScatterPlan_; }
 
     FacetInfo const& info(std::size_t fctNo) const { return fctInfo[fctNo]; }
     std::size_t gid(std::size_t elNo) const { return volInfo[elNo].template get<GID>(); }
