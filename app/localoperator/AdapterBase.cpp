@@ -1,4 +1,4 @@
-#include "SeasAdapterBase.h"
+#include "AdapterBase.h"
 
 #include "config.h"
 #include "form/BC.h"
@@ -13,46 +13,46 @@
 
 namespace tndm {
 
-SeasAdapterBase::SeasAdapterBase(
-    std::unique_ptr<BoundaryMap> fault_map, std::shared_ptr<Curvilinear<DomainDimension>> cl,
-    std::shared_ptr<DGOperatorTopo> topo, std::unique_ptr<RefElement<DomainDimension - 1u>> space,
-    std::vector<std::array<double, DomainDimension - 1u>> const& quadPoints,
-    std::array<double, DomainDimension> const& up,
-    std::array<double, DomainDimension> const& ref_normal)
-    : cl_(std::move(cl)), topo_(std::move(topo)), space_(std::move(space)),
-      faultMap_(std::move(fault_map)), up_(up), ref_normal_(ref_normal), nq_(quadPoints.size()) {
+AdapterBase::AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                         std::unique_ptr<RefElement<DomainDimension - 1u>> space,
+                         SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule,
+                         std::array<double, DomainDimension> const& up,
+                         std::array<double, DomainDimension> const& ref_normal)
+    : cl_(std::move(cl)), space_(std::move(space)), quad_rule_(quad_rule), up_(up),
+      ref_normal_(ref_normal) {
 
-    e_q = space_->evaluateBasisAt(quadPoints);
-    e_q_T = space_->evaluateBasisAt(quadPoints, {1, 0});
+    e_q = space_->evaluateBasisAt(quad_rule_.points());
+    e_q_T = space_->evaluateBasisAt(quad_rule_.points(), {1, 0});
     minv = space_->inverseMassMatrix();
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
-        auto facetParam = cl_->facetParam(f, quadPoints);
+        auto facetParam = cl_->facetParam(f, quad_rule_.points());
         geoDxi_q.emplace_back(cl_->evaluateGradientAt(facetParam));
     }
 }
 
-void SeasAdapterBase::begin_preparation(std::size_t numFaultFaces) {
-    fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nq_), 0u, numFaultFaces, nq_);
+void AdapterBase::begin_preparation(std::size_t numFaultFaces) {
+    auto nq = quad_rule_.size();
+    fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nq), 0u, numFaultFaces, nq);
 }
 
-void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scratch) {
-    auto const fctNo = faultMap_->fctNo(faultNo);
-    auto const& info = topo_->info(fctNo);
+void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch) {
+    auto nq = quad_rule_.size();
 
-    auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq_));
-    auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq_));
-    auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nq_));
+    auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
+    auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
+    auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nq));
     auto normal = Tensor(fault_[faultNo].template get<UnitNormal>().data()->data(),
-                         cl_->normalResultInfo(nq_));
+                         cl_->normalResultInfo(nq));
     auto fault_basis_q = Tensor(fault_[faultNo].template get<FaultBasis>().data()->data(),
-                                cl_->facetBasisResultInfo(nq_));
+                                cl_->facetBasisResultInfo(nq));
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, JInv);
     cl_->normal(info.localNo[0], detJ, JInv, normal);
     cl_->normalize(normal);
-    for (std::size_t i = 0; i < nq_; ++i) {
+    for (std::size_t i = 0; i < nq; ++i) {
         auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
         auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
         auto n_ref_dot_n = dot(ref_normal_, normal_i);
@@ -65,7 +65,7 @@ void SeasAdapterBase::prepare(std::size_t faultNo, LinearAllocator<double>& scra
         }
     }
     cl_->facetBasis(up_, normal, fault_basis_q);
-    for (std::size_t q = 0; q < nq_; ++q) {
+    for (std::size_t q = 0; q < nq; ++q) {
         if (fault_[faultNo].template get<SignFlipped>()[q]) {
             for (std::size_t i = 0; i < fault_basis_q.shape(1); ++i) {
                 for (std::size_t j = 0; j < fault_basis_q.shape(0); ++j) {

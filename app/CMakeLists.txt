@@ -165,9 +165,12 @@ set(APP_COMMON_SRCS
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
+    localoperator/AdapterBase.cpp
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
+    localoperator/ElasticityAdapter.cpp
     localoperator/Poisson.cpp
+    localoperator/PoissonAdapter.cpp
     localoperator/RateAndStateBase.cpp
     pc/lspoly.c
     pc/register.cpp
@@ -200,9 +203,6 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 
 add_executable(tandem
     tandem/SeasConfig.cpp
-    tandem/SeasAdapterBase.cpp
-    tandem/SeasElasticityAdapter.cpp
-    tandem/SeasPoissonAdapter.cpp
     tandem/SEAS.cpp
     tandem.cpp)
 target_link_libraries(tandem PRIVATE app-common)

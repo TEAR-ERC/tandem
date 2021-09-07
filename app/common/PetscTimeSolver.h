@@ -15,7 +15,7 @@ namespace tndm {
 class PetscTimeSolver {
 public:
     template <typename TimeOp> PetscTimeSolver(TimeOp& timeop) {
-        state_ = std::make_unique<PetscVector>(timeop.block_size(), timeop.numLocalElements(),
+        state_ = std::make_unique<PetscVector>(timeop.block_size(), timeop.num_local_elements(),
                                                timeop.comm());
         timeop.initial_condition(*state_);
 
