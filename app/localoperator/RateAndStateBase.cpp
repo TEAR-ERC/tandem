@@ -7,9 +7,13 @@
 
 namespace tndm {
 
+auto RateAndStateBase::Space() -> NodalRefElement<DomainDimension - 1u> {
+    return NodalRefElement<DomainDimension - 1u>(
+        PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>(), ALIGNMENT);
+}
+
 RateAndStateBase::RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl)
-    : cl_(std::move(cl)),
-      space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension - 1u>(), ALIGNMENT) {
+    : cl_(std::move(cl)), space_(Space()) {
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, space_.refNodes());

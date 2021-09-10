@@ -27,7 +27,7 @@ namespace tndm {
 class AdapterBase {
 public:
     AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                std::unique_ptr<RefElement<DomainDimension - 1u>> space,
+                RefElement<DomainDimension - 1u> const& space,
                 SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule,
                 std::array<double, DomainDimension> const& up,
                 std::array<double, DomainDimension> const& ref_normal);
@@ -43,7 +43,6 @@ public:
 
 protected:
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;
-    std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
     SimplexQuadratureRule<DomainDimension - 1u> quad_rule_;
     std::array<double, DomainDimension> up_;
     std::array<double, DomainDimension> ref_normal_;

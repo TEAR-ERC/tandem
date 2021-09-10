@@ -14,16 +14,15 @@
 namespace tndm {
 
 AdapterBase::AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                         std::unique_ptr<RefElement<DomainDimension - 1u>> space,
+                         RefElement<DomainDimension - 1u> const& space,
                          SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule,
                          std::array<double, DomainDimension> const& up,
                          std::array<double, DomainDimension> const& ref_normal)
-    : cl_(std::move(cl)), space_(std::move(space)), quad_rule_(quad_rule), up_(up),
-      ref_normal_(ref_normal) {
+    : cl_(std::move(cl)), quad_rule_(quad_rule), up_(up), ref_normal_(ref_normal) {
 
-    e_q = space_->evaluateBasisAt(quad_rule_.points());
-    e_q_T = space_->evaluateBasisAt(quad_rule_.points(), {1, 0});
-    minv = space_->inverseMassMatrix();
+    e_q = space.evaluateBasisAt(quad_rule_.points());
+    e_q_T = space.evaluateBasisAt(quad_rule_.points(), {1, 0});
+    minv = space.inverseMassMatrix();
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, quad_rule_.points());

@@ -19,7 +19,6 @@ template <> std::size_t Adapter<Elasticity>::traction_block_size() const {
 template <>
 void Adapter<Elasticity>::traction(std::size_t faultNo, Matrix<double> const& traction_q,
                                    Vector<double>& traction, LinearAllocator<double>&) const {
-    auto const nbf = space_->numBasisFunctions();
     assert(traction_q.size() == elasticity_adapter::tensor::traction_q::Size);
     assert(traction.shape(0) == traction_block_size());
 
