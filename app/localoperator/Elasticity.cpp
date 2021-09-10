@@ -741,12 +741,12 @@ void Elasticity::apply_inverse_mass(std::size_t elNo, Vector<double const> const
     krnl.execute();
 }
 
-void Elasticity::project(std::size_t elNo, functional_t<NumQuantities> x, Vector<double>& y) const {
+void Elasticity::project(std::size_t elNo, volume_functional_t x, Vector<double>& y) const {
     alignas(ALIGNMENT) double U_Q_raw[tensor::U_Q::size()];
     alignas(ALIGNMENT) double U_raw[tensor::U::size()];
 
     auto U_Q = Matrix<double>(U_Q_raw, NumQuantities, volRule.size());
-    make_volume_functional(x)(elNo, U_Q);
+    x(elNo, U_Q);
 
     kernel::project_u_rhs krnl;
     krnl.E_Q = E_Q.data();

@@ -166,6 +166,7 @@ set(APP_COMMON_SRCS
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
+    form/SeasFDOperator.cpp
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
     localoperator/AdapterBase.cpp

@@ -3,11 +3,13 @@
 #include "config.h"
 #include "form/AdapterOperator.h"
 #include "form/BoundaryMap.h"
+#include "form/FacetFunctionalFactory.h"
 #include "form/FiniteElementFunction.h"
 #include "form/FrictionOperator.h"
 #include "form/SeasFDOperator.h"
 #include "form/SeasQDDiscreteGreenOperator.h"
 #include "form/SeasQDOperator.h"
+#include "form/VolumeFunctionalFactory.h"
 #include "localoperator/Adapter.h"
 #include "localoperator/DieterichRuinaAgeing.h"
 #include "localoperator/Elasticity.h"
@@ -281,9 +283,7 @@ void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
 
 template <typename Type>
 void solve_seas_fd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using adapter_t = AdapterOperator<Type>;
-    using dg_t = DGOperator<Type>;
-    using seas_t = SeasFDOperator<adapter_t, dg_t>;
+    using seas_t = SeasFDOperator;
     using seas_monitor_t = seas::MonitorFD<seas_t>;
 
     auto op = make_op<Type>(mesh, cfg);
@@ -295,13 +295,16 @@ void solve_seas_fd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
     auto seasop =
         std::make_shared<seas_t>(std::move(dgop), std::move(adapter), std::move(friction));
     if (op.scenario.boundary()) {
-        seasop->set_boundary(*op.scenario.boundary());
+        seasop->set_boundary(std::make_unique<FacetFunctionalFactory<Type>>(
+            op.dg_lop, *op.scenario.boundary(), cfg.ref_normal));
     }
     if (op.scenario.initial_displacement()) {
-        seasop->set_initial_displacement(*op.scenario.initial_displacement());
+        seasop->set_initial_displacement(std::make_unique<VolumeFunctionalFactory<Type>>(
+            op.dg_lop, *op.scenario.initial_displacement()));
     }
     if (op.scenario.initial_velocity()) {
-        seasop->set_initial_velocity(*op.scenario.initial_velocity());
+        seasop->set_initial_velocity(std::make_unique<VolumeFunctionalFactory<Type>>(
+            op.dg_lop, *op.scenario.initial_velocity()));
     }
 
     auto ts =

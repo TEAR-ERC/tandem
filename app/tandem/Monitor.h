@@ -1,6 +1,7 @@
 #ifndef SEASMONITOR_20210909_H
 #define SEASMONITOR_20210909_H
 
+#include "config.h"
 #include "form/FiniteElementFunction.h"
 #include "tandem/Writer.h"
 
@@ -191,10 +192,9 @@ private:
     }
     auto volume_data(BlockVector const& v, BlockVector const& u,
                      std::vector<std::size_t> const* subset)
-        -> std::array<FiniteElementFunction<SeasFDOperator::Dim>, 2> {
+        -> std::array<FiniteElementFunction<DomainDimension>, 2> {
         if (subset) {
-            return {seasop_->domain_function(v, subset->begin(), subset->end()),
-                    seasop_->domain_function(u, subset->begin(), subset->end())};
+            return {seasop_->domain_function(v, *subset), seasop_->domain_function(u, *subset)};
         } else {
             return {seasop_->domain_function(v), seasop_->domain_function(u)};
         }

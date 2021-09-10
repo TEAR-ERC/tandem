@@ -47,9 +47,6 @@ public:
     template <class T> using apply_inverse_mass_t = decltype(&T::apply_inverse_mass);
     template <class T> using project_t = decltype(&T::project);
 
-    using vector_functional_t =
-        typename LocalOperator::template functional_t<LocalOperator::NumQuantities>;
-
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::shared_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
           scratch_(lop_->scratch_mem_size(), lop_->alignment()),
@@ -270,7 +267,7 @@ public:
         x.end_access_readonly(x_handle);
     }
 
-    void project(vector_functional_t x, BlockVector& y) {
+    void project(typename base::volume_functional_t x, BlockVector& y) override {
         auto y_handle = y.begin_access();
         if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
 
