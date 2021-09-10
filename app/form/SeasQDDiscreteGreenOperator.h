@@ -3,7 +3,9 @@
 
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
+#include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
+#include "form/FacetFunctionalFactory.h"
 #include "form/SeasQDOperator.h"
 
 #include "parallel/LocalGhostCompositeView.h"
@@ -19,13 +21,12 @@
 
 namespace tndm {
 
-template <typename AdapterOperator, typename DomainOperator>
-class SeasQDDiscreteGreenOperator : public SeasQDOperator<AdapterOperator, DomainOperator> {
+class SeasQDDiscreteGreenOperator : public SeasQDOperator {
 public:
-    using base = SeasQDOperator<AdapterOperator, DomainOperator>;
+    using base = SeasQDOperator;
 
-    SeasQDDiscreteGreenOperator(std::unique_ptr<DomainOperator> dgop,
-                                std::unique_ptr<AdapterOperator> adapter,
+    SeasQDDiscreteGreenOperator(std::unique_ptr<typename base::dg_t> dgop,
+                                std::unique_ptr<AbstractAdapterOperator> adapter,
                                 std::unique_ptr<AbstractFrictionOperator> friction,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig())
         : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
@@ -33,7 +34,7 @@ public:
     }
     ~SeasQDDiscreteGreenOperator() { MatDestroy(&G_); }
 
-    void set_boundary(typename base::time_functional_t fun) {
+    void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
         base::set_boundary(std::move(fun));
         compute_boundary_traction();
     }
@@ -95,13 +96,11 @@ private:
     std::unique_ptr<PetscVector> t_boundary_;
 };
 
-template <typename AdapterOperator, typename DomainOperator>
-void SeasQDDiscreteGreenOperator<AdapterOperator,
-                                 DomainOperator>::compute_discrete_greens_function() {
+void SeasQDDiscreteGreenOperator::compute_discrete_greens_function() {
     auto slip_block_size = base::friction().slip_block_size();
 
     PetscInt num_local_elements = base::adapter().num_local_elements();
-    PetscInt m_bs = base::adapter().lop().traction_block_size();
+    PetscInt m_bs = base::adapter().traction_block_size();
     PetscInt n_bs = 1;
     PetscInt m = num_local_elements * m_bs;
     PetscInt n = num_local_elements * slip_block_size * n_bs;
@@ -184,8 +183,7 @@ void SeasQDDiscreteGreenOperator<AdapterOperator,
     CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
 }
 
-template <typename AdapterOperator, typename DomainOperator>
-void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator>::compute_boundary_traction() {
+void SeasQDDiscreteGreenOperator::compute_boundary_traction() {
     MPI_Comm comm = base::comm();
     int rank;
     MPI_Comm_rank(comm, &rank);

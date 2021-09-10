@@ -44,7 +44,7 @@ public:
 
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
-        auto elasticity = std::make_unique<Elasticity>(std::move(cl), lam_, mu_, method);
+        auto elasticity = std::make_shared<Elasticity>(std::move(cl), lam_, mu_, method);
         set(*elasticity);
         return elasticity;
     }

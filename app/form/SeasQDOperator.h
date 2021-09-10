@@ -5,8 +5,11 @@
 #include "common/PetscLinearSolver.h"
 #include "common/PetscVector.h"
 #include "config.h"
+#include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
+#include "form/FacetFunctionalFactory.h"
 
+#include "form/AbstractDGOperator.h"
 #include "form/BoundaryMap.h"
 #include "interface/BlockVector.h"
 #include "parallel/LocalGhostCompositeView.h"
@@ -26,29 +29,27 @@
 
 namespace tndm {
 
-template <typename AdapterOperator, typename DomainOperator> class SeasQDOperator {
+class SeasQDOperator {
 public:
-    constexpr static std::size_t DomainNumQuantities =
-        DomainOperator::local_operator_t::NumQuantities;
-    using time_functional_t = std::function<std::array<double, DomainNumQuantities>(
-        std::array<double, DomainDimension + 1u> const&)>;
+    using dg_t = AbstractDGOperator<DomainDimension>;
 
-    SeasQDOperator(std::unique_ptr<DomainOperator> dgop, std::unique_ptr<AdapterOperator> adapter,
+    SeasQDOperator(std::unique_ptr<dg_t> dgop, std::unique_ptr<AbstractAdapterOperator> adapter,
                    std::unique_ptr<AbstractFrictionOperator> friction, bool matrix_free = false,
                    MGConfig const& mg_config = MGConfig())
         : dgop_(std::move(dgop)), linear_solver_(*dgop_, matrix_free, mg_config),
           adapter_(std::move(adapter)), friction_(std::move(friction)),
           disp_scatter_(dgop_->topo().elementScatterPlan()),
-          disp_ghost_(
-              disp_scatter_.recv_prototype<double>(dgop_->block_size(), dgop_->lop().alignment())),
+          disp_ghost_(disp_scatter_.recv_prototype<double>(dgop_->block_size(), ALIGNMENT)),
           state_scatter_(adapter_->fault_map().scatter_plan()),
           state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)),
-          traction_(adapter_->lop().traction_block_size(), adapter_->num_local_elements(),
+          traction_(adapter_->traction_block_size(), adapter_->num_local_elements(),
                     adapter_->comm()) {}
 
     void warmup() { linear_solver_.warmup(); }
 
-    void set_boundary(time_functional_t fun) { fun_boundary_ = std::move(fun); }
+    void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+        fun_boundary_ = std::move(fun);
+    }
 
     auto block_sizes() -> std::array<std::size_t, 1> const { return {friction_->block_size()}; }
     auto num_local_elements() -> std::array<std::size_t, 1> const {
@@ -56,10 +57,10 @@ public:
     }
     MPI_Comm comm() const { return dgop_->topo().comm(); }
 
-    AdapterOperator& adapter() { return *adapter_; }
-    AdapterOperator const& adapter() const { return *adapter_; }
-    DomainOperator& domain() { return *dgop_; }
-    DomainOperator const& domain() const { return *dgop_; }
+    AbstractAdapterOperator& adapter() { return *adapter_; }
+    AbstractAdapterOperator const& adapter() const { return *adapter_; }
+    dg_t& domain() { return *dgop_; }
+    dg_t const& domain() const { return *dgop_; }
     AbstractFrictionOperator& friction() { return *friction_; }
     AbstractFrictionOperator const& friction() const { return *friction_; }
 
@@ -97,9 +98,8 @@ public:
         }
     }
 
-    template <typename Iterator> auto displacement(Iterator first, Iterator last) const {
-        return dgop_->solution(linear_solver_.x(), std::forward<Iterator>(first),
-                               std::forward<Iterator>(last));
+    auto displacement(std::vector<std::size_t> const& subset) const {
+        return dgop_->solution(linear_solver_.x(), subset);
     }
     auto displacement() const { return dgop_->solution(linear_solver_.x()); }
 
@@ -120,38 +120,33 @@ protected:
         state_scatter_.wait_scatter();
     }
 
-    auto make_state_view(BlockVector const& state) {
+    auto make_state_view(BlockVector const& state) -> LocalGhostCompositeView {
         return LocalGhostCompositeView(state, state_ghost_);
     }
 
     void solve(double time, BlockView const& state_view) {
-        dgop_->lop().set_slip(adapter_->slip_bc(state_view));
-        dgop_->lop().set_dirichlet(
-            [this, time](std::array<double, DomainDimension> const& x) {
-                std::array<double, DomainDimension + 1u> xt;
-                std::copy(x.begin(), x.end(), xt.begin());
-                xt.back() = time;
-                return this->fun_boundary_(xt);
-            },
-            adapter_->lop().ref_normal());
+        dgop_->set_slip(adapter_->slip_bc(state_view));
+        if (fun_boundary_) {
+            dgop_->set_dirichlet((*fun_boundary_)(time));
+        }
         linear_solver_.update_rhs(*dgop_);
         linear_solver_.solve();
-        dgop_->lop().set_slip(invalid_slip_bc());
+        dgop_->set_slip(invalid_slip_bc());
         disp_scatter_.begin_scatter(linear_solver_.x(), disp_ghost_);
         disp_scatter_.wait_scatter();
     }
 
     void update_traction(BlockView const& state_view) {
         auto disp_view = LocalGhostCompositeView(linear_solver_.x(), disp_ghost_);
-        dgop_->lop().set_slip(adapter_->slip_bc(state_view));
-        adapter_->traction(*dgop_, disp_view, traction_);
-        dgop_->lop().set_slip(invalid_slip_bc());
+        dgop_->set_slip(adapter_->slip_bc(state_view));
+        adapter_->traction(disp_view, traction_);
+        dgop_->set_slip(invalid_slip_bc());
     }
 
 private:
-    std::unique_ptr<DomainOperator> dgop_;
+    std::unique_ptr<dg_t> dgop_;
     PetscLinearSolver linear_solver_;
-    std::unique_ptr<AdapterOperator> adapter_;
+    std::unique_ptr<AbstractAdapterOperator> adapter_;
     std::unique_ptr<AbstractFrictionOperator> friction_;
 
     Scatter disp_scatter_;
@@ -160,8 +155,7 @@ private:
     Scatter state_scatter_;
     SparseBlockVector<double> state_ghost_;
 
-    time_functional_t fun_boundary_ = [](std::array<double, DomainDimension + 1u> const& x)
-        -> std::array<double, DomainNumQuantities> { return {}; };
+    std::unique_ptr<AbstractFacetFunctionalFactory> fun_boundary_ = nullptr;
 
 protected:
     PetscVector traction_;

@@ -8,11 +8,10 @@
 #include "form/SeasFDOperator.h"
 #include "form/SeasQDDiscreteGreenOperator.h"
 #include "form/SeasQDOperator.h"
+#include "localoperator/Adapter.h"
 #include "localoperator/DieterichRuinaAgeing.h"
 #include "localoperator/Elasticity.h"
-#include "localoperator/ElasticityAdapter.h"
 #include "localoperator/Poisson.h"
-#include "localoperator/PoissonAdapter.h"
 #include "localoperator/RateAndState.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "tandem/FrictionConfig.h"
@@ -49,19 +48,19 @@ template <typename Type> struct make_lop;
 template <> struct make_lop<Poisson> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Poisson> const& scenario) {
-        return std::make_unique<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
+        return std::make_shared<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
     }
 };
 template <> struct make_lop<Elasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Elasticity> const& scenario) {
-        return std::make_unique<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
+        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
                                             DGMethod::IP);
     }
 };
 
-template <typename Type, typename AdapterType> struct make_op {
-    using adapter_t = AdapterOperator<AdapterType>;
+template <typename Type> struct make_op {
+    using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
     using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
     using friction_t = FrictionOperator<friction_lop_t>;
@@ -74,9 +73,10 @@ template <typename Type, typename AdapterType> struct make_op {
                                                             PolynomialDegree);
         fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
         topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+        dg_lop = make_lop<Type>::dg(cl, scenario);
     }
 
-    auto dg() { return std::make_unique<dg_t>(topo, make_lop<Type>::dg(cl, scenario)); }
+    auto dg() { return std::make_unique<dg_t>(topo, dg_lop); }
     auto friction() {
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
@@ -89,8 +89,9 @@ template <typename Type, typename AdapterType> struct make_op {
     }
     auto adapter(Config const& cfg, dg_t& dg, friction_t& friction) {
         return std::make_unique<adapter_t>(
-            std::make_unique<AdapterType>(cl, friction.lop().space().clone(),
-                                          dg.lop().facetQuadratureRule(), cfg.up, cfg.ref_normal),
+            dg_lop,
+            std::make_unique<Adapter<Type>>(cl, friction.lop().space().clone(),
+                                            dg_lop->facetQuadratureRule(), cfg.up, cfg.ref_normal),
             topo, fault_map);
     }
 
@@ -99,6 +100,7 @@ template <typename Type, typename AdapterType> struct make_op {
     std::shared_ptr<Curvilinear<DomainDimension>> cl;
     std::shared_ptr<BoundaryMap> fault_map;
     std::shared_ptr<DGOperatorTopo> topo;
+    std::shared_ptr<Type> dg_lop;
 };
 
 template <std::size_t N>
@@ -223,15 +225,12 @@ auto L2_error_fault(LocalSimplexMesh<DomainDimension> const& mesh,
     return error;
 }
 
-template <typename Type, typename AdapterType, bool MakeGreen>
+template <typename Type, bool MakeGreen>
 void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using adapter_t = AdapterOperator<AdapterType>;
-    using dg_t = DGOperator<Type>;
-    using seas_t = std::conditional_t<MakeGreen, SeasQDDiscreteGreenOperator<adapter_t, dg_t>,
-                                      SeasQDOperator<adapter_t, dg_t>>;
+    using seas_t = std::conditional_t<MakeGreen, SeasQDDiscreteGreenOperator, SeasQDOperator>;
     using seas_monitor_t = seas::MonitorQD<seas_t>;
 
-    auto op = make_op<Type, AdapterType>(mesh, cfg);
+    auto op = make_op<Type>(mesh, cfg);
 
     auto dgop = op.dg();
     auto friction = op.friction();
@@ -241,7 +240,8 @@ void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
         std::make_shared<seas_t>(std::move(dgop), std::move(adapter), std::move(friction),
                                  cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     if (op.scenario.boundary()) {
-        seasop->set_boundary(*op.scenario.boundary());
+        seasop->set_boundary(std::make_unique<FacetFunctionalFactory<Type>>(
+            op.dg_lop, *op.scenario.boundary(), cfg.ref_normal));
     }
     seasop->warmup();
 
@@ -279,14 +279,14 @@ void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
                   seasop->comm());
 }
 
-template <typename Type, typename AdapterType>
+template <typename Type>
 void solve_seas_fd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using adapter_t = AdapterOperator<AdapterType>;
+    using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
     using seas_t = SeasFDOperator<adapter_t, dg_t>;
     using seas_monitor_t = seas::MonitorFD<seas_t>;
 
-    auto op = make_op<Type, AdapterType>(mesh, cfg);
+    auto op = make_op<Type>(mesh, cfg);
 
     auto dgop = op.dg();
     auto friction = op.friction();
@@ -342,13 +342,13 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     if (cfg.type == SeasType::Poisson) {
         switch (cfg.mode) {
         case SeasMode::QuasiDynamicDiscreteGreen:
-            detail::solve_seas_qd_problem<Poisson, PoissonAdapter, true>(mesh, cfg);
+            detail::solve_seas_qd_problem<Poisson, true>(mesh, cfg);
             break;
         case SeasMode::QuasiDynamic:
-            detail::solve_seas_qd_problem<Poisson, PoissonAdapter, false>(mesh, cfg);
+            detail::solve_seas_qd_problem<Poisson, false>(mesh, cfg);
             break;
         case SeasMode::FullyDynamic:
-            detail::solve_seas_fd_problem<Poisson, PoissonAdapter>(mesh, cfg);
+            detail::solve_seas_fd_problem<Poisson>(mesh, cfg);
             break;
         default:
             break;
@@ -356,13 +356,13 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     } else if (cfg.type == SeasType::Elasticity) {
         switch (cfg.mode) {
         case SeasMode::QuasiDynamicDiscreteGreen:
-            detail::solve_seas_qd_problem<Elasticity, ElasticityAdapter, true>(mesh, cfg);
+            detail::solve_seas_qd_problem<Elasticity, true>(mesh, cfg);
             break;
         case SeasMode::QuasiDynamic:
-            detail::solve_seas_qd_problem<Elasticity, ElasticityAdapter, false>(mesh, cfg);
+            detail::solve_seas_qd_problem<Elasticity, false>(mesh, cfg);
             break;
         case SeasMode::FullyDynamic:
-            detail::solve_seas_fd_problem<Elasticity, ElasticityAdapter>(mesh, cfg);
+            detail::solve_seas_fd_problem<Elasticity>(mesh, cfg);
             break;
         default:
             break;

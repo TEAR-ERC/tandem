@@ -1,8 +1,12 @@
 #ifndef DGOPERATOR_20200909_H
 #define DGOPERATOR_20200909_H
 
+#include "form/AbstractDGOperator.h"
+#include "form/AbstractInterpolationOperator.h"
 #include "form/DGOperatorTopo.h"
 #include "form/FiniteElementFunction.h"
+#include "form/InterpolationOperator.h"
+#include "interface/BlockMatrix.h"
 #include "interface/BlockVector.h"
 #include "parallel/LocalGhostCompositeView.h"
 #include "parallel/Scatter.h"
@@ -19,8 +23,9 @@
 
 namespace tndm {
 
-template <typename LocalOperator> class DGOperator {
+template <typename LocalOperator> class DGOperator : public AbstractDGOperator<LocalOperator::Dim> {
 public:
+    using base = AbstractDGOperator<LocalOperator::Dim>;
     using local_operator_t = LocalOperator;
 
     template <class T> using prepare_volume_t = decltype(&T::prepare_volume);
@@ -45,7 +50,7 @@ public:
     using vector_functional_t =
         typename LocalOperator::template functional_t<LocalOperator::NumQuantities>;
 
-    DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
+    DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::shared_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
           scratch_(lop_->scratch_mem_size(), lop_->alignment()),
           scatter_(topo->elementScatterPlan()),
@@ -83,14 +88,21 @@ public:
         lop_->end_preparation(topo_->elementScatterPlan());
     }
 
-    LocalOperator& lop() { return *lop_; }
-    std::size_t block_size() const { return lop_->block_size(); }
-    std::size_t numLocalElements() const { return topo_->numLocalElements(); }
-    DGOperatorTopo const& topo() const { return *topo_; }
-    std::shared_ptr<DGOperatorTopo> topo_ptr() const { return topo_; }
-    std::size_t number_of_local_dofs() const { return block_size() * numLocalElements(); }
+    std::size_t block_size() const override { return lop_->block_size(); }
+    DGOperatorTopo const& topo() const override { return *topo_; }
 
-    template <typename BlockMatrix> void assemble(BlockMatrix& matrix) {
+    LocalOperator& lop() { return *lop_; }
+    std::size_t num_local_elements() const override { return topo_->numLocalElements(); }
+    std::shared_ptr<DGOperatorTopo> topo_ptr() const { return topo_; }
+
+    auto interpolation_operator() -> std::unique_ptr<AbstractInterpolationOperator> override {
+        auto lop = lop_->make_interpolation_op();
+        using i_lop_t = typename decltype(lop)::element_type;
+        return std::make_unique<InterpolationOperator<i_lop_t>>(num_local_elements(),
+                                                                std::move(lop));
+    }
+
+    void assemble(BlockMatrix& matrix) override {
         auto bs = lop_->block_size();
 
         auto A_size = LinearAllocator<double>::allocation_size(bs * bs, lop_->alignment());
@@ -158,7 +170,7 @@ public:
         matrix.end_assembly();
     }
 
-    void rhs(BlockVector& vector) {
+    void rhs(BlockVector& vector) override {
         auto bs = lop_->block_size();
 
         auto b_size = LinearAllocator<double>::allocation_size(bs, lop_->alignment());
@@ -208,7 +220,7 @@ public:
         vector.end_access(access_handle);
     }
 
-    void apply(BlockVector const& x, BlockVector& y) {
+    void apply(BlockVector const& x, BlockVector& y) override {
         constexpr std::size_t NumFacets = LocalOperator::Dim + 1;
         auto y_handle = y.begin_access();
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
@@ -243,7 +255,7 @@ public:
         y.end_access(y_handle);
     }
 
-    void apply_inverse_mass(BlockVector const& x, BlockVector& y) {
+    void apply_inverse_mass(BlockVector const& x, BlockVector& y) override {
         auto x_handle = x.begin_access_readonly();
         auto y_handle = y.begin_access();
         if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
@@ -303,9 +315,16 @@ public:
         return soln;
     }
 
-    auto solution(BlockVector const& vector) const {
-        auto range = Range<std::size_t>(0, topo_->numLocalElements());
-        return solution(vector, range.begin(), range.end());
+    auto solution(BlockVector const& vector, std::vector<std::size_t> const& subset)
+        -> FiniteElementFunction<LocalOperator::Dim> override {
+        return solution(vector, subset.begin(), subset.end());
+    }
+    auto solution(BlockVector const& vector, std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<LocalOperator::Dim> override {
+        if (!range) {
+            *range = Range<std::size_t>(0, num_local_elements());
+        }
+        return solution(vector, range->begin(), range->end());
     }
 
     auto coefficients() const {
@@ -321,9 +340,19 @@ public:
         return coeffs;
     }
 
+    void set_force(typename base::volume_functional_t fun) override {
+        lop_->set_force(std::move(fun));
+    }
+    void set_slip(typename base::facet_functional_t fun) override {
+        lop_->set_slip(std::move(fun));
+    }
+    void set_dirichlet(typename base::facet_functional_t fun) override {
+        lop_->set_dirichlet(std::move(fun));
+    }
+
 private:
     std::shared_ptr<DGOperatorTopo> topo_;
-    std::unique_ptr<LocalOperator> lop_;
+    std::shared_ptr<LocalOperator> lop_;
     Scratch<double> scratch_;
     Scatter scatter_;
     SparseBlockVector<double> ghost_;

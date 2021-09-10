@@ -161,6 +161,7 @@ set(APP_COMMON_SRCS
     common/MeshConfig.cpp
     common/MGConfig.cpp
     common/PetscDGMatrix.cpp
+    common/PetscDGShell.cpp
     common/PetscInterplMatrix.cpp
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp

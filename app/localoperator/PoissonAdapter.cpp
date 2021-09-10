@@ -1,4 +1,4 @@
-#include "PoissonAdapter.h"
+#include "Adapter.h"
 
 #include "config.h"
 #include "kernels/poisson/tensor.h"
@@ -9,15 +9,18 @@
 
 namespace tndm {
 
-std::size_t PoissonAdapter::traction_block_size() const {
+class Poisson;
+
+template <> std::size_t Adapter<Poisson>::traction_block_size() const {
     // Traction needs only one component for Poisson.
     // We still set 2 components here in order to enable a standardised interface,
     // which includes shear and normal components of traction.
     return poisson_adapter::tensor::traction::Shape[0] * 2;
 }
 
-void PoissonAdapter::traction(std::size_t faultNo, Matrix<double> const& traction_q,
-                              Vector<double>& traction, LinearAllocator<double>&) const {
+template <>
+void Adapter<Poisson>::traction(std::size_t faultNo, Matrix<double> const& traction_q,
+                                Vector<double>& traction, LinearAllocator<double>&) const {
     std::fill(traction.data(), traction.data() + traction.size(), 0.0);
 
     poisson_adapter::kernel::evaluate_traction krnl;
@@ -30,8 +33,9 @@ void PoissonAdapter::traction(std::size_t faultNo, Matrix<double> const& tractio
     krnl.execute();
 }
 
-void PoissonAdapter::slip(std::size_t faultNo, Vector<double const>& state,
-                          Matrix<double>& slip_q) const {
+template <>
+void Adapter<Poisson>::slip(std::size_t faultNo, Vector<double const>& state,
+                            Matrix<double>& slip_q) const {
     assert(slip_q.shape(0) == 1);
     assert(slip_q.shape(1) == poisson_adapter::tensor::slip_q::size());
     poisson_adapter::kernel::evaluate_slip krnl;

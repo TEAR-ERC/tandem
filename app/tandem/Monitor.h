@@ -123,7 +123,7 @@ private:
     }
     auto volume_data(std::vector<std::size_t> const* subset) {
         if (subset) {
-            return seasop_->displacement(subset->begin(), subset->end());
+            return seasop_->displacement(*subset);
         } else {
             return seasop_->displacement();
         }

@@ -1,6 +1,8 @@
 #ifndef INTERPOLATIONOPERATOR_20210317_H
 #define INTERPOLATIONOPERATOR_20210317_H
 
+#include "form/AbstractInterpolationOperator.h"
+#include "interface/BlockMatrix.h"
 #include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
@@ -13,18 +15,18 @@
 
 namespace tndm {
 
-template <typename LocalOperator> class InterpolationOperator {
+template <typename LocalOperator>
+class InterpolationOperator : public AbstractInterpolationOperator {
 public:
     using local_operator_t = LocalOperator;
 
     InterpolationOperator(std::size_t numLocalElements, std::unique_ptr<LocalOperator> lop)
         : numLocalElements_(numLocalElements), lop_(std::move(lop)) {}
 
-    unsigned max_degree() const { return lop_->max_degree(); }
-    std::size_t block_size(unsigned degree) const { return lop_->block_size(degree); }
+    unsigned max_degree() const override { return lop_->max_degree(); }
+    std::size_t block_size(unsigned degree) const override { return lop_->block_size(degree); }
 
-    template <typename BlockMatrix>
-    void assemble(unsigned to_degree, unsigned from_degree, BlockMatrix& matrix) {
+    void assemble(unsigned to_degree, unsigned from_degree, BlockMatrix& matrix) override {
         if (to_degree <= from_degree) {
             throw std::logic_error("to_degree must be larger than from_degree.");
         }

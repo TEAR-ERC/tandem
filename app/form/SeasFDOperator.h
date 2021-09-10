@@ -41,8 +41,8 @@ public:
         : dgop_(std::move(dgop)), adapter_(std::move(adapter)), friction_(std::move(friction)),
           traction_(adapter_->lop().traction_block_size(), adapter_->num_local_elements(),
                     adapter_->comm()),
-          b_(dgop_->block_size(), dgop_->numLocalElements(), comm()),
-          tmp_(dgop_->block_size(), dgop_->numLocalElements(), comm()),
+          b_(dgop_->block_size(), dgop_->num_local_elements(), comm()),
+          tmp_(dgop_->block_size(), dgop_->num_local_elements(), comm()),
           disp_scatter_(dgop_->topo().elementScatterPlan()),
           disp_ghost_(
               disp_scatter_.recv_prototype<double>(dgop_->block_size(), dgop_->lop().alignment())),
@@ -57,7 +57,7 @@ public:
         return {dgop_->block_size(), dgop_->block_size(), friction_->block_size()};
     }
     auto num_local_elements() -> std::array<std::size_t, 3> const {
-        return {dgop_->numLocalElements(), dgop_->numLocalElements(),
+        return {dgop_->num_local_elements(), dgop_->num_local_elements(),
                 friction_->num_local_elements()};
     }
     MPI_Comm comm() const { return dgop_->topo().comm(); }
@@ -83,7 +83,7 @@ public:
              BlockVector& dv, BlockVector& du, BlockVector& ds) {
         auto v_handle = v.begin_access_readonly();
         auto du_handle = du.begin_access();
-        for (std::size_t elNo = 0, num = dgop_->numLocalElements(); elNo < num; ++elNo) {
+        for (std::size_t elNo = 0, num = dgop_->num_local_elements(); elNo < num; ++elNo) {
             auto v_block = v_handle.subtensor(slice{}, elNo);
             auto du_block = du_handle.subtensor(slice{}, elNo);
             du_block.copy_values(v_block);
@@ -150,7 +150,7 @@ private:
         auto disp_view = LocalGhostCompositeView(u, disp_ghost_);
         auto state_view = make_state_view(s);
         dgop_->lop().set_slip(adapter_->slip_bc(state_view));
-        adapter_->traction(*dgop_, disp_view, traction_);
+        adapter_->traction(disp_view, traction_);
         dgop_->lop().set_slip(invalid_slip_bc());
     }
 
