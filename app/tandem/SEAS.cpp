@@ -230,7 +230,6 @@ auto L2_error_fault(LocalSimplexMesh<DomainDimension> const& mesh,
 template <typename Type, bool MakeGreen>
 void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     using seas_t = std::conditional_t<MakeGreen, SeasQDDiscreteGreenOperator, SeasQDOperator>;
-    using seas_monitor_t = seas::MonitorQD<seas_t>;
 
     auto op = make_op<Type>(mesh, cfg);
 
@@ -251,7 +250,7 @@ void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
         PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
                                                  seasop->num_local_elements(), seasop->comm()));
 
-    auto monitor = std::make_unique<seas_monitor_t>(seasop, ts.fsal());
+    auto monitor = std::make_unique<seas::MonitorQD>(seasop, ts.fsal());
     add_writers(cfg, mesh, op.cl, seasop->adapter().fault_map(), *monitor, seasop->comm());
     ts.set_monitor(*monitor);
 
@@ -284,7 +283,6 @@ void solve_seas_qd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
 template <typename Type>
 void solve_seas_fd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     using seas_t = SeasFDOperator;
-    using seas_monitor_t = seas::MonitorFD<seas_t>;
 
     auto op = make_op<Type>(mesh, cfg);
 
@@ -311,7 +309,7 @@ void solve_seas_fd_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config
         PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
                                                  seasop->num_local_elements(), seasop->comm()));
 
-    auto monitor = std::make_unique<seas_monitor_t>(seasop, ts.fsal());
+    auto monitor = std::make_unique<seas::MonitorFD>(seasop, ts.fsal());
     add_writers(cfg, mesh, op.cl, seasop->adapter().fault_map(), *monitor, seasop->comm());
     ts.set_monitor(*monitor);
 
