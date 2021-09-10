@@ -1,5 +1,6 @@
 final_time = 2207520000
 resolution = 1
+mode = "QD"
 type = "poisson"
 lib = "mms1.lua"
 scenario = "mms1"

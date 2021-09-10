@@ -3,6 +3,7 @@
 
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
+#include "form/AbstractFrictionOperator.h"
 #include "form/SeasQDOperator.h"
 
 #include "parallel/LocalGhostCompositeView.h"
@@ -18,15 +19,14 @@
 
 namespace tndm {
 
-template <typename AdapterOperator, typename DomainOperator, typename FrictionOperator>
-class SeasQDDiscreteGreenOperator
-    : public SeasQDOperator<AdapterOperator, DomainOperator, FrictionOperator> {
+template <typename AdapterOperator, typename DomainOperator>
+class SeasQDDiscreteGreenOperator : public SeasQDOperator<AdapterOperator, DomainOperator> {
 public:
-    using base = SeasQDOperator<AdapterOperator, DomainOperator, FrictionOperator>;
+    using base = SeasQDOperator<AdapterOperator, DomainOperator>;
 
     SeasQDDiscreteGreenOperator(std::unique_ptr<DomainOperator> dgop,
                                 std::unique_ptr<AdapterOperator> adapter,
-                                std::unique_ptr<FrictionOperator> friction,
+                                std::unique_ptr<AbstractFrictionOperator> friction,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig())
         : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
         compute_discrete_greens_function();
@@ -95,10 +95,10 @@ private:
     std::unique_ptr<PetscVector> t_boundary_;
 };
 
-template <typename AdapterOperator, typename DomainOperator, typename FrictionOperator>
-void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator,
-                                 FrictionOperator>::compute_discrete_greens_function() {
-    auto slip_block_size = base::friction().lop().slip_block_size();
+template <typename AdapterOperator, typename DomainOperator>
+void SeasQDDiscreteGreenOperator<AdapterOperator,
+                                 DomainOperator>::compute_discrete_greens_function() {
+    auto slip_block_size = base::friction().slip_block_size();
 
     PetscInt num_local_elements = base::adapter().num_local_elements();
     PetscInt m_bs = base::adapter().lop().traction_block_size();
@@ -184,9 +184,8 @@ void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator,
     CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
 }
 
-template <typename AdapterOperator, typename DomainOperator, typename FrictionOperator>
-void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator,
-                                 FrictionOperator>::compute_boundary_traction() {
+template <typename AdapterOperator, typename DomainOperator>
+void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator>::compute_boundary_traction() {
     MPI_Comm comm = base::comm();
     int rank;
     MPI_Comm_rank(comm, &rank);
@@ -194,7 +193,7 @@ void SeasQDDiscreteGreenOperator<AdapterOperator, DomainOperator,
         std::cout << "Computing boundary Green's function" << std::endl;
     }
 
-    auto slip_block_size = base::friction().lop().slip_block_size();
+    auto slip_block_size = base::friction().slip_block_size();
     auto scatter = Scatter(base::adapter().fault_map().scatter_plan());
     auto ghost = scatter.template recv_prototype<double>(slip_block_size, ALIGNMENT);
 

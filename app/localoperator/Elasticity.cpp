@@ -723,6 +723,43 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     }
 }
 
+void Elasticity::apply_inverse_mass(std::size_t elNo, Vector<double const> const& x,
+                                    Vector<double>& y) const {
+    auto J_Q = vol[elNo].get<AbsDetJ>();
+    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
+    for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
+        Jinv_Q[q] = 1.0 / J_Q[q];
+    }
+
+    kernel::apply_inverse_mass krnl;
+    krnl.E_Q = E_Q.data();
+    krnl.MinvRef = MhatInv.data();
+    krnl.Jinv_Q = Jinv_Q;
+    krnl.U = x.data();
+    krnl.Unew = y.data();
+    krnl.W = volRule.weights().data();
+    krnl.execute();
+}
+
+void Elasticity::project(std::size_t elNo, functional_t<NumQuantities> x, Vector<double>& y) const {
+    alignas(ALIGNMENT) double U_Q_raw[tensor::U_Q::size()];
+    alignas(ALIGNMENT) double U_raw[tensor::U::size()];
+
+    auto U_Q = Matrix<double>(U_Q_raw, NumQuantities, volRule.size());
+    make_volume_functional(x)(elNo, U_Q);
+
+    kernel::project_u_rhs krnl;
+    krnl.E_Q = E_Q.data();
+    krnl.J = vol[elNo].get<AbsDetJ>().data();
+    krnl.U = U_raw;
+    krnl.U_Q = U_Q_raw;
+    krnl.W = volRule.weights().data();
+    krnl.execute();
+
+    auto U = Vector<double const>(U_raw, tensor::U::size());
+    apply_inverse_mass(elNo, U, y);
+}
+
 std::size_t Elasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const {
     std::size_t flops = kernel::apply_volume::HardwareFlops;
     for (std::size_t f = 0; f < NumFacets; ++f) {

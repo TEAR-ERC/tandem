@@ -69,6 +69,9 @@ public:
 
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
+    void apply_inverse_mass(std::size_t elNo, Vector<double const> const& x,
+                            Vector<double>& y) const;
+    void project(std::size_t elNo, functional_t<NumQuantities> x, Vector<double>& y) const;
 
     std::size_t flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const;
 

@@ -50,6 +50,8 @@ public:
     auto const& values() const { return data_; }
     std::string name(std::size_t q) const;
 
+    void setNames(std::vector<std::string> names) { names_ = std::move(names); }
+
 private:
     std::unique_ptr<RefElement<D>> refElement_;
     std::vector<std::string> names_;

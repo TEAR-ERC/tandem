@@ -14,7 +14,7 @@ void ScalarWriter::write_header(std::ofstream& file) const {
     file << std::endl;
 }
 
-void ScalarWriter::write(double time, double* scalar, std::size_t num_scalars) const {
+void ScalarWriter::write(double time, mneme::span<double> scalars) const {
     std::ofstream file;
     if (time <= 0.0) {
         file.open(file_name_, std::ios::out);
@@ -25,8 +25,8 @@ void ScalarWriter::write(double time, double* scalar, std::size_t num_scalars) c
 
     file << std::scientific << std::setprecision(15);
     file << time;
-    for (std::size_t p = 0; p < num_scalars; ++p) {
-        file << " " << scalar[p];
+    for (auto scalar : scalars) {
+        file << " " << scalar;
     }
     file << std::endl;
     file.close();

@@ -73,7 +73,7 @@ public:
      *
      * @return L2 error
      */
-    static double L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+    static double L2(Curvilinear<D> const& cl, FiniteElementFunction<D> const& numeric,
                      SolutionInterface const& reference, int targetRank = 0,
                      MPI_Comm comm = MPI_COMM_WORLD);
 
@@ -90,7 +90,7 @@ public:
      *
      * @return L2 error
      */
-    static double L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
+    static double L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
                      FiniteElementFunction<D - 1> const& numeric,
                      std::vector<std::size_t> const& fctNos, SolutionInterface const& reference,
                      int targetRank, MPI_Comm comm);
@@ -108,7 +108,7 @@ public:
      *
      * @return Error measured in H1 semi-norm
      */
-    static double H1_semi(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+    static double H1_semi(Curvilinear<D> const& cl, FiniteElementFunction<D> const& numeric,
                           SolutionInterface const& reference, int targetRank = 0,
                           MPI_Comm = MPI_COMM_WORLD);
 };

@@ -2,6 +2,7 @@ final_time = 47304000000
 mesh_file = "bp3.msh"
 lib = "bp3.lua"
 scenario = "bp3_d60_normal"
+mode = "QD"
 type = "elasticity"
 ref_normal = [1, 0]
 boundary_linear = true

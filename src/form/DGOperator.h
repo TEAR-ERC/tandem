@@ -39,6 +39,11 @@ public:
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
+    template <class T> using apply_inverse_mass_t = decltype(&T::apply_inverse_mass);
+    template <class T> using project_t = decltype(&T::project);
+
+    using vector_functional_t =
+        typename LocalOperator::template functional_t<LocalOperator::NumQuantities>;
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::unique_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
@@ -233,6 +238,33 @@ public:
 
             for (std::size_t elNo = copy_first; elNo < ghost_first; ++elNo) {
                 lop_apply(elNo);
+            }
+        }
+        y.end_access(y_handle);
+    }
+
+    void apply_inverse_mass(BlockVector const& x, BlockVector& y) {
+        auto x_handle = x.begin_access_readonly();
+        auto y_handle = y.begin_access();
+        if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
+
+            for (std::size_t elNo = 0, num = topo_->numLocalElements(); elNo < num; ++elNo) {
+                auto y_block = y_handle.subtensor(slice{}, elNo);
+                auto x_block = x_handle.subtensor(slice{}, elNo);
+                lop_->apply_inverse_mass(elNo, x_block, y_block);
+            }
+        }
+        y.end_access(y_handle);
+        x.end_access_readonly(x_handle);
+    }
+
+    void project(vector_functional_t x, BlockVector& y) {
+        auto y_handle = y.begin_access();
+        if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
+
+            for (std::size_t elNo = 0, num = topo_->numLocalElements(); elNo < num; ++elNo) {
+                auto y_block = y_handle.subtensor(slice{}, elNo);
+                lop_->project(elNo, x, y_block);
             }
         }
         y.end_access(y_handle);

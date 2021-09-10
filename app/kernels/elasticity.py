@@ -20,6 +20,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
     Dx_Q = Tensor('Dx_Q', Dxi_Q.shape())
     U = Tensor('U', (Nbf, dim), alignStride=petsc_alignment)
+    U_Q = Tensor('U_Q', (dim, Nq), alignStride=petsc_alignment)
     Unew = Tensor('Unew', (Nbf, dim), alignStride=petsc_alignment)
     A = Tensor('A', (Nbf, dim, Nbf, dim))
     delta = Tensor('delta', (dim, dim), spp=np.identity(dim))
@@ -187,6 +188,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     G_q_T = [Tensor('G_q_T({})'.format(x), (dim, dim, nq)) for x in range(2)]
     Dxi_Q_120 = Tensor('Dxi_Q_120', (dim, Nq, Nbf))
     Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
+    MinvRef = Tensor('MinvRef', (Nbf, Nbf))
+    Jinv_Q = Tensor('Jinv_Q', (Nq,))
 
 
     generator.add('flux_u_skeleton', u_hat_minus_u_q['qi']
@@ -219,6 +222,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
             mu_q[0]['q'] * (u_hat_minus_u_q['qu'] * n_q['jq'] + u_hat_minus_u_q['qj'] * n_q['uq'])) +
         w['q'] * negative_E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq']
     )
+
+    generator.add('apply_inverse_mass', Unew['kp'] <=
+        MinvRef['kr'] * W['q'] * Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'] * U['lp'])
+
+    generator.add('project_u_rhs', U['kp'] <= E_Q['kq'] * W['q'] * J['q'] * U_Q['pq'])
 
     # traction
 
