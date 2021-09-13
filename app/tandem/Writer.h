@@ -162,8 +162,6 @@ public:
 
     DataLevel level() const override { return DataLevel::Scalar; }
     void write(double time, mneme::span<double> data) override {
-        assert();
-
         int rank;
         MPI_Comm_rank(comm_, &rank);
 
@@ -183,7 +181,7 @@ public:
                  LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                  unsigned degree, MPI_Comm comm)
         : Writer(prefix, oi), pvd_(prefix), adapter_(std::move(cl), mesh.elements().localSize()),
-          degree_(degree) {}
+          degree_(degree), comm_(std::move(comm)) {}
 
     DataLevel level() const override { return DataLevel::Volume; }
     void write(double time, mneme::span<FiniteElementFunction<D>> data) override {

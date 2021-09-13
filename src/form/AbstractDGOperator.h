@@ -23,7 +23,7 @@ public:
 
     virtual ~AbstractDGOperator() {}
 
-    virtual std::size_t block_size() const;
+    virtual std::size_t block_size() const = 0;
     virtual std::size_t num_local_elements() const = 0;
     virtual std::size_t number_of_local_dofs() const { return block_size() * num_local_elements(); }
     virtual DGOperatorTopo const& topo() const = 0;

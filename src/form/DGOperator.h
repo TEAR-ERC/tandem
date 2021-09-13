@@ -300,7 +300,7 @@ public:
         std::size_t out_no = 0;
         for (; first != last; ++first) {
             std::size_t elNo = *first;
-            assert(elNo < numLocalElements());
+            assert(elNo < num_local_elements());
 
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
             auto state_block = access_handle.subtensor(slice{}, elNo);
