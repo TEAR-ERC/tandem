@@ -74,7 +74,8 @@ public:
     multi_index_t const& stride() const { return stride_; }
     index_t stride(index_t pos) const { return stride_[pos]; }
 
-    void set_zero() { std::fill(data_, data_ + size(), RealT(0.0)); }
+    void set_zero() { set_constant(0.0); }
+    void set_constant(RealT c) { std::fill(data_, data_ + size(), c); }
 
     template <typename OtherRealT, bool OtherPacked>
     void copy_values(Tensor<OtherRealT, D, OtherPacked> const& other) {

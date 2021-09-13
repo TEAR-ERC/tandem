@@ -30,6 +30,7 @@ public:
     constexpr static char Warp[] = "warp";
     constexpr static char Mu[] = "mu";
     constexpr static char Lam[] = "lam";
+    constexpr static char Rho[] = "rho";
     constexpr static char Boundary[] = "boundary";
     constexpr static char Solution[] = "solution";
     constexpr static char InitialDisplacement[] = "initial_displacement";
@@ -46,6 +47,9 @@ public:
         }
         if (lib_.hasMember(scenario, Lam)) {
             lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
+        }
+        if (lib_.hasMember(scenario, Rho)) {
+            rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension, 1>(scenario, Rho));
         }
 
         if (lib_.hasMember(scenario, Boundary)) {
@@ -72,6 +76,7 @@ public:
     auto const& transform() const { return warp_; }
     auto const& mu() const { return mu_; }
     auto const& lam() const { return lam_; }
+    auto const& rho() const { return rho_; }
     auto const& boundary() const { return boundary_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
@@ -93,6 +98,7 @@ protected:
     functional_t lam_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
         return {0.0};
     };
+    std::optional<functional_t> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
     std::optional<vector_functional_t> u_ini_ = std::nullopt;

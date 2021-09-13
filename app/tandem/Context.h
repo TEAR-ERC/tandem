@@ -21,6 +21,7 @@
 #include <petscsys.h>
 
 #include <array>
+#include <optional>
 
 namespace tndm::seas::detail {
 
@@ -35,7 +36,7 @@ template <> struct make_lop<Elasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Elasticity> const& scenario) {
         return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
-                                            DGMethod::IP);
+                                            scenario.rho(), DGMethod::IP);
     }
 };
 

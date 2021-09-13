@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -35,7 +36,8 @@ public:
     constexpr static std::size_t NumQuantities = DomainDimension;
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu, DGMethod method = DGMethod::BR2);
+               functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
+               DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
@@ -156,6 +158,7 @@ private:
     // Input
     volume_functional_t fun_lam;
     volume_functional_t fun_mu;
+    volume_functional_t fun_rho;
     volume_functional_t fun_force;
     facet_functional_t fun_dirichlet;
     facet_functional_t fun_slip;
@@ -169,11 +172,19 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct rhoInv {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
     struct lam_W_J_Q {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu_W_J_Q {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct rhoInv_W_Jinv_Q {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -198,10 +209,11 @@ private:
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
-    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu>;
+    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, rhoInv>;
     mneme::StridedView<material_vol_t> material;
 
-    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, JInvT>;
+    using vol_pre_t =
+        mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, rhoInv_W_Jinv_Q, JInvT>;
     mneme::StridedView<vol_pre_t> volPre;
 
     using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;

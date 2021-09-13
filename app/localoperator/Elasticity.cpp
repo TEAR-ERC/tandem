@@ -24,13 +24,15 @@ namespace kernel = tndm::elasticity::kernel;
 namespace tndm {
 
 Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                       functional_t<1> mu, DGMethod method)
+                       functional_t<1> mu, std::optional<functional_t<1>> rho, DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_lam(make_volume_functional(std::move(lam))),
-      fun_mu(make_volume_functional(std::move(mu))), fun_force(zero_volume_function),
-      fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
+      fun_mu(make_volume_functional(std::move(mu))),
+      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function),
+      fun_force(zero_volume_function), fun_dirichlet(zero_facet_function),
+      fun_slip(zero_facet_function) {
 
     MhatInv = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
@@ -114,6 +116,13 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
     fun_mu(elNo, mu_Q);
 
+    alignas(ALIGNMENT) double rhoInv_Q_raw[tensor::rhoInv_Q::size()];
+    auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
+    fun_rho(elNo, rhoInv_Q);
+    for (unsigned q = 0; q < tensor::rhoInv_Q::Shape[0]; ++q) {
+        rhoInv_Q(q, 0) = 1.0 / rhoInv_Q(q, 0);
+    }
+
     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
     kernel::project_material_lhs krnl_lhs;
     krnl_lhs.matE_Q_T = matE_Q_T.data();
@@ -124,6 +133,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     auto lam_field = material[elNo].get<lam>().data();
     auto mu_field = material[elNo].get<mu>().data();
+    auto rhoInv_field = material[elNo].get<rhoInv>().data();
     kernel::project_material_rhs krnl_rhs;
     krnl_rhs.matE_Q_T = matE_Q_T.data();
     krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
@@ -131,6 +141,8 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     krnl_rhs.lam_Q = lam_Q_raw;
     krnl_rhs.mu = mu_field;
     krnl_rhs.mu_Q = mu_Q_raw;
+    krnl_rhs.rhoInv = rhoInv_field;
+    krnl_rhs.rhoInv_Q = rhoInv_Q_raw;
     krnl_rhs.W = volRule.weights().data();
     krnl_rhs.execute();
 
@@ -141,6 +153,8 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
                               Eigen::InnerStride<1>>;
     using MuMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
                              Eigen::InnerStride<1>>;
+    using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
+                                 Eigen::Unaligned, Eigen::InnerStride<1>>;
 
     auto proj = MMap(Mmem).fullPivLu();
 
@@ -149,6 +163,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     auto mu_eigen = MuMap(mu_field);
     mu_eigen = proj.solve(mu_eigen);
+
+    auto rhoInv_eigen = RhoInvMap(rhoInv_field);
+    rhoInv_eigen = proj.solve(rhoInv_eigen);
 
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
@@ -227,14 +244,24 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
 
     auto lam_field = material[elNo].get<lam>();
     auto mu_field = material[elNo].get<mu>();
+    auto rhoInv_field = material[elNo].get<rhoInv>();
+
+    auto J_Q = vol[elNo].get<AbsDetJ>();
+    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
+    for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
+        Jinv_Q[q] = 1.0 / J_Q[q];
+    }
 
     kernel::precomputeVolume krnl_pre;
     krnl_pre.matE_Q_T = matE_Q_T.data();
     krnl_pre.J = vol[elNo].get<AbsDetJ>().data();
+    krnl_pre.Jinv_Q = Jinv_Q;
     krnl_pre.lam = lam_field.data();
     krnl_pre.lam_W_J_Q = volPre[elNo].template get<lam_W_J_Q>().data();
     krnl_pre.mu = mu_field.data();
     krnl_pre.mu_W_J_Q = volPre[elNo].template get<mu_W_J_Q>().data();
+    krnl_pre.rhoInv = rhoInv_field.data();
+    krnl_pre.rhoInv_W_Jinv_Q = volPre[elNo].template get<rhoInv_W_Jinv_Q>().data();
     krnl_pre.W = volRule.weights().data();
     krnl_pre.execute();
 
@@ -725,19 +752,12 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
 
 void Elasticity::apply_inverse_mass(std::size_t elNo, Vector<double const> const& x,
                                     Vector<double>& y) const {
-    auto J_Q = vol[elNo].get<AbsDetJ>();
-    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
-    for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
-        Jinv_Q[q] = 1.0 / J_Q[q];
-    }
-
     kernel::apply_inverse_mass krnl;
     krnl.E_Q = E_Q.data();
     krnl.MinvRef = MhatInv.data();
-    krnl.Jinv_Q = Jinv_Q;
+    krnl.rhoInv_W_Jinv_Q = volPre[elNo].get<rhoInv_W_Jinv_Q>().data();
     krnl.U = x.data();
     krnl.Unew = y.data();
-    krnl.W = volRule.weights().data();
     krnl.execute();
 }
 
@@ -756,8 +776,21 @@ void Elasticity::project(std::size_t elNo, volume_functional_t x, Vector<double>
     krnl.W = volRule.weights().data();
     krnl.execute();
 
-    auto U = Vector<double const>(U_raw, tensor::U::size());
-    apply_inverse_mass(elNo, U, y);
+    auto J_Q = vol[elNo].get<AbsDetJ>();
+    auto const& w = volRule.weights();
+    alignas(ALIGNMENT) double rhoInv_W_Jinv_Q[tensor::rhoInv_W_Jinv_Q::size()] = {};
+    static_assert(tensor::rhoInv_W_Jinv_Q::Shape[0] == tensor::Jinv_Q::Shape[0]);
+    for (unsigned q = 0; q < tensor::rhoInv_W_Jinv_Q::Shape[0]; ++q) {
+        rhoInv_W_Jinv_Q[q] = w[q] / J_Q[q];
+    }
+
+    kernel::apply_inverse_mass im;
+    im.E_Q = E_Q.data();
+    im.MinvRef = MhatInv.data();
+    im.rhoInv_W_Jinv_Q = rhoInv_W_Jinv_Q;
+    im.U = U_raw;
+    im.Unew = y.data();
+    im.execute();
 }
 
 std::size_t Elasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const {

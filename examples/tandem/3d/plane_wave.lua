@@ -6,8 +6,7 @@ PW.V0 = 1.0e-6
 PW.f0 = 0.6
 PW.Vini = 1e-12
 
---PW.rho = 2.670
-PW.rho = 1.0
+PW.rho0 = 2.670
 PW.cs = 3.464
 PW.nu = 0.25
 
@@ -18,8 +17,12 @@ function PW.new()
     return self
 end
 
+function PW:rho(x, y, z)
+    return self.rho0
+end
+
 function PW:mu(x, y, z)
-    return self.cs^2 * self.rho
+    return self.cs^2 * self.rho0
 end
 
 function PW:lam(x, y, z)
@@ -27,7 +30,7 @@ function PW:lam(x, y, z)
 end
 
 function PW:c_p(x, y, z)
-    return math.sqrt((self:lam(x, y, z) + 2.0 * self:mu(x, y, z))/self.rho)
+    return math.sqrt((self:lam(x, y, z) + 2.0 * self:mu(x, y, z))/self.rho0)
 end
 
 function PW:solution(x, y, z, t)

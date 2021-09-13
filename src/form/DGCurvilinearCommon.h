@@ -106,6 +106,7 @@ public:
     }
 
     static void zero_volume_function(std::size_t, Matrix<double>& x) { x.set_zero(); }
+    static void one_volume_function(std::size_t, Matrix<double>& x) { x.set_constant(1.0); }
     static void zero_facet_function(std::size_t, Matrix<double>& x, bool) { x.set_zero(); }
 
     SimplexQuadratureRule<D - 1u> const& facetQuadratureRule() const { return fctRule; }

@@ -7,14 +7,18 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     # volume
 
     J = Tensor('J', (Nq,))
+    Jinv_Q = Tensor('Jinv_Q', (Nq,))
     G = Tensor('G', (dim, dim, Nq))
     lam = Tensor('lam', (Nbf,))
     lam_Q = Tensor('lam_Q', (Nq,))
     mu = Tensor('mu', (Nbf,))
     mu_Q = Tensor('mu_Q', (Nq,))
+    rhoInv = Tensor('rhoInv', (Nbf,))
+    rhoInv_Q = Tensor('rhoInv_Q', (Nq,))
     W = Tensor('W', (Nq,))
     lam_W_J_Q = Tensor('lam_W_J_Q', (Nq,))
     mu_W_J_Q = Tensor('mu_W_J_Q', (Nq,))
+    rhoInv_W_Jinv_Q = Tensor('rhoInv_W_Jinv_Q', (Nq,))
     E_Q = Tensor('E_Q', (Nbf, Nq))
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
@@ -33,12 +37,14 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
                 matE_Q_T['qk'] * W['q'] * J['q'] * matE_Q_T['ql'])
     generator.add('project_material_rhs', [
         lam['k'] <= lam_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
-        mu['k'] <= mu_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q']
+        mu['k'] <= mu_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
+        rhoInv['k'] <= rhoInv_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q']
     ])
 
     generator.add('precomputeVolume', [
         lam_W_J_Q['q'] <= matE_Q_T['qt'] * lam['t'] * W['q'] * J['q'],
-        mu_W_J_Q['q'] <= matE_Q_T['qt'] * mu['t'] * W['q'] * J['q']
+        mu_W_J_Q['q'] <= matE_Q_T['qt'] * mu['t'] * W['q'] * J['q'],
+        rhoInv_W_Jinv_Q['q'] <= matE_Q_T['qt'] * rhoInv['t'] * W['q'] * Jinv_Q['q']
     ])
 
     generator.add('Dx_Q', Dx_Q['kiq'] <= G['eiq'] * Dxi_Q['keq'])
@@ -189,7 +195,6 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     Dxi_Q_120 = Tensor('Dxi_Q_120', (dim, Nq, Nbf))
     Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
     MinvRef = Tensor('MinvRef', (Nbf, Nbf))
-    Jinv_Q = Tensor('Jinv_Q', (Nq,))
 
 
     generator.add('flux_u_skeleton', u_hat_minus_u_q['qi']
@@ -224,7 +229,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     )
 
     generator.add('apply_inverse_mass', Unew['kp'] <=
-        MinvRef['kr'] * W['q'] * Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'] * U['lp'])
+        MinvRef['kr'] * rhoInv_W_Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'] * U['lp'])
 
     generator.add('project_u_rhs', U['kp'] <= E_Q['kq'] * W['q'] * J['q'] * U_Q['pq'])
 
