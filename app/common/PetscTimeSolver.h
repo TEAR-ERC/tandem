@@ -23,6 +23,7 @@ public:
     std::size_t get_step_number() const;
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
+    void set_time_step(double dt);
 
 protected:
     TS ts_ = nullptr;

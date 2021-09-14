@@ -83,6 +83,8 @@ public:
     void traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
                            Matrix<double>& result) const;
 
+    inline double cfl_time_step(std::size_t elNo) const { return cfl_dt_[elNo]; }
+
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         auto names = std::vector<std::string>(NumQuantities);
         char buf[100];
@@ -221,6 +223,8 @@ private:
 
     using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, JInvT>;
     mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
+
+    std::vector<double> cfl_dt_;
 
     // Options
     constexpr static double epsilon = -1.0;

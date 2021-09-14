@@ -46,6 +46,7 @@ public:
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
     template <class T> using apply_inverse_mass_t = decltype(&T::apply_inverse_mass);
     template <class T> using project_t = decltype(&T::project);
+    template <class T> using cfl_time_step_t = decltype(&T::cfl_time_step);
 
     DGOperator(std::shared_ptr<DGOperatorTopo> const& topo, std::shared_ptr<LocalOperator> lop)
         : topo_(std::move(topo)), lop_(std::move(lop)),
@@ -277,6 +278,16 @@ public:
             }
         }
         y.end_access(y_handle);
+    }
+
+    double local_cfl_time_step() const override {
+        double dt = std::numeric_limits<double>::max();
+        if constexpr (std::experimental::is_detected_v<cfl_time_step_t, LocalOperator>) {
+            for (std::size_t elNo = 0, num = num_local_elements(); elNo < num; ++elNo) {
+                dt = std::min(dt, lop_->cfl_time_step(elNo));
+            }
+        }
+        return dt;
     }
 
     std::size_t flops_apply() {

@@ -117,6 +117,8 @@ template <typename T> struct qd_operator_specifics {
         return seasop;
     }
 
+    static std::optional<double> cfl_time_step(T const&) { return std::nullopt; }
+
     template <typename TimeSolver>
     static auto displacement(double time, TimeSolver const& ts, T& seasop) {
         seasop.update_internal_state(time, ts.state(0), true, false, true);
@@ -143,6 +145,10 @@ template <> struct operator_specifics<SeasFDOperator> {
         return seasop;
     }
 
+    static std::optional<double> cfl_time_step(SeasFDOperator const& seasop) {
+        return std::make_optional(seasop.cfl_time_step());
+    }
+
     template <typename TimeSolver>
     static auto displacement(double, TimeSolver const& ts, SeasFDOperator& seasop) {
         return seasop.domain_function(ts.state(1));
@@ -162,6 +168,11 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     auto ts =
         PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
                                                  seasop->num_local_elements(), seasop->comm()));
+
+    auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
+    if (cfl_time_step) {
+        ts.set_time_step(*cfl_time_step);
+    }
 
     auto monitor =
         std::make_unique<typename operator_specifics<seas_t>::monitor_t>(seasop, ts.fsal());
@@ -183,6 +194,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     if (rank == 0) {
         std::cout << "DOFs (domain): " << num_dofs_domain << std::endl;
         std::cout << "DOFs (fault): " << num_dofs_fault << std::endl;
+        if (cfl_time_step) {
+            std::cout << "CFL time step: " << *cfl_time_step << std::endl;
+        }
     }
 
     Stopwatch sw;
@@ -218,6 +232,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         std::cout << "max_time_step=" << monitor->max_time_step() << std::endl;
         std::cout << "dofs_domain=" << num_dofs_domain << std::endl;
         std::cout << "dofs_fault=" << num_dofs_fault << std::endl;
+        if (cfl_time_step) {
+            std::cout << "dt_cfl=" << *cfl_time_step << std::endl;
+        }
         if (L2_error_domain) {
             std::cout << "L2_error_domain=" << *L2_error_domain << std::endl;
         }

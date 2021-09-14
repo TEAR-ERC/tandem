@@ -40,4 +40,6 @@ std::size_t PetscTimeSolverBase::get_step_rejections() const {
     return rejects;
 }
 
+void PetscTimeSolverBase::set_time_step(double dt) { CHKERRTHROW(TSSetTimeStep(ts_, dt)); }
+
 } // namespace tndm

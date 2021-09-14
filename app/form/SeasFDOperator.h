@@ -64,6 +64,7 @@ public:
     inline AbstractFrictionOperator& friction() { return *friction_; }
     inline AbstractFrictionOperator const& friction() const { return *friction_; }
 
+    double cfl_time_step() const;
     void initial_condition(BlockVector& v, BlockVector& u, BlockVector& s);
     void rhs(double time, BlockVector const& v, BlockVector const& u, BlockVector const& s,
              BlockVector& dv, BlockVector& du, BlockVector& ds);

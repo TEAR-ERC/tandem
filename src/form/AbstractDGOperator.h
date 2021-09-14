@@ -34,6 +34,7 @@ public:
     virtual void apply(BlockVector const& x, BlockVector& y) = 0;
     virtual void apply_inverse_mass(BlockVector const& x, BlockVector& y) = 0;
     virtual void project(volume_functional_t x, BlockVector& y) = 0;
+    virtual double local_cfl_time_step() const = 0;
 
     virtual auto solution(BlockVector const& vector, std::vector<std::size_t> const& subset)
         -> FiniteElementFunction<D> = 0;

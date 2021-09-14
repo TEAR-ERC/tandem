@@ -17,6 +17,13 @@ SeasFDOperator::SeasFDOperator(std::unique_ptr<dg_t> dgop,
       state_scatter_(adapter_->fault_map().scatter_plan()),
       state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)) {}
 
+double SeasFDOperator::cfl_time_step() const {
+    double local_dt = dgop_->local_cfl_time_step();
+    double global_dt;
+    MPI_Allreduce(&local_dt, &global_dt, 1, MPI_DOUBLE, MPI_MIN, comm());
+    return global_dt;
+}
+
 void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVector& s) {
     if (u_ini_) {
         dgop_->project((*u_ini_)(), u);

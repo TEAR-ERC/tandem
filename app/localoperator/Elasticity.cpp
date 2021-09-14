@@ -100,6 +100,8 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     const auto totalFacets = NumFacets * numElements;
     fct_on_vol_pre.setStorage(std::make_shared<fct_on_vol_pre_t>(totalFacets * fctRule.size()), 0u,
                               totalFacets, fctRule.size());
+
+    cfl_dt_.resize(numLocalElements);
 }
 
 void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
@@ -271,8 +273,19 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
         max_mat = std::max(max_mat, lam_field[i] + 2.0 * mu_field[i]);
     }
 
-    base::penalty[elNo] *=
-        max_mat * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
+    assert(lam_field.size() == rhoInv_field.size());
+    double max_wave_speed = std::numeric_limits<double>::lowest();
+    for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
+        double c_p = std::sqrt((lam_field[i] + 2.0 * mu_field[i]) * rhoInv_field[i]);
+        max_wave_speed = std::max(max_wave_speed, c_p);
+    }
+
+    constexpr double C_N = (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) /
+                           static_cast<double>(DomainDimension);
+    if (elNo < cfl_dt_.size()) {
+        cfl_dt_[elNo] = 1.0 / (max_wave_speed * C_N * base::penalty[elNo]);
+    }
+    base::penalty[elNo] *= max_mat * C_N;
 }
 
 bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
