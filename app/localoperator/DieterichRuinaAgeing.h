@@ -85,26 +85,30 @@ public:
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
-        double a = 0.0;
-        double b = tauAbs / eta;
-        if (a > b) {
-            std::swap(a, b);
-        }
-        auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
-            return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
-        };
         double V = 0.0;
-        try {
-            V = zeroIn(a, b, fF);
-        } catch (std::exception const&) {
-            std::cout << "sigma_n = " << snAbs << std::endl
-                      << "|tau| = " << tauAbs << std::endl
-                      << "psi = " << psi << std::endl
-                      << "L = " << a << std::endl
-                      << "U = " << b << std::endl
-                      << "F(L) = " << fF(a) << std::endl
-                      << "F(U) = " << fF(b) << std::endl;
-            throw;
+        if (eta == 0.0) {
+            V = Finv(index, snAbs, tauAbs, psi);
+        } else {
+            double a = 0.0;
+            double b = tauAbs / eta;
+            if (a > b) {
+                std::swap(a, b);
+            }
+            auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
+                return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+            };
+            try {
+                V = zeroIn(a, b, fF);
+            } catch (std::exception const&) {
+                std::cout << "sigma_n = " << snAbs << std::endl
+                          << "|tau| = " << tauAbs << std::endl
+                          << "psi = " << psi << std::endl
+                          << "L = " << a << std::endl
+                          << "U = " << b << std::endl
+                          << "F(L) = " << fF(a) << std::endl
+                          << "F(U) = " << fF(b) << std::endl;
+                throw;
+            }
         }
         return -(V / (F(index, snAbs, V, psi) + eta * V)) * tauAbsVec;
     }
@@ -149,6 +153,11 @@ private:
         double e = exp(psi / a);
         double f = a * asinh((V / (2.0 * cp_.V0)) * e);
         return snAbs * f;
+    }
+
+    double Finv(std::size_t index, double snAbs, double tauAbs, double psi) const {
+        auto a = p_[index].get<A>();
+        return 2.0 * cp_.V0 * sinh(tauAbs / (a * snAbs)) * exp(-psi / a);
     }
 
     ConstantParams cp_;
