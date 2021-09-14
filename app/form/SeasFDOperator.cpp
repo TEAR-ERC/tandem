@@ -39,7 +39,7 @@ void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVect
     friction_->pre_init(s);
     update_ghost_state(s);
     update_traction(u, s);
-    friction_->init(traction_, s);
+    friction_->init(0.0, traction_, s);
 }
 
 void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u,

@@ -37,7 +37,7 @@ public:
 
         update_traction(0.0, state);
 
-        base::friction().init(base::traction_, state);
+        base::friction().init(0.0, base::traction_, state);
     }
 
     inline void rhs(double time, BlockVector const& state, BlockVector& result) {

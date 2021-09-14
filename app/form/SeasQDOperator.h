@@ -66,11 +66,12 @@ public:
     }
     inline auto displacement() const { return dgop_->solution(linear_solver_.x()); }
 
-    inline auto state(BlockVector const& state_vec, std::vector<std::size_t> const& subset) {
-        return friction_->state(traction_, state_vec, subset);
+    inline auto state(double time, BlockVector const& state_vec,
+                      std::vector<std::size_t> const& subset) {
+        return friction_->state(time, traction_, state_vec, subset);
     }
-    inline auto state(BlockVector const& state_vec) {
-        return friction_->state(traction_, state_vec);
+    inline auto state(double time, BlockVector const& state_vec) {
+        return friction_->state(time, traction_, state_vec);
     }
 
 protected:

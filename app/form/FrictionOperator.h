@@ -54,7 +54,7 @@ public:
         state.end_access(state_handle);
     }
 
-    void init(BlockVector const& traction, BlockVector& state) override {
+    void init(double time, BlockVector const& traction, BlockVector& state) override {
         auto traction_handle = traction.begin_access_readonly();
         auto state_handle = state.begin_access();
         VMax_ = 0.0;
@@ -62,7 +62,7 @@ public:
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
-            double VMax = lop_->init(faultNo, traction_block, state_block, scratch_);
+            double VMax = lop_->init(time, faultNo, traction_block, state_block, scratch_);
 
             VMax_ = std::max(VMax_, VMax);
         }
@@ -82,7 +82,7 @@ public:
             auto state_block = state_handle.subtensor(slice{}, faultNo);
             auto result_block = result_handle.subtensor(slice{}, faultNo);
             double VMax =
-                lop_->rhs(faultNo, time, traction_block, state_block, result_block, scratch_);
+                lop_->rhs(time, faultNo, traction_block, state_block, result_block, scratch_);
 
             VMax_ = std::max(VMax_, VMax);
         }
@@ -120,7 +120,7 @@ public:
     }
 
     template <typename Iterator>
-    auto state(BlockVector const& traction, BlockVector const& state, Iterator first,
+    auto state(double time, BlockVector const& traction, BlockVector const& state, Iterator first,
                Iterator last) {
         auto num_elements = std::distance(first, last);
         auto soln = lop_->state_prototype(num_elements);
@@ -137,26 +137,26 @@ public:
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
-            lop_->state(faultNo, traction_block, state_block, value_matrix, scratch_);
+            lop_->state(time, faultNo, traction_block, state_block, value_matrix, scratch_);
         }
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
         return soln;
     }
 
-    auto state(BlockVector const& traction, BlockVector const& state_vec,
+    auto state(double time, BlockVector const& traction, BlockVector const& state_vec,
                std::vector<std::size_t> const& subset)
         -> FiniteElementFunction<DomainDimension - 1u> override {
-        return state(traction, state_vec, subset.begin(), subset.end());
+        return state(time, traction, state_vec, subset.begin(), subset.end());
     }
 
-    auto state(BlockVector const& traction, BlockVector const& state_vec,
+    auto state(double time, BlockVector const& traction, BlockVector const& state_vec,
                std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<DomainDimension - 1u> override {
         if (!range) {
             *range = Range<std::size_t>(0, num_local_elements());
         }
-        return state(traction, state_vec, range->begin(), range->end());
+        return state(time, traction, state_vec, range->begin(), range->end());
     }
 
     template <typename Iterator> auto params(Iterator first, Iterator last) {

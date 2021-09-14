@@ -67,12 +67,13 @@ public:
     void monitor(double time, BlockVector const& state);
 
 private:
-    inline auto boundary_data(BlockVector const& state, std::vector<std::size_t> const* subset)
+    inline auto boundary_data(double time, BlockVector const& state,
+                              std::vector<std::size_t> const* subset)
         -> FiniteElementFunction<DomainDimension - 1u> {
         if (subset) {
-            return seasop_->state(state, *subset);
+            return seasop_->state(time, state, *subset);
         } else {
-            return seasop_->state(state);
+            return seasop_->state(time, state);
         }
     }
     inline auto volume_data(std::vector<std::size_t> const* subset)
@@ -109,12 +110,13 @@ public:
     void monitor(double time, BlockVector const& v, BlockVector const& u, BlockVector const& s);
 
 private:
-    inline auto boundary_data(BlockVector const& s, std::vector<std::size_t> const* subset)
+    inline auto boundary_data(double time, BlockVector const& s,
+                              std::vector<std::size_t> const* subset)
         -> FiniteElementFunction<DomainDimension - 1u> {
         if (subset) {
-            return seasop_->fault_state(s, *subset);
+            return seasop_->fault_state(time, s, *subset);
         } else {
-            return seasop_->fault_state(s);
+            return seasop_->fault_state(time, s);
         }
     }
     inline auto volume_data(BlockVector const& v, BlockVector const& u,

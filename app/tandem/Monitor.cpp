@@ -38,7 +38,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     writer->write(time, mneme::span(&VMax, 1));
                     break;
                 case DataLevel::Boundary: {
-                    auto data = boundary_data(state, writer->subset());
+                    auto data = boundary_data(time, state, writer->subset());
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }
@@ -68,7 +68,7 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     writer->write(time, mneme::span(&VMax, 1));
                     break;
                 case DataLevel::Boundary: {
-                    auto data = boundary_data(s, writer->subset());
+                    auto data = boundary_data(time, s, writer->subset());
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }

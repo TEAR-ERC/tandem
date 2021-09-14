@@ -23,7 +23,7 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
     solve(0.0, make_state_view(state));
     update_traction(make_state_view(state));
 
-    friction_->init(traction_, state);
+    friction_->init(0.0, traction_, state);
 }
 
 void SeasQDOperator::rhs(double time, BlockVector const& state, BlockVector& result) {

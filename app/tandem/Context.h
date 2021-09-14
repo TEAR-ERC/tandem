@@ -70,6 +70,9 @@ public:
         if (friction_scenario->source_fun()) {
             fric->lop().set_source_fun(*friction_scenario->source_fun());
         }
+        if (friction_scenario->delta_tau_fun()) {
+            fric->lop().set_delta_tau_fun(*friction_scenario->delta_tau_fun());
+        }
         return fric;
     }
     auto adapter() -> std::unique_ptr<AbstractAdapterOperator> override {

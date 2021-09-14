@@ -23,14 +23,14 @@ public:
     virtual double VMax_local() const = 0;
 
     virtual void pre_init(BlockVector& state) = 0;
-    virtual void init(BlockVector const& traction, BlockVector& state) = 0;
+    virtual void init(double time, BlockVector const& traction, BlockVector& state) = 0;
     virtual void rhs(double time, BlockVector const& traction, BlockVector const& state,
                      BlockVector& result) = 0;
 
-    virtual auto state(BlockVector const& traction, BlockVector const& state,
+    virtual auto state(double time, BlockVector const& traction, BlockVector const& state,
                        std::vector<std::size_t> const& subset)
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
-    virtual auto state(BlockVector const& traction, BlockVector const& state,
+    virtual auto state(double time, BlockVector const& traction, BlockVector const& state,
                        std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
     virtual auto raw_state(BlockVector const& state)
