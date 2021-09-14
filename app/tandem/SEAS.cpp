@@ -171,7 +171,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
     if (cfl_time_step) {
-        ts.set_time_step(*cfl_time_step);
+        ts.set_max_time_step(*cfl_time_step);
     }
 
     auto monitor =
