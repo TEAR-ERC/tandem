@@ -40,13 +40,14 @@ void Profile::print(std::ostream& out, MPI_Comm comm) const {
                 return x.size() < y.size();
             })->size();
     auto tp = TablePrinter(my_out, {w_1st_col, 10},
-                           {"Region", "t_min", "t_median", "t_mean", "t_max", "GFLOPS"});
+                           {"Region", "t_min", "t_median", "t_mean", "t_max", "TFLOP", "GFLOP/s"});
 
     auto print_summary = [&tp, &comm](std::string const& name, double time, uint64_t flops) {
         auto s = Summary(time, comm);
         uint64_t global_flops;
         MPI_Reduce(&flops, &global_flops, 1, MPI_UINT64_T, MPI_SUM, 0, comm);
-        tp << name << s.min << s.median << s.mean << s.max << global_flops / s.sum * 1e-9;
+        tp << name << s.min << s.median << s.mean << s.max << global_flops * 1e-12
+           << global_flops / s.max * 1e-9;
     };
 
     double total_time = 0.0;

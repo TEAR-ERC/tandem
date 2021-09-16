@@ -23,9 +23,8 @@ Summary::Summary(double value, MPI_Comm comm) {
         } else {
             median = 0.5 * (values[N / 2 - 1] + values[N / 2]);
         }
+        mean = std::accumulate(values.begin(), values.end(), 0.0) / N;
         max = values.back();
-        sum = std::accumulate(values.begin(), values.end(), 0.0);
-        mean = sum / N;
     } else {
         MPI_Gather(&value, 1, MPI_DOUBLE, nullptr, 1, MPI_DOUBLE, 0, comm);
     }
