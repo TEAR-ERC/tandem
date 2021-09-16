@@ -18,8 +18,11 @@ SeasFDOperator::SeasFDOperator(std::unique_ptr<dg_t> dgop,
       state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)) {
 
     r_dv = profile_.add("dv");
-    r_du = profile_.add("du");
+    r_du_apply = profile_.add("du (apply)");
+    r_du_other = profile_.add("du (other)");
     r_ds = profile_.add("ds");
+
+    flops_du_apply = dgop_->flops_apply();
 }
 
 double SeasFDOperator::cfl_time_step() const {
@@ -59,9 +62,13 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     }
     du.end_access(du_handle);
     s.end_access_readonly(v_handle);
-    profile_.end(r_dv);
+    profile_.end(r_dv, flops_dv);
 
-    profile_.begin(r_du);
+    profile_.begin(r_du_apply);
+    dgop_->apply(u, tmp_);
+    profile_.end(r_du_apply, flops_du_apply);
+
+    profile_.begin(r_du_other);
     update_ghost_state(s);
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
@@ -69,17 +76,16 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
 
     b_.set_zero();
     dgop_->rhs(b_);
-    dgop_->apply(u, tmp_);
     CHKERRTHROW(VecAXPY(b_.vec(), -1.0, tmp_.vec()));
     dgop_->apply_inverse_mass(b_, dv);
 
     dgop_->set_slip(invalid_slip_bc());
-    profile_.end(r_du);
+    profile_.end(r_du_other, flops_du_other);
 
     profile_.begin(r_ds);
     update_traction(u, s);
     friction_->rhs(time, traction_, s, ds);
-    profile_.end(r_ds);
+    profile_.end(r_ds, flops_ds);
 }
 
 void SeasFDOperator::update_traction(BlockVector const& u, BlockVector const& s) {

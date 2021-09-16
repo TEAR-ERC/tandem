@@ -290,7 +290,7 @@ public:
         return dt;
     }
 
-    std::size_t flops_apply() {
+    std::size_t flops_apply() const override {
         std::size_t flops = 0;
         if constexpr (std::experimental::is_detected_v<flops_apply_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {

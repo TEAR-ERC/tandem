@@ -32,6 +32,7 @@ public:
     virtual void assemble(BlockMatrix& matrix) = 0;
     virtual void rhs(BlockVector& vector) = 0;
     virtual void apply(BlockVector const& x, BlockVector& y) = 0;
+    virtual std::size_t flops_apply() const = 0;
     virtual void apply_inverse_mass(BlockVector const& x, BlockVector& y) = 0;
     virtual void project(volume_functional_t x, BlockVector& y) = 0;
     virtual double local_cfl_time_step() const = 0;

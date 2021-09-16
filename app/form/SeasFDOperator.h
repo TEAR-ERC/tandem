@@ -120,7 +120,8 @@ private:
     std::unique_ptr<AbstractVolumeFunctionalFactory> v_ini_ = nullptr;
 
     Profile profile_;
-    std::size_t r_dv, r_du, r_ds;
+    std::size_t r_dv, r_du_apply, r_du_other, r_ds;
+    uint64_t flops_dv = 0, flops_du_apply = 0, flops_du_other = 0, flops_ds = 0;
 };
 
 } // namespace tndm

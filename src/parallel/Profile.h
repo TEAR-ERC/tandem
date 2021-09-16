@@ -21,9 +21,10 @@ public:
     inline std::size_t size() const { return regions_.size(); }
 
     inline void begin(std::size_t region) { watches_[region].start(); }
-    inline void end(std::size_t region) {
+    inline void end(std::size_t region, uint64_t flops = 0) {
         double time = watches_[region].stop();
         times_[region] += time;
+        flops_[region] += flops;
     }
 
     inline Summary summary(std::size_t region, MPI_Comm comm) const {
@@ -36,6 +37,7 @@ private:
     std::vector<Stopwatch> watches_;
     std::vector<std::string> regions_;
     std::vector<double> times_;
+    std::vector<uint64_t> flops_;
 };
 
 } // namespace tndm

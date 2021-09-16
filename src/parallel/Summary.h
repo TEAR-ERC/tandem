@@ -12,6 +12,7 @@ struct Summary {
     double median;
     double mean;
     double max;
+    double sum;
 };
 
 } // namespace tndm
