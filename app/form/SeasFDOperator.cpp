@@ -15,7 +15,12 @@ SeasFDOperator::SeasFDOperator(std::unique_ptr<dg_t> dgop,
       disp_scatter_(dgop_->topo().elementScatterPlan()),
       disp_ghost_(disp_scatter_.recv_prototype<double>(dgop_->block_size(), ALIGNMENT)),
       state_scatter_(adapter_->fault_map().scatter_plan()),
-      state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)) {}
+      state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)) {
+
+    r_dv = profile_.add("dv");
+    r_du = profile_.add("du");
+    r_ds = profile_.add("ds");
+}
 
 double SeasFDOperator::cfl_time_step() const {
     double local_dt = dgop_->local_cfl_time_step();
@@ -44,6 +49,7 @@ void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVect
 
 void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u,
                          BlockVector const& s, BlockVector& dv, BlockVector& du, BlockVector& ds) {
+    profile_.begin(r_dv);
     auto v_handle = v.begin_access_readonly();
     auto du_handle = du.begin_access();
     for (std::size_t elNo = 0, num = dgop_->num_local_elements(); elNo < num; ++elNo) {
@@ -53,7 +59,9 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     }
     du.end_access(du_handle);
     s.end_access_readonly(v_handle);
+    profile_.end(r_dv);
 
+    profile_.begin(r_du);
     update_ghost_state(s);
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
@@ -66,9 +74,12 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     dgop_->apply_inverse_mass(b_, dv);
 
     dgop_->set_slip(invalid_slip_bc());
+    profile_.end(r_du);
 
+    profile_.begin(r_ds);
     update_traction(u, s);
     friction_->rhs(time, traction_, s, ds);
+    profile_.end(r_ds);
 }
 
 void SeasFDOperator::update_traction(BlockVector const& u, BlockVector const& s) {

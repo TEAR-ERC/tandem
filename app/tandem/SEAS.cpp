@@ -128,6 +128,8 @@ template <typename T> struct qd_operator_specifics {
     template <typename TimeSolver> static auto state(double, TimeSolver const& ts, T& seasop) {
         return seasop.friction().raw_state(ts.state(0));
     }
+
+    static void print_profile(T const&) {}
 };
 template <>
 struct operator_specifics<SeasQDOperator> : public qd_operator_specifics<SeasQDOperator> {};
@@ -157,6 +159,10 @@ template <> struct operator_specifics<SeasFDOperator> {
     template <typename TimeSolver>
     static auto state(double, TimeSolver const& ts, SeasFDOperator& seasop) {
         return seasop.friction().raw_state(ts.state(2));
+    }
+
+    static void print_profile(SeasFDOperator const& seasop) {
+        seasop.profile().print(std::cout, seasop.comm());
     }
 };
 
@@ -218,6 +224,14 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         L2_error_fault = tndm::Error<DomainDimension>::L2(
             mesh, *ctx.cl, numeric, seasop->adapter().fault_map().localFctNos(), *fault_solution, 0,
             seasop->comm());
+    }
+
+    if (rank == 0) {
+        std::cout << std::endl;
+    }
+    operator_specifics<seas_t>::print_profile(*seasop);
+    if (rank == 0) {
+        std::cout << std::endl;
     }
 
     if (rank == 0) {

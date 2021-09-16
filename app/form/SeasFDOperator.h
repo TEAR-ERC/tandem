@@ -15,6 +15,7 @@
 #include "form/BoundaryMap.h"
 #include "interface/BlockVector.h"
 #include "parallel/LocalGhostCompositeView.h"
+#include "parallel/Profile.h"
 #include "parallel/Scatter.h"
 #include "parallel/SparseBlockVector.h"
 #include "tensor/Tensor.h"
@@ -82,6 +83,8 @@ public:
         return friction_->state(time, traction_, state_vec);
     }
 
+    inline Profile const& profile() const { return profile_; };
+
 private:
     inline auto invalid_slip_bc() {
         return [](std::size_t, Matrix<double>&, bool) {
@@ -115,6 +118,9 @@ private:
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_boundary_ = nullptr;
     std::unique_ptr<AbstractVolumeFunctionalFactory> u_ini_ = nullptr;
     std::unique_ptr<AbstractVolumeFunctionalFactory> v_ini_ = nullptr;
+
+    Profile profile_;
+    std::size_t r_dv, r_du, r_ds;
 };
 
 } // namespace tndm
