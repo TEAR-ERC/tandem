@@ -24,7 +24,7 @@ public:
      * to the respective column number. If the size of names exceeds the size of widths
      * then the widths.back() is taken as column width.
      */
-    TablePrinter(std::ostream& out, std::initializer_list<int> widths,
+    TablePrinter(std::ostream* out, std::initializer_list<int> widths,
                  std::initializer_list<std::string> names);
     ~TablePrinter();
     TablePrinter(TablePrinter&& other) = default;
@@ -42,9 +42,9 @@ public:
         return *this;
     }
 
-private:
     void separator();
 
+private:
     std::ostream* out_ = nullptr;
     std::vector<int> widths_;
     std::size_t col_;

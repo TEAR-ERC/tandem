@@ -1,11 +1,10 @@
 #include "TablePrinter.h"
-#include <initializer_list>
 
 namespace tndm {
 
-TablePrinter::TablePrinter(std::ostream& out, std::initializer_list<int> widths,
+TablePrinter::TablePrinter(std::ostream* out, std::initializer_list<int> widths,
                            std::initializer_list<std::string> names)
-    : out_(&out), widths_(std::move(widths)), col_(0), old_precision_(out.precision()) {
+    : out_(out), widths_(std::move(widths)), col_(0), old_precision_(out->precision()) {
     auto name = names.begin();
 
     int col = 0;
