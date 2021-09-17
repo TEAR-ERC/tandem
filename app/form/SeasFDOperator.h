@@ -92,11 +92,6 @@ private:
         };
     }
 
-    inline void update_ghost_state(BlockVector const& state) {
-        state_scatter_.begin_scatter(state, state_ghost_);
-        state_scatter_.wait_scatter();
-    }
-
     inline auto make_state_view(BlockVector const& state) -> LocalGhostCompositeView {
         return LocalGhostCompositeView(state, state_ghost_);
     }

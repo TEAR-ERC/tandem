@@ -33,6 +33,9 @@ double SeasFDOperator::cfl_time_step() const {
 }
 
 void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVector& s) {
+    state_scatter_.begin_scatter(s, state_ghost_);
+    disp_scatter_.begin_scatter(u, disp_ghost_);
+
     if (u_ini_) {
         dgop_->project((*u_ini_)(), u);
     } else {
@@ -45,7 +48,8 @@ void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVect
     }
 
     friction_->pre_init(s);
-    update_ghost_state(s);
+    state_scatter_.wait_scatter();
+    disp_scatter_.wait_scatter();
     update_traction(u, s);
     friction_->init(0.0, traction_, s);
 }
@@ -53,6 +57,9 @@ void SeasFDOperator::initial_condition(BlockVector& v, BlockVector& u, BlockVect
 void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u,
                          BlockVector const& s, BlockVector& dv, BlockVector& du, BlockVector& ds) {
     profile_.begin(r_dv);
+    state_scatter_.begin_scatter(s, state_ghost_);
+    disp_scatter_.begin_scatter(u, disp_ghost_);
+
     auto v_handle = v.begin_access_readonly();
     auto du_handle = du.begin_access();
     for (std::size_t elNo = 0, num = dgop_->num_local_elements(); elNo < num; ++elNo) {
@@ -61,7 +68,7 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
         du_block.copy_values(v_block);
     }
     du.end_access(du_handle);
-    s.end_access_readonly(v_handle);
+    v.end_access_readonly(v_handle);
     profile_.end(r_dv, flops_dv);
 
     profile_.begin(r_du_apply);
@@ -69,7 +76,7 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     profile_.end(r_du_apply, flops_du_apply);
 
     profile_.begin(r_du_other);
-    update_ghost_state(s);
+    state_scatter_.wait_scatter();
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
     if (fun_boundary_) {
@@ -85,14 +92,13 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     profile_.end(r_du_other, flops_du_other);
 
     profile_.begin(r_ds);
+    disp_scatter_.wait_scatter();
     update_traction(u, s);
     friction_->rhs(time, traction_, s, ds);
     profile_.end(r_ds, flops_ds);
 }
 
 void SeasFDOperator::update_traction(BlockVector const& u, BlockVector const& s) {
-    disp_scatter_.begin_scatter(u, disp_ghost_);
-    disp_scatter_.wait_scatter();
     auto disp_view = LocalGhostCompositeView(u, disp_ghost_);
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
