@@ -71,6 +71,10 @@ public:
         assert(requestNo == requests_.size());
     }
 
+    void test_scatter() {
+        int flag;
+        MPI_Testall(requests_.size(), requests_.data(), &flag, MPI_STATUSES_IGNORE);
+    }
     void wait_scatter() { MPI_Waitall(requests_.size(), requests_.data(), MPI_STATUSES_IGNORE); }
 
 private:

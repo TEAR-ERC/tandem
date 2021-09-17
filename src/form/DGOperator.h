@@ -242,6 +242,7 @@ public:
 
             for (std::size_t elNo = 0; elNo < copy_first; ++elNo) {
                 lop_apply(elNo);
+                scatter_.test_scatter();
             }
 
             scatter_.wait_scatter();
