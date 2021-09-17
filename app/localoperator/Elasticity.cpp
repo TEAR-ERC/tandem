@@ -30,9 +30,7 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_lam(make_volume_functional(std::move(lam))),
       fun_mu(make_volume_functional(std::move(mu))),
-      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function),
-      fun_force(zero_volume_function), fun_dirichlet(zero_facet_function),
-      fun_slip(zero_facet_function) {
+      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
 
     MhatInv = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
@@ -494,13 +492,17 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
 
 bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
                             LinearAllocator<double>& scratch) const {
+    if (!fun_force) {
+        return false;
+    }
+
     assert(tensor::b::Shape[0] == tensor::A::Shape[0]);
 
     double F_Q_raw[tensor::F_Q::size()];
     assert(tensor::F_Q::Shape[1] == volRule.size());
 
     auto F_Q = Matrix<double>(F_Q_raw, NumQuantities, volRule.size());
-    fun_force(elNo, F_Q);
+    (*fun_force)(elNo, F_Q);
 
     kernel::rhsVolume rhs;
     rhs.E_Q = E_Q.data();
@@ -515,10 +517,10 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
 bool Elasticity::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (bc == BC::Fault) {
-        fun_slip(fctNo, f_q, false);
-    } else if (bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, false);
+    if (bc == BC::Fault && fun_slip) {
+        (*fun_slip)(fctNo, f_q, false);
+    } else if (bc == BC::Dirichlet && fun_dirichlet) {
+        (*fun_dirichlet)(fctNo, f_q, false);
     } else {
         return false;
     }
@@ -527,15 +529,15 @@ bool Elasticity::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
 bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (bc == BC::Fault) {
-        fun_slip(fctNo, f_q, true);
+    if (bc == BC::Fault && fun_slip) {
+        (*fun_slip)(fctNo, f_q, true);
         for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
             for (std::size_t p = 0; p < NumQuantities; ++p) {
                 f_q(p, q) *= 0.5;
             }
         }
-    } else if (bc == BC::Dirichlet) {
-        fun_dirichlet(fctNo, f_q, true);
+    } else if (bc == BC::Dirichlet && fun_dirichlet) {
+        (*fun_dirichlet)(fctNo, f_q, true);
     } else {
         return false;
     }

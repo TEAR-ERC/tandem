@@ -72,7 +72,9 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     update_ghost_state(s);
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
-    dgop_->set_dirichlet((*fun_boundary_)(time));
+    if (fun_boundary_) {
+        dgop_->set_dirichlet((*fun_boundary_)(time));
+    }
 
     b_.set_zero();
     dgop_->rhs(b_);

@@ -161,9 +161,9 @@ private:
     volume_functional_t fun_lam;
     volume_functional_t fun_mu;
     volume_functional_t fun_rho;
-    volume_functional_t fun_force;
-    facet_functional_t fun_dirichlet;
-    facet_functional_t fun_slip;
+    std::optional<volume_functional_t> fun_force = std::nullopt;
+    std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
+    std::optional<facet_functional_t> fun_slip = std::nullopt;
 
     // Precomputed data
     struct lam {
