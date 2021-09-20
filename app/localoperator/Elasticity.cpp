@@ -95,10 +95,6 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     fctPre.setStorage(std::make_shared<fct_pre_t>(numLocalFacets * fctRule.size()), 0u,
                       numLocalFacets, fctRule.size());
 
-    const auto totalFacets = NumFacets * numElements;
-    fct_on_vol_pre.setStorage(std::make_shared<fct_on_vol_pre_t>(totalFacets * fctRule.size()), 0u,
-                              totalFacets, fctRule.size());
-
     cfl_dt_.resize(numLocalElements);
 }
 
@@ -178,21 +174,10 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     }
 }
 
-void Elasticity::copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side) {
-    const auto lam_q = (side == 1) ? fctPre[fctNo].get<lam_q_1>() : fctPre[fctNo].get<lam_q_0>();
-    const auto mu_q = (side == 1) ? fctPre[fctNo].get<mu_q_1>() : fctPre[fctNo].get<mu_q_0>();
+void Elasticity::transpose_JInv(std::size_t fctNo, int side) {
     const auto G_q = (side == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
-    const auto idx = NumFacets * info.up[side] + info.localNo[side];
-    auto l = fct_on_vol_pre[idx].get<lam_q_0>();
-    auto m = fct_on_vol_pre[idx].get<mu_q_0>();
-    auto G_q_T = fct_on_vol_pre[idx].get<JInvT>();
+    auto G_q_T = (side == 1) ? fctPre[fctNo].get<JInvT1>() : fctPre[fctNo].get<JInvT0>();
     for (std::size_t q = 0; q < fctRule.size(); ++q) {
-        assert(q < l.size());
-        assert(q < lam_q.size());
-        assert(q < m.size());
-        assert(q < mu_q.size());
-        l[q] = lam_q[q];
-        m[q] = mu_q[q];
         for (std::ptrdiff_t i = 0; i < Dim; ++i) {
             for (std::ptrdiff_t j = 0; j < Dim; ++j) {
                 G_q_T[q][i + j * Dim] = G_q[q][j + i * Dim];
@@ -220,8 +205,8 @@ void Elasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
         krnl.execute(side);
     }
 
-    copy_lam_mu(fctNo, info, 0);
-    copy_lam_mu(fctNo, info, 1);
+    transpose_JInv(fctNo, 0);
+    transpose_JInv(fctNo, 1);
 }
 
 void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
@@ -236,7 +221,7 @@ void Elasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
     krnl.mu = material[info.up[0]].get<mu>().data();
     krnl.execute(0);
 
-    copy_lam_mu(fctNo, info, 0);
+    transpose_JInv(fctNo, 0);
 }
 
 void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
@@ -688,14 +673,28 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     alignas(ALIGNMENT) double Ju_q0[tensor::Ju_q::size(0)];
     alignas(ALIGNMENT) double Ju_q1[tensor::Ju_q::size(1)];
     for (std::size_t f = 0; f < NumFacets; ++f) {
+        bool is_skeleton_face = elNo != info[f].lid;
+        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+
+        auto fctNo = info[f].fctNo;
+        double const* lamq0 = fctPre[fctNo].get<lam_q_0>().data();
+        double const* lamq1 = fctPre[fctNo].get<lam_q_1>().data();
+        double const* muq0 = fctPre[fctNo].get<mu_q_0>().data();
+        double const* muq1 = fctPre[fctNo].get<mu_q_1>().data();
+        double const* GqT0 = fctPre[fctNo].get<JInvT0>().data()->data();
+        double const* GqT1 = fctPre[fctNo].get<JInvT1>().data()->data();
+        if (is_skeleton_face && info[f].side == 1) {
+            std::swap(lamq0, lamq1);
+            std::swap(muq0, muq1);
+            std::swap(GqT0, GqT1);
+        }
+
         alignas(ALIGNMENT) double u_hat_minus_u_q[tensor::u_hat_minus_u_q::size()] = {};
         alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
 
         std::size_t idx0 = NumFacets * elNo + f;
         std::size_t idx1 = NumFacets * info[f].lid + info[f].localNo;
 
-        bool is_skeleton_face = elNo != info[f].lid;
-        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
         if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
@@ -711,12 +710,12 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
-            fs.G_q_T(1) = fct_on_vol_pre[idx1].get<JInvT>().data()->data();
-            fs.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
-            fs.lam_q(1) = fct_on_vol_pre[idx1].get<lam_q_0>().data();
-            fs.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
-            fs.mu_q(1) = fct_on_vol_pre[idx1].get<mu_q_0>().data();
+            fs.G_q_T(0) = GqT0;
+            fs.G_q_T(1) = GqT1;
+            fs.lam_q(0) = lamq0;
+            fs.lam_q(1) = lamq1;
+            fs.mu_q(0) = muq0;
+            fs.mu_q(1) = muq1;
             fs.negative_E_q_T(1) = negative_E_q_T[info[f].localNo].data();
             fs.U = x_0.data();
             fs.U_ext = x_n[f].data();
@@ -736,10 +735,10 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.c00 = -penalty(elNo, elNo);
             fs.delta = init::delta::Values;
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
-            fs.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
+            fs.G_q_T(0) = GqT0;
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
-            fs.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
+            fs.lam_q(0) = lamq0;
+            fs.mu_q(0) = muq0;
             fs.U = x_0.data();
             fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
             fs.sigma_hat_q = sigma_hat_q;
@@ -753,9 +752,9 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         af.delta = init::delta::Values;
         af.Dxi_q(0) = Dxi_q[f].data();
         af.negative_E_q(0) = negative_E_q[f].data();
-        af.G_q_T(0) = fct_on_vol_pre[idx0].get<JInvT>().data()->data();
-        af.lam_q(0) = fct_on_vol_pre[idx0].get<lam_q_0>().data();
-        af.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
+        af.G_q_T(0) = GqT0;
+        af.lam_q(0) = lamq0;
+        af.mu_q(0) = muq0;
         af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         af.sigma_hat_q = sigma_hat_q;
         af.u_hat_minus_u_q = u_hat_minus_u_q;
