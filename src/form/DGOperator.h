@@ -27,6 +27,7 @@ template <typename LocalOperator> class DGOperator : public AbstractDGOperator<L
 public:
     using base = AbstractDGOperator<LocalOperator::Dim>;
     using local_operator_t = LocalOperator;
+    constexpr static std::size_t NumFacets = LocalOperator::Dim + 1;
 
     template <class T> using prepare_volume_t = decltype(&T::prepare_volume);
     template <class T> using prepare_skeleton_t = decltype(&T::prepare_skeleton);
@@ -44,7 +45,7 @@ public:
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
-    template <class T> using apply_inverse_mass_t = decltype(&T::apply_inverse_mass);
+    template <class T> using wave_rhs_t = decltype(&T::wave_rhs);
     template <class T> using project_t = decltype(&T::project);
     template <class T> using cfl_time_step_t = decltype(&T::cfl_time_step);
 
@@ -219,60 +220,20 @@ public:
     }
 
     void apply(BlockVector const& x, BlockVector& y) override {
-        constexpr std::size_t NumFacets = LocalOperator::Dim + 1;
-        auto y_handle = y.begin_access();
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
-            auto copy_first = topo_->numInteriorElements();
-            auto ghost_first = topo_->numLocalElements();
-            auto block_view = LocalGhostCompositeView(x, ghost_);
-
-            const auto lop_apply = [&](std::size_t elNo) {
-                auto y_0 = y_handle.subtensor(slice{}, elNo);
-                auto x_0 = block_view.get_block(elNo);
-                auto info = topo_->neighbours(elNo);
-                assert(info.size() == NumFacets);
-                std::array<decltype(x_0), NumFacets> x_n;
-                for (std::size_t d = 0; d < NumFacets; ++d) {
-                    x_n[d] = block_view.get_block(info[d].lid);
-                }
-                lop_->apply(elNo, info, x_0, x_n, y_0);
-            };
-
-            scatter_.begin_scatter(x, ghost_);
-
-            for (std::size_t elNo = 0; elNo < copy_first; ++elNo) {
-                lop_apply(elNo);
-                scatter_.test_scatter();
-            }
-
-            scatter_.wait_scatter();
-
-            for (std::size_t elNo = copy_first; elNo < ghost_first; ++elNo) {
-                lop_apply(elNo);
-            }
+            apply_(x, y, &LocalOperator::apply);
         }
-        y.end_access(y_handle);
     }
 
-    void apply_inverse_mass(BlockVector const& x, BlockVector& y) override {
-        auto x_handle = x.begin_access_readonly();
-        auto y_handle = y.begin_access();
-        if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
-
-            for (std::size_t elNo = 0, num = topo_->numLocalElements(); elNo < num; ++elNo) {
-                auto y_block = y_handle.subtensor(slice{}, elNo);
-                auto x_block = x_handle.subtensor(slice{}, elNo);
-                lop_->apply_inverse_mass(elNo, x_block, y_block);
-            }
+    void wave_rhs(BlockVector const& x, BlockVector& y) override {
+        if constexpr (std::experimental::is_detected_v<wave_rhs_t, LocalOperator>) {
+            apply_(x, y, &LocalOperator::wave_rhs);
         }
-        y.end_access(y_handle);
-        x.end_access_readonly(x_handle);
     }
 
     void project(typename base::volume_functional_t x, BlockVector& y) override {
         auto y_handle = y.begin_access();
-        if constexpr (std::experimental::is_detected_v<apply_inverse_mass_t, LocalOperator>) {
-
+        if constexpr (std::experimental::is_detected_v<project_t, LocalOperator>) {
             for (std::size_t elNo = 0, num = topo_->numLocalElements(); elNo < num; ++elNo) {
                 auto y_block = y_handle.subtensor(slice{}, elNo);
                 lop_->project(elNo, x, y_block);
@@ -360,6 +321,45 @@ public:
     }
 
 private:
+    using apply_fun_ptr = void (LocalOperator::*)(
+        std::size_t, mneme::span<SideInfo>, Vector<double const> const&,
+        std::array<Vector<double const>, NumFacets> const&, Vector<double>&) const;
+
+    void apply_(BlockVector const& x, BlockVector& y, apply_fun_ptr apply_fun) {
+        auto y_handle = y.begin_access();
+
+        auto copy_first = topo_->numInteriorElements();
+        auto ghost_first = topo_->numLocalElements();
+        auto block_view = LocalGhostCompositeView(x, ghost_);
+
+        const auto lop_apply = [&](std::size_t elNo) {
+            auto y_0 = y_handle.subtensor(slice{}, elNo);
+            auto x_0 = block_view.get_block(elNo);
+            auto info = topo_->neighbours(elNo);
+            assert(info.size() == NumFacets);
+            std::array<decltype(x_0), NumFacets> x_n;
+            for (std::size_t d = 0; d < NumFacets; ++d) {
+                x_n[d] = block_view.get_block(info[d].lid);
+            }
+            ((lop_.get())->*apply_fun)(elNo, info, x_0, x_n, y_0);
+        };
+
+        scatter_.begin_scatter(x, ghost_);
+
+        for (std::size_t elNo = 0; elNo < copy_first; ++elNo) {
+            lop_apply(elNo);
+            scatter_.test_scatter();
+        }
+
+        scatter_.wait_scatter();
+
+        for (std::size_t elNo = copy_first; elNo < ghost_first; ++elNo) {
+            lop_apply(elNo);
+        }
+
+        y.end_access(y_handle);
+    }
+
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<LocalOperator> lop_;
     Scratch<double> scratch_;

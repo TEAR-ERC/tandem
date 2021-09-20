@@ -71,8 +71,9 @@ public:
 
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
-    void apply_inverse_mass(std::size_t elNo, Vector<double const> const& x,
-                            Vector<double>& y) const;
+    void wave_rhs(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+                  std::array<Vector<double const>, NumFacets> const& x_n,
+                  Vector<double>& y_0) const;
     void project(std::size_t elNo, volume_functional_t x, Vector<double>& y) const;
 
     std::size_t flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const;
@@ -121,6 +122,10 @@ public:
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
 
 private:
+    template <bool WithRHS>
+    void apply_(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
+
     double penalty(std::size_t elNo0, std::size_t elNo1) const {
         if (method_ == DGMethod::BR2) {
             return NumFacets;
@@ -186,7 +191,7 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct rhoInv_W_Jinv_Q {
+    struct negative_rhoInv_W_Jinv_Q {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -222,8 +227,8 @@ private:
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, rhoInv>;
     mneme::StridedView<material_vol_t> material;
 
-    using vol_pre_t =
-        mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, rhoInv_W_Jinv_Q, JInvT>;
+    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q,
+                                          negative_rhoInv_W_Jinv_Q, JInvT>;
     mneme::StridedView<vol_pre_t> volPre;
 
     using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1,

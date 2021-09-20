@@ -10,19 +10,16 @@ SeasFDOperator::SeasFDOperator(std::unique_ptr<dg_t> dgop,
                                std::unique_ptr<AbstractFrictionOperator> friction)
     : dgop_(std::move(dgop)), adapter_(std::move(adapter)), friction_(std::move(friction)),
       traction_(adapter_->traction_block_size(), adapter_->num_local_elements(), adapter_->comm()),
-      b_(dgop_->block_size(), dgop_->num_local_elements(), comm()),
-      tmp_(dgop_->block_size(), dgop_->num_local_elements(), comm()),
       disp_scatter_(dgop_->topo().elementScatterPlan()),
       disp_ghost_(disp_scatter_.recv_prototype<double>(dgop_->block_size(), ALIGNMENT)),
       state_scatter_(adapter_->fault_map().scatter_plan()),
       state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)) {
 
     r_dv = profile_.add("dv");
-    r_du_apply = profile_.add("du (apply)");
-    r_du_other = profile_.add("du (other)");
+    r_du = profile_.add("du");
     r_ds = profile_.add("ds");
 
-    flops_du_apply = dgop_->flops_apply();
+    flops_du = dgop_->flops_apply();
 }
 
 double SeasFDOperator::cfl_time_step() const {
@@ -71,11 +68,7 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     v.end_access_readonly(v_handle);
     profile_.end(r_dv, flops_dv);
 
-    profile_.begin(r_du_apply);
-    dgop_->apply(u, tmp_);
-    profile_.end(r_du_apply, flops_du_apply);
-
-    profile_.begin(r_du_other);
+    profile_.begin(r_du);
     state_scatter_.wait_scatter();
     auto state_view = make_state_view(s);
     dgop_->set_slip(adapter_->slip_bc(state_view));
@@ -83,13 +76,10 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
         dgop_->set_dirichlet((*fun_boundary_)(time));
     }
 
-    b_.set_zero();
-    dgop_->rhs(b_);
-    CHKERRTHROW(VecAXPY(b_.vec(), -1.0, tmp_.vec()));
-    dgop_->apply_inverse_mass(b_, dv);
+    dgop_->wave_rhs(u, dv);
 
     dgop_->set_slip(invalid_slip_bc());
-    profile_.end(r_du_other, flops_du_other);
+    profile_.end(r_du, flops_du);
 
     profile_.begin(r_ds);
     disp_scatter_.wait_scatter();

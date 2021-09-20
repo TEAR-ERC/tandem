@@ -246,7 +246,8 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
     krnl_pre.mu = mu_field.data();
     krnl_pre.mu_W_J_Q = volPre[elNo].template get<mu_W_J_Q>().data();
     krnl_pre.rhoInv = rhoInv_field.data();
-    krnl_pre.rhoInv_W_Jinv_Q = volPre[elNo].template get<rhoInv_W_Jinv_Q>().data();
+    krnl_pre.negative_rhoInv_W_Jinv_Q =
+        volPre[elNo].template get<negative_rhoInv_W_Jinv_Q>().data();
     krnl_pre.W = volRule.weights().data();
     krnl_pre.execute();
 
@@ -652,10 +653,11 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     return true;
 }
 
-void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
-                       Vector<double const> const& x_0,
-                       std::array<Vector<double const>, NumFacets> const& x_n,
-                       Vector<double>& y_0) const {
+template <bool WithRHS>
+void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
+                        Vector<double const> const& x_0,
+                        std::array<Vector<double const>, NumFacets> const& x_n,
+                        Vector<double>& y_0) const {
     alignas(ALIGNMENT) double Ju_Q[tensor::Ju_Q::size()];
     kernel::apply_volume av;
     av.delta = init::delta::Values;
@@ -734,6 +736,24 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.Ju_q(0) = Ju_q0;
             fs.Ju_q(1) = Ju_q1;
             fs.execute();
+
+            if constexpr (WithRHS) {
+                alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
+                if (bc_skeleton(fctNo, info[f].bc, f_q_raw)) {
+                    kernel::flux_u_add_bc fub;
+                    fub.c00 = info[f].side == 1 ? 0.5 : -0.5;
+                    fub.f_q = f_q_raw;
+                    fub.u_hat_minus_u_q = u_hat_minus_u_q;
+                    fub.execute();
+
+                    kernel::flux_sigma_add_bc fsb;
+                    fsb.c00 = penalty(elNo, info[f].lid);
+                    fsb.f_q = f_q_raw;
+                    fsb.n_unit_q = n_unit_q;
+                    fsb.sigma_hat_q = sigma_hat_q;
+                    fsb.execute();
+                }
+            }
         } else if (is_fault_or_dirichlet) {
             kernel::flux_u_boundary fu;
             fu.U = x_0.data();
@@ -754,6 +774,24 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.sigma_hat_q = sigma_hat_q;
             fs.Ju_q(0) = Ju_q0;
             fs.execute();
+
+            if constexpr (WithRHS) {
+                alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
+                if (bc_boundary(fctNo, info[f].bc, f_q_raw)) {
+                    kernel::flux_u_add_bc fub;
+                    fub.c00 = 1.0;
+                    fub.f_q = f_q_raw;
+                    fub.u_hat_minus_u_q = u_hat_minus_u_q;
+                    fub.execute();
+
+                    kernel::flux_sigma_add_bc fsb;
+                    fsb.c00 = penalty(elNo, info[f].lid);
+                    fsb.f_q = f_q_raw;
+                    fsb.n_unit_q = n_unit_q;
+                    fsb.sigma_hat_q = sigma_hat_q;
+                    fsb.execute();
+                }
+            }
         } else {
             continue;
         }
@@ -774,14 +812,27 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     }
 }
 
-void Elasticity::apply_inverse_mass(std::size_t elNo, Vector<double const> const& x,
-                                    Vector<double>& y) const {
+void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
+                       Vector<double const> const& x_0,
+                       std::array<Vector<double const>, NumFacets> const& x_n,
+                       Vector<double>& y_0) const {
+    apply_<false>(elNo, std::move(info), x_0, x_n, y_0);
+}
+
+void Elasticity::wave_rhs(std::size_t elNo, mneme::span<SideInfo> info,
+                          Vector<double const> const& x_0,
+                          std::array<Vector<double const>, NumFacets> const& x_n,
+                          Vector<double>& y_0) const {
+    alignas(ALIGNMENT) double rhs_raw[tensor::Unew::size()];
+    auto rhs = Vector<double>(rhs_raw, y_0.shape(0));
+    apply_<true>(elNo, std::move(info), x_0, x_n, rhs);
+
     kernel::apply_inverse_mass krnl;
     krnl.E_Q = E_Q.data();
     krnl.MinvRef = MhatInv.data();
-    krnl.rhoInv_W_Jinv_Q = volPre[elNo].get<rhoInv_W_Jinv_Q>().data();
-    krnl.U = x.data();
-    krnl.Unew = y.data();
+    krnl.Jinv_Q = volPre[elNo].get<negative_rhoInv_W_Jinv_Q>().data();
+    krnl.U = rhs_raw;
+    krnl.Unew = y_0.data();
     krnl.execute();
 }
 
@@ -802,16 +853,15 @@ void Elasticity::project(std::size_t elNo, volume_functional_t x, Vector<double>
 
     auto J_Q = vol[elNo].get<AbsDetJ>();
     auto const& w = volRule.weights();
-    alignas(ALIGNMENT) double rhoInv_W_Jinv_Q[tensor::rhoInv_W_Jinv_Q::size()] = {};
-    static_assert(tensor::rhoInv_W_Jinv_Q::Shape[0] == tensor::Jinv_Q::Shape[0]);
-    for (unsigned q = 0; q < tensor::rhoInv_W_Jinv_Q::Shape[0]; ++q) {
-        rhoInv_W_Jinv_Q[q] = w[q] / J_Q[q];
+    alignas(ALIGNMENT) double Jinv_Q[tensor::Jinv_Q::size()] = {};
+    for (unsigned q = 0; q < tensor::Jinv_Q::Shape[0]; ++q) {
+        Jinv_Q[q] = w[q] / J_Q[q];
     }
 
     kernel::apply_inverse_mass im;
     im.E_Q = E_Q.data();
     im.MinvRef = MhatInv.data();
-    im.rhoInv_W_Jinv_Q = rhoInv_W_Jinv_Q;
+    im.Jinv_Q = Jinv_Q;
     im.U = U_raw;
     im.Unew = y.data();
     im.execute();

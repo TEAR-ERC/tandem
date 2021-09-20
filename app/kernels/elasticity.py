@@ -18,7 +18,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     W = Tensor('W', (Nq,))
     lam_W_J_Q = Tensor('lam_W_J_Q', (Nq,))
     mu_W_J_Q = Tensor('mu_W_J_Q', (Nq,))
-    rhoInv_W_Jinv_Q = Tensor('rhoInv_W_Jinv_Q', (Nq,))
+    negative_rhoInv_W_Jinv_Q = Tensor('negative_rhoInv_W_Jinv_Q', (Nq,))
     E_Q = Tensor('E_Q', (Nbf, Nq))
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
     Dxi_Q = Tensor('Dxi_Q', (Nbf, dim, Nq))
@@ -44,7 +44,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     generator.add('precomputeVolume', [
         lam_W_J_Q['q'] <= matE_Q_T['qt'] * lam['t'] * W['q'] * J['q'],
         mu_W_J_Q['q'] <= matE_Q_T['qt'] * mu['t'] * W['q'] * J['q'],
-        rhoInv_W_Jinv_Q['q'] <= matE_Q_T['qt'] * rhoInv['t'] * W['q'] * Jinv_Q['q']
+        negative_rhoInv_W_Jinv_Q['q'] <= -matE_Q_T['qt'] * rhoInv['t'] * W['q'] * Jinv_Q['q']
     ])
 
     generator.add('Dx_Q', Dx_Q['kiq'] <= G['eiq'] * Dxi_Q['keq'])
@@ -197,9 +197,11 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     MinvRef = Tensor('MinvRef', (Nbf, Nbf))
 
 
-    generator.add('flux_u_skeleton', u_hat_minus_u_q['qi']
-            <= 0.5 * (negative_E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
+    generator.add('flux_u_skeleton', u_hat_minus_u_q['qi'] <=
+            0.5 * (negative_E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
     generator.add('flux_u_boundary', u_hat_minus_u_q['qi'] <= negative_E_q_T[0]['ql'] * U['li'])
+    generator.add('flux_u_add_bc', u_hat_minus_u_q['qi'] <=
+            u_hat_minus_u_q['qi'] + c0[0] * f_q['iq'])
 
     def constitutive_q(x):
         return lam_q[x]['q'] * delta['ij'] * delta['rs'] * Ju_q[x]['qrs'] \
@@ -211,11 +213,13 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
         sigma_hat_q['ijq'] <= 0.5 * (constitutive_q(0) + constitutive_q(1)) +
             c0[0] * (E_q_T[0]['ql'] * U['li'] + negative_E_q_T[1]['ql'] * U_ext['li']) * n_unit_q['jq']
     ])
-
     generator.add('flux_sigma_boundary', [
         Ju_q[0]['qrs'] <= G_q_T[0]['seq'] * Dxi_q_120[0]['eql'] * U['lr'],
         sigma_hat_q['ijq'] <= constitutive_q(0) + c0[0] * E_q_T[0]['ql'] * U['li'] * n_unit_q['jq']
     ])
+    generator.add('flux_sigma_add_bc', sigma_hat_q['ijq'] <=
+            sigma_hat_q['ijq'] + c0[0] * f_q['iq'] * n_unit_q['jq'])
+
     generator.add('apply_volume', [
         Ju_Q['qsr'] <= G_Q_T['seq'] * Dxi_Q_120['eql'] * U['lr'],
         Unew['ku'] <= Dxi_Q['keq'] * G['ejq'] *
@@ -229,7 +233,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     )
 
     generator.add('apply_inverse_mass', Unew['kp'] <=
-        MinvRef['kr'] * rhoInv_W_Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'] * U['lp'])
+        MinvRef['kr'] * Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'] * U['lp'])
 
     generator.add('project_u_rhs', U['kp'] <= E_Q['kq'] * W['q'] * J['q'] * U_Q['pq'])
 

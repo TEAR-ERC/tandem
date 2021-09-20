@@ -103,7 +103,6 @@ private:
     std::unique_ptr<AbstractFrictionOperator> friction_;
 
     PetscVector traction_;
-    PetscVector b_, tmp_;
     Scatter disp_scatter_;
     SparseBlockVector<double> disp_ghost_;
 
@@ -115,8 +114,8 @@ private:
     std::unique_ptr<AbstractVolumeFunctionalFactory> v_ini_ = nullptr;
 
     Profile profile_;
-    std::size_t r_dv, r_du_apply, r_du_other, r_ds;
-    uint64_t flops_dv = 0, flops_du_apply = 0, flops_du_other = 0, flops_ds = 0;
+    std::size_t r_dv, r_du, r_ds;
+    uint64_t flops_dv = 0, flops_du = 0, flops_ds = 0;
 };
 
 } // namespace tndm
