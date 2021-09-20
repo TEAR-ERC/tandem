@@ -123,13 +123,12 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
     volPre.setStorage(std::make_shared<vol_pre_t>(numElements * volRule.size()), 0u,
                       numLocalElements, volRule.size());
 
-    const auto totalFacets = NumFacets * numElements;
-    fct_on_vol_pre.setStorage(std::make_shared<fct_on_vol_pre_t>(totalFacets * fctRule.size()), 0u,
-                              totalFacets, fctRule.size());
+    fctPre.setStorage(std::make_shared<fct_pre_t>(numLocalFacets * fctRule.size()), 0u,
+                      numLocalFacets, fctRule.size());
 }
 
-void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
-    base::prepare_volume_post_skeleton(elNo, scratch);
+void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
+    base::prepare_volume(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
     alignas(ALIGNMENT) double K_Q_raw[tensor::K_Q::size()];
@@ -160,7 +159,40 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
 
     auto K_eigen = KMap(Kfield);
     K_eigen = MMap(Mmem).fullPivLu().solve(K_eigen);
+}
 
+void Poisson::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
+                               LinearAllocator<double>& scratch) {
+    base::prepare_skeleton(fctNo, info, scratch);
+
+    for (int side = 0; side < 2; ++side) {
+        kernel::K_G_q k;
+        k.G_q = side == 1 ? fct[fctNo].get<JInv1>().data()->data()
+                          : fct[fctNo].get<JInv0>().data()->data();
+        k.K = material[info.up[side]].get<K>().data();
+        k.K_G_q(0) = side == 1 ? fctPre[fctNo].get<KJInv1>().data()->data()
+                               : fctPre[fctNo].get<KJInv0>().data()->data();
+        k.matE_q_T = matE_q_T[info.localNo[side]].data();
+        k.execute();
+    }
+}
+
+void Poisson::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
+                               LinearAllocator<double>& scratch) {
+    base::prepare_boundary(fctNo, info, scratch);
+
+    kernel::K_G_q k;
+    k.G_q = fct[fctNo].get<JInv0>().data()->data();
+    k.K = material[info.up[0]].get<K>().data();
+    k.K_G_q(0) = fctPre[fctNo].get<KJInv0>().data()->data();
+    k.matE_q_T = matE_q_T[info.localNo[0]].data();
+    k.execute();
+}
+
+void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch) {
+    base::prepare_volume_post_skeleton(elNo, scratch);
+
+    auto Kfield = material[elNo].get<K>().data();
     auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
     base::penalty[elNo] *=
         Kmax * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
@@ -172,16 +204,6 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     krnl.matE_Q_T = matE_Q_T.data();
     krnl.W = volRule.weights().data();
     krnl.execute();
-
-    for (std::size_t f = 0; f < NumFacets; ++f) {
-        auto idx = NumFacets * elNo + f;
-        kernel::K_G_q k;
-        k.G_q = fct_on_vol[idx].get<JInv0>().data()->data();
-        k.K = material[elNo].get<K>().data();
-        k.K_G_q(0) = fct_on_vol_pre[idx].get<KJInv>().data()->data();
-        k.matE_q_T = matE_q_T[f].data();
-        k.execute();
-    }
 }
 
 bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
@@ -524,11 +546,32 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
     av.U_new = y_0.data();
     av.execute();
 
+    alignas(ALIGNMENT) double n_q_flipped[tensor::n_q::size()];
+    alignas(ALIGNMENT) double n_unit_q_flipped[tensor::n_unit_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
-        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
-        alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
         bool is_skeleton_face = elNo != info[f].lid;
         bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+
+        auto fctNo = info[f].fctNo;
+        double const* n_q = fct[fctNo].get<Normal>().data()->data();
+        double const* n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+        double const* K_G_q0 = fctPre[fctNo].get<KJInv0>().data()->data();
+        double const* K_G_q1 = fctPre[fctNo].get<KJInv1>().data()->data();
+        if (is_skeleton_face && info[f].side == 1) {
+            std::swap(K_G_q0, K_G_q1);
+
+            for (int i = 0; i < tensor::n_q::size(); ++i) {
+                n_q_flipped[i] = -n_q[i];
+            }
+            n_q = n_q_flipped;
+            for (int i = 0; i < tensor::n_unit_q::size(); ++i) {
+                n_unit_q_flipped[i] = -n_unit_q[i];
+            }
+            n_unit_q = n_unit_q_flipped;
+        }
+
+        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
+        alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
         if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
@@ -544,14 +587,11 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
             fs.E_q_T(0) = E_q_T[f].data();
             fs.negative_E_q_T(1) = negative_E_q_T[info[f].localNo].data();
-            fs.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
-            fs.K_G_q(1) = fct_on_vol_pre[NumFacets * info[f].lid + info[f].localNo]
-                              .get<KJInv>()
-                              .data()
-                              ->data();
+            fs.K_G_q(0) = K_G_q0;
+            fs.K_G_q(1) = K_G_q1;
             fs.U = x_0.data();
             fs.U_ext = x_n[f].data();
-            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.n_unit_q = n_unit_q;
             fs.sigma_hat_q = sigma_hat_q;
             fs.execute();
         } else if (is_fault_or_dirichlet) {
@@ -565,9 +605,9 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fs.c00 = -penalty(elNo, elNo);
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
+            fs.K_G_q(0) = K_G_q0;
             fs.U = x_0.data();
-            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.n_unit_q = n_unit_q;
             fs.sigma_hat_q = sigma_hat_q;
             fs.execute();
         } else {
@@ -577,8 +617,8 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
         kernel::apply_facet af;
         af.Dxi_q(0) = Dxi_q[f].data();
         af.E_q(0) = E_q[f].data();
-        af.K_G_q(0) = fct_on_vol_pre[NumFacets * elNo + f].get<KJInv>().data()->data();
-        af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
+        af.K_G_q(0) = K_G_q0;
+        af.n_q = n_q;
         af.sigma_hat_q = sigma_hat_q;
         af.u_hat_q = u_hat_q;
         af.U_new = y_0.data();

@@ -157,11 +157,9 @@ protected:
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
                                       NormalLength, Coords>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
-    using fct_on_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, Normal, UnitNormal, JInv0>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
-    mneme::StridedView<fct_on_vol_t> fct_on_vol;
     std::vector<double> penalty;
 };
 
