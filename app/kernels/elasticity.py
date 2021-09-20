@@ -173,7 +173,7 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     # matrix-free
 
     U_ext = Tensor('U_ext', (Nbf, dim), alignStride=petsc_alignment)
-    u_hat_q = Tensor('u_hat_q', (nq, dim))
+    u_hat_minus_u_q = Tensor('u_hat_minus_u_q', (nq, dim))
     sigma_hat_q = Tensor('sigma_hat_q', (dim, dim, nq))
     E_Q_T = Tensor('E_Q_T', (Nq, Nbf))
     negative_E_Q = Tensor('negative_E_Q', (Nbf, Nq))
@@ -189,9 +189,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     Dxi_q_120 = [Tensor('Dxi_q_120({})'.format(x), (dim, nq, Nbf)) for x in range(2)]
 
 
-    generator.add('flux_u_skeleton',
-        u_hat_q['qi'] <= 0.5 * (negative_E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
-    generator.add('flux_u_boundary', u_hat_q['qi'] <= negative_E_q_T[0]['ql'] * U['li'])
+    generator.add('flux_u_skeleton', u_hat_minus_u_q['qi']
+            <= 0.5 * (negative_E_q_T[0]['ql'] * U['li'] + E_q_T[1]['ql'] * U_ext['li']))
+    generator.add('flux_u_boundary', u_hat_minus_u_q['qi'] <= negative_E_q_T[0]['ql'] * U['li'])
 
     def constitutive_q(x):
         return lam_q[x]['q'] * delta['ij'] * delta['rs'] * Ju_q[x]['qrs'] \
@@ -215,8 +215,8 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
             mu_W_J_Q['q'] * (Ju_Q['quj'] + Ju_Q['qju']))
     ])
     generator.add('apply_facet', Unew['ku'] <= Unew['ku'] + w['q'] * G_q_T[0]['jeq'] * Dxi_q[0]['keq'] *
-            (lam_q[0]['q'] * delta['uj'] * u_hat_q['qr'] * n_q['rq'] +
-            mu_q[0]['q'] * (u_hat_q['qu'] * n_q['jq'] + u_hat_q['qj'] * n_q['uq'])) +
+            (lam_q[0]['q'] * delta['uj'] * u_hat_minus_u_q['qr'] * n_q['rq'] +
+            mu_q[0]['q'] * (u_hat_minus_u_q['qu'] * n_q['jq'] + u_hat_minus_u_q['qj'] * n_q['uq'])) +
         w['q'] * negative_E_q[0]['kq'] * n_q['jq'] * sigma_hat_q['ujq']
     )
 

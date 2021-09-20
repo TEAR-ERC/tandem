@@ -646,7 +646,7 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
     alignas(ALIGNMENT) double Ju_q0[tensor::Ju_q::size(0)];
     alignas(ALIGNMENT) double Ju_q1[tensor::Ju_q::size(1)];
     for (std::size_t f = 0; f < NumFacets; ++f) {
-        alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
+        alignas(ALIGNMENT) double u_hat_minus_u_q[tensor::u_hat_minus_u_q::size()] = {};
         alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
 
         std::size_t idx0 = NumFacets * elNo + f;
@@ -660,7 +660,7 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
             fu.U = x_0.data();
             fu.U_ext = x_n[f].data();
-            fu.u_hat_q = u_hat_q;
+            fu.u_hat_minus_u_q = u_hat_minus_u_q;
             fu.execute();
 
             kernel::flux_sigma_skeleton fs;
@@ -686,7 +686,7 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         } else if (is_fault_or_dirichlet) {
             kernel::flux_u_boundary fu;
             fu.U = x_0.data();
-            fu.u_hat_q = u_hat_q;
+            fu.u_hat_minus_u_q = u_hat_minus_u_q;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.execute();
 
@@ -716,7 +716,7 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         af.mu_q(0) = fct_on_vol_pre[idx0].get<mu_q_0>().data();
         af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
         af.sigma_hat_q = sigma_hat_q;
-        af.u_hat_q = u_hat_q;
+        af.u_hat_minus_u_q = u_hat_minus_u_q;
         af.Unew = y_0.data();
         af.w = fctRule.weights().data();
         af.execute();
