@@ -672,21 +672,34 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
 
     alignas(ALIGNMENT) double Ju_q0[tensor::Ju_q::size(0)];
     alignas(ALIGNMENT) double Ju_q1[tensor::Ju_q::size(1)];
+    alignas(ALIGNMENT) double n_q_flipped[tensor::n_q::size()];
+    alignas(ALIGNMENT) double n_unit_q_flipped[tensor::n_unit_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
         bool is_skeleton_face = elNo != info[f].lid;
         bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
 
         auto fctNo = info[f].fctNo;
-        double const* lamq0 = fctPre[fctNo].get<lam_q_0>().data();
-        double const* lamq1 = fctPre[fctNo].get<lam_q_1>().data();
-        double const* muq0 = fctPre[fctNo].get<mu_q_0>().data();
-        double const* muq1 = fctPre[fctNo].get<mu_q_1>().data();
-        double const* GqT0 = fctPre[fctNo].get<JInvT0>().data()->data();
-        double const* GqT1 = fctPre[fctNo].get<JInvT1>().data()->data();
+        double const* n_q = fct[fctNo].get<Normal>().data()->data();
+        double const* n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+        double const* lam_q0 = fctPre[fctNo].get<lam_q_0>().data();
+        double const* lam_q1 = fctPre[fctNo].get<lam_q_1>().data();
+        double const* mu_q0 = fctPre[fctNo].get<mu_q_0>().data();
+        double const* mu_q1 = fctPre[fctNo].get<mu_q_1>().data();
+        double const* G_q_T0 = fctPre[fctNo].get<JInvT0>().data()->data();
+        double const* G_q_T1 = fctPre[fctNo].get<JInvT1>().data()->data();
         if (is_skeleton_face && info[f].side == 1) {
-            std::swap(lamq0, lamq1);
-            std::swap(muq0, muq1);
-            std::swap(GqT0, GqT1);
+            std::swap(lam_q0, lam_q1);
+            std::swap(mu_q0, mu_q1);
+            std::swap(G_q_T0, G_q_T1);
+
+            for (int i = 0; i < tensor::n_q::size(); ++i) {
+                n_q_flipped[i] = -n_q[i];
+            }
+            n_q = n_q_flipped;
+            for (int i = 0; i < tensor::n_unit_q::size(); ++i) {
+                n_unit_q_flipped[i] = -n_unit_q[i];
+            }
+            n_unit_q = n_unit_q_flipped;
         }
 
         alignas(ALIGNMENT) double u_hat_minus_u_q[tensor::u_hat_minus_u_q::size()] = {};
@@ -710,16 +723,16 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.G_q_T(0) = GqT0;
-            fs.G_q_T(1) = GqT1;
-            fs.lam_q(0) = lamq0;
-            fs.lam_q(1) = lamq1;
-            fs.mu_q(0) = muq0;
-            fs.mu_q(1) = muq1;
+            fs.G_q_T(0) = G_q_T0;
+            fs.G_q_T(1) = G_q_T1;
+            fs.lam_q(0) = lam_q0;
+            fs.lam_q(1) = lam_q1;
+            fs.mu_q(0) = mu_q0;
+            fs.mu_q(1) = mu_q1;
             fs.negative_E_q_T(1) = negative_E_q_T[info[f].localNo].data();
             fs.U = x_0.data();
             fs.U_ext = x_n[f].data();
-            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.n_unit_q = n_unit_q;
             fs.sigma_hat_q = sigma_hat_q;
             fs.Ju_q(0) = Ju_q0;
             fs.Ju_q(1) = Ju_q1;
@@ -735,12 +748,12 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
             fs.c00 = -penalty(elNo, elNo);
             fs.delta = init::delta::Values;
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
-            fs.G_q_T(0) = GqT0;
+            fs.G_q_T(0) = G_q_T0;
             fs.E_q_T(0) = E_q_T[f].data();
-            fs.lam_q(0) = lamq0;
-            fs.mu_q(0) = muq0;
+            fs.lam_q(0) = lam_q0;
+            fs.mu_q(0) = mu_q0;
             fs.U = x_0.data();
-            fs.n_unit_q = fct_on_vol[NumFacets * elNo + f].get<UnitNormal>().data()->data();
+            fs.n_unit_q = n_unit_q;
             fs.sigma_hat_q = sigma_hat_q;
             fs.Ju_q(0) = Ju_q0;
             fs.execute();
@@ -752,10 +765,10 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         af.delta = init::delta::Values;
         af.Dxi_q(0) = Dxi_q[f].data();
         af.negative_E_q(0) = negative_E_q[f].data();
-        af.G_q_T(0) = GqT0;
-        af.lam_q(0) = lamq0;
-        af.mu_q(0) = muq0;
-        af.n_q = fct_on_vol[NumFacets * elNo + f].get<Normal>().data()->data();
+        af.G_q_T(0) = G_q_T0;
+        af.lam_q(0) = lam_q0;
+        af.mu_q(0) = mu_q0;
+        af.n_q = n_q;
         af.sigma_hat_q = sigma_hat_q;
         af.u_hat_minus_u_q = u_hat_minus_u_q;
         af.Unew = y_0.data();
