@@ -705,9 +705,6 @@ void Elasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
         alignas(ALIGNMENT) double u_hat_minus_u_q[tensor::u_hat_minus_u_q::size()] = {};
         alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
 
-        std::size_t idx0 = NumFacets * elNo + f;
-        std::size_t idx1 = NumFacets * info[f].lid + info[f].localNo;
-
         if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();

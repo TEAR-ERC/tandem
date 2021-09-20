@@ -46,6 +46,11 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
+    void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch);
+    void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
+                          LinearAllocator<double>& scratch);
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00,
@@ -155,7 +160,11 @@ private:
         using type = std::array<double, Dim * Dim>;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct KJInv {
+    struct KJInv0 {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct KJInv1 {
         using type = std::array<double, Dim * Dim>;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -166,8 +175,8 @@ private:
     using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJWK>;
     mneme::StridedView<vol_pre_t> volPre;
 
-    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, KJInv>;
-    mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
+    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, KJInv0, KJInv1>;
+    mneme::StridedView<fct_pre_t> fctPre;
 
     // Options
     constexpr static double epsilon = -1.0;
