@@ -80,9 +80,12 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             for (int i = 0; i < 2; ++i) {
                 if (info.inside[i]) {
                     auto& si = neighbourInfo[info.up[i]];
-                    si[info.localNo[i]].lid = info.up[(i + 1) % 2];
-                    si[info.localNo[i]].localNo = info.localNo[(i + 1) % 2];
-                    si[info.localNo[i]].bc = info.bc;
+                    auto l = info.localNo[i];
+                    si[l].fctNo = fctNo;
+                    si[l].side = i;
+                    si[l].lid = info.up[(i + 1) % 2];
+                    si[l].localNo = info.localNo[(i + 1) % 2];
+                    si[l].bc = info.bc;
                 }
             }
         }

@@ -132,7 +132,7 @@ private:
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
-    void copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side);
+    void transpose_JInv(std::size_t fctNo, int side);
 
     DGMethod method_;
 
@@ -210,6 +210,14 @@ private:
         using type = std::array<double, Dim * Dim>;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct JInvT0 {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct JInvT1 {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
 
     using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, rhoInv>;
     mneme::StridedView<material_vol_t> material;
@@ -218,11 +226,9 @@ private:
         mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, rhoInv_W_Jinv_Q, JInvT>;
     mneme::StridedView<vol_pre_t> volPre;
 
-    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;
+    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1,
+                                          JInvT0, JInvT1>;
     mneme::StridedView<fct_pre_t> fctPre;
-
-    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, JInvT>;
-    mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
 
     std::vector<double> cfl_dt_;
 
