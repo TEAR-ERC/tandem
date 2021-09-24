@@ -740,14 +740,15 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
             if constexpr (WithRHS) {
                 alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
                 if (bc_skeleton(fctNo, info[f].bc, f_q_raw)) {
+                    double sign = info[f].side == 1 ? -1.0 : 1.0;
                     kernel::flux_u_add_bc fub;
-                    fub.c00 = info[f].side == 1 ? 0.5 : -0.5;
+                    fub.c00 = 0.5 * sign;
                     fub.f_q = f_q_raw;
                     fub.u_hat_minus_u_q = u_hat_minus_u_q;
                     fub.execute();
 
                     kernel::flux_sigma_add_bc fsb;
-                    fsb.c00 = penalty(elNo, info[f].lid);
+                    fsb.c00 = sign * penalty(elNo, info[f].lid);
                     fsb.f_q = f_q_raw;
                     fsb.n_unit_q = n_unit_q;
                     fsb.sigma_hat_q = sigma_hat_q;
