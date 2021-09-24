@@ -254,7 +254,7 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
     assert(lam_field.size() == mu_field.size());
     double max_mat = std::numeric_limits<double>::lowest();
     for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
-        max_mat = std::max(max_mat, lam_field[i] + 2.0 * mu_field[i]);
+        max_mat = std::max(max_mat, Dim * lam_field[i] + 2.0 * mu_field[i]);
     }
 
     assert(lam_field.size() == rhoInv_field.size());
