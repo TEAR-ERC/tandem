@@ -33,7 +33,8 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
                    fctRule.size());
     vol.setStorage(std::make_shared<vol_t>(numElements * volRule.size()), 0u, numElements,
                    volRule.size());
-    penalty.resize(numElements, 0.0);
+    area_.resize(numLocalFacets);
+    volume_.resize(numElements);
 }
 
 template <std::size_t D>
@@ -50,10 +51,16 @@ void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<do
     cl_->absDetJ(elNo, J, absDetJ);
     cl_->jacobianInv(J, jInv);
     cl_->map(elNo, geoE_Q, coords);
+
+    double volume = 0.0;
+    for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
+        volume += volRule.weights()[i] * absDetJ(i);
+    }
+    volume_[elNo] = volume;
 }
 
 template <std::size_t D>
-void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
+void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& info,
                                             LinearAllocator<double>& scratch) {
     double* Jmem = scratch.allocate(fctRule.size() * D * D);
     double* detJmem = scratch.allocate(fctRule.size());
@@ -84,13 +91,7 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     for (std::ptrdiff_t i = 0; i < length.size(); ++i) {
         area += fctRule.weights()[i] * length[i];
     }
-    if (isBnd) {
-        penalty[info.up[0]] += area;
-    } else {
-        area *= 0.5;
-        penalty[info.up[0]] += area;
-        penalty[info.up[1]] += area;
-    }
+    area_[fctNo] = area;
 
     auto jInv1 = Tensor(fct[fctNo].template get<JInv1>().data()->data(),
                         cl_->jacobianResultInfo(fctRule.size()));
@@ -100,24 +101,9 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 }
 
 template <std::size_t D>
-void DGCurvilinearCommon<D>::prepare_volume_post_skeleton(std::size_t elNo,
-                                                          LinearAllocator<double>& scratch) {
-    auto const& absDetJ = vol[elNo].template get<AbsDetJ>();
-
-    // Compute shape measure for interior penalty method
-    // See Shahbazi, "An explicit expression for the penalty parameter of the
-    //                interior penalty method"
-    double volume = 0.0;
-    for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
-        volume += volRule.weights()[i] * absDetJ[i];
-    }
-    penalty[elNo] /= volume;
-}
-
-template <std::size_t D>
 void DGCurvilinearCommon<D>::end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan) {
     auto scatter = SimpleScatter<double>(std::move(elementScatterPlan));
-    scatter.scatter(penalty.data());
+    scatter.scatter(volume_.data());
 }
 
 template class DGCurvilinearCommon<2u>;

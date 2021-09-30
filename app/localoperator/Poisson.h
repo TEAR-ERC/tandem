@@ -52,6 +52,7 @@ public:
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch);
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>&);
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00,
                          LinearAllocator<double>& scratch) const;
@@ -108,13 +109,12 @@ public:
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
 
 private:
-    double penalty(std::size_t elNo0, std::size_t elNo1) const {
+    double penalty(std::size_t fctNo) const {
         if (method_ == DGMethod::BR2) {
             return NumFacets;
         }
-        return std::max(base::penalty[elNo0], base::penalty[elNo1]);
+        return penalty_[fctNo];
     }
-    double penalty(FacetInfo const& info) const { return penalty(info.up[0], info.up[1]); }
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     void compute_K_Dx_q(std::size_t fctNo, FacetInfo const& info,
@@ -177,6 +177,8 @@ private:
 
     using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, KJInv0, KJInv1>;
     mneme::StridedView<fct_pre_t> fctPre;
+
+    std::vector<double> penalty_;
 
     // Options
     constexpr static double epsilon = -1.0;

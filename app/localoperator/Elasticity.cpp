@@ -7,6 +7,7 @@
 #include "basis/WarpAndBlend.h"
 #include "form/BC.h"
 #include "form/DGCurvilinearCommon.h"
+#include "form/InverseInequality.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "quadrules/SimplexQuadratureRule.h"
@@ -95,11 +96,9 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     fctPre.setStorage(std::make_shared<fct_pre_t>(numLocalFacets * fctRule.size()), 0u,
                       numLocalFacets, fctRule.size());
 
-    cfl_dt_.resize(numLocalElements);
+    penalty_.resize(numLocalFacets);
+    cfl_dt_.resize(numLocalElements, 0.0);
 }
-
-void prepare_skeleton(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
-void prepare_boundary(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch) {}
 
 void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
@@ -250,26 +249,66 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
         volPre[elNo].template get<negative_rhoInv_W_Jinv_Q>().data();
     krnl_pre.W = volRule.weights().data();
     krnl_pre.execute();
+}
 
+double Elasticity::stiffness_tensor_upper_bound(std::size_t elNo) const {
+    auto lam_field = material[elNo].get<lam>();
+    auto mu_field = material[elNo].get<mu>();
     assert(lam_field.size() == mu_field.size());
-    double max_mat = std::numeric_limits<double>::lowest();
+
+    double k1 = std::numeric_limits<double>::lowest();
     for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
-        max_mat = std::max(max_mat, Dim * lam_field[i] + 2.0 * mu_field[i]);
+        k1 = std::max(k1, Dim * lam_field[i] + 2.0 * mu_field[i]);
+    }
+    return k1;
+}
+
+double Elasticity::inverse_density_upper_bound(std::size_t elNo) const {
+    auto rhoInv_field = material[elNo].get<rhoInv>();
+
+    double ir1 = std::numeric_limits<double>::lowest();
+    for (std::size_t i = 0, n = rhoInv_field.size(); i < n; ++i) {
+        ir1 = std::max(ir1, rhoInv_field[i]);
+    }
+    return ir1;
+}
+
+void Elasticity::prepare_penalty(std::size_t fctNo, FacetInfo const& info,
+                                 LinearAllocator<double>&) {
+    auto const p = [&](int side) {
+        const double k1 = stiffness_tensor_upper_bound(info.up[side]);
+        constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
+        return (Dim + 1) * k1 * c_N_1 * area_[fctNo] / volume_[info.up[side]];
+    };
+
+    if (info.up[0] != info.up[1]) {
+        penalty_[fctNo] = (p(0) + p(1)) / 4.0;
+    } else {
+        penalty_[fctNo] = p(0);
+    }
+}
+
+void Elasticity::prepare_cfl(std::size_t elNo, mneme::span<SideInfo> info,
+                             LinearAllocator<double>&) {
+    double l_max = 0.0; // Bound for maximum eigenvalue
+    double bnd_area = 0.0;
+    for (std::size_t f = 0; f < NumFacets; ++f) {
+        const bool is_skeleton_face = elNo != info[f].lid;
+        const double gamma = is_skeleton_face ? 2.0 : 1.0;
+        const auto fctNo = info[f].fctNo;
+
+        constexpr double c_N = InverseInequality<Dim>::trace_constant(PolynomialDegree);
+        l_max += gamma * penalty_[fctNo] * c_N * area_[fctNo] / volume_[elNo];
+        bnd_area += area_[fctNo];
     }
 
-    assert(lam_field.size() == rhoInv_field.size());
-    double max_wave_speed = std::numeric_limits<double>::lowest();
-    for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
-        double c_p = std::sqrt((lam_field[i] + 2.0 * mu_field[i]) * rhoInv_field[i]);
-        max_wave_speed = std::max(max_wave_speed, c_p);
-    }
-
-    constexpr double C_N = (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) /
-                           static_cast<double>(DomainDimension);
-    if (elNo < cfl_dt_.size()) {
-        cfl_dt_[elNo] = 1.0 / (max_wave_speed * C_N * base::penalty[elNo]);
-    }
-    base::penalty[elNo] *= max_mat * C_N;
+    const double k1 = stiffness_tensor_upper_bound(elNo);
+    const double ir1 = inverse_density_upper_bound(elNo);
+    const double h_1 = bnd_area / volume_[elNo];
+    constexpr double C_N = InverseInequality<Dim>::grad_constant(PolynomialDegree);
+    l_max += k1 * ir1 * C_N * h_1 * h_1;
+    l_max *= 2.0;
+    cfl_dt_[elNo] = 1.0 / sqrt(l_max);
 }
 
 bool Elasticity::assemble_volume(std::size_t elNo, Matrix<double>& A00,
@@ -383,7 +422,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
     krnl.c01 = -krnl.c00;
     krnl.c10 = epsilon * 0.5;
     krnl.c11 = -krnl.c10;
-    krnl.c20 = penalty(info);
+    krnl.c20 = penalty(fctNo);
     krnl.c21 = -krnl.c20;
     krnl.a(0, 0) = A00.data();
     krnl.a(0, 1) = A01.data();
@@ -465,7 +504,7 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     kernel::assembleSurface krnl;
     krnl.c00 = -1.0;
     krnl.c10 = epsilon;
-    krnl.c20 = penalty(info);
+    krnl.c20 = penalty(fctNo);
     krnl.a(0, 0) = A00.data();
     krnl.E_q(0) = E_q[info.localNo[0]].data();
     krnl.L_q(0) = L_q0;
@@ -575,7 +614,7 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
-    rhs.c20 = penalty(info);
+    rhs.c20 = penalty(fctNo);
     rhs.Dx_q(0) = Dx_q;
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
@@ -637,7 +676,7 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = epsilon;
-    rhs.c20 = penalty(info);
+    rhs.c20 = penalty(fctNo);
     rhs.Dx_q(0) = Dx_q;
     rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
     rhs.E_q(0) = E_q[info.localNo[0]].data();
@@ -717,7 +756,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
             fu.execute();
 
             kernel::flux_sigma_skeleton fs;
-            fs.c00 = -penalty(elNo, info[f].lid);
+            fs.c00 = -penalty(fctNo);
             fs.delta = init::delta::Values;
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
@@ -748,7 +787,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
                     fub.execute();
 
                     kernel::flux_sigma_add_bc fsb;
-                    fsb.c00 = sign * penalty(elNo, info[f].lid);
+                    fsb.c00 = sign * penalty(fctNo);
                     fsb.f_q = f_q_raw;
                     fsb.n_unit_q = n_unit_q;
                     fsb.sigma_hat_q = sigma_hat_q;
@@ -763,7 +802,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
             fu.execute();
 
             kernel::flux_sigma_boundary fs;
-            fs.c00 = -penalty(elNo, elNo);
+            fs.c00 = -penalty(fctNo);
             fs.delta = init::delta::Values;
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.G_q_T(0) = G_q_T0;
@@ -786,7 +825,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
                     fub.execute();
 
                     kernel::flux_sigma_add_bc fsb;
-                    fsb.c00 = penalty(elNo, info[f].lid);
+                    fsb.c00 = penalty(fctNo);
                     fsb.f_q = f_q_raw;
                     fsb.n_unit_q = n_unit_q;
                     fsb.sigma_hat_q = sigma_hat_q;
@@ -928,7 +967,7 @@ void Elasticity::traction_skeleton(std::size_t fctNo, FacetInfo const& info,
     bc_skeleton(fctNo, info.bc, f_q_raw);
 
     kernel::compute_traction krnl;
-    krnl.c00 = -penalty(info);
+    krnl.c00 = -penalty(fctNo);
     krnl.Dx_q(0) = Dx_q0;
     krnl.Dx_q(1) = Dx_q1;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
@@ -963,7 +1002,7 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
     bc_boundary(fctNo, info.bc, f_q_raw);
 
     kernel::compute_traction_bnd krnl;
-    krnl.c00 = -penalty(info);
+    krnl.c00 = -penalty(fctNo);
     krnl.Dx_q(0) = Dx_q0;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
     krnl.f_q = f_q_raw;

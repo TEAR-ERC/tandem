@@ -48,13 +48,13 @@ public:
     void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
-        prepare_bndskl(fctNo, info, false, scratch);
+        prepare_bndskl(fctNo, info, scratch);
     }
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
-        prepare_bndskl(fctNo, info, true, scratch);
+        prepare_bndskl(fctNo, info, scratch);
     }
-    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_volume_post_skeleton(std::size_t, LinearAllocator<double>&) {}
     void end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan);
 
     template <std::size_t Q>
@@ -113,8 +113,7 @@ public:
     SimplexQuadratureRule<D> const& volQuadratureRule() const { return volRule; }
 
 protected:
-    void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
-                        LinearAllocator<double>& scratch);
+    void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch);
 
     std::shared_ptr<Curvilinear<D>> cl_;
 
@@ -160,7 +159,8 @@ protected:
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
-    std::vector<double> penalty;
+    std::vector<double> area_;
+    std::vector<double> volume_;
 };
 
 } // namespace tndm

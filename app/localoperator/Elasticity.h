@@ -54,6 +54,8 @@ public:
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch);
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>&);
+    void prepare_cfl(std::size_t elNo, mneme::span<SideInfo> info, LinearAllocator<double>&);
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00,
                          LinearAllocator<double>& scratch) const;
@@ -126,13 +128,14 @@ private:
     void apply_(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                 std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
 
-    double penalty(std::size_t elNo0, std::size_t elNo1) const {
+    double penalty(std::size_t fctNo) const {
         if (method_ == DGMethod::BR2) {
             return NumFacets;
         }
-        return std::max(base::penalty[elNo0], base::penalty[elNo1]);
+        return penalty_[fctNo];
     }
-    double penalty(FacetInfo const& info) const { return penalty(info.up[0], info.up[1]); }
+    double stiffness_tensor_upper_bound(std::size_t elNo) const;
+    double inverse_density_upper_bound(std::size_t elNo) const;
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
@@ -235,6 +238,7 @@ private:
                                           JInvT0, JInvT1>;
     mneme::StridedView<fct_pre_t> fctPre;
 
+    std::vector<double> penalty_;
     std::vector<double> cfl_dt_;
 
     // Options

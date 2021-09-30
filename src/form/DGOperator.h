@@ -34,6 +34,8 @@ public:
     template <class T> using prepare_boundary_t = decltype(&T::prepare_boundary);
     template <class T>
     using prepare_volume_post_skeleton_t = decltype(&T::prepare_volume_post_skeleton);
+    template <class T> using prepare_penalty_t = decltype(&T::prepare_penalty);
+    template <class T> using prepare_cfl_t = decltype(&T::prepare_cfl);
     template <class T> using assemble_volume_t = decltype(&T::assemble_volume);
     template <class T> using assemble_skeleton_t = decltype(&T::assemble_skeleton);
     template <class T> using assemble_boundary_t = decltype(&T::assemble_boundary);
@@ -85,6 +87,21 @@ public:
             }
         }
         lop_->end_preparation(topo_->elementScatterPlan());
+
+        if constexpr (std::experimental::is_detected_v<prepare_penalty_t, LocalOperator>) {
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                scratch_.reset();
+                auto const& info = topo_->info(fctNo);
+                lop_->prepare_penalty(fctNo, info, scratch_);
+            }
+        }
+
+        if constexpr (std::experimental::is_detected_v<prepare_cfl_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
+                lop_->prepare_cfl(elNo, topo_->neighbours(elNo), scratch_);
+            }
+        }
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }

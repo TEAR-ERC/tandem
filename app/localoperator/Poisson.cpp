@@ -7,6 +7,7 @@
 #include "basis/WarpAndBlend.h"
 #include "form/BC.h"
 #include "form/DGCurvilinearCommon.h"
+#include "form/InverseInequality.h"
 #include "form/RefElement.h"
 #include "geometry/Curvilinear.h"
 #include "quadrules/SimplexQuadratureRule.h"
@@ -125,6 +126,8 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
 
     fctPre.setStorage(std::make_shared<fct_pre_t>(numLocalFacets * fctRule.size()), 0u,
                       numLocalFacets, fctRule.size());
+
+    penalty_.resize(numLocalFacets);
 }
 
 void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
@@ -193,9 +196,6 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     base::prepare_volume_post_skeleton(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
-    auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
-    base::penalty[elNo] *=
-        Kmax * (PolynomialDegree + 1) * (PolynomialDegree + DomainDimension) / DomainDimension;
 
     kernel::J_W_K_Q krnl;
     krnl.J_W_K_Q = volPre[elNo].get<AbsDetJWK>().data()->data();
@@ -204,6 +204,21 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
     krnl.matE_Q_T = matE_Q_T.data();
     krnl.W = volRule.weights().data();
     krnl.execute();
+}
+
+void Poisson::prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>&) {
+    auto const p = [&](int side) {
+        auto Kfield = material[info.up[side]].get<K>().data();
+        auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
+        constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
+        return (Dim + 1) * Kmax * c_N_1 * area_[fctNo] / volume_[info.up[side]];
+    };
+
+    if (info.up[0] != info.up[1]) {
+        penalty_[fctNo] = (p(0) + p(1)) / 4.0;
+    } else {
+        penalty_[fctNo] = p(0);
+    }
 }
 
 bool Poisson::assemble_volume(std::size_t elNo, Matrix<double>& A00,
@@ -291,7 +306,7 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
     assemble.c01 = -assemble.c00;
     assemble.c10 = epsilon * 0.5;
     assemble.c11 = -assemble.c10;
-    assemble.c20 = penalty(info);
+    assemble.c20 = penalty(fctNo);
     assemble.c21 = -assemble.c20;
     assemble.a(0, 0) = A00.data();
     assemble.a(0, 1) = A01.data();
@@ -357,7 +372,7 @@ bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix
     kernel::assembleSurface assemble;
     assemble.c00 = -1.0;
     assemble.c10 = epsilon;
-    assemble.c20 = penalty(info);
+    assemble.c20 = penalty(fctNo);
     assemble.a(0, 0) = A00.data();
     assemble.K_Dx_q(0) = K_Dx_q0;
     assemble.E_q(0) = E_q[info.localNo[0]].data();
@@ -463,7 +478,7 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = 0.5 * epsilon;
-    rhs.c20 = penalty(info);
+    rhs.c20 = penalty(fctNo);
     rhs.f_q = f_q_raw;
     rhs.f_lifted_q = f_lifted_q;
     rhs.n_q = fct[fctNo].get<Normal>().data()->data();
@@ -521,7 +536,7 @@ bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<doub
     kernel::rhsFacet rhs;
     rhs.b = B0.data();
     rhs.c10 = epsilon;
-    rhs.c20 = penalty(info);
+    rhs.c20 = penalty(fctNo);
     rhs.f_q = f_q_raw;
     rhs.f_lifted_q = f_lifted_q;
     rhs.n_q = fct[fctNo].get<Normal>().data()->data();
@@ -582,7 +597,7 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fu.execute();
 
             kernel::flux_sigma_skeleton fs;
-            fs.c00 = -penalty(elNo, info[f].lid);
+            fs.c00 = -penalty(fctNo);
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.Dxi_q_120(1) = Dxi_q_120[info[f].localNo].data();
             fs.E_q_T(0) = E_q_T[f].data();
@@ -602,7 +617,7 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
             fu.execute();
 
             kernel::flux_sigma_boundary fs;
-            fs.c00 = -penalty(elNo, elNo);
+            fs.c00 = -penalty(fctNo);
             fs.Dxi_q_120(0) = Dxi_q_120[f].data();
             fs.E_q_T(0) = E_q_T[f].data();
             fs.K_G_q(0) = K_G_q0;
@@ -671,7 +686,7 @@ void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, K_Dx_q1});
 
     kernel::grad_u krnl;
-    krnl.c00 = -penalty(info);
+    krnl.c00 = -penalty(fctNo);
     krnl.K_Dx_q(0) = K_Dx_q0;
     krnl.K_Dx_q(1) = K_Dx_q1;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
@@ -695,7 +710,7 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});
 
     kernel::grad_u_bnd krnl;
-    krnl.c00 = -penalty(info);
+    krnl.c00 = -penalty(fctNo);
     krnl.K_Dx_q(0) = K_Dx_q0;
     krnl.E_q(0) = E_q[info.localNo[0]].data();
     krnl.f_q = f_q_raw;
