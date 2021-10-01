@@ -13,6 +13,10 @@ void setConfigSchema(TableSchema<Config>& schema,
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(path_converter)
         .validator(PathExists());
+    schema.add_value("cfl", &Config::cfl)
+        .validator([](auto&& x) { return x > 0.0; })
+        .default_value(1.0)
+        .help("CFL tuning parameter (typically >= 1.0)");
 
     schema.add_value("mode", &Config::mode)
         .converter([](std::string_view value) {

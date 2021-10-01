@@ -72,6 +72,7 @@ struct Config {
     std::optional<double> resolution;
     double final_time;
     std::optional<std::string> mesh_file;
+    double cfl;
 
     SeasMode mode;
     SeasType type;
