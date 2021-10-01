@@ -110,7 +110,7 @@ public:
                 throw;
             }
         }
-        return -(V / (F(index, snAbs, V, psi) + eta * V)) * tauAbsVec;
+        return -(V / tauAbs) * tauAbsVec;
     }
 
     double state_rhs(std::size_t index, double V, double psi) const {
@@ -156,8 +156,13 @@ private:
     }
 
     double Finv(std::size_t index, double snAbs, double tauAbs, double psi) const {
+        // We have
+        // V = 2 V_0 sinh(tauAbs / (a snAbs)) exp(-psi / a)
+        // substituting r = tauAbs / snAbs and sinh(x) = (exp(x) - exp(-x)) / 2 we obtain
+        // V = V_0 (exp((r - psi) / a) - exp(-(r + psi) / a))
         auto a = p_[index].get<A>();
-        return 2.0 * cp_.V0 * sinh(tauAbs / (a * snAbs)) * exp(-psi / a);
+        double r = tauAbs / snAbs;
+        return cp_.V0 * (exp((r - psi) / a) - exp(-(r + psi) / a));
     }
 
     ConstantParams cp_;
