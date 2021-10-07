@@ -135,7 +135,7 @@ template <>
 struct operator_specifics<SeasQDOperator> : public qd_operator_specifics<SeasQDOperator> {};
 template <>
 struct operator_specifics<SeasQDDiscreteGreenOperator>
-    : public qd_operator_specifics<SeasQDOperator> {};
+    : public qd_operator_specifics<SeasQDDiscreteGreenOperator> {};
 
 template <> struct operator_specifics<SeasFDOperator> {
     using monitor_t = seas::MonitorFD;
