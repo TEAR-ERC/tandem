@@ -314,17 +314,35 @@ public:
         return solution(vector, range->begin(), range->end());
     }
 
-    auto coefficients() const {
-        auto coeffs = lop_->coefficients_prototype(topo_->numLocalElements());
+    template <typename Iterator> auto params(Iterator first, Iterator last) {
+        auto num_elements = std::distance(first, last);
+        auto coeffs = lop_->coefficients_prototype(num_elements);
         auto& values = coeffs.values();
 
         auto scratch = Scratch<double>(lop_->scratch_mem_size(), lop_->alignment());
-        for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+        std::size_t out_no = 0;
+        for (; first != last; ++first) {
+            std::size_t elNo = *first;
+            assert(elNo < num_local_elements());
+
             scratch.reset();
-            auto C = values.subtensor(slice{}, slice{}, elNo);
+            auto C = values.subtensor(slice{}, slice{}, out_no++);
             lop_->coefficients_volume(elNo, C, scratch);
         }
         return coeffs;
+    }
+
+    auto params(std::vector<std::size_t> const& subset)
+        -> FiniteElementFunction<LocalOperator::Dim> override {
+        return params(subset.begin(), subset.end());
+    }
+
+    auto params(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<LocalOperator::Dim> override {
+        if (!range) {
+            *range = Range<std::size_t>(0, num_local_elements());
+        }
+        return params(range->begin(), range->end());
     }
 
     void set_force(typename base::volume_functional_t fun) override {

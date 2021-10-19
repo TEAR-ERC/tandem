@@ -202,7 +202,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     }
 
     if (cfg.output) {
-        auto coeffs = dgop.coefficients();
+        auto coeffs = dgop.params();
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
         auto piece = writer.addPiece(adapter);

@@ -56,6 +56,25 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
     update_dt_limits(time);
 }
 
+void MonitorQD::write_static() {
+    for (auto const& writer : writers_) {
+        switch (writer->level()) {
+        case DataLevel::Scalar:
+            break;
+        case DataLevel::Boundary: {
+            auto data = static_boundary_data(writer->subset());
+            writer->write_static(mneme::span(&data, 1));
+            break;
+        }
+        case DataLevel::Volume: {
+            auto data = static_volume_data(writer->subset());
+            writer->write_static(mneme::span(&data, 1));
+            break;
+        }
+        };
+    }
+}
+
 void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                         BlockVector const& s) {
     if (!writers_.empty()) {
@@ -85,6 +104,25 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
     }
 
     update_dt_limits(time);
+}
+
+void MonitorFD::write_static() {
+    for (auto const& writer : writers_) {
+        switch (writer->level()) {
+        case DataLevel::Scalar:
+            break;
+        case DataLevel::Boundary: {
+            auto data = static_boundary_data(writer->subset());
+            writer->write_static(mneme::span(&data, 1));
+            break;
+        }
+        case DataLevel::Volume: {
+            auto data = static_volume_data(writer->subset());
+            writer->write_static(mneme::span(&data, 1));
+            break;
+        }
+        };
+    }
 }
 
 auto MonitorFD::velocity_names(std::size_t numQuantities) -> std::vector<std::string> {

@@ -183,6 +183,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     auto monitor =
         std::make_unique<typename operator_specifics<seas_t>::monitor_t>(seasop, ts.fsal());
     add_writers(cfg, mesh, ctx.cl, seasop->adapter().fault_map(), *monitor, seasop->comm());
+    monitor->write_static();
+
     ts.set_monitor(*monitor);
 
     int rank;

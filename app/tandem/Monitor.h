@@ -66,6 +66,11 @@ public:
      */
     void monitor(double time, BlockVector const& state);
 
+    /**
+     * @brief Write static output, i.e. material and on-fault parameters
+     */
+    void write_static();
+
 private:
     inline auto boundary_data(double time, BlockVector const& state,
                               std::vector<std::size_t> const* subset)
@@ -76,12 +81,28 @@ private:
             return seasop_->state(time, state);
         }
     }
+    inline auto static_boundary_data(std::vector<std::size_t> const* subset)
+        -> FiniteElementFunction<DomainDimension - 1u> {
+        if (subset) {
+            return seasop_->friction().params(*subset);
+        } else {
+            return seasop_->friction().params();
+        }
+    }
     inline auto volume_data(std::vector<std::size_t> const* subset)
         -> FiniteElementFunction<DomainDimension> {
         if (subset) {
             return seasop_->displacement(*subset);
         } else {
             return seasop_->displacement();
+        }
+    }
+    inline auto static_volume_data(std::vector<std::size_t> const* subset)
+        -> FiniteElementFunction<DomainDimension> {
+        if (subset) {
+            return seasop_->domain().params(*subset);
+        } else {
+            return seasop_->domain().params();
         }
     }
 
@@ -109,6 +130,11 @@ public:
      */
     void monitor(double time, BlockVector const& v, BlockVector const& u, BlockVector const& s);
 
+    /**
+     * @brief Write static output, i.e. material and on-fault parameters
+     */
+    void write_static();
+
 private:
     inline auto boundary_data(double time, BlockVector const& s,
                               std::vector<std::size_t> const* subset)
@@ -119,6 +145,14 @@ private:
             return seasop_->fault_state(time, s);
         }
     }
+    inline auto static_boundary_data(std::vector<std::size_t> const* subset)
+        -> FiniteElementFunction<DomainDimension - 1u> {
+        if (subset) {
+            return seasop_->friction().params(*subset);
+        } else {
+            return seasop_->friction().params();
+        }
+    }
     inline auto volume_data(BlockVector const& v, BlockVector const& u,
                             std::vector<std::size_t> const* subset)
         -> std::array<FiniteElementFunction<DomainDimension>, 2> {
@@ -126,6 +160,14 @@ private:
             return {seasop_->domain_function(v, *subset), seasop_->domain_function(u, *subset)};
         } else {
             return {seasop_->domain_function(v), seasop_->domain_function(u)};
+        }
+    }
+    inline auto static_volume_data(std::vector<std::size_t> const* subset)
+        -> FiniteElementFunction<DomainDimension> {
+        if (subset) {
+            return seasop_->domain().params(*subset);
+        } else {
+            return seasop_->domain().params();
         }
     }
     auto velocity_names(std::size_t numQuantities) -> std::vector<std::string>;

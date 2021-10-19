@@ -202,6 +202,15 @@ public:
         }
     }
 
+    void write_static(mneme::span<FiniteElementFunction<D>> data) override {
+        auto writer = VTUWriter<D>(degree_, true, comm_);
+        auto piece = writer.addPiece(adapter_);
+        for (auto const& fun : data) {
+            piece.addPointData(fun);
+        }
+        writer.write(prefix_ + "-static");
+    }
+
 private:
     PVDWriter pvd_;
     CurvilinearVTUAdapter<D> adapter_;

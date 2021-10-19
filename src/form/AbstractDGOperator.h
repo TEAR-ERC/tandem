@@ -42,6 +42,9 @@ public:
     virtual auto solution(BlockVector const& vector,
                           std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<D> = 0;
+    virtual auto params(std::vector<std::size_t> const& subset) -> FiniteElementFunction<D> = 0;
+    virtual auto params(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<D> = 0;
 
     virtual void set_force(volume_functional_t fun) = 0;
     virtual void set_slip(facet_functional_t fun) = 0;

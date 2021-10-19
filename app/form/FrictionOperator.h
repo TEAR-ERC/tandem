@@ -176,9 +176,17 @@ public:
         return soln;
     }
 
-    auto params() {
-        auto range = Range<std::size_t>(0, num_local_elements());
-        return params(range.begin(), range.end());
+    auto params(std::vector<std::size_t> const& subset)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        return params(subset.begin(), subset.end());
+    }
+
+    auto params(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        if (!range) {
+            *range = Range<std::size_t>(0, num_local_elements());
+        }
+        return params(range->begin(), range->end());
     }
 
 private:
