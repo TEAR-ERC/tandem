@@ -251,16 +251,18 @@ void Elasticity::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<
     krnl_pre.execute();
 }
 
-double Elasticity::stiffness_tensor_upper_bound(std::size_t elNo) const {
+std::pair<double, double> Elasticity::stiffness_tensor_bounds(std::size_t elNo) const {
     auto lam_field = material[elNo].get<lam>();
     auto mu_field = material[elNo].get<mu>();
     assert(lam_field.size() == mu_field.size());
 
-    double k1 = std::numeric_limits<double>::lowest();
+    double c0 = std::numeric_limits<double>::max();
+    double c1 = std::numeric_limits<double>::lowest();
     for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
-        k1 = std::max(k1, Dim * lam_field[i] + 2.0 * mu_field[i]);
+        c0 = std::min(c0, 2.0 * mu_field[i]);
+        c1 = std::max(c1, Dim * lam_field[i] + 2.0 * mu_field[i]);
     }
-    return k1;
+    return {c0, c1};
 }
 
 double Elasticity::inverse_density_upper_bound(std::size_t elNo) const {
@@ -276,9 +278,9 @@ double Elasticity::inverse_density_upper_bound(std::size_t elNo) const {
 void Elasticity::prepare_penalty(std::size_t fctNo, FacetInfo const& info,
                                  LinearAllocator<double>&) {
     auto const p = [&](int side) {
-        const double k1 = stiffness_tensor_upper_bound(info.up[side]);
+        const auto [c0, c1] = stiffness_tensor_bounds(info.up[side]);
         constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
-        return (Dim + 1) * k1 * c_N_1 * area_[fctNo] / volume_[info.up[side]];
+        return (Dim + 1) * c_N_1 * (area_[fctNo] / volume_[info.up[side]]) * (c1 * c1 / c0);
     };
 
     if (info.up[0] != info.up[1]) {
@@ -302,11 +304,11 @@ void Elasticity::prepare_cfl(std::size_t elNo, mneme::span<SideInfo> info,
         bnd_area += area_[fctNo];
     }
 
-    const double k1 = stiffness_tensor_upper_bound(elNo);
+    const auto [c0, c1] = stiffness_tensor_bounds(elNo);
     const double ir1 = inverse_density_upper_bound(elNo);
     const double h_1 = bnd_area / volume_[elNo];
     constexpr double C_N = InverseInequality<Dim>::grad_constant(PolynomialDegree);
-    l_max += k1 * ir1 * C_N * h_1 * h_1;
+    l_max += c1 * ir1 * C_N * h_1 * h_1;
     l_max *= 2.0;
     cfl_dt_[elNo] = 1.0 / sqrt(l_max);
 }

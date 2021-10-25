@@ -134,7 +134,7 @@ private:
         }
         return penalty_[fctNo];
     }
-    double stiffness_tensor_upper_bound(std::size_t elNo) const;
+    std::pair<double, double> stiffness_tensor_bounds(std::size_t elNo) const;
     double inverse_density_upper_bound(std::size_t elNo) const;
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;

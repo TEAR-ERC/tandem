@@ -209,9 +209,10 @@ void Poisson::prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<dou
 void Poisson::prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>&) {
     auto const p = [&](int side) {
         auto Kfield = material[info.up[side]].get<K>().data();
-        auto Kmax = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
+        auto k0 = *std::min_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
+        auto k1 = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
         constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
-        return (Dim + 1) * Kmax * c_N_1 * area_[fctNo] / volume_[info.up[side]];
+        return (Dim + 1) * c_N_1 * (area_[fctNo] / volume_[info.up[side]]) * (k1 * k1 / k0);
     };
 
     if (info.up[0] != info.up[1]) {
