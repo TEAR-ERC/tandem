@@ -27,10 +27,7 @@ public:
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig());
     ~SeasQDDiscreteGreenOperator();
 
-    inline void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
-        base::set_boundary(std::move(fun));
-        compute_boundary_traction();
-    }
+    void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
 
     inline void initial_condition(BlockVector& state) {
         base::friction().pre_init(state);

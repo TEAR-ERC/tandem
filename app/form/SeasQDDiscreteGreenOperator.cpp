@@ -13,7 +13,14 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
     compute_discrete_greens_function();
 }
+
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() { MatDestroy(&G_); }
+
+void SeasQDDiscreteGreenOperator::set_boundary(
+    std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+    base::set_boundary(std::move(fun));
+    compute_boundary_traction();
+}
 
 void SeasQDDiscreteGreenOperator::update_internal_state(double time, BlockVector const& state,
                                                         bool state_changed_since_last_rhs,

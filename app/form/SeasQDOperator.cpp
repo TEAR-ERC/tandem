@@ -16,6 +16,11 @@ SeasQDOperator::SeasQDOperator(std::unique_ptr<dg_t> dgop,
       state_ghost_(state_scatter_.recv_prototype<double>(friction_->block_size(), ALIGNMENT)),
       traction_(adapter_->traction_block_size(), adapter_->num_local_elements(), adapter_->comm()) {
 }
+
+void SeasQDOperator::set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+    fun_boundary_ = std::move(fun);
+}
+
 void SeasQDOperator::initial_condition(BlockVector& state) {
     friction_->pre_init(state);
 

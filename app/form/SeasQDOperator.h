@@ -36,9 +36,7 @@ public:
 
     inline void warmup() { linear_solver_.warmup(); }
 
-    inline void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
-        fun_boundary_ = std::move(fun);
-    }
+    virtual void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
 
     inline auto block_sizes() -> std::array<std::size_t, 1> const {
         return {friction_->block_size()};
