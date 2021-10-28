@@ -6,6 +6,7 @@ force = "force"
 boundary = "solution"
 slip = "slip"
 solution = "solution"
+solution_jacobian = "solution_jacobian"
 lam = "lam"
 ref_normal = [1, 0]
 
