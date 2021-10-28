@@ -2,6 +2,7 @@ final_time = 56764800000
 mesh_file = "bp5.msh"
 lib = "bp5.lua"
 scenario = "bp5_outside"
+mode = "QD"
 type = "elasticity"
 ref_normal = [0, -1, 0]
 boundary_linear = true

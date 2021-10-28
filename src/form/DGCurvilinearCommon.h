@@ -48,13 +48,13 @@ public:
     void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
-        prepare_bndskl(fctNo, info, false, scratch);
+        prepare_bndskl(fctNo, info, scratch);
     }
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
-        prepare_bndskl(fctNo, info, true, scratch);
+        prepare_bndskl(fctNo, info, scratch);
     }
-    void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_volume_post_skeleton(std::size_t, LinearAllocator<double>&) {}
     void end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan);
 
     template <std::size_t Q>
@@ -106,14 +106,14 @@ public:
     }
 
     static void zero_volume_function(std::size_t, Matrix<double>& x) { x.set_zero(); }
+    static void one_volume_function(std::size_t, Matrix<double>& x) { x.set_constant(1.0); }
     static void zero_facet_function(std::size_t, Matrix<double>& x, bool) { x.set_zero(); }
 
     SimplexQuadratureRule<D - 1u> const& facetQuadratureRule() const { return fctRule; }
     SimplexQuadratureRule<D> const& volQuadratureRule() const { return volRule; }
 
 protected:
-    void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, bool isBnd,
-                        LinearAllocator<double>& scratch);
+    void prepare_bndskl(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>& scratch);
 
     std::shared_ptr<Curvilinear<D>> cl_;
 
@@ -156,12 +156,11 @@ protected:
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
                                       NormalLength, Coords>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
-    using fct_on_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, Normal, UnitNormal, JInv0>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
-    mneme::StridedView<fct_on_vol_t> fct_on_vol;
-    std::vector<double> penalty;
+    std::vector<double> area_;
+    std::vector<double> volume_;
 };
 
 } // namespace tndm

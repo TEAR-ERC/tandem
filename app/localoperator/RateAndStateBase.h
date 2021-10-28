@@ -23,6 +23,8 @@ namespace tndm {
 
 class RateAndStateBase {
 public:
+    static auto Space() -> NodalRefElement<DomainDimension - 1u>;
+
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
     // D-1 slip components + 1 state component
     constexpr static std::size_t NumQuantities = TangentialComponents + 1u;

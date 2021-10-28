@@ -1,20 +1,28 @@
 #include "SEAS.h"
 #include "common/PetscTimeSolver.h"
 #include "config.h"
+#include "form/AbstractDGOperator.h"
 #include "form/AdapterOperator.h"
 #include "form/BoundaryMap.h"
+#include "form/FacetFunctionalFactory.h"
+#include "form/FiniteElementFunction.h"
 #include "form/FrictionOperator.h"
+#include "form/SeasFDOperator.h"
 #include "form/SeasQDDiscreteGreenOperator.h"
 #include "form/SeasQDOperator.h"
+#include "form/VolumeFunctionalFactory.h"
+#include "localoperator/Adapter.h"
 #include "localoperator/DieterichRuinaAgeing.h"
 #include "localoperator/Elasticity.h"
-#include "localoperator/ElasticityAdapter.h"
 #include "localoperator/Poisson.h"
-#include "localoperator/PoissonAdapter.h"
 #include "localoperator/RateAndState.h"
+#include "mesh/LocalSimplexMesh.h"
+#include "tandem/Context.h"
+#include "tandem/ContextBase.h"
 #include "tandem/FrictionConfig.h"
+#include "tandem/Monitor.h"
 #include "tandem/SeasScenario.h"
-#include "tandem/SeasWriter.h"
+#include "tandem/Writer.h"
 
 #include "form/DGOperator.h"
 #include "form/DGOperatorTopo.h"
@@ -24,12 +32,14 @@
 #include "tensor/Managed.h"
 #include "util/Stopwatch.h"
 
+#include <limits>
 #include <mpi.h>
 #include <petscsys.h>
 
 #include <algorithm>
 #include <array>
 #include <ctime>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -39,133 +49,151 @@
 
 namespace tndm::detail {
 
-template <SeasType Type> struct make_lop;
-template <> struct make_lop<SeasType::Poisson> {
-    using type = Poisson;
-    using adapter_type = PoissonAdapter;
+template <typename Type>
+auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+    return std::make_unique<seas::Context<Type>>(
+        mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
+        std::make_unique<DieterichRuinaAgeingScenario>(cfg.lib, cfg.scenario), cfg.up,
+        cfg.ref_normal);
+}
 
-    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                   SeasScenario<type> const& scenario) {
-        return std::make_unique<type>(std::move(cl), scenario.mu(), DGMethod::IP);
+template <std::size_t N>
+auto make_state_vecs(std::array<std::size_t, N> const& block_sizes,
+                     std::array<std::size_t, N> const& num_elements, MPI_Comm comm) {
+    std::array<std::unique_ptr<PetscVector>, N> state;
+    for (std::size_t n = 0; n < N; ++n) {
+        state[n] = std::make_unique<PetscVector>(block_sizes[n], num_elements[n], comm);
+    }
+    return state;
+}
+
+auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
+                 std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
+                 seas::Monitor& monitor, MPI_Comm comm) {
+    if (cfg.fault_output && cfg.domain_output) {
+        if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
+            throw std::runtime_error(
+                "Fault output prefix and domain output prefix must not be identical");
+        }
+    }
+    if (cfg.fault_probe_output) {
+        monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
+            cfg.fault_probe_output->prefix, cfg.fault_probe_output->probes,
+            cfg.fault_probe_output->make_adaptive_output_interval(), mesh, cl, fault_map, comm));
+    }
+    if (cfg.domain_probe_output) {
+        monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+            cfg.domain_probe_output->prefix, cfg.domain_probe_output->probes,
+            cfg.domain_probe_output->make_adaptive_output_interval(), mesh, cl, comm));
+    }
+    if (cfg.fault_output) {
+        monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
+            cfg.fault_output->prefix, cfg.fault_output->make_adaptive_output_interval(), mesh, cl,
+            PolynomialDegree, fault_map, comm));
+    }
+    if (cfg.fault_scalar_output) {
+        monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
+            cfg.fault_scalar_output->prefix,
+            cfg.fault_scalar_output->make_adaptive_output_interval(), comm));
+    }
+    if (cfg.domain_output) {
+        monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
+            cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh, cl,
+            PolynomialDegree, comm));
+    }
+}
+
+template <typename seas_t> struct operator_specifics;
+
+template <typename T> struct qd_operator_specifics {
+    using monitor_t = seas::MonitorQD;
+
+    static auto make(Config const& cfg, seas::ContextBase& ctx) {
+        auto seasop = std::make_shared<T>(std::move(ctx.dg()), std::move(ctx.adapter()),
+                                          std::move(ctx.friction()), cfg.matrix_free,
+                                          MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+        ctx.setup_seasop(*seasop);
+        seasop->warmup();
+        return seasop;
     }
 
-    static auto adapter(Config const& cfg, std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                        std::unique_ptr<RefElement<DomainDimension - 1u>> space,
-                        SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule) {
-        return std::make_unique<PoissonAdapter>(std::move(cl), std::move(space), quad_rule, cfg.up,
-                                                cfg.ref_normal);
+    static std::optional<double> cfl_time_step(T const&) { return std::nullopt; }
+
+    template <typename TimeSolver>
+    static auto displacement(double time, TimeSolver const& ts, T& seasop) {
+        seasop.update_internal_state(time, ts.state(0), true, false, true);
+        return seasop.displacement();
+    }
+
+    template <typename TimeSolver> static auto state(double, TimeSolver const& ts, T& seasop) {
+        return seasop.friction().raw_state(ts.state(0));
+    }
+
+    static void print_profile(T const&) {}
+};
+template <>
+struct operator_specifics<SeasQDOperator> : public qd_operator_specifics<SeasQDOperator> {};
+template <>
+struct operator_specifics<SeasQDDiscreteGreenOperator>
+    : public qd_operator_specifics<SeasQDDiscreteGreenOperator> {};
+
+template <> struct operator_specifics<SeasFDOperator> {
+    using monitor_t = seas::MonitorFD;
+
+    static auto make(Config const& cfg, seas::ContextBase& ctx) {
+        auto seasop = std::make_shared<SeasFDOperator>(
+            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()));
+        ctx.setup_seasop(*seasop);
+        return seasop;
+    }
+
+    static std::optional<double> cfl_time_step(SeasFDOperator const& seasop) {
+        return std::make_optional(seasop.cfl_time_step());
+    }
+
+    template <typename TimeSolver>
+    static auto displacement(double, TimeSolver const& ts, SeasFDOperator& seasop) {
+        return seasop.domain_function(ts.state(1));
+    }
+
+    template <typename TimeSolver>
+    static auto state(double, TimeSolver const& ts, SeasFDOperator& seasop) {
+        return seasop.friction().raw_state(ts.state(2));
+    }
+
+    static void print_profile(SeasFDOperator const& seasop) {
+        seasop.profile().print(std::cout, seasop.comm());
     }
 };
-template <> struct make_lop<SeasType::Elasticity> {
-    using type = Elasticity;
-    using adapter_type = ElasticityAdapter;
 
-    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                   SeasScenario<type> const& scenario) {
-        return std::make_unique<type>(std::move(cl), scenario.lam(), scenario.mu(), DGMethod::IP);
+template <typename seas_t>
+void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                        seas::ContextBase& ctx) {
+    auto seasop = operator_specifics<seas_t>::make(cfg, ctx);
+
+    auto ts =
+        PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
+                                                 seasop->num_local_elements(), seasop->comm()));
+
+    auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
+    if (cfl_time_step) {
+        ts.set_max_time_step(*cfl_time_step * cfg.cfl);
     }
 
-    static auto adapter(Config const& cfg, std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                        std::unique_ptr<RefElement<DomainDimension - 1u>> space,
-                        SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule) {
-        return std::make_unique<ElasticityAdapter>(std::move(cl), std::move(space), quad_rule,
-                                                   cfg.up, cfg.ref_normal);
-    }
-};
+    auto monitor =
+        std::make_unique<typename operator_specifics<seas_t>::monitor_t>(seasop, ts.fsal());
+    add_writers(cfg, mesh, ctx.cl, seasop->adapter().fault_map(), *monitor, seasop->comm());
+    monitor->write_static();
 
-template <SeasType Type, bool MakeGreen>
-void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    using adapter_lop_t = typename make_lop<Type>::adapter_type;
-    using adapter_t = AdapterOperator<adapter_lop_t>;
-    using dg_lop_t = typename make_lop<Type>::type;
-    using dg_t = DGOperator<dg_lop_t>;
-    using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
-    using friction_t = FrictionOperator<friction_lop_t>;
-    using seas_t =
-        std::conditional_t<MakeGreen, SeasQDDiscreteGreenOperator<adapter_t, dg_t, friction_t>,
-                           SeasQDOperator<adapter_t, dg_t, friction_t>>;
-    using seas_fault_probe_writer_t = SeasFaultProbeWriter<DomainDimension, seas_t>;
-    using seas_domain_probe_writer_t = SeasDomainProbeWriter<DomainDimension, seas_t>;
-    using seas_fault_writer_t = SeasFaultWriter<DomainDimension, seas_t>;
-    using seas_fault_scalar_writer_t = SeasFaultScalarWriter<seas_t>;
-    using seas_domain_writer_t = SeasDomainWriter<DomainDimension, seas_t>;
-    using seas_monitor_t = SeasMonitor<seas_t>;
-
-    int rank;
-    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
-
-    auto scenario = SeasScenario<dg_lop_t>(cfg.lib, cfg.scenario);
-    auto friction_scenario = DieterichRuinaAgeingScenario(cfg.lib, cfg.scenario);
-
-    auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
-                                                             PolynomialDegree);
-    auto fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
-    auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
-
-    auto dgop = std::make_unique<dg_t>(topo, make_lop<Type>::dg(cl, scenario));
-
-    auto friction =
-        std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
-    friction->lop().set_constant_params(friction_scenario.constant_params());
-    friction->lop().set_params(friction_scenario.param_fun());
-    if (friction_scenario.source_fun()) {
-        friction->lop().set_source_fun(*friction_scenario.source_fun());
-    }
-
-    auto adapter = std::make_unique<adapter_t>(
-        make_lop<Type>::adapter(cfg, cl, friction->lop().space().clone(),
-                                dgop->lop().facetQuadratureRule()),
-        topo, fault_map);
-    auto seasop =
-        std::make_shared<seas_t>(std::move(dgop), std::move(adapter), std::move(friction),
-                                 cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
-    if (scenario.boundary()) {
-        seasop->set_boundary(*scenario.boundary());
-    }
-    seasop->warmup();
-
-    auto ts = PetscTimeSolver(*seasop);
-
-    std::vector<std::unique_ptr<SeasWriter>> writers;
-    {
-        if (cfg.fault_output && cfg.domain_output) {
-            if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
-                throw std::runtime_error(
-                    "Fault output prefix and domain output prefix must not be identical");
-            }
-        }
-        if (cfg.fault_probe_output) {
-            writers.emplace_back(std::make_unique<seas_fault_probe_writer_t>(
-                cfg.fault_probe_output->prefix, cfg.fault_probe_output->probes,
-                cfg.fault_probe_output->make_adaptive_output_interval(), mesh, cl, seasop));
-        }
-        if (cfg.domain_probe_output) {
-            writers.emplace_back(std::make_unique<seas_domain_probe_writer_t>(
-                cfg.domain_probe_output->prefix, cfg.domain_probe_output->probes,
-                cfg.domain_probe_output->make_adaptive_output_interval(), mesh, cl, seasop));
-        }
-        if (cfg.fault_output) {
-            writers.emplace_back(std::make_unique<seas_fault_writer_t>(
-                cfg.fault_output->prefix, cfg.fault_output->make_adaptive_output_interval(), mesh,
-                cl, seasop, PolynomialDegree));
-        }
-        if (cfg.fault_scalar_output) {
-            writers.emplace_back(std::make_unique<seas_fault_scalar_writer_t>(
-                cfg.fault_scalar_output->prefix,
-                cfg.fault_scalar_output->make_adaptive_output_interval(), seasop));
-        }
-        if (cfg.domain_output) {
-            writers.emplace_back(std::make_unique<seas_domain_writer_t>(
-                cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh,
-                cl, seasop, PolynomialDegree));
-        }
-    }
-    auto monitor = std::make_unique<seas_monitor_t>(seasop, std::move(writers), ts.fsal());
     ts.set_monitor(*monitor);
 
-    const auto reduce_number = [&topo](std::size_t number) {
+    int rank;
+    MPI_Comm comm = seasop->comm();
+    MPI_Comm_rank(comm, &rank);
+
+    const auto reduce_number = [&comm](std::size_t number) {
         std::size_t number_global;
-        MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, topo->comm());
+        MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, comm);
         return number_global;
     };
     std::size_t num_dofs_domain = reduce_number(seasop->domain().number_of_local_dofs());
@@ -174,48 +202,61 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     if (rank == 0) {
         std::cout << "DOFs (domain): " << num_dofs_domain << std::endl;
         std::cout << "DOFs (fault): " << num_dofs_fault << std::endl;
+        if (cfl_time_step) {
+            std::cout << "CFL time step: " << *cfl_time_step << std::endl;
+        }
     }
 
     Stopwatch sw;
     sw.start();
     ts.solve(cfg.final_time);
-    double time = sw.stop();
+    double solve_time = sw.stop();
+
+    std::optional<double> L2_error_domain = std::nullopt;
+    auto domain_solution = ctx.domain_solution(cfg.final_time);
+    if (domain_solution) {
+        auto numeric = operator_specifics<seas_t>::displacement(cfg.final_time, ts, *seasop);
+        L2_error_domain =
+            tndm::Error<DomainDimension>::L2(*ctx.cl, numeric, *domain_solution, 0, seasop->comm());
+    }
+    std::optional<double> L2_error_fault = std::nullopt;
+    auto fault_solution = ctx.fault_solution(cfg.final_time);
+    if (fault_solution) {
+        auto numeric = operator_specifics<seas_t>::state(cfg.final_time, ts, *seasop);
+        L2_error_fault = tndm::Error<DomainDimension>::L2(
+            mesh, *ctx.cl, numeric, seasop->adapter().fault_map().localFctNos(), *fault_solution, 0,
+            seasop->comm());
+    }
+
+    if (rank == 0) {
+        std::cout << std::endl;
+    }
+    operator_specifics<seas_t>::print_profile(*seasop);
+    if (rank == 0) {
+        std::cout << std::endl;
+    }
 
     if (rank == 0) {
         auto date_time = std::time(nullptr);
         std::cout << "========= Summary =========" << std::endl;
         std::cout << "date_time=" << std::ctime(&date_time);
         std::cout << "code_version=" << VersionString << std::endl;
-        std::cout << "solve_time=" << time << std::endl;
+        std::cout << "solve_time=" << solve_time << std::endl;
         std::cout << "time_steps=" << ts.get_step_number() << std::endl;
         std::cout << "step_rejections=" << ts.get_step_rejections() << std::endl;
         std::cout << "min_time_step=" << monitor->min_time_step() << std::endl;
         std::cout << "max_time_step=" << monitor->max_time_step() << std::endl;
         std::cout << "dofs_domain=" << num_dofs_domain << std::endl;
         std::cout << "dofs_fault=" << num_dofs_fault << std::endl;
-    }
-
-    auto solution = scenario.solution(cfg.final_time);
-    if (solution) {
-        seasop->update_internal_state(cfg.final_time, ts.state(), true, false, true);
-        auto numeric = seasop->displacement();
-        double error =
-            tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "L2_error_domain=" << error << std::endl;
+        if (cfl_time_step) {
+            std::cout << "dt_cfl=" << *cfl_time_step << std::endl;
         }
-    }
-    auto fault_solution = friction_scenario.solution(cfg.final_time);
-    if (fault_solution) {
-        auto numeric = seasop->friction().raw_state(ts.state());
-        double error = tndm::Error<DomainDimension>::L2(
-            mesh, *cl, numeric, seasop->friction().fault_map().localFctNos(), *fault_solution, 0,
-            PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "L2_error_fault=" << error << std::endl;
+        if (L2_error_domain) {
+            std::cout << "L2_error_domain=" << *L2_error_domain << std::endl;
         }
-    }
-    if (rank == 0) {
+        if (L2_error_fault) {
+            std::cout << "L2_error_fault=" << *L2_error_fault << std::endl;
+        }
         std::cout << "===========================" << std::endl;
     }
 }
@@ -225,18 +266,30 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
-    if (cfg.type == SeasType::Poisson) {
-        if (cfg.discrete_green) {
-            detail::solve_seas_problem<SeasType::Poisson, true>(mesh, cfg);
-        } else {
-            detail::solve_seas_problem<SeasType::Poisson, false>(mesh, cfg);
-        }
-    } else if (cfg.type == SeasType::Elasticity) {
-        if (cfg.discrete_green) {
-            detail::solve_seas_problem<SeasType::Elasticity, true>(mesh, cfg);
-        } else {
-            detail::solve_seas_problem<SeasType::Elasticity, false>(mesh, cfg);
-        }
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg.type) {
+    case SeasType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg);
+        break;
+    case SeasType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+        break;
+    };
+    switch (cfg.mode) {
+    case SeasMode::QuasiDynamicDiscreteGreen:
+        detail::solve_seas_problem<SeasQDDiscreteGreenOperator>(mesh, cfg, *ctx);
+        break;
+    case SeasMode::QuasiDynamic:
+        detail::solve_seas_problem<SeasQDOperator>(mesh, cfg, *ctx);
+        break;
+    case SeasMode::FullyDynamic:
+        detail::solve_seas_problem<SeasFDOperator>(mesh, cfg, *ctx);
+        break;
+    default:
+        break;
     }
 }
 

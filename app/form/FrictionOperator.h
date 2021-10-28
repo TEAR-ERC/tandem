@@ -2,6 +2,7 @@
 #define FRICTIONOPERATOR_20210906_H
 
 #include "config.h"
+#include "form/AbstractFrictionOperator.h"
 
 #include "form/BoundaryMap.h"
 #include "form/DGOperatorTopo.h"
@@ -20,7 +21,7 @@
 
 namespace tndm {
 
-template <typename LocalOperator> class FrictionOperator {
+template <typename LocalOperator> class FrictionOperator : public AbstractFrictionOperator {
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
                      std::shared_ptr<BoundaryMap> fault_map)
@@ -35,16 +36,16 @@ public:
         lop_->end_preparation();
     }
 
-    std::size_t block_size() const { return lop_->block_size(); }
+    std::size_t block_size() const override { return lop_->block_size(); }
+    std::size_t slip_block_size() const override { return lop_->slip_block_size(); }
+    std::size_t num_local_elements() const override { return fault_map_->local_size(); }
+    double VMax_local() const override { return VMax_; }
     std::size_t num_elements() const { return fault_map_->size(); }
-    std::size_t num_local_elements() const { return fault_map_->local_size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& fault_map() const { return *fault_map_; }
-    std::size_t number_of_local_dofs() const { return num_local_elements() * block_size(); }
-    double VMax_local() const { return VMax_; }
     LocalOperator& lop() { return *lop_; }
 
-    void pre_init(BlockVector& state) {
+    void pre_init(BlockVector& state) override {
         auto state_handle = state.begin_access();
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto state_block = state_handle.subtensor(slice{}, faultNo);
@@ -53,7 +54,7 @@ public:
         state.end_access(state_handle);
     }
 
-    void init(BlockVector const& traction, BlockVector& state) {
+    void init(double time, BlockVector const& traction, BlockVector& state) override {
         auto traction_handle = traction.begin_access_readonly();
         auto state_handle = state.begin_access();
         VMax_ = 0.0;
@@ -61,7 +62,7 @@ public:
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
-            double VMax = lop_->init(faultNo, traction_block, state_block, scratch_);
+            double VMax = lop_->init(time, faultNo, traction_block, state_block, scratch_);
 
             VMax_ = std::max(VMax_, VMax);
         }
@@ -70,7 +71,7 @@ public:
     }
 
     void rhs(double time, BlockVector const& traction, BlockVector const& state,
-             BlockVector& result) {
+             BlockVector& result) override {
         auto traction_handle = traction.begin_access_readonly();
         auto state_handle = state.begin_access_readonly();
         auto result_handle = result.begin_access();
@@ -81,7 +82,7 @@ public:
             auto state_block = state_handle.subtensor(slice{}, faultNo);
             auto result_block = result_handle.subtensor(slice{}, faultNo);
             double VMax =
-                lop_->rhs(faultNo, time, traction_block, state_block, result_block, scratch_);
+                lop_->rhs(time, faultNo, traction_block, state_block, result_block, scratch_);
 
             VMax_ = std::max(VMax_, VMax);
         }
@@ -112,13 +113,14 @@ public:
         return soln;
     }
 
-    auto raw_state(BlockVector const& vector) {
+    auto raw_state(BlockVector const& vector)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
         auto range = Range<std::size_t>(0, num_local_elements());
         return raw_state(vector, range.begin(), range.end());
     }
 
     template <typename Iterator>
-    auto state(BlockVector const& traction, BlockVector const& state, Iterator first,
+    auto state(double time, BlockVector const& traction, BlockVector const& state, Iterator first,
                Iterator last) {
         auto num_elements = std::distance(first, last);
         auto soln = lop_->state_prototype(num_elements);
@@ -135,16 +137,26 @@ public:
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
-            lop_->state(faultNo, traction_block, state_block, value_matrix, scratch_);
+            lop_->state(time, faultNo, traction_block, state_block, value_matrix, scratch_);
         }
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
         return soln;
     }
 
-    auto state(BlockVector const& traction, BlockVector const& state_vec) {
-        auto range = Range<std::size_t>(0, num_local_elements());
-        return state(traction, state_vec, range.begin(), range.end());
+    auto state(double time, BlockVector const& traction, BlockVector const& state_vec,
+               std::vector<std::size_t> const& subset)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        return state(time, traction, state_vec, subset.begin(), subset.end());
+    }
+
+    auto state(double time, BlockVector const& traction, BlockVector const& state_vec,
+               std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        if (!range) {
+            *range = Range<std::size_t>(0, num_local_elements());
+        }
+        return state(time, traction, state_vec, range->begin(), range->end());
     }
 
     template <typename Iterator> auto params(Iterator first, Iterator last) {
@@ -164,9 +176,17 @@ public:
         return soln;
     }
 
-    auto params() {
-        auto range = Range<std::size_t>(0, num_local_elements());
-        return params(range.begin(), range.end());
+    auto params(std::vector<std::size_t> const& subset)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        return params(subset.begin(), subset.end());
+    }
+
+    auto params(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> FiniteElementFunction<DomainDimension - 1u> override {
+        if (!range) {
+            *range = Range<std::size_t>(0, num_local_elements());
+        }
+        return params(range->begin(), range->end());
     }
 
 private:

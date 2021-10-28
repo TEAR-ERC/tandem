@@ -1,5 +1,6 @@
 final_time = 94608000000
 mesh_file = "bp1_sym.msh"
+mode = "QD"
 type = "poisson"
 lib = "bp1.lua"
 scenario = "bp1_sym"

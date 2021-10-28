@@ -1,5 +1,6 @@
 final_time = 100.0
 resolution = 1
+mode = "QD"
 type = "elasticity"
 lib = "mms3.lua"
 scenario = "mms3"

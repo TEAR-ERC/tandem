@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    if (cfg->discrete_green && !cfg->boundary_linear) {
+    if (cfg->mode == SeasMode::QuasiDynamicDiscreteGreen && !cfg->boundary_linear) {
         std::cerr << "Discrete Green's function can only be used for linear Dirichlet boundaries."
                   << std::endl;
         return -1;

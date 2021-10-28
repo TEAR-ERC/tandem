@@ -25,12 +25,16 @@ public:
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     using functional_t = LuaLib::functional_t<DomainDimension, 1>;
     using time_functional_t = LuaLib::functional_t<DomainDimension + 1, NumQuantities>;
+    using vector_functional_t = LuaLib::functional_t<DomainDimension, NumQuantities>;
 
     constexpr static char Warp[] = "warp";
     constexpr static char Mu[] = "mu";
     constexpr static char Lam[] = "lam";
+    constexpr static char Rho[] = "rho";
     constexpr static char Boundary[] = "boundary";
     constexpr static char Solution[] = "solution";
+    constexpr static char InitialDisplacement[] = "initial_displacement";
+    constexpr static char InitialVelocity[] = "initial_velocity";
 
     SeasScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
@@ -44,6 +48,9 @@ public:
         if (lib_.hasMember(scenario, Lam)) {
             lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
         }
+        if (lib_.hasMember(scenario, Rho)) {
+            rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension, 1>(scenario, Rho));
+        }
 
         if (lib_.hasMember(scenario, Boundary)) {
             boundary_ = std::make_optional(
@@ -54,11 +61,22 @@ public:
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
                 lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario, Solution)));
         }
+
+        if (lib_.hasMember(scenario, InitialDisplacement)) {
+            u_ini_ = std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities>(
+                scenario, InitialDisplacement));
+        }
+
+        if (lib_.hasMember(scenario, InitialVelocity)) {
+            v_ini_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, InitialVelocity));
+        }
     }
 
     auto const& transform() const { return warp_; }
     auto const& mu() const { return mu_; }
     auto const& lam() const { return lam_; }
+    auto const& rho() const { return rho_; }
     auto const& boundary() const { return boundary_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
@@ -68,6 +86,8 @@ public:
         }
         return nullptr;
     }
+    auto const& initial_displacement() const { return u_ini_; }
+    auto const& initial_velocity() const { return v_ini_; }
 
 protected:
     LuaLib lib_;
@@ -78,8 +98,11 @@ protected:
     functional_t lam_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
         return {0.0};
     };
+    std::optional<functional_t> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
+    std::optional<vector_functional_t> u_ini_ = std::nullopt;
+    std::optional<vector_functional_t> v_ini_ = std::nullopt;
 };
 
 } // namespace tndm

@@ -2,10 +2,12 @@
 #define ADAPTEROPERATOR_20210906_H
 
 #include "config.h"
+#include "form/AbstractAdapterOperator.h"
 
 #include "form/BoundaryMap.h"
 #include "interface/BlockVector.h"
 #include "interface/BlockView.h"
+#include "localoperator/Adapter.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
@@ -19,12 +21,13 @@
 
 namespace tndm {
 
-template <typename LocalOperator> class AdapterOperator {
+template <typename LocalOperator> class AdapterOperator : public AbstractAdapterOperator {
 public:
-    AdapterOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
-                    std::shared_ptr<BoundaryMap> fault_map)
-        : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
-          scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
+    AdapterOperator(std::shared_ptr<LocalOperator> adapted_lop,
+                    std::unique_ptr<Adapter<LocalOperator>> lop,
+                    std::shared_ptr<DGOperatorTopo> topo, std::shared_ptr<BoundaryMap> fault_map)
+        : adapted_lop_(std::move(adapted_lop)), lop_(std::move(lop)), topo_(std::move(topo)),
+          fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
 
         scratch_.reset();
         lop_->begin_preparation(num_elements());
@@ -35,13 +38,15 @@ public:
         lop_->end_preparation();
     }
 
+    BoundaryMap const& fault_map() const override { return *fault_map_; }
+    std::size_t num_local_elements() const override { return fault_map_->local_size(); }
+    std::size_t traction_block_size() const override { return lop_->traction_block_size(); }
+    MPI_Comm comm() const override { return topo_->comm(); }
     std::size_t num_elements() const { return fault_map_->size(); }
-    std::size_t num_local_elements() const { return fault_map_->local_size(); }
-    BoundaryMap const& fault_map() const { return *fault_map_; }
-    LocalOperator const& lop() const { return *lop_; }
-    MPI_Comm comm() const { return topo_->comm(); }
+    Adapter<LocalOperator> const& lop() const { return *lop_; }
 
-    auto slip_bc(BlockView const& state) {
+    auto slip_bc(BlockView const& state)
+        -> std::function<void(std::size_t, Matrix<double>&, bool)> override {
         return [this, &state](std::size_t fctNo, Matrix<double>& f_q, bool) {
             auto faultNo = fault_map_->bndNo(fctNo);
             auto state_block = state.get_block(faultNo);
@@ -49,9 +54,8 @@ public:
         };
     }
 
-    template <typename DGOp>
-    void traction(DGOp& dgop, BlockView const& displacement, BlockVector& result) {
-        auto traction_q = Managed<Matrix<double>>(dgop.lop().tractionResultInfo().shape(),
+    void traction(BlockView const& displacement, BlockVector& result) override {
+        auto traction_q = Managed<Matrix<double>>(adapted_lop_->tractionResultInfo().shape(),
                                                   std::size_t{ALIGNMENT});
 
         scratch_.reset();
@@ -62,9 +66,9 @@ public:
             auto u0 = displacement.get_block(info.up[0]);
             auto u1 = displacement.get_block(info.up[1]);
             if (info.up[0] == info.up[1]) {
-                dgop.lop().traction_boundary(fctNo, info, u0, traction_q);
+                adapted_lop_->traction_boundary(fctNo, info, u0, traction_q);
             } else {
-                dgop.lop().traction_skeleton(fctNo, info, u0, u1, traction_q);
+                adapted_lop_->traction_skeleton(fctNo, info, u0, u1, traction_q);
             }
 
             auto result_block = result_handle.subtensor(slice{}, faultNo);
@@ -74,7 +78,8 @@ public:
     }
 
 private:
-    std::unique_ptr<LocalOperator> lop_;
+    std::shared_ptr<LocalOperator> adapted_lop_;
+    std::unique_ptr<Adapter<LocalOperator>> lop_;
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;

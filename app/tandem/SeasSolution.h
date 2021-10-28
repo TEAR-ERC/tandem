@@ -1,7 +1,13 @@
 #ifndef SEASSOLUTION_20210719_H
 #define SEASSOLUTION_20210719_H
 
+#include "config.h"
+
 #include "script/LuaLib.h"
+#include "tensor/Tensor.h"
+
+#include <array>
+#include <cstddef>
 
 namespace tndm {
 

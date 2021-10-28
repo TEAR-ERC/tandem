@@ -1,6 +1,8 @@
 #ifndef SCALARWRITER_20210721_H
 #define SCALARWRITER_20210721_H
 
+#include <mneme/span.hpp>
+
 #include <cstddef>
 #include <fstream>
 #include <string>
@@ -16,7 +18,7 @@ public:
         file_name_ += ".dat";
     }
 
-    void write(double time, double* scalar, std::size_t num_scalars) const;
+    void write(double time, mneme::span<double> scalars) const;
 
 private:
     void write_header(std::ofstream& file) const;

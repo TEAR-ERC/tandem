@@ -1,8 +1,7 @@
-#ifndef POISSONADAPTER_20210906_H
-#define POISSONADAPTER_20210906_H
+#ifndef ADAPTER_20210910_H
+#define ADAPTER_20210910_H
 
 #include "localoperator/AdapterBase.h"
-#include "localoperator/Poisson.h"
 
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
@@ -11,10 +10,10 @@
 
 namespace tndm {
 
-class PoissonAdapter : public AdapterBase {
+template <typename T> class Adapter : public AdapterBase {
 public:
     using AdapterBase::AdapterBase;
-    using local_operator_t = Poisson;
+    using local_operator_t = T;
 
     std::size_t traction_block_size() const;
     void traction(std::size_t faultNo, Matrix<double> const& traction_q, Vector<double>& traction,
@@ -24,4 +23,4 @@ public:
 
 } // namespace tndm
 
-#endif // POISSONADAPTER_20210906_H
+#endif // ADAPTER_20210910_H

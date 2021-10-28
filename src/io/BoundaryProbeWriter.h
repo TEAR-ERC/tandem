@@ -7,6 +7,7 @@
 #include "io/Probe.h"
 #include "mesh/LocalSimplexMesh.h"
 
+#include <mneme/span.hpp>
 #include <mpi.h>
 
 #include <cstddef>
@@ -24,11 +25,12 @@ public:
                         LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                         BoundaryMap const& bnd_map, MPI_Comm comm);
 
-    void write(double time, FiniteElementFunction<D - 1> const& function) const;
+    void write(double time, mneme::span<FiniteElementFunction<D - 1>> functions) const;
 
     auto begin() const { return bndNos_.begin(); }
     auto end() const { return bndNos_.end(); }
     auto num_probes() const { return probes_.size(); }
+    std::vector<std::size_t> const& bndNos() const { return bndNos_; }
 
 private:
     struct ProbeMeta {
@@ -40,7 +42,7 @@ private:
     };
 
     void write_header(std::ofstream& file, ProbeMeta const& p,
-                      FiniteElementFunction<D - 1> const& function) const;
+                      mneme::span<FiniteElementFunction<D - 1>> functions) const;
 
     std::vector<std::size_t> bndNos_;
     std::vector<ProbeMeta> probes_;

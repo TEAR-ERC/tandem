@@ -55,7 +55,7 @@ ProbeWriter<D>::ProbeWriter(std::string_view prefix, std::vector<Probe<D>> const
 
 template <std::size_t D>
 void ProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& p,
-                                  FiniteElementFunction<D> const& function) const {
+                                  mneme::span<FiniteElementFunction<D>> functions) const {
     file << "TITLE = \"Station " << p.name << " (x = [";
     for (std::size_t d = 0; d < D; ++d) {
         file << p.x[d] << ", ";
@@ -63,30 +63,34 @@ void ProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& p,
     file.seekp(-2, std::ios::cur);
     file << "])\"" << std::endl;
     file << "VARIABLES = \"Time\"";
-    for (std::size_t q = 0; q < function.numQuantities(); ++q) {
-        file << ",\"" << function.name(q) << "\"";
+    for (auto const& function : functions) {
+        for (std::size_t q = 0; q < function.numQuantities(); ++q) {
+            file << ",\"" << function.name(q) << "\"";
+        }
     }
     file << std::endl;
 }
 
 template <std::size_t D>
-void ProbeWriter<D>::write(double time, FiniteElementFunction<D> const& function) const {
-    auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
+void ProbeWriter<D>::write(double time, mneme::span<FiniteElementFunction<D>> functions) const {
     for (auto const& probe : probes_) {
         std::ofstream file;
         if (time <= 0.0) {
             file.open(probe.file_name, std::ios::out);
-            write_header(file, probe, function);
+            write_header(file, probe, functions);
         } else {
             file.open(probe.file_name, std::ios::app);
         }
 
-        auto E = function.evaluationMatrix({probe.xi});
-        function.map(probe.no, E, result);
         file << std::scientific << std::setprecision(15);
         file << time;
-        for (std::size_t p = 0; p < function.numQuantities(); ++p) {
-            file << " " << result(0, p);
+        for (auto const& function : functions) {
+            auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
+            auto E = function.evaluationMatrix({probe.xi});
+            function.map(probe.no, E, result);
+            for (std::size_t p = 0; p < function.numQuantities(); ++p) {
+                file << " " << result(0, p);
+            }
         }
         file << std::endl;
         file.close();

@@ -8,90 +8,106 @@
 #include <petscts.h>
 #include <petscvec.h>
 
+#include <array>
+#include <cassert>
 #include <memory>
+#include <tuple>
 
 namespace tndm {
 
-class PetscTimeSolver {
+class PetscTimeSolverBase {
 public:
-    template <typename TimeOp> PetscTimeSolver(TimeOp& timeop) {
-        state_ = std::make_unique<PetscVector>(timeop.block_size(), timeop.num_local_elements(),
-                                               timeop.comm());
-        timeop.initial_condition(*state_);
+    PetscTimeSolverBase(MPI_Comm comm);
+    ~PetscTimeSolverBase();
 
-        CHKERRTHROW(TSCreate(timeop.comm(), &ts_));
-        CHKERRTHROW(TSSetProblemType(ts_, TS_NONLINEAR));
-        CHKERRTHROW(TSSetSolution(ts_, state_->vec()));
-        CHKERRTHROW(TSSetRHSFunction(ts_, nullptr, RHSFunction<TimeOp>, &timeop));
-        CHKERRTHROW(TSSetExactFinalTime(ts_, TS_EXACTFINALTIME_MATCHSTEP));
-        CHKERRTHROW(TSSetFromOptions(ts_));
+    std::size_t get_step_number() const;
+    std::size_t get_step_rejections() const;
+    inline bool fsal() const { return fsal_; }
+    void set_max_time_step(double dt);
 
-        TSType time_scheme;
-        CHKERRTHROW(TSGetType(ts_, &time_scheme));
+protected:
+    TS ts_ = nullptr;
+    bool fsal_;
+};
 
-        // Check whether time integrator has First Same As Last (FSAL) property
-        switch (fnv1a(time_scheme)) {
-        case HASH_DEF(TSRK): {
-            PetscBool FSAL;
-            CHKERRTHROW(TSRKGetTableau(ts_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                       nullptr, &FSAL));
-            fsal_ = FSAL == PETSC_TRUE;
-            break;
+template <std::size_t NumStateVecs> class PetscTimeSolver : public PetscTimeSolverBase {
+public:
+    template <typename TimeOp>
+    PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state)
+        : PetscTimeSolverBase(timeop.comm()), state_(std::move(state)) {
+
+        Vec x[NumStateVecs];
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            x[n] = state_[n]->vec();
         }
-        default:
-            fsal_ = false;
-            break;
-        };
+        MPI_Comm comm;
+        CHKERRTHROW(VecCreateNest(timeop.comm(), NumStateVecs, nullptr, x, &ts_state_));
+
+        std::apply([&timeop](auto&... x) { timeop.initial_condition((*x)...); }, state_);
+
+        CHKERRTHROW(TSSetSolution(ts_, ts_state_));
+        CHKERRTHROW(TSSetRHSFunction(ts_, nullptr, RHSFunction<TimeOp>, &timeop));
     }
-    ~PetscTimeSolver() { TSDestroy(&ts_); }
+    ~PetscTimeSolver() { VecDestroy(&ts_state_); }
 
     void solve(double upcoming_time) {
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
-        CHKERRTHROW(TSSolve(ts_, state_->vec()));
+        CHKERRTHROW(TSSolve(ts_, ts_state_));
     }
 
-    std::size_t get_step_number() const {
-        PetscInt steps;
-        CHKERRTHROW(TSGetStepNumber(ts_, &steps));
-        return steps;
+    auto& state(std::size_t idx) {
+        assert(idx < NumStateVecs);
+        return *state_[idx];
     }
-
-    std::size_t get_step_rejections() const {
-        PetscInt rejects;
-        CHKERRTHROW(TSGetStepRejections(ts_, &rejects));
-        return rejects;
+    auto const& state(std::size_t idx) const {
+        assert(idx < NumStateVecs);
+        return *state_[idx];
     }
-
-    auto& state() { return *state_; }
-    auto const& state() const { return *state_; }
 
     template <class Monitor> void set_monitor(Monitor& monitor) {
         CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, &monitor, nullptr));
     }
 
-    bool fsal() const { return fsal_; }
-
 private:
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
         TimeOp* self = reinterpret_cast<TimeOp*>(ctx);
-        auto u_view = PetscVectorView(u);
-        auto F_view = PetscVectorView(F);
-        self->rhs(t, u_view, F_view);
+
+        std::array<Vec, 2 * NumStateVecs> x;
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
+            CHKERRTHROW(VecNestGetSubVec(F, n, &x[NumStateVecs + n]));
+        }
+        auto x_view = std::apply(
+            [](auto&... x) -> std::array<PetscVectorView, 2 * NumStateVecs> {
+                return {PetscVectorView(x)...};
+            },
+            x);
+
+        std::apply([&self, &t](auto&... xv) { self->rhs(t, xv...); }, x_view);
         return 0;
     }
 
     template <class Monitor>
     static PetscErrorCode MonitorFunction(TS ts, PetscInt steps, PetscReal time, Vec u, void* ctx) {
         Monitor* self = reinterpret_cast<Monitor*>(ctx);
-        auto u_view = PetscVectorView(u);
-        self->monitor(time, u_view);
+
+        std::array<Vec, NumStateVecs> x;
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
+        }
+        auto x_view = std::apply(
+            [](auto&... x) -> std::array<PetscVectorView, NumStateVecs> {
+                return {PetscVectorView(x)...};
+            },
+            x);
+
+        std::apply([&self, &time](auto&... xv) { self->monitor(time, xv...); }, x_view);
         return 0;
     }
 
-    std::unique_ptr<PetscVector> state_;
-    TS ts_ = nullptr;
-    bool fsal_;
+    std::array<std::unique_ptr<PetscVector>, NumStateVecs> state_;
+    Vec ts_state_ = nullptr;
 };
 
 } // namespace tndm

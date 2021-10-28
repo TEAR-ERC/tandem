@@ -27,13 +27,14 @@ namespace tndm {
 class AdapterBase {
 public:
     AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                std::unique_ptr<RefElement<DomainDimension - 1u>> space,
+                RefElement<DomainDimension - 1u> const& space,
                 SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule,
                 std::array<double, DomainDimension> const& up,
                 std::array<double, DomainDimension> const& ref_normal);
 
-    std::size_t scratch_mem_size() const {
-        return quad_rule_.size() * (2 * DomainDimension * DomainDimension + DomainDimension + 1);
+    inline std::size_t scratch_mem_size() const {
+        return quad_rule_.size() * (2 * DomainDimension * DomainDimension + DomainDimension + 1) +
+               nbf_ * nbf_;
     }
     auto ref_normal() const { return ref_normal_; }
 
@@ -43,30 +44,39 @@ public:
 
 protected:
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;
-    std::unique_ptr<RefElement<DomainDimension - 1u>> space_;
     SimplexQuadratureRule<DomainDimension - 1u> quad_rule_;
     std::array<double, DomainDimension> up_;
     std::array<double, DomainDimension> ref_normal_;
 
     // Basis
+    std::size_t nbf_;
     std::vector<Managed<Tensor<double, 3u>>> geoDxi_q;
     Managed<Matrix<double>> e_q;
     Managed<Matrix<double>> e_q_T;
-    Managed<Matrix<double>> minv;
 
     struct SignFlipped {
         using type = bool;
     };
-    struct UnitNormal {
+    struct Normal {
         using type = std::array<double, DomainDimension>;
+    };
+    struct NormalLength {
+        using type = double;
     };
     struct FaultBasis {
         using type = std::array<double, DomainDimension * DomainDimension>;
     };
+    struct MInv {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
 
     using fault_t =
-        mneme::MultiStorage<mneme::DataLayout::SoA, SignFlipped, UnitNormal, FaultBasis>;
+        mneme::MultiStorage<mneme::DataLayout::SoA, SignFlipped, Normal, NormalLength, FaultBasis>;
     mneme::StridedView<fault_t> fault_;
+
+    using mass_t = mneme::MultiStorage<mneme::DataLayout::SoA, MInv>;
+    mneme::StridedView<mass_t> mass_;
 };
 
 } // namespace tndm

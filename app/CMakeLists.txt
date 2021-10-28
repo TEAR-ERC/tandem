@@ -161,10 +161,14 @@ set(APP_COMMON_SRCS
     common/MeshConfig.cpp
     common/MGConfig.cpp
     common/PetscDGMatrix.cpp
+    common/PetscDGShell.cpp
     common/PetscInterplMatrix.cpp
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
+    form/SeasFDOperator.cpp
+    form/SeasQDOperator.cpp
+    form/SeasQDDiscreteGreenOperator.cpp
     localoperator/AdapterBase.cpp
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
@@ -202,6 +206,7 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 ## Tandem
 
 add_executable(tandem
+    tandem/Monitor.cpp
     tandem/SeasConfig.cpp
     tandem/SEAS.cpp
     tandem.cpp)

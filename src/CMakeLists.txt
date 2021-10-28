@@ -45,9 +45,12 @@ add_library(tandem-lib
     parallel/Affinity.cpp
     parallel/CommPattern.cpp
     parallel/MetisPartitioner.cpp
+    parallel/Profile.cpp
     parallel/ScatterPlan.cpp
     parallel/SortedDistribution.cpp
+    parallel/Summary.cpp
     script/LuaLib.cpp
+    util/TablePrinter.cpp
     util/Zero.cpp
 )
 

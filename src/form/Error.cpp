@@ -10,7 +10,7 @@
 namespace tndm {
 
 template <std::size_t D>
-double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+double Error<D>::L2(Curvilinear<D> const& cl, FiniteElementFunction<D> const& numeric,
                     SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
     auto rule = simplexQuadratureRule<D>(MinQuadratureOrder);
 
@@ -50,7 +50,7 @@ double Error<D>::L2(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
 }
 
 template <std::size_t D>
-double Error<D>::L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
+double Error<D>::L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D> const& cl,
                     FiniteElementFunction<D - 1> const& numeric,
                     std::vector<std::size_t> const& fctNos, SolutionInterface const& reference,
                     int targetRank, MPI_Comm comm) {
@@ -118,7 +118,7 @@ double Error<D>::L2(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl,
 }
 
 template <std::size_t D>
-double Error<D>::H1_semi(Curvilinear<D>& cl, FiniteElementFunction<D> const& numeric,
+double Error<D>::H1_semi(Curvilinear<D> const& cl, FiniteElementFunction<D> const& numeric,
                          SolutionInterface const& reference, int targetRank, MPI_Comm comm) {
     auto rule = simplexQuadratureRule<D>(MinQuadratureOrder);
 

@@ -1,0 +1,20 @@
+final_time = 0.01
+resolution = 1
+lib = "plane_wave.lua"
+scenario = "plane_wave"
+mode = "FD"
+type = "elasticity"
+ref_normal = [1, 0, 0]
+boundary_linear = true
+
+[generate_mesh]
+intercepts = [
+    [0, 1],
+    [0, 1],
+    [0, 1]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]

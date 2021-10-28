@@ -14,7 +14,7 @@ BP5.h_t = 2.0
 BP5.H = 12.0
 BP5.w = 12.0
 BP5.l = 60
-BP5.rho = 2.670
+BP5.rho0 = 2.670
 BP5.cs = 3.464
 BP5.nu = 0.25
 
@@ -35,7 +35,7 @@ function BP5:boundary(x, y, z, t)
 end
 
 function BP5:mu(x, y, z)
-    return self.cs^2 * self.rho
+    return self.cs^2 * self.rho0
 end
 
 function BP5:lam(x, y, z)
@@ -43,7 +43,7 @@ function BP5:lam(x, y, z)
 end
 
 function BP5:eta(x, y, z)
-    return self.cs * self.rho / 2.0
+    return self.cs * self.rho0 / 2.0
 end
 
 function BP5:in_nucleation(x, y, z)

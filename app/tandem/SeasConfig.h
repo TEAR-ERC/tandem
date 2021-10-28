@@ -72,7 +72,9 @@ struct Config {
     std::optional<double> resolution;
     double final_time;
     std::optional<std::string> mesh_file;
+    double cfl;
 
+    SeasMode mode;
     SeasType type;
     std::string lib;
     std::string scenario;
@@ -80,7 +82,6 @@ struct Config {
     std::array<double, DomainDimension> ref_normal;
     bool boundary_linear;
 
-    bool discrete_green;
     bool matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;

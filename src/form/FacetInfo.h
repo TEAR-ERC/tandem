@@ -9,6 +9,8 @@
 namespace tndm {
 
 struct SideInfo {
+    std::size_t fctNo;
+    int side;
     std::size_t lid;
     std::size_t localNo;
     BC bc;

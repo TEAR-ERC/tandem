@@ -26,6 +26,8 @@ public:
         std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
     using source_fun_t =
         std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
+    using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
+        std::array<double, DomainDimension + 1> const&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -40,16 +42,19 @@ public:
     }
 
     void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }
+    void set_delta_tau_fun(delta_tau_fun_t delta_tau) {
+        delta_tau_ = std::make_optional(std::move(delta_tau));
+    }
 
     void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator<double>&) const;
-    double init(std::size_t faultNo, Vector<double const> const& traction, Vector<double>& state,
-                LinearAllocator<double>&) const;
+    double init(double time, std::size_t faultNo, Vector<double const> const& traction,
+                Vector<double>& state, LinearAllocator<double>&) const;
 
-    double rhs(std::size_t faultNo, double time, Vector<double const> const& traction,
+    double rhs(double time, std::size_t faultNo, Vector<double const> const& traction,
                Vector<double const>& state, Vector<double>& result, LinearAllocator<double>&) const;
 
     auto state_prototype(std::size_t numLocalElements) const;
-    void state(std::size_t faultNo, Vector<double const> const& traction,
+    void state(double time, std::size_t faultNo, Vector<double const> const& traction,
                Vector<double const>& state, Matrix<double>& result, LinearAllocator<double>&) const;
     auto params_prototype(std::size_t numLocalElements) const;
     void params(std::size_t faultNo, Matrix<double>& result, LinearAllocator<double>&) const;
@@ -70,9 +75,17 @@ private:
         }
         return result;
     }
+    auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
+        auto x = fault_[faultNo].template get<Coords>()[node];
+        std::array<double, DomainDimension + 1> xt;
+        std::copy(x.begin(), x.end(), xt.begin());
+        xt.back() = time;
+        return (*delta_tau_)(xt);
+    }
 
     Law law_;
     std::optional<source_fun_t> source_;
+    std::optional<delta_tau_fun_t> delta_tau_;
 };
 
 template <class Law>
@@ -90,8 +103,9 @@ void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
 }
 
 template <class Law>
-double RateAndState<Law>::init(std::size_t faultNo, Vector<double const> const& traction,
-                               Vector<double>& state, LinearAllocator<double>&) const {
+double RateAndState<Law>::init(double time, std::size_t faultNo,
+                               Vector<double const> const& traction, Vector<double>& state,
+                               LinearAllocator<double>&) const {
     double VMax = 0.0;
     auto s_mat = state_mat(state);
     auto t_mat = traction_mat(traction);
@@ -100,6 +114,9 @@ double RateAndState<Law>::init(std::size_t faultNo, Vector<double const> const& 
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
         auto tau = get_tau(node, t_mat);
+        if (delta_tau_) {
+            tau = tau + get_delta_tau(time, faultNo, node);
+        }
         auto psi = law_.psi_init(index + node, sn, tau);
         double V = norm(law_.slip_rate(index + node, sn, tau, psi));
         VMax = std::max(VMax, V);
@@ -109,7 +126,7 @@ double RateAndState<Law>::init(std::size_t faultNo, Vector<double const> const& 
 }
 
 template <class Law>
-double RateAndState<Law>::rhs(std::size_t faultNo, double time,
+double RateAndState<Law>::rhs(double time, std::size_t faultNo,
                               Vector<double const> const& traction, Vector<double const>& state,
                               Vector<double>& result, LinearAllocator<double>&) const {
     double VMax = 0.0;
@@ -121,7 +138,11 @@ double RateAndState<Law>::rhs(std::size_t faultNo, double time,
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
         auto psi = s_mat(node, PsiIndex);
-        auto Vi = law_.slip_rate(index + node, sn, get_tau(node, t_mat), psi);
+        auto tau = get_tau(node, t_mat);
+        if (delta_tau_) {
+            tau = tau + get_delta_tau(time, faultNo, node);
+        }
+        auto Vi = law_.slip_rate(index + node, sn, tau, psi);
         double V = norm(Vi);
         VMax = std::max(VMax, V);
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
@@ -165,9 +186,9 @@ template <class Law> auto RateAndState<Law>::state_prototype(std::size_t numLoca
 }
 
 template <class Law>
-void RateAndState<Law>::state(std::size_t faultNo, Vector<double const> const& traction,
-                              Vector<double const>& state, Matrix<double>& result,
-                              LinearAllocator<double>&) const {
+void RateAndState<Law>::state(double time, std::size_t faultNo,
+                              Vector<double const> const& traction, Vector<double const>& state,
+                              Matrix<double>& result, LinearAllocator<double>&) const {
     auto s_mat = state_mat(state);
     auto t_mat = traction_mat(traction);
     std::size_t nbf = space_.numBasisFunctions();
@@ -175,6 +196,9 @@ void RateAndState<Law>::state(std::size_t faultNo, Vector<double const> const& t
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
         auto tau = get_tau(node, t_mat);
+        if (delta_tau_) {
+            tau = tau + get_delta_tau(time, faultNo, node);
+        }
         auto psi = s_mat(node, PsiIndex);
         auto V = law_.slip_rate(index + node, sn, tau, psi);
         auto tau_hat = law_.tau_hat(index + node, tau, V);

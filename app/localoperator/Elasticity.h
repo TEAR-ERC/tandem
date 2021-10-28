@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -35,7 +36,8 @@ public:
     constexpr static std::size_t NumQuantities = DomainDimension;
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu, DGMethod method = DGMethod::BR2);
+               functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
+               DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
@@ -52,6 +54,8 @@ public:
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch);
     void prepare_volume_post_skeleton(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAllocator<double>&);
+    void prepare_cfl(std::size_t elNo, mneme::span<SideInfo> info, LinearAllocator<double>&);
 
     bool assemble_volume(std::size_t elNo, Matrix<double>& A00,
                          LinearAllocator<double>& scratch) const;
@@ -69,6 +73,10 @@ public:
 
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
+    void wave_rhs(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+                  std::array<Vector<double const>, NumFacets> const& x_n,
+                  Vector<double>& y_0) const;
+    void project(std::size_t elNo, volume_functional_t x, Vector<double>& y) const;
 
     std::size_t flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const;
 
@@ -77,6 +85,8 @@ public:
                            Vector<double const>& u1, Matrix<double>& result) const;
     void traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double const>& u0,
                            Matrix<double>& result) const;
+
+    inline double cfl_time_step(std::size_t elNo) const { return cfl_dt_[elNo]; }
 
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         auto names = std::vector<std::string>(NumQuantities);
@@ -114,18 +124,23 @@ public:
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
 
 private:
-    double penalty(std::size_t elNo0, std::size_t elNo1) const {
+    template <bool WithRHS>
+    void apply_(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
+                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
+
+    double penalty(std::size_t fctNo) const {
         if (method_ == DGMethod::BR2) {
             return NumFacets;
         }
-        return std::max(base::penalty[elNo0], base::penalty[elNo1]);
+        return penalty_[fctNo];
     }
-    double penalty(FacetInfo const& info) const { return penalty(info.up[0], info.up[1]); }
+    std::pair<double, double> stiffness_tensor_bounds(std::size_t elNo) const;
+    double inverse_density_upper_bound(std::size_t elNo) const;
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
-    void copy_lam_mu(std::size_t fctNo, FacetInfo const& info, int side);
+    void transpose_JInv(std::size_t fctNo, int side);
 
     DGMethod method_;
 
@@ -153,9 +168,10 @@ private:
     // Input
     volume_functional_t fun_lam;
     volume_functional_t fun_mu;
-    volume_functional_t fun_force;
-    facet_functional_t fun_dirichlet;
-    facet_functional_t fun_slip;
+    volume_functional_t fun_rho;
+    std::optional<volume_functional_t> fun_force = std::nullopt;
+    std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
+    std::optional<facet_functional_t> fun_slip = std::nullopt;
 
     // Precomputed data
     struct lam {
@@ -166,11 +182,19 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct rhoInv {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
     struct lam_W_J_Q {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu_W_J_Q {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct negative_rhoInv_W_Jinv_Q {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -194,18 +218,28 @@ private:
         using type = std::array<double, Dim * Dim>;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct JInvT0 {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct JInvT1 {
+        using type = std::array<double, Dim * Dim>;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
 
-    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu>;
+    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, rhoInv>;
     mneme::StridedView<material_vol_t> material;
 
-    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q, JInvT>;
+    using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q,
+                                          negative_rhoInv_W_Jinv_Q, JInvT>;
     mneme::StridedView<vol_pre_t> volPre;
 
-    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1>;
+    using fct_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, lam_q_1, mu_q_1,
+                                          JInvT0, JInvT1>;
     mneme::StridedView<fct_pre_t> fctPre;
 
-    using fct_on_vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu_q_0, JInvT>;
-    mneme::StridedView<fct_on_vol_pre_t> fct_on_vol_pre;
+    std::vector<double> penalty_;
+    std::vector<double> cfl_dt_;
 
     // Options
     constexpr static double epsilon = -1.0;

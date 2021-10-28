@@ -37,7 +37,7 @@ public:
 
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
-        auto poisson = std::make_unique<Poisson>(std::move(cl), coefficient_, method);
+        auto poisson = std::make_shared<Poisson>(std::move(cl), coefficient_, method);
         set(*poisson);
         return poisson;
     }
