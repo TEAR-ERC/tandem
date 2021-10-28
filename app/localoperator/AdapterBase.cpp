@@ -5,7 +5,11 @@
 #include "form/FacetInfo.h"
 #include "form/RefElement.h"
 #include "geometry/Vector.h"
+#include "tensor/EigenMap.h"
 #include "tensor/Utility.h"
+
+#include <Eigen/Core>
+#include <Eigen/LU>
 
 #include <memory>
 #include <stdexcept>
@@ -18,11 +22,11 @@ AdapterBase::AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                          SimplexQuadratureRule<DomainDimension - 1u> const& quad_rule,
                          std::array<double, DomainDimension> const& up,
                          std::array<double, DomainDimension> const& ref_normal)
-    : cl_(std::move(cl)), quad_rule_(quad_rule), up_(up), ref_normal_(ref_normal) {
+    : cl_(std::move(cl)), quad_rule_(quad_rule), up_(up), ref_normal_(ref_normal),
+      nbf_(space.numBasisFunctions()) {
 
     e_q = space.evaluateBasisAt(quad_rule_.points());
     e_q_T = space.evaluateBasisAt(quad_rule_.points(), {1, 0});
-    minv = space.inverseMassMatrix();
 
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto facetParam = cl_->facetParam(f, quad_rule_.points());
@@ -33,6 +37,8 @@ AdapterBase::AdapterBase(std::shared_ptr<Curvilinear<DomainDimension>> cl,
 void AdapterBase::begin_preparation(std::size_t numFaultFaces) {
     auto nq = quad_rule_.size();
     fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nq), 0u, numFaultFaces, nq);
+    auto nbf2 = nbf_ * nbf_;
+    mass_.setStorage(std::make_shared<mass_t>(numFaultFaces * nbf2), 0u, numFaultFaces, nbf2);
 }
 
 void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
@@ -42,18 +48,22 @@ void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
     auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
     auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
     auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nq));
-    auto normal = Tensor(fault_[faultNo].template get<UnitNormal>().data()->data(),
-                         cl_->normalResultInfo(nq));
+    auto normal =
+        Tensor(fault_[faultNo].template get<Normal>().data()->data(), cl_->normalResultInfo(nq));
+    auto& nl = fault_[faultNo].template get<NormalLength>();
     auto fault_basis_q = Tensor(fault_[faultNo].template get<FaultBasis>().data()->data(),
                                 cl_->facetBasisResultInfo(nq));
+    auto m = make_scratch_tensor<Matrix<double>>(scratch, nbf_, nbf_);
+    auto mInv = Matrix<double>(mass_[faultNo].template get<MInv>().data(), nbf_, nbf_);
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, JInv);
     cl_->normal(info.localNo[0], detJ, JInv, normal);
-    cl_->normalize(normal);
     for (std::size_t i = 0; i < nq; ++i) {
         auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
-        auto& normal_i = fault_[faultNo].template get<UnitNormal>()[i];
+        auto& normal_i = fault_[faultNo].template get<Normal>()[i];
+        nl[i] = norm(normal_i);
+
         auto n_ref_dot_n = dot(ref_normal_, normal_i);
         if (std::fabs(n_ref_dot_n) < 10000.0 * std::numeric_limits<double>::epsilon()) {
             throw std::logic_error("Normal and reference normal are almost perpendicular.");
@@ -73,6 +83,18 @@ void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
             }
         }
     }
+
+    auto const& w = quad_rule_.weights();
+    for (std::size_t i = 0; i < nbf_; ++i) {
+        for (std::size_t j = 0; j < nbf_; ++j) {
+            m(i, j) = 0.0;
+            for (std::size_t q = 0; q < nq; ++q) {
+                m(i, j) += w[q] * nl[q] * e_q(i, q) * e_q(j, q);
+            }
+        }
+    }
+    EigenMap(mInv) = EigenMap(m).inverse();
+
     scratch.reset();
 }
 

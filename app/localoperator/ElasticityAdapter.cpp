@@ -26,7 +26,8 @@ void Adapter<Elasticity>::traction(std::size_t faultNo, Matrix<double> const& tr
     krnl.e_q_T = e_q_T.data();
     krnl.fault_basis_q = fault_[faultNo].template get<FaultBasis>().data()->data();
     krnl.traction_q = traction_q.data();
-    krnl.minv = minv.data();
+    krnl.minv = mass_[faultNo].template get<MInv>().data();
+    krnl.nl_q = fault_[faultNo].template get<NormalLength>().data();
     krnl.traction = traction.data();
     krnl.w = quad_rule_.weights().data();
     krnl.execute();

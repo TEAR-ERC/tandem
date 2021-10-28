@@ -26,9 +26,9 @@ void Adapter<Poisson>::traction(std::size_t faultNo, Matrix<double> const& tract
     poisson_adapter::kernel::evaluate_traction krnl;
     krnl.e_q_T = e_q_T.data();
     krnl.grad_u = traction_q.data();
-    krnl.minv = minv.data();
+    krnl.minv = mass_[faultNo].template get<MInv>().data();
     krnl.traction = traction.data() + poisson_adapter::tensor::traction::Shape[0];
-    krnl.n_unit_q = fault_[faultNo].template get<UnitNormal>().data()->data();
+    krnl.n_q = fault_[faultNo].template get<Normal>().data()->data();
     krnl.w = quad_rule_.weights().data();
     krnl.execute();
 }
