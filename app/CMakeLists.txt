@@ -176,7 +176,7 @@ set(APP_COMMON_SRCS
     localoperator/Poisson.cpp
     localoperator/PoissonAdapter.cpp
     localoperator/RateAndStateBase.cpp
-    pc/lspoly.c
+    #pc/lspoly.c
     pc/register.cpp
 )
 if(${LAPACK_FOUND})
