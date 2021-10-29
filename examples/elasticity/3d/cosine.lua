@@ -18,3 +18,12 @@ function solution(x, y, z)
            math.cos(math.pi * x) * math.cos(math.pi * z)
 end
 
+function solution_jacobian(x, y, z)
+    return -math.pi * math.sin(math.pi * x) * math.cos(math.pi * y),
+           -math.pi * math.cos(math.pi * x) * math.sin(math.pi * y),
+           0,
+           0, 0, 0,
+           -math.pi * math.sin(math.pi * x) * math.cos(math.pi * z),
+           0,
+           -math.pi * math.cos(math.pi * x) * math.sin(math.pi * z)
+end

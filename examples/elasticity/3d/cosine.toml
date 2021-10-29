@@ -6,6 +6,7 @@ warp = "warp"
 force = "force"
 boundary = "solution"
 solution = "solution"
+solution_jacobian = "solution_jacobian"
 mu = "mu"
 lam = "lam"
 
