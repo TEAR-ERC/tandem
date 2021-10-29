@@ -5,6 +5,7 @@ lib = "singular.lua"
 boundary = "solution"
 coefficient = "coefficient"
 solution = "solution"
+solution_jacobian = "solution_jacobian"
 
 [generate_mesh]
 intercepts = [
