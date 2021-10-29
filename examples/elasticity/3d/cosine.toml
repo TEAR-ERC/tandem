@@ -2,6 +2,7 @@ resolution = 0.125
 
 [elasticity]
 lib = "cosine.lua"
+warp = "warp"
 force = "force"
 boundary = "solution"
 solution = "solution"
