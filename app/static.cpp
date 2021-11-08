@@ -118,8 +118,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     std::size_t num_dofs_domain = reduce_number(dgop.number_of_local_dofs());
 
+    double local_mesh_size = cl->local_mesh_size();
+    double mesh_size;
+    MPI_Reduce(&local_mesh_size, &mesh_size, 1, mpi_type_t<double>(), MPI_MAX, 0, topo->comm());
+
     if (rank == 0) {
         std::cout << "DOFs: " << num_dofs_domain << std::endl;
+        std::cout << "Mesh size: " << mesh_size << std::endl;
     }
 
     sw.start();

@@ -40,6 +40,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     }
 
     std::size_t vertexNo = 0;
+    local_mesh_size_ = 0.0;
     for (auto const& element : mesh.elements()) {
         auto vlids = mesh.template downward<0>(element);
         std::array<std::array<double, D>, D + 1> verts;
@@ -51,6 +52,16 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
         for (auto& refNode : refElement_.refNodes()) {
             (*storage)[vertexNo] = transform(map(refNode));
             ++vertexNo;
+        }
+
+        for (auto& x : verts) {
+            x = transform(x);
+        }
+        for (auto const& x : verts) {
+            for (auto const& y : verts) {
+                auto h = norm(x - y);
+                local_mesh_size_ = std::max(local_mesh_size_, h);
+            }
         }
     }
 

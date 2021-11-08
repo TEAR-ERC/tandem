@@ -72,6 +72,15 @@ public:
     std::size_t numElements() const { return vertices.size(); }
     NodalRefElement<D> const& refElement() const { return refElement_; }
 
+    /**
+     * @brief Computes maximum mesh size on local partition
+     *
+     * The mesh size is defined as the maximum distance of the simplex's vertices.
+     * That is, the mesh size is equal to the maximum diameter of the affine mesh approximating
+     * the domain, thus, the maximum diameter of the "high-order" mesh might be larger.
+     */
+    double local_mesh_size() const { return local_mesh_size_; }
+
 private:
     const unsigned N;
     NodalRefElement<D> refElement_;
@@ -85,6 +94,8 @@ private:
     std::array<Simplex<D - 1>, D + 1> f2v;
     std::array<std::array<double, D>, D + 1> refVertices = Simplex<D>::referenceSimplexVertices();
     std::array<Eigen::Matrix<double, D, 1>, D + 1> refNormals;
+
+    double local_mesh_size_;
 };
 
 } // namespace tndm
