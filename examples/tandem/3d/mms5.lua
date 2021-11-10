@@ -2,17 +2,17 @@ mms5 = {}
 
 mms5.t_e = 50.0
 mms5.t_w = 1.0
-mms5.rho = 2.670
+mms5.rho0 = 2.670
 mms5.cs = 3.464
 mms5.nu = 0.25
-mms5.E = 2.0 * mms5.cs^2 * mms5.rho * (1.0 + mms5.nu)
+mms5.E = 2.0 * mms5.cs^2 * mms5.rho0 * (1.0 + mms5.nu)
 mms5.b = 0.02
 mms5.V0 = 1.0e-6
 mms5.f0 = 0.6
 mms5.k = 3.14159265358979323846
 
 function mms5:mu(x, y, z)
-    return self.cs^2 * self.rho
+    return self.cs^2 * self.rho0
 end
 
 function mms5:lam(x, y, z)
@@ -20,7 +20,7 @@ function mms5:lam(x, y, z)
 end
 
 function mms5:eta(x, y, z)
-    return self.cs * self.rho / 2.0
+    return self.cs * self.rho0 / 2.0
 end
 
 function mms5:L(x, y, z)

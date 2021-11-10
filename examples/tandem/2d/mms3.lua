@@ -2,17 +2,17 @@ mms3 = {}
 
 mms3.t_e = 50.0
 mms3.t_w = 1.0
-mms3.rho = 2.670
+mms3.rho0 = 2.670
 mms3.cs = 3.464
 mms3.nu = 0.25
-mms3.E = 2.0 * mms3.cs^2 * mms3.rho * (1.0 + mms3.nu)
+mms3.E = 2.0 * mms3.cs^2 * mms3.rho0 * (1.0 + mms3.nu)
 mms3.b = 0.02
 mms3.V0 = 1.0e-6
 mms3.f0 = 0.6
 mms3.k = 3.14159265358979323846
 
 function mms3:mu(x, y)
-    return self.cs^2 * self.rho
+    return self.cs^2 * self.rho0
 end
 
 function mms3:lam(x, y)
@@ -20,7 +20,7 @@ function mms3:lam(x, y)
 end
 
 function mms3:eta(x, y)
-    return self.cs * self.rho / 2.0
+    return self.cs * self.rho0 / 2.0
 end
 
 function mms3:L(x, y)
