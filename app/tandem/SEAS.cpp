@@ -199,9 +199,14 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     std::size_t num_dofs_domain = reduce_number(seasop->domain().number_of_local_dofs());
     std::size_t num_dofs_fault = reduce_number(seasop->friction().number_of_local_dofs());
 
+    double local_mesh_size = ctx.cl->local_mesh_size();
+    double mesh_size;
+    MPI_Reduce(&local_mesh_size, &mesh_size, 1, mpi_type_t<double>(), MPI_MAX, 0, comm);
+
     if (rank == 0) {
         std::cout << "DOFs (domain): " << num_dofs_domain << std::endl;
         std::cout << "DOFs (fault): " << num_dofs_fault << std::endl;
+        std::cout << "Mesh size: " << mesh_size << std::endl;
         if (cfl_time_step) {
             std::cout << "CFL time step: " << *cfl_time_step << std::endl;
         }
@@ -248,6 +253,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         std::cout << "max_time_step=" << monitor->max_time_step() << std::endl;
         std::cout << "dofs_domain=" << num_dofs_domain << std::endl;
         std::cout << "dofs_fault=" << num_dofs_fault << std::endl;
+        std::cout << "mesh_size=" << mesh_size << std::endl;
         if (cfl_time_step) {
             std::cout << "dt_cfl=" << *cfl_time_step << std::endl;
         }
