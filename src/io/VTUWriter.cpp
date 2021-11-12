@@ -4,6 +4,7 @@
 #include "io/VTUAdapter.h"
 #include "tensor/Managed.h"
 #include "tensor/Tensor.h"
+#include "util/Scratch.h"
 
 #include <mpi.h>
 #include <numeric>
@@ -96,18 +97,22 @@ template <std::size_t D> VTUPiece<D> VTUWriter<D>::addPiece(VTUAdapter<D>& adapt
     return vtupiece;
 }
 
-template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D> const& function) {
-    auto pointsPerElement = writer_.refNodes().size();
-
+template <std::size_t D> tinyxml2::XMLElement* VTUPiece<D>::getPointDataRoot() {
     XMLElement* pdata = piece_->LastChildElement("PointData");
     if (!pdata) {
         pdata = piece_->InsertNewChildElement("PointData");
     }
+    return pdata;
+}
+
+template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D> const& function) {
+    auto pointsPerElement = writer_.refNodes().size();
+    XMLElement* pdata = getPointDataRoot();
 
     auto E = function.evaluationMatrix(writer_.refNodes());
     auto data = Managed<Tensor<double, 3u>>(pointsPerElement, function.numElements(),
                                             function.numQuantities());
-    auto result = Managed<Matrix<double>>(pointsPerElement, function.numQuantities());
+    auto result = Managed(function.mapResultInfo(pointsPerElement));
     for (std::size_t elNo = 0; elNo < function.numElements(); ++elNo) {
         function.map(elNo, E, result);
         for (std::size_t p = 0; p < function.numQuantities(); ++p) {
@@ -123,6 +128,44 @@ template <std::size_t D> void VTUPiece<D>::addPointData(FiniteElementFunction<D>
         }
         writer_.addDataArray(pdata, function.name(p), 1, data_ptr,
                              pointsPerElement * function.numElements());
+    }
+}
+
+template <std::size_t D>
+void VTUPiece<D>::addJacobianData(FiniteElementFunction<D> const& function,
+                                  VTUAdapter<D> const& adapter) {
+    auto pointsPerElement = writer_.refNodes().size();
+    XMLElement* pdata = getPointDataRoot();
+
+    auto scratch = Scratch<double>(adapter.scratch_mem_size());
+    auto Dxi = function.gradientEvaluationTensor(writer_.refNodes());
+    auto data = Managed<Tensor<double, 3u>>(pointsPerElement, function.numElements(),
+                                            D * function.numQuantities());
+    auto jInvAtP = Managed(adapter.jacobianResultInfo());
+    auto result = Managed(function.gradientResultInfo(pointsPerElement));
+    for (std::size_t elNo = 0; elNo < function.numElements(); ++elNo) {
+        adapter.jacobianInv(elNo, jInvAtP, scratch);
+        function.gradient(elNo, Dxi, jInvAtP, result);
+        for (std::size_t d = 0; d < D; ++d) {
+            for (std::size_t p = 0; p < function.numQuantities(); ++p) {
+                for (std::size_t i = 0; i < pointsPerElement; ++i) {
+                    data(i, elNo, d + p * D) = result(i, p, d);
+                }
+            }
+        }
+        scratch.reset();
+    }
+    for (std::size_t d = 0; d < D; ++d) {
+        for (std::size_t p = 0; p < function.numQuantities(); ++p) {
+            double* data_ptr = nullptr;
+            if (function.numElements() > 0) {
+                data_ptr = &data(0, 0, d + p * D);
+            }
+            std::stringstream s;
+            s << "d" << function.name(p) << "_d" << d;
+            writer_.addDataArray(pdata, s.str(), 1, data_ptr,
+                                 pointsPerElement * function.numElements());
+        }
     }
 }
 

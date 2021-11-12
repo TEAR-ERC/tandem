@@ -179,9 +179,9 @@ template <std::size_t D> class DomainWriter : public Writer {
 public:
     DomainWriter(std::string_view prefix, AdaptiveOutputInterval oi,
                  LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
-                 unsigned degree, MPI_Comm comm)
+                 unsigned degree, bool jacobian, MPI_Comm comm)
         : Writer(prefix, oi), pvd_(prefix), adapter_(std::move(cl), mesh.elements().localSize()),
-          degree_(degree), comm_(std::move(comm)) {}
+          degree_(degree), jacobian_(jacobian), comm_(std::move(comm)) {}
 
     DataLevel level() const override { return DataLevel::Volume; }
     void write(double time, mneme::span<FiniteElementFunction<D>> data) override {
@@ -193,6 +193,9 @@ public:
         auto piece = writer.addPiece(adapter_);
         for (auto const& fun : data) {
             piece.addPointData(fun);
+            if (jacobian_) {
+                piece.addJacobianData(fun, adapter_);
+            }
         }
         auto base_step = this->name();
         writer.write(base_step);
@@ -216,6 +219,7 @@ private:
     CurvilinearVTUAdapter<D> adapter_;
     unsigned degree_;
     MPI_Comm comm_;
+    bool jacobian_;
 };
 
 } // namespace tndm::seas

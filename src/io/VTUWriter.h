@@ -144,6 +144,10 @@ public:
      */
     void addPointData(FiniteElementFunction<D> const& function);
     /**
+     * @brief Samples Jacobian of FiniteElementFunction and adds point data to VTU file.
+     */
+    void addJacobianData(FiniteElementFunction<D> const& function, VTUAdapter<D> const& adapter);
+    /**
      * @brief Adds cell data with name "name" to VTU file.
      *
      * There is no high order cell data in VTK, therefore pass one value per cell.
@@ -164,6 +168,8 @@ public:
     }
 
 private:
+    tinyxml2::XMLElement* getPointDataRoot();
+
     VTUWriter<D>& writer_;
     tinyxml2::XMLElement* piece_;
 };

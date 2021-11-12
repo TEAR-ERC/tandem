@@ -212,6 +212,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
         auto piece = writer.addPiece(adapter);
         piece.addPointData(numeric);
+        piece.addJacobianData(numeric, adapter);
         piece.addPointData(coeffs);
         writer.write(*cfg.output);
     }

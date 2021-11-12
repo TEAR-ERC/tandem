@@ -99,7 +99,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
     if (cfg.domain_output) {
         monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
             cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh, cl,
-            PolynomialDegree, comm));
+            PolynomialDegree, cfg.domain_output->jacobian, comm));
     }
 }
 

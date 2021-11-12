@@ -28,6 +28,10 @@ struct OutputConfig {
     }
 };
 
+struct DomainOutputConfig : OutputConfig {
+    bool jacobian;
+};
+
 struct ProbeOutputConfig : OutputConfig {
     std::vector<Probe<DomainDimension>> probes;
 };
@@ -56,6 +60,16 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
         .help("Maximum time difference between samples");
+};
+
+template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
+    auto cast = [](auto ptr) {
+        using type = std::remove_reference_t<decltype(std::declval<DomainOutputConfig>().*ptr)>;
+        return static_cast<type Derived::*>(ptr);
+    };
+    outputSchema.add_value("jacobian", cast(&Derived::jacobian))
+        .default_value(false)
+        .help("Output Jacobian");
 };
 
 template <typename Derived> void setProbeOutputConfigSchema(TableSchema<Derived>& outputSchema) {
@@ -89,7 +103,7 @@ struct Config {
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;
     std::optional<OutputConfig> fault_scalar_output;
-    std::optional<OutputConfig> domain_output;
+    std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
 };
