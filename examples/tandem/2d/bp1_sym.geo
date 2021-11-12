@@ -1,8 +1,11 @@
-DefineConstant[ Lf = {0.200, Min 0, Max 10, Name "Fault resolution" } ];
+DefineConstant[ hf = {0.200, Min 0, Max 1000, Name "Fault resolution" } ];
+DefineConstant[ h = {50.0, Min 0, Max 1000, Name "Far boundary resolution" } ];
+DefineConstant[ D = {400, Min 0, Max 10000, Name "Domain size" } ];
+DefineConstant[ cx = {3e-2, Min 0, Max 10, Name "Coarsening factor in x direction" } ];
+DefineConstant[ cy = {1e-3, Min 0, Max 10, Name "Coarsening factor in y direction" } ];
 
-h = 50;
-w = 400;
-d = 400;
+w = D;
+d = D;
 d1 = 15;
 d2 = 16;
 d3 = 18;
@@ -30,6 +33,6 @@ Physical Curve(3) = {8, 9, 10, 11};
 Physical Curve(5) = {3, 7};
 Physical Surface(1) = {1};
 Field[1] = MathEval;
-Field[1].F = Sprintf("%g + 3e-2*x^2 + 1e-3*(min(0, y+40))^2", Lf);
+Field[1].F = Sprintf("%g + %g*x^2 + %g*(min(0, y+40))^2", hf, cx, cy);
 Background Field = 1;
 Mesh.MshFileVersion = 2.2;

@@ -5,7 +5,7 @@ BP1.amax = 0.025
 BP1.H = 15.0
 BP1.h = 3.0
 BP1.Vp = 1e-9
-BP1.rho = 2.670
+BP1.rho0 = 2.670
 BP1.b = 0.015
 BP1.V0 = 1.0e-6
 BP1.f0 = 0.6
@@ -32,7 +32,7 @@ function BP1:mu(x, y)
 end
 
 function BP1:eta(x, y)
-    return math.sqrt(self:mu(x, y) * self.rho) / 2.0
+    return math.sqrt(self:mu(x, y) * self.rho0) / 2.0
 end
 
 function BP1:L(x, y)
