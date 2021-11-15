@@ -10,6 +10,7 @@ The following dependencies are likely available via your package manager:
 - `Eigen <https://eigen.tuxfamily.org/>`_ (≥ 3.3)
 - Python (≥ 3.5) with NumPy (≥ 1.12.0)
 - `Lua <https://www.lua.org/>`_ (≥ 5.3)
+- `CMake <https://cmake.org/>`_ (≥ 3.18)
 
 The following dependencies likely need to be installed manually:
 
