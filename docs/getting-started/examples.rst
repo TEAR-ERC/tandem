@@ -122,11 +122,11 @@ file which selects an adaptive Runge-Kutta time-stepping scheme.
 The option :code:`-ts_monitor` enables monitoring of time and time-step size.
 
 Time to fetch a coffee, as this is going to take a while.
-In order to speed things up, add :code:`--discrete_green yes`:
+In order to speed things up, add :code:`--mode QDGreen`:
 
 .. code:: console
 
-   $ ./app/tandem ../examples/tandem/2d/bp1_sym.toml --discrete_green yes \
+   $ ./app/tandem ../examples/tandem/2d/bp1_sym.toml --mode QDGreen \
          --petsc -options_file ../examples/options/lu_mumps.cfg \
          -options_file ../examples/options/rk45.cfg -ts_monitor 
 
