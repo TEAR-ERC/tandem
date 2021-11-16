@@ -56,13 +56,13 @@ ProbeWriter<D>::ProbeWriter(std::string_view prefix, std::vector<Probe<D>> const
 template <std::size_t D>
 void ProbeWriter<D>::write_header(std::ofstream& file, ProbeMeta const& p,
                                   mneme::span<FiniteElementFunction<D>> functions) const {
-    file << "TITLE = \"Station " << p.name << " (x = [";
+    file << "# TITLE = \"Station " << p.name << " (x = [";
     for (std::size_t d = 0; d < D; ++d) {
         file << p.x[d] << ", ";
     }
     file.seekp(-2, std::ios::cur);
     file << "])\"" << std::endl;
-    file << "VARIABLES = \"Time\"";
+    file << "# VARIABLES = \"Time\"";
     for (auto const& function : functions) {
         for (std::size_t q = 0; q < function.numQuantities(); ++q) {
             file << ",\"" << function.name(q) << "\"";
