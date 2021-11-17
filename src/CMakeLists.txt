@@ -15,6 +15,7 @@ add_library(tandem-fem-lib
     quadrules/WitherdenVincent2015_Tri.cpp
     quadrules/WitherdenVincent2015_Tet.cpp
     quadrules/TensorProductRule.cpp
+    util/Math.cpp
 )
 
 target_compile_features(tandem-fem-lib PUBLIC cxx_std_17)
@@ -33,6 +34,7 @@ add_library(tandem-lib
     io/BoundaryProbeWriter.cpp
     io/ProbeWriter.cpp
     io/ScalarWriter.cpp
+    io/GlobalSimplexMeshBuilder.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
     io/PVDWriter.cpp

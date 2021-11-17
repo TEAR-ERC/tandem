@@ -115,7 +115,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
     fun_rho(elNo, rhoInv_Q);
     for (unsigned q = 0; q < tensor::rhoInv_Q::Shape[0]; ++q) {
-        rhoInv_Q(q, 0) = 1.0 / rhoInv_Q(q, 0);
+        rhoInv_Q(0, q) = 1.0 / rhoInv_Q(0, q);
     }
 
     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];

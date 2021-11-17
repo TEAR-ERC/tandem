@@ -1,6 +1,7 @@
 #include "GaussJacobi.h"
 #include "basis/Functions.h"
 #include "quadrules/IntervalQuadratureRule.h"
+#include "util/Math.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>

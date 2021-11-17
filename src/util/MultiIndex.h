@@ -45,7 +45,7 @@ std::array<U, D> permute(std::array<T, D> const& permutation, std::array<U, D> c
 
 template <std::size_t D, typename T>
 std::array<T, D> operator+(std::array<T, D> const& lhs, std::array<T, D> const& rhs) {
-    std::array<uint64_t, D> result;
+    std::array<T, D> result;
     for (std::size_t d = 0; d < D; ++d) {
         result[d] = lhs[d] + rhs[d];
     }
@@ -60,6 +60,58 @@ std::array<T, D> operator-(std::array<T, D> const& lhs, std::array<T, D> const& 
     }
     return result;
 }
+
+template <typename T, std::size_t D> class MultiIndexIterator {
+public:
+    using iterator_category = std::input_iterator_tag;
+    using value_type = std::array<T, D>;
+    using difference_type = std::array<std::ptrdiff_t, D>;
+    using pointer = value_type*;
+    using reference = value_type&;
+
+    MultiIndexIterator(std::array<T, D> i, std::array<T, D> shape) : i_(i), shape_(shape) {}
+
+    bool operator!=(MultiIndexIterator<T, D> const& other) {
+        return i_ != other.i_ || shape_ != other.shape_;
+    }
+
+    auto& operator++() {
+        ++i_[0];
+        int d = 0;
+        while (i_[d] >= shape_[d] && d < D - 1) {
+            i_[d++] = 0;
+            ++i_[d];
+        }
+        return *this;
+    }
+    auto operator++(int) {
+        MultiIndexIterator<T, D> copy = *this;
+        ++(*this);
+        return copy;
+    }
+
+    reference operator*() { return i_; }
+
+private:
+    std::array<T, D> i_;
+    std::array<T, D> shape_;
+};
+
+template <typename T, std::size_t D> class product {
+public:
+    product(std::array<T, D> shape) : shape_(shape) {}
+
+    auto begin() { return MultiIndexIterator<T, D>({}, shape_); }
+    auto end() {
+        auto i = std::array<T, D>{};
+        i.back() = shape_.back();
+        return MultiIndexIterator<T, D>(i, shape_);
+    }
+
+private:
+    std::array<T, D> shape_;
+};
+
 } // namespace tndm
 
 #endif // MULTIINDEX_H

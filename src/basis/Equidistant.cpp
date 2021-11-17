@@ -1,8 +1,8 @@
 #include "Equidistant.h"
-#include <cassert>
 #include "geometry/Vector.h"
 #include "mesh/Simplex.h"
 #include "util/Combinatorics.h"
+#include <cassert>
 
 namespace tndm {
 

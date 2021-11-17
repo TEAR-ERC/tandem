@@ -1,14 +1,7 @@
 #include "Functions.h"
+#include "util/Math.h"
 
 namespace tndm {
-
-uint64_t rangeProduct(uint64_t from, uint64_t to) {
-    uint64_t product = 1;
-    for (; from <= to; ++from) {
-        product *= from;
-    }
-    return product;
-}
 
 double JacobiP(unsigned n, unsigned a, unsigned b, double x) {
     if (n == 0) {
