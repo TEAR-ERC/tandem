@@ -2,6 +2,8 @@
 #define COMMPATTERN_H
 
 #include "MPITraits.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 #include "util/Range.h"
 
 #include <functional>
@@ -13,6 +15,10 @@ namespace tndm {
 
 class AllToAllV {
 public:
+    template <typename Tr>
+    using tensor_ret_t =
+        Managed<Tensor<typename detail::traits<Tr>::real_t, detail::traits<Tr>::Dim>>;
+
     AllToAllV(std::vector<int>&& sndcnts, MPI_Comm comm = MPI_COMM_WORLD);
     AllToAllV(std::vector<int>&& sndcnts, std::vector<int>&& recvcnts,
               MPI_Comm comm = MPI_COMM_WORLD);
@@ -29,6 +35,23 @@ public:
         std::vector<T> recvdData(std::accumulate(recvcounts.begin(), recvcounts.end(), 0));
         MPI_Alltoallv(dataToSend.data(), sendcounts.data(), sdispls.data(), mpiType,
                       recvdData.data(), recvcounts.data(), rdispls.data(), mpiType, comm);
+        return recvdData;
+    }
+
+    template <typename Tr>
+    [[nodiscard]] auto exchange(Tr const& dataToSend) const -> tensor_ret_t<Tr> {
+        auto shape = dataToSend.shape();
+        shape.back() = std::accumulate(recvcounts.begin(), recvcounts.end(), 0);
+        auto recvdData = tensor_ret_t<Tr>(shape);
+
+        std::size_t numReals = 1;
+        for (std::size_t i = 0; i < shape.size() - 1; ++i) {
+            numReals *= shape[i];
+        }
+
+        auto mpiType = mpi_array_type<typename Tr::real_t>(numReals);
+        MPI_Alltoallv(dataToSend.data(), sendcounts.data(), sdispls.data(), mpiType.get(),
+                      recvdData.data(), recvcounts.data(), rdispls.data(), mpiType.get(), comm);
         return recvdData;
     }
 

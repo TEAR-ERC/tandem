@@ -6,6 +6,7 @@
 #include "quadrules/TabulatedRules.h"
 #include "quadrules/TensorProductRule.h"
 #include "util/Combinatorics.h"
+#include "util/Math.h"
 
 #include "doctest.h"
 

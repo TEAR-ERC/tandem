@@ -2,14 +2,17 @@
 #include "basis/Functions.h"
 #include "basis/GaussLegendre.h"
 #include "basis/Nodal.h"
+#include "basis/Util.h"
 #include "basis/WarpAndBlend.h"
 
 #include "doctest.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -770,5 +773,29 @@ TEST_CASE("Nodes") {
                                                     {0.375, 0.25, 0.125},
                                                     {0.25, 0.25, 0.25}};
         checkNodes(eqd3(8), refNodes);
+    }
+
+    SUBCASE("Tri equidistant permutations") {
+        auto factory = EquidistantNodesFactory<2u>();
+        for (unsigned degree = 1; degree < 10; ++degree) {
+            auto nodes = factory(degree);
+            auto p = std::array<unsigned, 3>{0, 1, 2};
+            do {
+                auto P = node_permutation(nodes, p);
+                REQUIRE(P != std::nullopt);
+            } while (std::next_permutation(p.begin(), p.end()));
+        }
+    }
+
+    SUBCASE("Tet equidistant permutations") {
+        auto factory = EquidistantNodesFactory<3u>();
+        for (unsigned degree = 1; degree < 10; ++degree) {
+            auto nodes = factory(degree);
+            auto p = std::array<unsigned, 4>{0, 1, 2, 3};
+            do {
+                auto P = node_permutation(nodes, p);
+                REQUIRE(P != std::nullopt);
+            } while (std::next_permutation(p.begin(), p.end()));
+        }
     }
 }

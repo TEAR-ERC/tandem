@@ -4,6 +4,8 @@
 #include "form/BC.h"
 #include "parallel/CommPattern.h"
 #include "parallel/MPITraits.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 #include "util/Algorithm.h"
 
 #include <mpi.h>
@@ -36,7 +38,7 @@ public:
 
     std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
                                             AllToAllV const& a2a) const override {
-        std::vector<std::array<double, SpaceD>> requestedVertices;
+        std::vector<vertex_t> requestedVertices;
         requestedVertices.reserve(lids.size());
         for (auto& lid : lids) {
             assert(lid < vertices.size());
@@ -90,6 +92,47 @@ public:
 
 private:
     std::vector<BC> boundaryConditions;
+};
+
+class ElementData : public MeshData {
+public:
+    using nodes_t = Managed<Tensor<double, 3u>>;
+    constexpr static std::size_t ElementMode = 2;
+
+    ElementData(nodes_t&& nodes) : nodes_(std::move(nodes)) {}
+    virtual ~ElementData() {}
+
+    std::size_t size() const override { return nodes_.size(); }
+
+    std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
+                                            AllToAllV const& a2a) const override {
+        auto shape = nodes_.shape();
+        shape[ElementMode] = lids.size();
+        auto requestedNodes = nodes_t(shape);
+        std::size_t I = nodes_.shape(0), J = nodes_.shape(1), K = nodes_.shape(2);
+        std::size_t k = 0;
+        for (auto& lid : lids) {
+            assert(lid < K);
+            for (std::size_t j = 0; j < J; ++j) {
+                for (std::size_t i = 0; i < I; ++i) {
+                    requestedNodes(i, j, k) = nodes_(i, j, lid);
+                }
+            }
+            ++k;
+        }
+
+        auto newNodes = a2a.exchange(requestedNodes);
+        return std::make_unique<ElementData>(std::move(newNodes));
+    }
+
+    void permute(std::vector<std::size_t> const& permutation) override {
+        apply_permutation(nodes_, permutation, ElementMode);
+    }
+
+    nodes_t const& getNodes() const { return nodes_; }
+
+private:
+    nodes_t nodes_;
 };
 
 } // namespace tndm

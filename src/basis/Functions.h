@@ -39,20 +39,6 @@
 namespace tndm {
 
 /**
- * @brief Computes \prod_{i=from}^{to} i. Returns 1 if from > to.
- */
-uint64_t rangeProduct(uint64_t from, uint64_t to);
-
-/**
- * @brief Factorial operation
- *
- * @param n
- *
- * @return n!
- */
-inline uint64_t factorial(uint64_t n) { return rangeProduct(1, n); }
-
-/**
  * @brief Evaluates Jacobi polynomial P_{n}^{(a,b)}(x).
  */
 double JacobiP(unsigned n, unsigned a, unsigned b, double x);

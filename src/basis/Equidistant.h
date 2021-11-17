@@ -14,6 +14,13 @@ namespace tndm {
  */
 template <std::size_t D> class EquidistantNodesFactory : public NodesFactory<D> {
 public:
+    /**
+     * @brief Returns equidistant nodes on the reference D-simplex
+     *
+     * @param degree Polynomial degree
+     *
+     * @return Vector of nodes
+     */
     std::vector<std::array<double, D>> operator()(unsigned degree) const override;
 
 private:

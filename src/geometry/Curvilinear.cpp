@@ -1,6 +1,8 @@
 #include "Curvilinear.h"
 #include "Affine.h"
 #include "Vector.h"
+#include "basis/Equidistant.h"
+#include "basis/Util.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "mesh/MeshData.h"
 #include "tensor/EigenMap.h"
@@ -19,6 +21,7 @@
 #include <cstdint>
 #include <iterator>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 
 namespace tndm {
@@ -38,8 +41,24 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
     }
+    auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
+    Managed<Matrix<double>> eval_basis;
+    if (elementData) {
+        auto const& nodes = elementData->getNodes();
+        // Vertices are excluded in nodes, therefore add D + 1
+        std::size_t num_bf = nodes.shape(1) + D + 1u;
+        auto N = num_nodes_to_degree<D>(num_bf);
+        if (!N) {
+            std::stringstream s;
+            s << "The number of nodes " << num_bf << " is incomplete.";
+            throw std::runtime_error(s.str());
+        }
+        auto espace = NodalRefElement<D>(*N, EquidistantNodesFactory<D>());
+        eval_basis = espace.evaluateBasisAt(refElement_.refNodes());
+    }
 
     std::size_t vertexNo = 0;
+    std::size_t elNo = 0;
     local_mesh_size_ = 0.0;
     for (auto const& element : mesh.elements()) {
         auto vlids = mesh.template downward<0>(element);
@@ -48,11 +67,34 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
         for (auto const& vlid : vlids) {
             verts[localVertexNo++] = vertexData->getVertices()[vlid];
         }
-        RefPlexToGeneralPlex<D> map(verts);
-        for (auto& refNode : refElement_.refNodes()) {
-            (*storage)[vertexNo] = transform(map(refNode));
-            ++vertexNo;
+
+        if (elementData) {
+            constexpr std::size_t NumVerts = D + 1u;
+            auto const& nodes = elementData->getNodes();
+            for (std::size_t j = 0; j < eval_basis.shape(1); ++j) {
+                auto vtx = std::array<double, D>{};
+                std::size_t i = 0;
+                for (; i < NumVerts; ++i) {
+                    for (std::size_t d = 0; d < D; ++d) {
+                        vtx[d] += verts[i][d] * eval_basis(i, j);
+                    }
+                }
+                for (; i < eval_basis.shape(0); ++i) {
+                    for (std::size_t d = 0; d < D; ++d) {
+                        vtx[d] += nodes(d, i - NumVerts, elNo) * eval_basis(i, j);
+                    }
+                }
+                (*storage)[vertexNo] = transform(vtx);
+                ++vertexNo;
+            }
+        } else {
+            RefPlexToGeneralPlex<D> map(verts);
+            for (auto& refNode : refElement_.refNodes()) {
+                (*storage)[vertexNo] = transform(map(refNode));
+                ++vertexNo;
+            }
         }
+        ++elNo;
 
         for (auto& x : verts) {
             x = transform(x);

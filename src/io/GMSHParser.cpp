@@ -1,6 +1,7 @@
 #include "GMSHParser.h"
 #include "io/GMSHLexer.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -153,7 +154,8 @@ bool GMSHParser::parseElements() {
     }
     auto numElements = lexer.getInteger();
 
-    constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
+    constexpr std::size_t MaxElementType = sizeof(NumNodes) / sizeof(std::size_t);
+    constexpr std::size_t MaxNodes = *std::max_element(NumNodes, NumNodes + MaxElementType);
     long tag = -1;
     std::array<long, MaxNodes> nodes;
 
@@ -167,9 +169,9 @@ bool GMSHParser::parseElements() {
 
         getNextToken();
         if (curTok != GMSHToken::integer || lexer.getInteger() < 1 ||
-            lexer.getInteger() > MaxNodes) {
+            lexer.getInteger() > MaxElementType) {
             char buf[128];
-            sprintf(buf, "Expected element-type with 1 <= element-type <= %zu", MaxNodes);
+            sprintf(buf, "Expected element-type with 1 <= element-type <= %zu", MaxElementType);
             return logErrorAnnotated<bool>(buf);
         }
         long type = lexer.getInteger();

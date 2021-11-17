@@ -1,4 +1,6 @@
 #include "doctest.h"
+#include "tensor/Managed.h"
+#include "tensor/Tensor.h"
 #include "util/Algorithm.h"
 #include "util/Combinatorics.h"
 #include "util/LinearAllocator.h"
@@ -8,12 +10,7 @@
 #include <cmath>
 #include <new>
 
-using tndm::AllIntegerSums;
-using tndm::binom;
-using tndm::Choose;
-using tndm::find_blocks;
-using tndm::LinearAllocator;
-using tndm::zeroIn;
+using namespace tndm;
 
 TEST_CASE("Combinatorics") {
     SUBCASE("binom") {
@@ -188,12 +185,77 @@ TEST_CASE("Allocator") {
 }
 
 TEST_CASE("Algorithm") {
-    auto indices = std::array<std::size_t, 10>{5, 6, 7, 3, 1, 45, 46, 47, 49, 50};
-    auto [block_lengths, displacements] = find_blocks(indices);
+    SUBCASE("Find blocks") {
+        auto indices = std::array<std::size_t, 10>{5, 6, 7, 3, 1, 45, 46, 47, 49, 50};
+        auto [block_lengths, displacements] = find_blocks(indices);
 
-    CHECK(block_lengths.size() == 5);
-    CHECK(displacements.size() == block_lengths.size());
+        CHECK(block_lengths.size() == 5);
+        CHECK(displacements.size() == block_lengths.size());
 
-    auto ref_displs = std::vector<std::size_t>{5, 3, 1, 45, 49};
-    CHECK(std::equal(ref_displs.begin(), ref_displs.end(), displacements.begin()));
+        auto ref_displs = std::vector<std::size_t>{5, 3, 1, 45, 49};
+        CHECK(std::equal(ref_displs.begin(), ref_displs.end(), displacements.begin()));
+    }
+
+    SUBCASE("Apply permutation") {
+        auto tensor = Managed<Tensor<double, 3u>>(2, 3, 2);
+        std::iota(tensor.data(), tensor.data() + tensor.size(), 0);
+
+        CHECK(tensor(0, 0, 0) == 0);
+        CHECK(tensor(1, 0, 0) == 1);
+        CHECK(tensor(0, 1, 0) == 2);
+        CHECK(tensor(1, 1, 0) == 3);
+        CHECK(tensor(0, 2, 0) == 4);
+        CHECK(tensor(1, 2, 0) == 5);
+        CHECK(tensor(0, 0, 1) == 6);
+        CHECK(tensor(1, 0, 1) == 7);
+        CHECK(tensor(0, 1, 1) == 8);
+        CHECK(tensor(1, 1, 1) == 9);
+        CHECK(tensor(0, 2, 1) == 10);
+        CHECK(tensor(1, 2, 1) == 11);
+
+        apply_permutation(tensor, std::vector<std::ptrdiff_t>{2, 0, 1}, 1);
+
+        CHECK(tensor(0, 0, 0) == 4);
+        CHECK(tensor(1, 0, 0) == 5);
+        CHECK(tensor(0, 1, 0) == 0);
+        CHECK(tensor(1, 1, 0) == 1);
+        CHECK(tensor(0, 2, 0) == 2);
+        CHECK(tensor(1, 2, 0) == 3);
+        CHECK(tensor(0, 0, 1) == 10);
+        CHECK(tensor(1, 0, 1) == 11);
+        CHECK(tensor(0, 1, 1) == 6);
+        CHECK(tensor(1, 1, 1) == 7);
+        CHECK(tensor(0, 2, 1) == 8);
+        CHECK(tensor(1, 2, 1) == 9);
+
+        apply_permutation(tensor, std::vector<std::ptrdiff_t>{1, 0}, 2);
+
+        CHECK(tensor(0, 0, 0) == 10);
+        CHECK(tensor(1, 0, 0) == 11);
+        CHECK(tensor(0, 1, 0) == 6);
+        CHECK(tensor(1, 1, 0) == 7);
+        CHECK(tensor(0, 2, 0) == 8);
+        CHECK(tensor(1, 2, 0) == 9);
+        CHECK(tensor(0, 0, 1) == 4);
+        CHECK(tensor(1, 0, 1) == 5);
+        CHECK(tensor(0, 1, 1) == 0);
+        CHECK(tensor(1, 1, 1) == 1);
+        CHECK(tensor(0, 2, 1) == 2);
+        CHECK(tensor(1, 2, 1) == 3);
+
+        apply_permutation(tensor, std::vector<std::ptrdiff_t>{1, 0}, 0);
+
+        CHECK(tensor(0, 0, 0) == 11);
+        CHECK(tensor(1, 0, 0) == 10);
+        CHECK(tensor(0, 1, 0) == 7);
+        CHECK(tensor(1, 1, 0) == 6);
+        CHECK(tensor(0, 2, 0) == 9);
+        CHECK(tensor(1, 2, 0) == 8);
+        CHECK(tensor(0, 0, 1) == 5);
+        CHECK(tensor(1, 0, 1) == 4);
+        CHECK(tensor(0, 1, 1) == 1);
+        CHECK(tensor(1, 1, 1) == 0);
+        CHECK(tensor(0, 2, 1) == 3);
+        CHECK(tensor(1, 2, 1) == 2);
+    }
 }
