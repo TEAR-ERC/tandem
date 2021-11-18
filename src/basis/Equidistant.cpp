@@ -66,20 +66,17 @@ void EquidistantNodesFactory<D>::tet(int n, std::array<std::array<double, D>, 4>
             result.push_back(verts[3]);
 
             if (n >= 1) {
-                edge(n - 1, {verts[0], verts[1]}, result);
-                edge(n - 1, {verts[1], verts[2]}, result);
-                edge(n - 1, {verts[2], verts[0]}, result);
-                edge(n - 1, {verts[0], verts[3]}, result);
-                edge(n - 1, {verts[1], verts[3]}, result);
-                edge(n - 1, {verts[2], verts[3]}, result);
+                for (auto const& e : tet_edge_convention(convention_)) {
+                    edge(n - 1, {verts[e[0]], verts[e[1]]}, result);
+                }
             }
 
             double sf = 1.0 / n;
             if (n >= 3) {
-                triangle(n - 3, shrinkAndShift<2>(sf, {verts[0], verts[1], verts[3]}), result);
-                triangle(n - 3, shrinkAndShift<2>(sf, {verts[2], verts[3], verts[1]}), result);
-                triangle(n - 3, shrinkAndShift<2>(sf, {verts[0], verts[3], verts[2]}), result);
-                triangle(n - 3, shrinkAndShift<2>(sf, {verts[0], verts[2], verts[1]}), result);
+                for (auto const& f : tet_face_convention(convention_)) {
+                    triangle(n - 3, shrinkAndShift<2>(sf, {verts[f[0]], verts[f[1]], verts[f[2]]}),
+                             result);
+                }
             }
 
             verts = shrinkAndShift<3>(sf, verts);

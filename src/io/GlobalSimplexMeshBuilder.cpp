@@ -1,6 +1,7 @@
 #include "GlobalSimplexMeshBuilder.h"
 
 #include "basis/Equidistant.h"
+#include "basis/NumberingConvention.h"
 #include "basis/Util.h"
 #include "mesh/MeshData.h"
 #include "parallel/MPITraits.h"
@@ -23,7 +24,7 @@ void GlobalSimplexMeshBuilder<D>::preparePermutationTable(std::size_t numNodes) 
 
     node_permutations_ = Managed<Matrix<unsigned>>(numNodes, factorial(NumVerts));
 
-    auto nodes = EquidistantNodesFactory<D>()(*N);
+    auto nodes = EquidistantNodesFactory<D>(NumberingConvention::GMSH)(*N);
     auto p = std::array<unsigned, NumVerts>{};
     std::iota(p.begin(), p.end(), 0);
     do {
@@ -146,7 +147,8 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
             ++old_id;
         }
         auto vertexData = std::make_unique<VertexData<D>>(std::move(new_vertices));
-        auto elementData = std::make_unique<ElementData>(std::move(high_order_verts));
+        auto elementData =
+            std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
                                                       std::move(elementData), comm);
     } else {

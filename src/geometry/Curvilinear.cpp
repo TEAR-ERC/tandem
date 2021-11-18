@@ -53,7 +53,8 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
             s << "The number of nodes " << num_bf << " is incomplete.";
             throw std::runtime_error(s.str());
         }
-        auto espace = NodalRefElement<D>(*N, EquidistantNodesFactory<D>());
+        auto espace = NodalRefElement<D>(
+            *N, EquidistantNodesFactory<D>(elementData->getNumberingConvention()));
         eval_basis = espace.evaluateBasisAt(refElement_.refNodes());
     }
 

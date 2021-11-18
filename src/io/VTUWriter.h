@@ -3,6 +3,7 @@
 
 #include "DataType.h"
 #include "basis/Equidistant.h"
+#include "basis/NumberingConvention.h"
 
 #include <mpi.h>
 #include <stdexcept>
@@ -30,8 +31,8 @@ public:
     static int32_t VTKType(bool linear);
 
     VTUWriter(unsigned degree = 1u, bool zlibCompress = true, MPI_Comm comm = MPI_COMM_WORLD)
-        : refNodes_(EquidistantNodesFactory<D>()(degree)), zlibCompress_(zlibCompress),
-          comm_(comm) {
+        : refNodes_(EquidistantNodesFactory<D>(NumberingConvention::VTK)(degree)),
+          zlibCompress_(zlibCompress), comm_(comm) {
         auto grid = doc_.NewElement("UnstructuredGrid");
         doc_.InsertFirstChild(grid);
     }

@@ -1,6 +1,7 @@
 #ifndef MESHDATA_H
 #define MESHDATA_H
 
+#include "basis/NumberingConvention.h"
 #include "form/BC.h"
 #include "parallel/CommPattern.h"
 #include "parallel/MPITraits.h"
@@ -99,7 +100,8 @@ public:
     using nodes_t = Managed<Tensor<double, 3u>>;
     constexpr static std::size_t ElementMode = 2;
 
-    ElementData(nodes_t&& nodes) : nodes_(std::move(nodes)) {}
+    ElementData(nodes_t&& nodes, NumberingConvention convention)
+        : nodes_(std::move(nodes)), convention_(convention) {}
     virtual ~ElementData() {}
 
     std::size_t size() const override { return nodes_.size(); }
@@ -122,7 +124,7 @@ public:
         }
 
         auto newNodes = a2a.exchange(requestedNodes);
-        return std::make_unique<ElementData>(std::move(newNodes));
+        return std::make_unique<ElementData>(std::move(newNodes), convention_);
     }
 
     void permute(std::vector<std::size_t> const& permutation) override {
@@ -130,9 +132,11 @@ public:
     }
 
     nodes_t const& getNodes() const { return nodes_; }
+    NumberingConvention getNumberingConvention() const { return convention_; }
 
 private:
     nodes_t nodes_;
+    NumberingConvention convention_;
 };
 
 } // namespace tndm
