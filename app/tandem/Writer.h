@@ -9,6 +9,7 @@
 #include "io/PVDWriter.h"
 #include "io/ProbeWriter.h"
 #include "io/ScalarWriter.h"
+#include "io/TableWriter.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/LocalSimplexMesh.h"
@@ -75,10 +76,12 @@ protected:
 
 template <std::size_t D> class FaultProbeWriter : public Writer {
 public:
-    FaultProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
-                     AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
-                     std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map, MPI_Comm comm)
-        : Writer(prefix, oi), writer_(prefix, probes, mesh, std::move(cl), bnd_map, comm) {}
+    FaultProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+                     std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
+                     LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                     BoundaryMap const& bnd_map, MPI_Comm comm)
+        : Writer(prefix, oi),
+          writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), bnd_map, comm) {}
 
     DataLevel level() const override { return DataLevel::Boundary; }
     std::vector<std::size_t> const* subset() const override { return &writer_.bndNos(); }
@@ -94,10 +97,12 @@ private:
 
 template <std::size_t D> class DomainProbeWriter : public Writer {
 public:
-    DomainProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
-                      AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
-                      std::shared_ptr<Curvilinear<D>> cl, MPI_Comm comm)
-        : Writer(prefix, oi), writer_(prefix, probes, mesh, std::move(cl), comm) {}
+    DomainProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+                      std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
+                      LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                      MPI_Comm comm)
+        : Writer(prefix, oi),
+          writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), comm) {}
 
     DataLevel level() const override { return DataLevel::Volume; }
     std::vector<std::size_t> const* subset() const override { return &writer_.elNos(); }
@@ -157,8 +162,10 @@ private:
 
 class FaultScalarWriter : public Writer {
 public:
-    FaultScalarWriter(std::string_view prefix, AdaptiveOutputInterval oi, MPI_Comm comm)
-        : Writer(prefix, oi), writer_(prefix, {"VMax"}), comm_(std::move(comm)) {}
+    FaultScalarWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+                      AdaptiveOutputInterval oi, MPI_Comm comm)
+        : Writer(prefix, oi), writer_(prefix, std::move(table_writer), {"VMax"}),
+          comm_(std::move(comm)) {}
 
     DataLevel level() const override { return DataLevel::Scalar; }
     void write(double time, mneme::span<double> data) override {
