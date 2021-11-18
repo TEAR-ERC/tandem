@@ -4,9 +4,8 @@
 #include "io/ProbeWriterUtil.h"
 #include "util/LinearAllocator.h"
 
-#include <iomanip>
-#include <ios>
 #include <mpi.h>
+#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -14,10 +13,12 @@ namespace tndm {
 
 template <std::size_t D>
 BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
+                                            std::unique_ptr<TableWriter> table_writer,
                                             std::vector<Probe<D>> const& probes,
                                             LocalSimplexMesh<D> const& mesh,
                                             std::shared_ptr<Curvilinear<D>> cl,
-                                            BoundaryMap const& bnd_map, MPI_Comm comm) {
+                                            BoundaryMap const& bnd_map, MPI_Comm comm)
+    : out_(std::move(table_writer)) {
     auto bpl =
         BoundaryPointLocator<D>(std::make_shared<PointLocator<D>>(cl), mesh, bnd_map.localFctNos());
 
@@ -47,7 +48,8 @@ BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
     probes_.reserve(located_probes.size());
     for (auto const& p : located_probes) {
         auto file_name = std::string(prefix);
-        file_name += probes[p.first].name + ".dat";
+        file_name += probes[p.first].name;
+        file_name += out_->default_extension();
         probes_.emplace_back(ProbeMeta{probes[p.first].name, file_name, fctNo2OutNo[p.second.no],
                                        p.second.chi, p.second.x});
     }
@@ -55,47 +57,46 @@ BoundaryProbeWriter<D>::BoundaryProbeWriter(std::string_view prefix,
 
 template <std::size_t D>
 void BoundaryProbeWriter<D>::write_header(
-    std::ofstream& file, ProbeMeta const& p,
-    mneme::span<FiniteElementFunction<D - 1>> functions) const {
-    file << "TITLE = \"Station " << p.name << " (x = [";
+    ProbeMeta const& p, mneme::span<FiniteElementFunction<D - 1>> functions) const {
+    std::stringstream s;
+    s << "Station " << p.name << " (x = [";
     for (std::size_t d = 0; d < D; ++d) {
-        file << p.x[d] << ", ";
+        s << p.x[d] << ", ";
     }
-    file.seekp(-2, std::ios::cur);
-    file << "])\"" << std::endl;
-    file << "VARIABLES = \"Time\"";
+    s.seekp(-2, std::ios::cur);
+    s << "])";
+    out_->add_title(s.str());
+    *out_ << beginheader << "Time";
     for (auto const& function : functions) {
         for (std::size_t q = 0; q < function.numQuantities(); ++q) {
-            file << ",\"" << function.name(q) << "\"";
+            *out_ << function.name(q);
         }
     }
-    file << std::endl;
+    *out_ << endheader;
 }
 
 template <std::size_t D>
 void BoundaryProbeWriter<D>::write(double time,
                                    mneme::span<FiniteElementFunction<D - 1>> functions) const {
     for (auto const& probe : probes_) {
-        std::ofstream file;
         if (time <= 0.0) {
-            file.open(probe.file_name, std::ios::out);
-            write_header(file, probe, functions);
+            out_->open(probe.file_name, false);
+            write_header(probe, functions);
         } else {
-            file.open(probe.file_name, std::ios::app);
+            out_->open(probe.file_name, true);
         }
 
-        file << std::scientific << std::setprecision(15);
-        file << time;
+        *out_ << time;
         for (auto const& function : functions) {
             auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
             auto E = function.evaluationMatrix({probe.chi});
             function.map(probe.no, E, result);
             for (std::size_t p = 0; p < function.numQuantities(); ++p) {
-                file << " " << result(0, p);
+                *out_ << result(0, p);
             }
         }
-        file << std::endl;
-        file.close();
+        *out_ << endrow;
+        out_->close();
     }
 }
 

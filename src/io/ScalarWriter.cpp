@@ -5,31 +5,29 @@
 
 namespace tndm {
 
-void ScalarWriter::write_header(std::ofstream& file) const {
-    file << "TITLE = \"Scalar output\"" << std::endl;
-    file << "VARIABLES = \"Time\"";
+void ScalarWriter::write_header() const {
+    out_->add_title("Scalar output");
+    *out_ << beginheader << "Time";
     for (auto variable_name : variable_names_) {
-        file << ",\"" << variable_name << "\"";
+        *out_ << variable_name;
     }
-    file << std::endl;
+    *out_ << endheader;
 }
 
 void ScalarWriter::write(double time, mneme::span<double> scalars) const {
-    std::ofstream file;
     if (time <= 0.0) {
-        file.open(file_name_, std::ios::out);
-        write_header(file);
+        out_->open(file_name_, false);
+        write_header();
     } else {
-        file.open(file_name_, std::ios::app);
+        out_->open(file_name_, true);
     }
 
-    file << std::scientific << std::setprecision(15);
-    file << time;
+    *out_ << time;
     for (auto scalar : scalars) {
-        file << " " << scalar;
+        *out_ << scalar;
     }
-    file << std::endl;
-    file.close();
+    *out_ << endrow;
+    out_->close();
 }
 
 } // namespace tndm

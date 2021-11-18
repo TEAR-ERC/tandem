@@ -4,17 +4,22 @@
 #include "common/MGConfig.h"
 #include "common/MeshConfig.h"
 #include "config.h"
+#include "io/CSVWriter.h"
 #include "io/Probe.h"
+#include "io/TecplotWriter.h"
 #include "tandem/AdaptiveOutputStrategy.h"
 #include "tandem/SeasType.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace tndm {
+
+enum class TableWriterType { Tecplot, CSV, Unknown };
 
 struct OutputConfig {
     std::string prefix;
@@ -32,54 +37,23 @@ struct DomainOutputConfig : OutputConfig {
     bool jacobian;
 };
 
-struct ProbeOutputConfig : OutputConfig {
+struct TabularOutputConfig : OutputConfig {
+    TableWriterType type;
+
+    std::unique_ptr<TableWriter> make_writer() const {
+        switch (type) {
+        case TableWriterType::Tecplot:
+            return std::make_unique<TecplotWriter>();
+        case TableWriterType::CSV:
+            return std::make_unique<CSVWriter>();
+        case TableWriterType::Unknown:
+            return nullptr;
+        }
+    }
+};
+
+struct ProbeOutputConfig : TabularOutputConfig {
     std::vector<Probe<DomainDimension>> probes;
-};
-
-template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& outputSchema) {
-    auto cast = [](auto ptr) {
-        using type = std::remove_reference_t<decltype(std::declval<OutputConfig>().*ptr)>;
-        return static_cast<type Derived::*>(ptr);
-    };
-    outputSchema.add_value("prefix", cast(&Derived::prefix))
-        .validator(ParentPathExists())
-        .help("Output file name prefix");
-    outputSchema.add_value("atol", cast(&Derived::atol))
-        .validator([](auto&& x) { return x >= 0; })
-        .default_value(1e-50)
-        .help("Absolute tolerance for VMax");
-    outputSchema.add_value("rtol", cast(&Derived::rtol))
-        .validator([](auto&& x) { return x >= 0; })
-        .default_value(0.01)
-        .help("Relative tolerance for VMax");
-    outputSchema.add_value("t_min", cast(&Derived::t_min))
-        .validator([](auto&& x) { return x >= 0; })
-        .default_value(0.0)
-        .help("Minimum time difference between samples");
-    outputSchema.add_value("t_max", cast(&Derived::t_max))
-        .validator([](auto&& x) { return x > 0; })
-        .default_value(365 * 24 * 3600)
-        .help("Maximum time difference between samples");
-};
-
-template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
-    auto cast = [](auto ptr) {
-        using type = std::remove_reference_t<decltype(std::declval<DomainOutputConfig>().*ptr)>;
-        return static_cast<type Derived::*>(ptr);
-    };
-    outputSchema.add_value("jacobian", cast(&Derived::jacobian))
-        .default_value(false)
-        .help("Output Jacobian");
-};
-
-template <typename Derived> void setProbeOutputConfigSchema(TableSchema<Derived>& outputSchema) {
-    auto cast = [](auto ptr) {
-        using type = std::remove_reference_t<decltype(std::declval<ProbeOutputConfig>().*ptr)>;
-        return static_cast<type Derived::*>(ptr);
-    };
-    auto& probeSchema = outputSchema.add_array("probes", cast(&Derived::probes)).of_tables();
-    probeSchema.add_value("name", &Probe<DomainDimension>::name);
-    probeSchema.add_array("x", &Probe<DomainDimension>::x).of_values();
 };
 
 struct Config {
@@ -102,7 +76,7 @@ struct Config {
 
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;
-    std::optional<OutputConfig> fault_scalar_output;
+    std::optional<TabularOutputConfig> fault_scalar_output;
     std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;

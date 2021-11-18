@@ -77,29 +77,33 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         }
     }
     if (cfg.fault_probe_output) {
+        auto const& oc = *cfg.fault_probe_output;
         monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
-            cfg.fault_probe_output->prefix, cfg.fault_probe_output->probes,
-            cfg.fault_probe_output->make_adaptive_output_interval(), mesh, cl, fault_map, comm));
+            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            fault_map, comm));
     }
     if (cfg.domain_probe_output) {
+        auto const& oc = *cfg.domain_probe_output;
         monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
-            cfg.domain_probe_output->prefix, cfg.domain_probe_output->probes,
-            cfg.domain_probe_output->make_adaptive_output_interval(), mesh, cl, comm));
+            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            comm));
     }
     if (cfg.fault_output) {
+        auto const& oc = *cfg.fault_output;
         monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
-            cfg.fault_output->prefix, cfg.fault_output->make_adaptive_output_interval(), mesh, cl,
-            PolynomialDegree, fault_map, comm));
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+            comm));
     }
     if (cfg.fault_scalar_output) {
+        auto const& oc = *cfg.fault_scalar_output;
         monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
-            cfg.fault_scalar_output->prefix,
-            cfg.fault_scalar_output->make_adaptive_output_interval(), comm));
+            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm));
     }
     if (cfg.domain_output) {
+        auto const& oc = *cfg.domain_output;
         monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
-            cfg.domain_output->prefix, cfg.domain_output->make_adaptive_output_interval(), mesh, cl,
-            PolynomialDegree, cfg.domain_output->jacobian, comm));
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
+            comm));
     }
 }
 

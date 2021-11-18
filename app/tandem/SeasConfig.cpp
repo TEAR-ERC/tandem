@@ -2,6 +2,71 @@
 
 namespace tndm {
 
+namespace detail {
+
+template <typename T, typename P> auto up_cast(P ptr) {
+    using type = std::remove_reference_t<decltype(std::declval<T>().*ptr)>;
+    return static_cast<type T::*>(ptr);
+};
+
+template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& outputSchema) {
+    outputSchema.add_value("prefix", up_cast<Derived>(&Derived::prefix))
+        .validator(ParentPathExists())
+        .help("Output file name prefix");
+    outputSchema.add_value("atol", up_cast<Derived>(&Derived::atol))
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(1e-50)
+        .help("Absolute tolerance for VMax");
+    outputSchema.add_value("rtol", up_cast<Derived>(&Derived::rtol))
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(0.01)
+        .help("Relative tolerance for VMax");
+    outputSchema.add_value("t_min", up_cast<Derived>(&Derived::t_min))
+        .validator([](auto&& x) { return x >= 0; })
+        .default_value(0.0)
+        .help("Minimum time difference between samples");
+    outputSchema.add_value("t_max", up_cast<Derived>(&Derived::t_max))
+        .validator([](auto&& x) { return x > 0; })
+        .default_value(365 * 24 * 3600)
+        .help("Maximum time difference between samples");
+}
+
+template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
+    setOutputConfigSchema(outputSchema);
+
+    outputSchema.add_value("jacobian", up_cast<Derived>(&Derived::jacobian))
+        .default_value(false)
+        .help("Output Jacobian");
+};
+
+template <typename Derived> void setTabularOutputConfigSchema(TableSchema<Derived>& outputSchema) {
+    setOutputConfigSchema(outputSchema);
+
+    outputSchema.add_value("type", up_cast<Derived>(&Derived::type))
+        .converter([](std::string_view value) {
+            if (iEquals(value, "Tecplot")) {
+                return TableWriterType::Tecplot;
+            } else if (iEquals(value, "CSV")) {
+                return TableWriterType::CSV;
+            } else {
+                return TableWriterType::Unknown;
+            }
+        })
+        .validator([](TableWriterType const& mode) { return mode != TableWriterType::Unknown; })
+        .default_value(TableWriterType::CSV);
+}
+
+template <typename Derived> void setProbeOutputConfigSchema(TableSchema<Derived>& outputSchema) {
+    setTabularOutputConfigSchema(outputSchema);
+
+    auto& probeSchema =
+        outputSchema.add_array("probes", up_cast<Derived>(&Derived::probes)).of_tables();
+    probeSchema.add_value("name", &Probe<DomainDimension>::name);
+    probeSchema.add_array("x", &Probe<DomainDimension>::x).of_values();
+};
+
+} // namespace detail
+
 void setConfigSchema(TableSchema<Config>& schema,
                      MakePathRelativeToOtherPath const& path_converter) {
     schema.add_value("resolution", &Config::resolution)
@@ -78,21 +143,18 @@ void setConfigSchema(TableSchema<Config>& schema,
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
     auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
-    setOutputConfigSchema(faultOutputSchema);
+    detail::setOutputConfigSchema(faultOutputSchema);
     auto& faultScalarOutputSchema =
         schema.add_table("fault_scalar_output", &Config::fault_scalar_output);
-    setOutputConfigSchema(faultScalarOutputSchema);
+    detail::setTabularOutputConfigSchema(faultScalarOutputSchema);
     auto& domainOutputSchema = schema.add_table("domain_output", &Config::domain_output);
-    setOutputConfigSchema(domainOutputSchema);
-    setDomainOutputConfigSchema(domainOutputSchema);
+    detail::setDomainOutputConfigSchema(domainOutputSchema);
     auto& faultProbeOutputSchema =
         schema.add_table("fault_probe_output", &Config::fault_probe_output);
-    setOutputConfigSchema(faultProbeOutputSchema);
-    setProbeOutputConfigSchema(faultProbeOutputSchema);
+    detail::setProbeOutputConfigSchema(faultProbeOutputSchema);
     auto& domainProbeOutputSchema =
         schema.add_table("domain_probe_output", &Config::domain_probe_output);
-    setOutputConfigSchema(domainProbeOutputSchema);
-    setProbeOutputConfigSchema(domainProbeOutputSchema);
+    detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
 }
 
 } // namespace tndm
