@@ -2,6 +2,7 @@
 #include "basis/Functions.h"
 #include "basis/GaussLegendre.h"
 #include "basis/Nodal.h"
+#include "basis/NumberingConvention.h"
 #include "basis/Util.h"
 #include "basis/WarpAndBlend.h"
 
@@ -418,8 +419,8 @@ TEST_CASE("Nodes") {
         checkNodes(wab3(4), refNodes);
     }
 
-    auto eqd2 = EquidistantNodesFactory<2>();
-    auto eqd3 = EquidistantNodesFactory<3>();
+    auto eqd2 = EquidistantNodesFactory<2>(NumberingConvention::VTK);
+    auto eqd3 = EquidistantNodesFactory<3>(NumberingConvention::VTK);
 
     SUBCASE("Triangle nodes P1 (equidistant)") {
         std::vector<std::array<double, 2>> refNodes{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}};
@@ -776,7 +777,7 @@ TEST_CASE("Nodes") {
     }
 
     SUBCASE("Tri equidistant permutations") {
-        auto factory = EquidistantNodesFactory<2u>();
+        auto factory = EquidistantNodesFactory<2u>(NumberingConvention::GMSH);
         for (unsigned degree = 1; degree < 10; ++degree) {
             auto nodes = factory(degree);
             auto p = std::array<unsigned, 3>{0, 1, 2};
@@ -788,7 +789,7 @@ TEST_CASE("Nodes") {
     }
 
     SUBCASE("Tet equidistant permutations") {
-        auto factory = EquidistantNodesFactory<3u>();
+        auto factory = EquidistantNodesFactory<3u>(NumberingConvention::GMSH);
         for (unsigned degree = 1; degree < 10; ++degree) {
             auto nodes = factory(degree);
             auto p = std::array<unsigned, 4>{0, 1, 2, 3};

@@ -2,6 +2,7 @@
 #define EQUIDISTANT_20200630_H
 
 #include "Nodal.h"
+#include "NumberingConvention.h"
 
 #include <array>
 #include <cstddef>
@@ -14,6 +15,13 @@ namespace tndm {
  */
 template <std::size_t D> class EquidistantNodesFactory : public NodesFactory<D> {
 public:
+    /**
+     * @brief Construct an equidistant node factory
+     *
+     * @param convention Numbering convention
+     */
+    EquidistantNodesFactory(NumberingConvention convention) : convention_(convention) {}
+
     /**
      * @brief Returns equidistant nodes on the reference D-simplex
      *
@@ -36,6 +44,8 @@ private:
 
     void tet(int n, std::array<std::array<double, D>, 4>&& verts,
              std::vector<std::array<double, D>>& result) const;
+
+    NumberingConvention convention_;
 };
 
 } // namespace tndm
