@@ -1,0 +1,8 @@
+mesh_file = "circular_hole.msh"
+
+[poisson]
+lib = "circular_hole.lua"
+boundary = "solution"
+solution = "solution"
+solution_jacobian = "solution_jacobian"
+K = "K"
