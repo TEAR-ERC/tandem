@@ -117,9 +117,9 @@ function solution_jacobian(x, y, z)
     local ux_x = uR_x*ct*sb + ub_x*ct*cb + uR*(-st*sb*t_x+ct*cb*b_x) - ub*(st*cb*t_x+ct*sb*b_x)
     local ux_y = uR_y*ct*sb + ub_y*ct*cb + uR*(-st*sb*t_y+ct*cb*b_y) - ub*(st*cb*t_y+ct*sb*b_y)
     local ux_z = uR_z*ct*sb + ub_z*ct*cb + uR*(-st*sb*t_z+ct*cb*b_z) - ub*(st*cb*t_z+ct*sb*b_z)
-    local uy_x = uR_x*st*sb + ub_x*st*cb + uR*( ct*sb*t_x+ct*cb*b_x) + ub*(ct*cb*t_x-ct*sb*b_x)
-    local uy_y = uR_y*st*sb + ub_y*st*cb + uR*( ct*sb*t_y+ct*cb*b_y) + ub*(ct*cb*t_y-ct*sb*b_y)
-    local uy_z = uR_z*st*sb + ub_z*st*cb + uR*( ct*sb*t_z+ct*cb*b_z) + ub*(ct*cb*t_z-ct*sb*b_z)
+    local uy_x = uR_x*st*sb + ub_x*st*cb + uR*( ct*sb*t_x+st*cb*b_x) + ub*(ct*cb*t_x-st*sb*b_x)
+    local uy_y = uR_y*st*sb + ub_y*st*cb + uR*( ct*sb*t_y+st*cb*b_y) + ub*(ct*cb*t_y-st*sb*b_y)
+    local uy_z = uR_z*st*sb + ub_z*st*cb + uR*( ct*sb*t_z+st*cb*b_z) + ub*(ct*cb*t_z-st*sb*b_z)
     local uz_x = uR_x*cb - ub_x*sb - uR*sb*b_x - ub*cb*b_x
     local uz_y = uR_y*cb - ub_y*sb - uR*sb*b_y - ub*cb*b_y
     local uz_z = uR_z*cb - ub_z*sb - uR*sb*b_z - ub*cb*b_z
