@@ -49,6 +49,7 @@ struct TabularOutputConfig : OutputConfig {
         case TableWriterType::Unknown:
             return nullptr;
         }
+        return nullptr;
     }
 };
 

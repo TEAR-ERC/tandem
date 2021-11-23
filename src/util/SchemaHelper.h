@@ -34,9 +34,13 @@ public:
     template <typename Fun> MakePathRelativeToOtherPath(Fun otherPath) : otherPath_(otherPath) {}
 
     auto operator()(std::string_view path) {
-        auto newPath = std::filesystem::path(otherPath_()).parent_path();
-        newPath /= std::filesystem::path(path);
-        return newPath;
+        auto p = std::filesystem::path(path);
+        if (p.is_relative()) {
+            auto newPath = std::filesystem::path(otherPath_()).parent_path();
+            newPath /= p;
+            return newPath;
+        }
+        return p;
     }
 
 private:
