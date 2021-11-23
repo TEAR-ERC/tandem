@@ -1,0 +1,10 @@
+mesh_file = "spherical_hole.msh"
+
+[elasticity]
+lib = "spherical_hole.lua"
+force = "force"
+boundary = "solution"
+solution = "solution"
+solution_jacobian = "solution_jacobian"
+mu = "mu"
+lam = "lam"
