@@ -1,5 +1,4 @@
 mesh_file = "dip.msh"
-output = "dip"
 
 [elasticity]
 lib = "dip.lua"
