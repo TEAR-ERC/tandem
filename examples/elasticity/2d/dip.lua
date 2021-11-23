@@ -94,36 +94,37 @@ function sol_A(r, theta)
 end
 
 function jac_A(r, theta)
-    local x0 = lamda - 1
-    local x1 = theta*x0
-    local x2 = math.sin(x1)
-    local x3 = A_3*x2
-    local x4 = math.cos(x1)
-    local x5 = A_4*x4
-    local x6 = x3 + x5
-    local x7 = lamda + 1
-    local x8 = theta*x7
-    local x9 = math.sin(x8)
-    local x10 = A_1*x9
-    local x11 = math.cos(x8)
-    local x12 = A_2*x11
-    local x13 = (1.0/2.0)*r^lamda/mu
-    local x14 = lamda*x13/r
-    local x15 = 4*nu
-    local x16 = A_3*x4
-    local x17 = x0*x16
-    local x18 = A_4*x2
-    local x19 = x0*x18
-    local x20 = x17 - x19
-    local x21 = A_1*x11*x7
-    local x22 = A_2*x7*x9
-    local x23 = x15 - 4
-    local x24 = x7^2
-    local x25 = x0^2
-    local urA_r = x14*(4*x6*(1 - nu) - x7*(x10 + x12 + x6))
-    local urA_t = x13*(x20*(4 - x15) + (-lamda - 1)*(x20 + x21 - x22))
-    local utA_r = x14*(-x17 + x19 - x21 + x22 + x23*(x16 - x18))
-    local utA_t = x13*(x10*x24 + x12*x24 + x23*(-x0*x3 - x0*x5) + x25*x3 + x25*x5)
+    local x0 = 4*nu - 4
+    local x1 = lamda - 1
+    local x2 = theta*x1
+    local x3 = math.sin(x2)
+    local x4 = A_3*x3
+    local x5 = math.cos(x2)
+    local x6 = A_4*x5
+    local x7 = x4 + x6
+    local x8 = lamda + 1
+    local x9 = theta*x8
+    local x10 = math.sin(x9)
+    local x11 = A_1*x10
+    local x12 = math.cos(x9)
+    local x13 = A_2*x12
+    local x14 = (1.0/2.0)/mu
+    local x15 = lamda*r^x1*x14
+    local x16 = A_3*x5
+    local x17 = A_4*x3
+    local x18 = x16 - x17
+    local x19 = 4*x1*(nu - 1)
+    local x20 = A_1*x12*x8
+    local x21 = x1*x16
+    local x22 = A_2*x10*x8
+    local x23 = x1*x17
+    local x24 = r^lamda*x14
+    local x25 = x8^2
+    local x26 = x1^2
+    local urA_r = -x15*(x0*x7 + x8*(x11 + x13 + x7))
+    local urA_t = -x24*(x18*x19 + x8*(x20 + x21 - x22 - x23))
+    local utA_r = x15*(x0*x18 - x20 - x21 + x22 + x23)
+    local utA_t = x24*(x11*x25 + x13*x25 - x19*x7 + x26*x4 + x26*x6)
     return urA_r, urA_t, utA_r, utA_t
 end
 
@@ -146,36 +147,37 @@ function sol_B(r, theta)
 end
 
 function jac_B(r, theta)
-    local x0 = lamda - 1
-    local x1 = theta*x0
-    local x2 = math.sin(x1)
-    local x3 = B_3*x2
-    local x4 = math.cos(x1)
-    local x5 = B_4*x4
-    local x6 = x3 + x5
-    local x7 = lamda + 1
-    local x8 = theta*x7
-    local x9 = math.sin(x8)
-    local x10 = B_1*x9
-    local x11 = math.cos(x8)
-    local x12 = B_2*x11
-    local x13 = (1.0/2.0)*r^lamda/mu
-    local x14 = lamda*x13/r
-    local x15 = 4*nu
-    local x16 = B_3*x4
-    local x17 = x0*x16
-    local x18 = B_4*x2
-    local x19 = x0*x18
-    local x20 = x17 - x19
-    local x21 = B_1*x11*x7
-    local x22 = B_2*x7*x9
-    local x23 = x15 - 4
-    local x24 = x7^2
-    local x25 = x0^2
-    local urB_r = x14*(4*x6*(1 - nu) - x7*(x10 + x12 + x6))
-    local urB_t = x13*(x20*(4 - x15) + (-lamda - 1)*(x20 + x21 - x22))
-    local utB_r = x14*(-x17 + x19 - x21 + x22 + x23*(x16 - x18))
-    local utB_t = x13*(x10*x24 + x12*x24 + x23*(-x0*x3 - x0*x5) + x25*x3 + x25*x5)
+    local x0 = 4*nu - 4
+    local x1 = lamda - 1
+    local x2 = theta*x1
+    local x3 = math.sin(x2)
+    local x4 = B_3*x3
+    local x5 = math.cos(x2)
+    local x6 = B_4*x5
+    local x7 = x4 + x6
+    local x8 = lamda + 1
+    local x9 = theta*x8
+    local x10 = math.sin(x9)
+    local x11 = B_1*x10
+    local x12 = math.cos(x9)
+    local x13 = B_2*x12
+    local x14 = (1.0/2.0)/mu
+    local x15 = lamda*r^x1*x14
+    local x16 = B_3*x5
+    local x17 = B_4*x3
+    local x18 = x16 - x17
+    local x19 = 4*x1*(nu - 1)
+    local x20 = B_1*x12*x8
+    local x21 = x1*x16
+    local x22 = B_2*x10*x8
+    local x23 = x1*x17
+    local x24 = r^lamda*x14
+    local x25 = x8^2
+    local x26 = x1^2
+    local urB_r = -x15*(x0*x7 + x8*(x11 + x13 + x7))
+    local urB_t = -x24*(x18*x19 + x8*(x20 + x21 - x22 - x23))
+    local utB_r = x15*(x0*x18 - x20 - x21 + x22 + x23)
+    local utB_t = x24*(x11*x25 + x13*x25 - x19*x7 + x26*x4 + x26*x6)
     return urB_r, urB_t, utB_r, utB_t
 end
 
