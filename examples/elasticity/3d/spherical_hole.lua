@@ -98,11 +98,11 @@ function solution_jacobian(x, y, z)
     local st = math.sin(theta)
     local cb = math.cos(beta)
     local sb = math.sin(beta)
-    local R_x = ct*sb/R
-    local R_y = st*sb/R
-    local R_z = cb/R
-    local t_x = -st / R
-    local t_y = ct / R
+    local R_x = ct*sb
+    local R_y = st*sb
+    local R_z = cb
+    local t_x = -st / (R * sb)
+    local t_y =  ct / (R * sb)
     local t_z = 0
     local b_x = ct * cb / R
     local b_y = st * cb / R
