@@ -1,16 +1,16 @@
-DefineConstant[ h = {0.1, Min 0, Max 10, Name "Resolution" } ];
-DefineConstant[ hf = {0.05, Min 0, Max 10, Name "Resolution at fault-surface intersection" } ];
+DefineConstant[ h = {0.1, Min 0, Max 10, Name "Mesh size" } ];
 DefineConstant[ dip = {60, Min 0, Max 90, Name "Dipping angle" } ];
-DefineConstant[ L = {2.0, Min 0, Max 10, Name "L" } ];
+DefineConstant[ L = {1.0, Min 0, Max 10, Name "L" } ];
 DefineConstant[ H = {1.0, Min 0, Max 10, Name "H" } ];
 
 dip_rad = -dip * Pi / 180.0;
+offset = -H * Cos(dip_rad)/Sin(dip_rad);
 
 Point(1) = {L, 0, 0, h};
-Point(2) = {0, 0, 0, hf};
-Point(3) = {-H * Cos(dip_rad)/Sin(dip_rad), -H, 0, hf};
-Point(4) = {L, -H, 0, h};
-Point(5) = {-L, -H, 0, h};
+Point(2) = {0, 0, 0, h};
+Point(3) = {offset, -H, 0, h};
+Point(4) = {L + offset, -H, 0, h};
+Point(5) = {-L + offset, -H, 0, h};
 Point(6) = {-L, 0, 0, h};
 Line(1) = {1, 2};
 Line(2) = {2, 3};
