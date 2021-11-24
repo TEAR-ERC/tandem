@@ -13,6 +13,7 @@
 namespace tndm {
 
 template <std::size_t D> struct GMSHSimplexType {};
+template <> struct GMSHSimplexType<0u> { static constexpr std::array<long, 1> types = {15}; };
 template <> struct GMSHSimplexType<1u> {
     static constexpr std::array<long, 10> types = {1, 8, 26, 27, 28, 62, 63, 64, 65, 66};
 };
@@ -26,6 +27,19 @@ template <> struct GMSHSimplexType<3u> {
 template <std::size_t D> bool is_gmsh_simplex(long type) {
     return std::find(GMSHSimplexType<D>::types.begin(), GMSHSimplexType<D>::types.end(), type) !=
            GMSHSimplexType<D>::types.end();
+}
+
+template <std::size_t D> struct is_lower_dimensional_gmsh_simplex {
+    static bool value(long type) {
+        return is_gmsh_simplex<D - 1u>(type) ||
+               is_lower_dimensional_gmsh_simplex<D - 1u>::value(type);
+    }
+};
+template <> struct is_lower_dimensional_gmsh_simplex<0> {
+    static bool value(long type) { return false; }
+};
+template <std::size_t D> inline bool is_lower_dimensional_gmsh_simplex_v(long type) {
+    return is_lower_dimensional_gmsh_simplex<D>::value(type);
 }
 
 template <std::size_t D> class GlobalSimplexMeshBuilder : public GMSHMeshBuilder {

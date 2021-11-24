@@ -96,12 +96,31 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         }
         bcs.push_back(bc);
     } else {
-        ++ignoredElems;
+        if (is_lower_dimensional_gmsh_simplex_v<D - 1u>(type)) {
+            ++ignoredElems;
+        } else {
+            std::stringstream s;
+            s << "GMSH element of type " << type << " is not a 0,...," << D
+              << "-simplex. Does the domain dimension match the dimension of the mesh?";
+            throw std::runtime_error(s.str());
+        }
     }
 }
 
 template <std::size_t D>
 std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Comm comm) {
+    auto check_mesh = std::array<std::size_t, 2>{elements.size(), bcs.size()};
+    MPI_Allreduce(MPI_IN_PLACE, &check_mesh, 2, mpi_type_t<std::size_t>(), MPI_SUM, comm);
+    if (check_mesh[0] == 0) {
+        std::stringstream s;
+        s << "The mesh does not contain any " << D
+          << "-simplex. Does the domain dimension match the dimension of the mesh?";
+        throw std::runtime_error(s.str());
+    }
+    if (check_mesh[1] == 0) {
+        throw std::runtime_error("Boundary conditions are unspecified in the mesh.");
+    }
+
     std::unique_ptr<GlobalSimplexMesh<D>> mesh;
     auto high_order_shape = high_order_nodes.shape();
     MPI_Allreduce(MPI_IN_PLACE, &high_order_shape, 2,
