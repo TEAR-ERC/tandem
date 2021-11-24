@@ -105,13 +105,12 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     argparse::ArgumentParser program("static");
-    program.add_argument("-D", "--dim")
-        .help("Simplex dimension (D=2: triangle, D=3: tet)")
-        .default_value(2ul)
-        .action([](std::string const& value) { return std::stoul(value); });
     program.add_argument("-N", "--degree")
         .help("Polynomial degree for geometry approximation")
         .default_value(1ul)
+        .action([](std::string const& value) { return std::stoul(value); });
+    program.add_argument("dim")
+        .help("Simplex dimension (D=2: triangle, D=3: tet)")
         .action([](std::string const& value) { return std::stoul(value); });
     program.add_argument("mesh_file").help(".msh file");
     program.add_argument("output").help("Prefix of VTU output");
@@ -125,8 +124,8 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    auto D = program.get<unsigned long>("-D");
     auto N = program.get<unsigned long>("-N");
+    auto D = program.get<unsigned long>("dim");
     auto mesh_file = program.get<std::string>("mesh_file");
     auto output = program.get<std::string>("output");
 
