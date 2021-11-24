@@ -14,6 +14,11 @@ target_compile_options(warp-blend-opt PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(warp-blend-opt PRIVATE ../external/)
 target_link_libraries(warp-blend-opt PRIVATE tandem-fem-lib)
 
+add_executable(check-bc check-bc.cpp)
+target_compile_options(check-bc PRIVATE ${CPU_ARCH_FLAGS})
+target_include_directories(check-bc PRIVATE ../external/)
+target_link_libraries(check-bc PRIVATE tandem-lib)
+
 add_executable(test-mesh test-mesh.cpp)
 target_compile_options(test-mesh PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(test-mesh PRIVATE ../external/)
