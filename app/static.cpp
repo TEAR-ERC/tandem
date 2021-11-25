@@ -6,6 +6,7 @@
 #include "common/PetscLinearSolver.h"
 #include "common/PetscUtil.h"
 #include "common/PoissonScenario.h"
+#include "common/Type.h"
 #include "config.h"
 #include "form/DGCurvilinearCommon.h"
 #include "mesh/LocalSimplexMesh.h"
@@ -36,6 +37,7 @@
 #include <stdexcept>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -50,6 +52,10 @@ using namespace tndm;
 struct Config {
     std::optional<double> resolution;
     DGMethod method;
+    LocalOpType type;
+    std::string lib;
+    std::string scenario;
+    std::array<double, DomainDimension> ref_normal;
     bool matrix_free;
     bool test_matrix_free;
     MGStrategy mg_strategy;
@@ -57,8 +63,6 @@ struct Config {
     int profile;
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
-    std::optional<PoissonScenarioConfig> poisson;
-    std::optional<ElasticityScenarioConfig> elasticity;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
@@ -255,6 +259,28 @@ int main(int argc, char** argv) {
         })
         .default_value(DGMethod::IP)
         .validator([](DGMethod const& type) { return type != DGMethod::Unknown; });
+    schema.add_value("type", &Config::type)
+        .converter([](std::string_view value) {
+            if (iEquals(value, "poisson")) {
+                return LocalOpType::Poisson;
+            } else if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
+                return LocalOpType::Elasticity;
+            } else {
+                return LocalOpType::Unknown;
+            }
+        })
+        .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; });
+    schema.add_value("lib", &Config::lib)
+        .converter(makePathRelativeToConfig)
+        .validator(PathExists());
+    schema.add_value("scenario", &Config::scenario);
+    {
+        auto default_ref_normal = std::array<double, DomainDimension>{};
+        default_ref_normal[0] = 1.0;
+        schema.add_array("ref_normal", &Config::ref_normal)
+            .default_value(std::move(default_ref_normal))
+            .of_values();
+    }
     schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
     schema.add_value("test_matrix_free", &Config::test_matrix_free).default_value(false);
     schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
@@ -280,10 +306,6 @@ int main(int argc, char** argv) {
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
-    auto& poissonSchema = schema.add_table("poisson", &Config::poisson);
-    PoissonScenarioConfig::setSchema(poissonSchema, makePathRelativeToConfig);
-    auto& elasticitySchema = schema.add_table("elasticity", &Config::elasticity);
-    ElasticityScenarioConfig::setSchema(elasticitySchema, makePathRelativeToConfig);
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
@@ -338,15 +360,21 @@ int main(int argc, char** argv) {
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
 
-    if (cfg->poisson && !cfg->elasticity) {
-        auto scenario = PoissonScenario(*cfg->poisson);
+    switch (cfg->type) {
+    case LocalOpType::Poisson: {
+        auto scenario = PoissonScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
         static_problem(*mesh, scenario, *cfg);
-    } else if (!cfg->poisson && cfg->elasticity) {
-        auto scenario = ElasticityScenario(*cfg->elasticity);
-        static_problem(*mesh, scenario, *cfg);
-    } else {
-        std::cerr << "Please specify either [poisson] or [elasticity] (but not both)." << std::endl;
+        break;
     }
+    case LocalOpType::Elasticity: {
+        auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
+        static_problem(*mesh, scenario, *cfg);
+        break;
+    }
+    default:
+        std::cerr << "Unknown type. Should be either poisson or elasticity." << std::endl;
+        break;
+    };
 
     PetscErrorCode ierr = PetscFinalize();
 

@@ -1,5 +1,5 @@
 local dip = -math.pi / 3.0
-local mu = 1.0
+local mu0 = 1.0
 local S = 1.0
 local nu = 0.25
 local lamda = 0.5
@@ -48,14 +48,6 @@ do
     A_2 = -x0*(A_3*x3 + A_4*lamda + A_4*x2)
 end
 
-function mat_mu(x, y)
-    return mu
-end
-
-function mat_lam(x, y)
-    return 2.0 * mu * nu / (1-2*nu)
-end
-
 function polar(x, y)
     local r = math.sqrt(x^2 + y^2)
     local theta = math.atan2(y, x)
@@ -68,13 +60,6 @@ function uxy(r, theta, ur, ut)
     return ux, uy
 end
 
-function slip(x, y)
-    local r, theta = polar(x, y)
-    local ur = S * r^lamda / (2 * mu)
-    local ut = 0
-    return uxy(r, theta, ur, ut)
-end
-
 function sol_A(r, theta)
     local x0 = lamda - 1
     local x1 = theta*x0
@@ -85,7 +70,7 @@ function sol_A(r, theta)
     local x6 = theta*x5
     local x7 = math.sin(x6)
     local x8 = math.cos(x6)
-    local x9 = (1.0/2.0)*r^lamda/mu
+    local x9 = (1.0/2.0)*r^lamda/mu0
     local x10 = A_4*x2
     local x11 = A_3*x3
     local urA = x9*(4*x4*(1 - nu) - x5*(A_1*x7 + A_2*x8 + x4))
@@ -108,7 +93,7 @@ function jac_A(r, theta)
     local x11 = A_1*x10
     local x12 = math.cos(x9)
     local x13 = A_2*x12
-    local x14 = (1.0/2.0)/mu
+    local x14 = (1.0/2.0)/mu0
     local x15 = lamda*r^x1*x14
     local x16 = A_3*x5
     local x17 = A_4*x3
@@ -138,7 +123,7 @@ function sol_B(r, theta)
     local x6 = theta*x5
     local x7 = math.sin(x6)
     local x8 = math.cos(x6)
-    local x9 = (1.0/2.0)*r^lamda/mu
+    local x9 = (1.0/2.0)*r^lamda/mu0
     local x10 = B_4*x2
     local x11 = B_3*x3
     local urB = x9*(4*x4*(1 - nu) - x5*(B_1*x7 + B_2*x8 + x4))
@@ -161,7 +146,7 @@ function jac_B(r, theta)
     local x11 = B_1*x10
     local x12 = math.cos(x9)
     local x13 = B_2*x12
-    local x14 = (1.0/2.0)/mu
+    local x14 = (1.0/2.0)/mu0
     local x15 = lamda*r^x1*x14
     local x16 = B_3*x5
     local x17 = B_4*x3
@@ -181,7 +166,31 @@ function jac_B(r, theta)
     return urB_r, urB_t, utB_r, utB_t
 end
 
-function solution(x, y)
+local DippingFault = {}
+
+function DippingFault:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function DippingFault:mu(x, y)
+    return mu0
+end
+
+function DippingFault:lam(x, y)
+    return 2.0 * mu0 * nu / (1-2*nu)
+end
+
+function DippingFault:slip(x, y)
+    local r, theta = polar(x, y)
+    local ur = S * r^lamda / (2 * mu0)
+    local ut = 0
+    return uxy(r, theta, ur, ut)
+end
+
+function DippingFault:solution(x, y)
     local r, theta = polar(x, y)
     local ur, ut
     if theta < dip then
@@ -192,7 +201,11 @@ function solution(x, y)
     return uxy(r, theta, ur, ut)
 end
 
-function solution_jacobian(x, y)
+function DippingFault:boundary(x, y)
+    return self:solution(x, y)
+end
+
+function DippingFault:solution_jacobian(x, y)
     local r, theta = polar(x, y)
     local ur, ut, ur_r, ur_t, ut_r, ut_t
     if theta < dip then
@@ -220,3 +233,5 @@ function solution_jacobian(x, y)
 
     return ux_x, ux_y, uy_x, uy_y
 end
+
+dip_60 = DippingFault:new()

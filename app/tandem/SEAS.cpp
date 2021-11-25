@@ -278,10 +278,10 @@ namespace tndm {
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     std::unique_ptr<seas::ContextBase> ctx = nullptr;
     switch (cfg.type) {
-    case SeasType::Poisson:
+    case LocalOpType::Poisson:
         ctx = detail::make_context<Poisson>(mesh, cfg);
         break;
-    case SeasType::Elasticity:
+    case LocalOpType::Elasticity:
         ctx = detail::make_context<Elasticity>(mesh, cfg);
         break;
     default:
