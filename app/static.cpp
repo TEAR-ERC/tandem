@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
     if (rank == 0) {
-        Banner::print_logo_version_and_affinity(std::cout, affinity);
+        Banner::standard(std::cout, affinity);
     }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
