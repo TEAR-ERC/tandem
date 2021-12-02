@@ -53,7 +53,21 @@ protected:
 private:
     void compute_discrete_greens_function();
     void compute_boundary_traction();
+    void create_discrete_greens_function();
+    void partial_assemble_discrete_greens_function();
+    void write_discrete_greens_operator();
+    void load_discrete_greens_operator();
+    // all logic associated with matix craetion, loading / partial assembly is done here
+    void get_discrete_greens_function();
+    void write_discrete_greens_traction();
+    void load_discrete_greens_traction();
+    void get_boundary_traction();
 
+    std::string gf_operator_filename_ = "gf_mat.bin";
+    std::string gf_traction_filename_ = "gf_vec.bin";
+    PetscInt current_gf_ = 0;
+    PetscInt n_gf_ = 0;
+    double checkpoint_every_nmins_ = 30.0;
     Mat G_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;
