@@ -82,11 +82,12 @@ static PetscErrorCode _TSView(TS ts,PetscViewer viewer)
       ierr = PetscStrncpy(type,((PetscObject)ts)->type_name,256);CHKERRQ(ierr);
       ierr = PetscViewerBinaryWrite(viewer,type,256,PETSC_CHAR);CHKERRQ(ierr);
 
+      /* PETSC FIX START */
       /* missing content */
       ierr = PetscViewerBinaryWrite(viewer,&ts->ptime,1,PETSC_DOUBLE);CHKERRQ(ierr);
       ierr = PetscViewerBinaryWrite(viewer,&ts->steps,1,PETSC_INT);CHKERRQ(ierr);
       ierr = PetscViewerBinaryWrite(viewer,&ts->time_step,1,PETSC_DOUBLE);CHKERRQ(ierr);
-
+      /* PETSC FIX END */
     }
     if (ts->ops->view) {
       ierr = (*ts->ops->view)(ts,viewer);CHKERRQ(ierr);
@@ -176,10 +177,12 @@ PetscErrorCode _TSLoad(TS ts, PetscViewer viewer)
   if (classid != TS_FILE_CLASSID) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_ARG_WRONG,"Not TS next in file");
   ierr = PetscViewerBinaryRead(viewer,type,256,NULL,PETSC_CHAR);CHKERRQ(ierr);
 
-   /* missing content */
-   ierr = PetscViewerBinaryRead(viewer,&ts->ptime,1,NULL,PETSC_DOUBLE);CHKERRQ(ierr);
-   ierr = PetscViewerBinaryRead(viewer,&ts->steps,1,NULL,PETSC_INT);CHKERRQ(ierr);
-   ierr = PetscViewerBinaryRead(viewer,&ts->time_step,1,NULL,PETSC_DOUBLE);CHKERRQ(ierr);
+  /* PETSC FIX START */
+  /* missing content */
+  ierr = PetscViewerBinaryRead(viewer,&ts->ptime,1,NULL,PETSC_DOUBLE);CHKERRQ(ierr);
+  ierr = PetscViewerBinaryRead(viewer,&ts->steps,1,NULL,PETSC_INT);CHKERRQ(ierr);
+  ierr = PetscViewerBinaryRead(viewer,&ts->time_step,1,NULL,PETSC_DOUBLE);CHKERRQ(ierr);
+  /* PETSC BUG FIX END */
 
   ierr = TSSetType(ts, type);CHKERRQ(ierr);
   if (ts->ops->load) {
@@ -201,30 +204,19 @@ PetscErrorCode _TSLoad(TS ts, PetscViewer viewer)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode tandem_TSView(TS ts)
+PetscErrorCode tandem_TSView(TS ts,const char filename[])
 { 
-  const char filename[] = "ts_checkpoint.bin";
   PetscErrorCode ierr;
   PetscViewer viewer;
 
   ierr = PetscViewerBinaryOpen(PetscObjectComm((PetscObject)ts),filename,FILE_MODE_WRITE,&viewer);CHKERRQ(ierr);
   ierr = _TSView(ts,viewer);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
-  /*
-  TSView(ts,PETSC_VIEWER_STDOUT_WORLD);
-  {
-    PetscReal time;
-    PetscInt tk;
-    TSGetStepNumber(ts,&tk); printf("  step %d\n",(int)tk);
-    TSGetTime(ts,&time); printf("  time %lf\n",time);
-  } 
-  */
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode tandem_TSLoad(TS ts)
+PetscErrorCode tandem_TSLoad(TS ts,const char filename[])
 {
-  const char filename[] = "ts_checkpoint.bin";
   PetscErrorCode ierr;
   PetscViewer viewer;
   PetscBool flg = PETSC_FALSE;
@@ -235,15 +227,6 @@ PetscErrorCode tandem_TSLoad(TS ts)
   ierr = PetscViewerBinaryOpen(PetscObjectComm((PetscObject)ts),filename,FILE_MODE_READ,&viewer);CHKERRQ(ierr);
   ierr = _TSLoad(ts,viewer);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
-  /*
-  TSView(ts,PETSC_VIEWER_STDOUT_WORLD);
-  {
-    PetscReal time;
-    PetscInt tk;
-    TSGetStepNumber(ts,&tk); printf("  step %d\n",(int)tk);
-    TSGetTime(ts,&time); printf("  time %lf\n",time);
-  }
-  */
   PetscFunctionReturn(0);
 }                                                     
 

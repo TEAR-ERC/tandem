@@ -47,20 +47,17 @@ static PetscErrorCode _VecView_Nest(Vec x,PetscViewer viewer)
 
 static PetscErrorCode _VecLoad_Nest(Vec x,PetscViewer viewer)
 {
-  PetscBool      isascii,isbinary;
+  PetscBool      isbinary;
   PetscInt       i,nb;
   Vec            *v;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERASCII,&isascii);CHKERRQ(ierr);
   ierr = PetscObjectTypeCompare((PetscObject)viewer,PETSCVIEWERBINARY,&isbinary);CHKERRQ(ierr);
+  if (!isbinary) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_WRONG,"Invalid viewer; open viewer with PetscViewerBinaryOpen()");
   ierr = VecNestGetSubVecs(x,&nb,&v);CHKERRQ(ierr);
-  if (isascii) {
-  } else if (isbinary) {
-    for (i=0; i<nb; i++) {
-      ierr = VecLoad(v[i],viewer);CHKERRQ(ierr);
-    }
+  for (i=0; i<nb; i++) {
+    ierr = VecLoad(v[i],viewer);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }

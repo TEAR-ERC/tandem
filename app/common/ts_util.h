@@ -3,7 +3,7 @@
 
 #include <petscts.h>
 
-PetscErrorCode tandem_TSView(TS);
-PetscErrorCode tandem_TSLoad(TS);
+PetscErrorCode tandem_TSView(TS,const char*);
+PetscErrorCode tandem_TSLoad(TS,const char*);
 
 #endif // TS_UTIL_20211202_H

@@ -55,10 +55,10 @@ public:
     ~PetscTimeSolver() { VecDestroy(&ts_state_); }
 
     void solve(double upcoming_time) {
-        CHKERRTHROW(tandem_TSLoad(ts_));
+        CHKERRTHROW(tandem_TSLoad(ts_,"ts_checkpoint.bin"));
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
-        CHKERRTHROW(tandem_TSView(ts_));
+        CHKERRTHROW(tandem_TSView(ts_,"ts_checkpoint.bin"));
     }
 
     auto& state(std::size_t idx) {
