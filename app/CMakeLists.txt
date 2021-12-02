@@ -188,6 +188,8 @@ if(${LAPACK_FOUND})
     list(APPEND APP_COMMON_SRCS
          pc/eigdeflate.c
          pc/reig_aux.c
+         common/ts_util.c
+         common/vecnest_util.c
     )
 endif()
 add_library(app-common ${APP_COMMON_SRCS})

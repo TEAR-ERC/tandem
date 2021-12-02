@@ -3,7 +3,10 @@
 
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
-
+extern "C" {
+  #include "ts_util.h"
+  #include "vecnest_util.h"
+}
 #include <petscsystypes.h>
 #include <petscts.h>
 #include <petscvec.h>
@@ -42,6 +45,7 @@ public:
         }
         MPI_Comm comm;
         CHKERRTHROW(VecCreateNest(timeop.comm(), NumStateVecs, nullptr, x, &ts_state_));
+        CHKERRTHROW(VecNestUpgradeOperations(ts_state_));
 
         std::apply([&timeop](auto&... x) { timeop.initial_condition((*x)...); }, state_);
 
@@ -51,8 +55,10 @@ public:
     ~PetscTimeSolver() { VecDestroy(&ts_state_); }
 
     void solve(double upcoming_time) {
+        CHKERRTHROW(tandem_TSLoad(ts_));
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
+        CHKERRTHROW(tandem_TSView(ts_));
     }
 
     auto& state(std::size_t idx) {
