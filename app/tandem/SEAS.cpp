@@ -218,7 +218,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     Stopwatch sw;
     sw.start();
-    ts.solve(cfg.final_time);
+    //ts.solve(cfg.final_time);
+    ts.solve_with_checkpoints(cfg.final_time);
     double solve_time = sw.stop();
 
     std::optional<double> L2_error_domain = std::nullopt;

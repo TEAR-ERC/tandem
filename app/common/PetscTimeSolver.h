@@ -55,10 +55,43 @@ public:
     ~PetscTimeSolver() { VecDestroy(&ts_state_); }
 
     void solve(double upcoming_time) {
-        CHKERRTHROW(tandem_TSLoad(ts_,"ts_checkpoint.bin"));
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
-        CHKERRTHROW(tandem_TSView(ts_,"ts_checkpoint.bin"));
+    }
+
+    void solve_with_checkpoints(double upcoming_time) {
+      PetscInt ns0,ns = checkpoint_every_nsteps_;
+      TSConvergedReason reason;
+      PetscInt curr,span;
+
+      // Load an existing checkpoint if it exists
+      CHKERRTHROW(tandem_TSLoad(ts_,ts_filename_.c_str()));
+      CHKERRTHROW(TSSetMaxTime(ts_,upcoming_time));
+
+      CHKERRTHROW(TSGetMaxSteps(ts_,&ns0));
+      CHKERRTHROW(TSGetStepNumber(ts_,&curr));
+      CHKERRTHROW(TSSetMaxSteps(ts_,std::min(curr + ns,ns0)));
+
+      reason = TS_CONVERGED_ITERATING;
+      while (reason != TS_CONVERGED_TIME) {
+        CHKERRTHROW(TSGetStepNumber(ts_,&curr));
+        CHKERRTHROW(TSGetMaxSteps(ts_,&span));
+        printf("[checkpoint phase] executing steps %d to %d\n",(int)curr,(int)span);
+
+        CHKERRTHROW(TSSolve(ts_, ts_state_));
+        CHKERRTHROW(TSGetConvergedReason(ts_,&reason));
+
+        if (reason != TS_CONVERGED_TIME) {
+          // Checkpoint
+          CHKERRTHROW(tandem_TSView(ts_,ts_filename_.c_str()));
+          // Change configuration for next checkpoint cycle
+          CHKERRTHROW(TSGetStepNumber(ts_,&curr));
+          CHKERRTHROW(TSSetMaxSteps(ts_,std::min(curr + ns,ns0)));
+        } else {
+          // Checkpoint final trajectory
+          CHKERRTHROW(tandem_TSView(ts_,ts_filename_.c_str()));
+        }
+      }
     }
 
     auto& state(std::size_t idx) {
@@ -112,8 +145,11 @@ private:
         return 0;
     }
 
+
     std::array<std::unique_ptr<PetscVector>, NumStateVecs> state_;
     Vec ts_state_ = nullptr;
+    std::string ts_filename_ = "ts_checkpoint.bin";
+    PetscInt checkpoint_every_nsteps_ = 10;
 };
 
 } // namespace tndm
