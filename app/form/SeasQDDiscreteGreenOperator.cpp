@@ -214,11 +214,11 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator() {
 
 void SeasQDDiscreteGreenOperator::load_discrete_greens_operator() {
   PetscViewer v;
-  PetscBool found = PETSC_FALSE;
   PetscLogDouble t0,t1;
 
   if (!G_) {
-    // error - todo
+    CHKERRTHROW(PetscPrintf(base::comm(),"G_ is NULL. Cannot load the operator. Must call create_discrete_greens_function() first!\n"));
+    throw std::runtime_error("G_ is NULL");
   }
   CHKERRTHROW(PetscTime(&t0));
   CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),gf_operator_filename_.c_str(),FILE_MODE_READ,&v));
@@ -306,19 +306,25 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function() {
 
 void SeasQDDiscreteGreenOperator::get_discrete_greens_function() {
   PetscBool found = PETSC_FALSE;
+  PetscInt n_gf_loaded = 0;
 
+  // Create an empty dense matrix to store all GFs
   if (!G_) {
     create_discrete_greens_function();
   }
 
+  // If a checkpoint file is found, load it. Record the number of assembled GFs found in file.
   CHKERRTHROW(PetscTestFile(gf_operator_filename_.c_str(),'r',&found));
   if (found) {
     load_discrete_greens_operator();
+    n_gf_loaded = current_gf_;
   }
 
+  // Assemble as many GFs as possible in the range [current_gf_, n_gf_)
   partial_assemble_discrete_greens_function();
 
-  if (!found) {
+  // Write out the operator whenever the fully assembled operator was not loaded from file
+  if (n_gf_loaded != n_gf_) {
     write_discrete_greens_operator();
   }
 }
@@ -337,7 +343,6 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_traction() {
 
 void SeasQDDiscreteGreenOperator::load_discrete_greens_traction() {
   PetscViewer v;
-  PetscBool found = PETSC_FALSE;
   PetscLogDouble t0,t1;
 
   CHKERRTHROW(PetscTime(&t0));
