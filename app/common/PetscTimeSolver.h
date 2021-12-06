@@ -81,11 +81,17 @@ public:
         CHKERRTHROW(TSSolve(ts_, ts_state_));
         CHKERRTHROW(TSGetConvergedReason(ts_,&reason));
 
+        CHKERRTHROW(TSGetStepNumber(ts_,&curr));
+        if (curr == ns0) {
+          // Checkpoint final trajectory
+          CHKERRTHROW(tandem_TSView(ts_,ts_filename_.c_str()));
+          break;
+        }
+
         if (reason != TS_CONVERGED_TIME) {
           // Checkpoint
           CHKERRTHROW(tandem_TSView(ts_,ts_filename_.c_str()));
           // Change configuration for next checkpoint cycle
-          CHKERRTHROW(TSGetStepNumber(ts_,&curr));
           CHKERRTHROW(TSSetMaxSteps(ts_,std::min(curr + ns,ns0)));
         } else {
           // Checkpoint final trajectory
