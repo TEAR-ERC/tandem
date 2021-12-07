@@ -271,7 +271,9 @@ PetscErrorCode _TSLoad(TS ts, PetscViewer viewer)
   ierr = DMCreate(PetscObjectComm((PetscObject)ts),&dm);CHKERRQ(ierr);
   ierr = DMLoad(dm,viewer);CHKERRQ(ierr);
   ierr = TSSetDM(ts,dm);CHKERRQ(ierr);
-  ierr = DMCreateGlobalVector(ts->dm,&ts->vec_sol);CHKERRQ(ierr);
+  if (!ts->vec_sol) {
+      ierr = DMCreateGlobalVector(ts->dm,&ts->vec_sol);CHKERRQ(ierr);
+  }
   ierr = VecLoad(ts->vec_sol,viewer);CHKERRQ(ierr);
   ierr = DMGetDMTS(ts->dm,&sdm);CHKERRQ(ierr);
   ierr = DMTSLoad(sdm,viewer);CHKERRQ(ierr);
@@ -289,6 +291,7 @@ PetscErrorCode tandem_TSView(TS ts,const char filename[])
   ierr = PetscViewerBinaryOpen(PetscObjectComm((PetscObject)ts),filename,FILE_MODE_WRITE,&viewer);CHKERRQ(ierr);
   ierr = _TSView(ts,viewer);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
+
   PetscFunctionReturn(0);
 }
 
