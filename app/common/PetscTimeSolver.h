@@ -27,10 +27,16 @@ public:
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
     void set_max_time_step(double dt);
+    std::string get_checkpoint_filename(void);
+    void set_checkpoint_filename(std::string);
+    PetscInt get_checkpoint_frequency(void);
+    void set_checkpoint_frequency(PetscInt);
 
 protected:
     TS ts_ = nullptr;
     bool fsal_;
+    std::string ts_filename_ = "ts_checkpoint.bin";
+    PetscInt checkpoint_every_nsteps_ = 10;
 };
 
 template <std::size_t NumStateVecs> class PetscTimeSolver : public PetscTimeSolverBase {
@@ -154,8 +160,6 @@ private:
 
     std::array<std::unique_ptr<PetscVector>, NumStateVecs> state_;
     Vec ts_state_ = nullptr;
-    std::string ts_filename_ = "ts_checkpoint.bin";
-    PetscInt checkpoint_every_nsteps_ = 10;
 };
 
 } // namespace tndm
