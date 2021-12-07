@@ -117,6 +117,11 @@ void setConfigSchema(TableSchema<Config>& schema,
         .default_value(false)
         .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
 
+
+    schema.add_value("gf_checkpoint_prefix", &Config::gf_checkpoint_prefix)
+      .help("Path where Green's function operator and RHS will be checkpointed");
+  
+  
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
         .help("Use matrix-free operators");

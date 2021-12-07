@@ -5,14 +5,38 @@
 #include "parallel/LocalGhostCompositeView.h"
 #include "util/Stopwatch.h"
 
+#include <filesystem>
+namespace fs = std::filesystem;
+
 namespace tndm {
 
 SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<typename base::dg_t> dgop, std::unique_ptr<AbstractAdapterOperator> adapter,
-    std::unique_ptr<AbstractFrictionOperator> friction, bool matrix_free, MGConfig const& mg_config)
+                                                         std::unique_ptr<AbstractFrictionOperator> friction, bool matrix_free, MGConfig const& mg_config, std::string prefix)
     : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
-    //compute_discrete_greens_function();
-    get_discrete_greens_function();
+
+    // if prefix is not empty, set filenames and mark checkpoint_enabled_ = true
+    if (!prefix.empty()) {
+        std::cout << "Using GF checkpoint path: " << prefix << std::endl;
+        fs::path pckp(prefix);
+        bool exists = fs::exists(pckp);
+        if (!exists) {
+            bool ret = fs::create_directories(pckp);
+            if (!ret) std::cout << "--> Failed to create directory!" << std::endl;
+        }
+        auto default_names = get_checkpoint_filenames();
+        fs::path pckpOp(prefix);
+        pckpOp /= std::get<0>(default_names);
+        fs::path pckpVec(prefix);
+        pckpVec /= std::get<1>(default_names);
+        set_checkpoint_filenames(pckpOp, pckpVec);
+        checkpoint_enabled_ = true;
+    }
+    if (!checkpoint_enabled_) {
+        compute_discrete_greens_function();
+    } else {
+        get_discrete_greens_function();
+    }
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() { MatDestroy(&G_); }
@@ -20,9 +44,30 @@ SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() { MatDestroy(&G_); }
 void SeasQDDiscreteGreenOperator::set_boundary(
     std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
     base::set_boundary(std::move(fun));
-   //compute_boundary_traction();
-   get_boundary_traction();
+    if (!checkpoint_enabled_) {
+        compute_boundary_traction();
+    } else {
+        get_boundary_traction();
+    }
 }
+
+  std::tuple<std::string, std::string> SeasQDDiscreteGreenOperator::get_checkpoint_filenames(void) {
+    return std::make_tuple(gf_operator_filename_, gf_traction_filename_);
+  }
+
+  double SeasQDDiscreteGreenOperator::get_checkpoint_time_interval(void) {
+    return checkpoint_every_nmins_;
+  }
+
+  void SeasQDDiscreteGreenOperator::set_checkpoint_filenames(std::string mat_fname, std::string vec_fname) {
+    gf_operator_filename_ = mat_fname;
+    gf_traction_filename_ = vec_fname;
+  }
+
+  void SeasQDDiscreteGreenOperator::set_checkpoint_time_interval(double t) {
+    checkpoint_every_nmins_ = t;
+  }
+
 
 void SeasQDDiscreteGreenOperator::update_internal_state(double time, BlockVector const& state,
                                                         bool state_changed_since_last_rhs,

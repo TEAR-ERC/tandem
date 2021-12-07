@@ -135,11 +135,46 @@ template <typename T> struct qd_operator_specifics {
 
     static void print_profile(T const&) {}
 };
+
 template <>
-struct operator_specifics<SeasQDOperator> : public qd_operator_specifics<SeasQDOperator> {};
+struct operator_specifics<SeasQDOperator>
+  : public qd_operator_specifics<SeasQDOperator> {};
+
+
+template <typename T> struct qd_green_operator_specifics {
+  using monitor_t = seas::MonitorQD;
+
+  static auto make(Config const& cfg, seas::ContextBase& ctx) {
+    std::string prefix;
+    if (cfg.gf_checkpoint_prefix) { prefix = *(cfg.gf_checkpoint_prefix); }
+    else { prefix = ""; }
+    auto seasop = std::make_shared<T>(std::move(ctx.dg()), std::move(ctx.adapter()),
+                                      std::move(ctx.friction()), cfg.matrix_free,
+                                      MGConfig(cfg.mg_coarse_level, cfg.mg_strategy), prefix);
+    ctx.setup_seasop(*seasop);
+    seasop->warmup();
+    return seasop;
+  }
+
+  static std::optional<double> cfl_time_step(T const&) { return std::nullopt; }
+
+  template <typename TimeSolver>
+  static auto displacement(double time, TimeSolver const& ts, T& seasop) {
+    seasop.update_internal_state(time, ts.state(0), true, false, true);
+    return seasop.displacement();
+  }
+
+  template <typename TimeSolver> static auto state(double, TimeSolver const& ts, T& seasop) {
+    return seasop.friction().raw_state(ts.state(0));
+  }
+
+  static void print_profile(T const&) {}
+};
+
+
 template <>
 struct operator_specifics<SeasQDDiscreteGreenOperator>
-    : public qd_operator_specifics<SeasQDDiscreteGreenOperator> {};
+    : public qd_green_operator_specifics<SeasQDDiscreteGreenOperator> {};
 
 template <> struct operator_specifics<SeasFDOperator> {
     using monitor_t = seas::MonitorFD;

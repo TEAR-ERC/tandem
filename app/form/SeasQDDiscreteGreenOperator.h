@@ -24,7 +24,7 @@ public:
     SeasQDDiscreteGreenOperator(std::unique_ptr<typename base::dg_t> dgop,
                                 std::unique_ptr<AbstractAdapterOperator> adapter,
                                 std::unique_ptr<AbstractFrictionOperator> friction,
-                                bool matrix_free = false, MGConfig const& mg_config = MGConfig());
+                                bool matrix_free = false, MGConfig const& mg_config = MGConfig(), std::string prefix = "");
     ~SeasQDDiscreteGreenOperator();
 
     void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
@@ -47,7 +47,16 @@ public:
                                bool state_changed_since_last_rhs, bool require_traction,
                                bool require_displacement);
 
+    std::tuple<std::string, std::string> get_checkpoint_filenames(void);
+    double get_checkpoint_time_interval(void);
+    void set_checkpoint_filenames(std::string, std::string);
+    void set_checkpoint_time_interval(double);
+
 protected:
+    std::string gf_operator_filename_ = "gf_mat.bin";
+    std::string gf_traction_filename_ = "gf_vec.bin";
+    double checkpoint_every_nmins_ = 30.0;
+
     void update_traction(double time, BlockVector const& state);
 
 private:
@@ -63,11 +72,9 @@ private:
     void load_discrete_greens_traction();
     void get_boundary_traction();
 
-    std::string gf_operator_filename_ = "gf_mat.bin";
-    std::string gf_traction_filename_ = "gf_vec.bin";
+    bool checkpoint_enabled_ = false;
     PetscInt current_gf_ = 0;
     PetscInt n_gf_ = 0;
-    double checkpoint_every_nmins_ = 30.0;
     Mat G_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;

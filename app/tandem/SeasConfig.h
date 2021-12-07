@@ -75,6 +75,8 @@ struct Config {
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
 
+    std::optional<std::string> gf_checkpoint_prefix;
+
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;
     std::optional<TabularOutputConfig> fault_scalar_output;
