@@ -13,6 +13,10 @@
 
 namespace tndm {
 
+void make_displs(
+    std::vector<int> const& counts, std::vector<int>& displs,
+    std::function<int(int)> permutation = [](int p) { return p; });
+
 class AllToAllV {
 public:
     template <typename Tr>
@@ -56,16 +60,42 @@ public:
     }
 
 private:
-    void makeDispls(
-        std::vector<int> const& counts, std::vector<int>& displs,
-        std::function<int(int)> permutation = [](int p) { return p; });
-
     std::vector<int> sendcounts;
     MPI_Comm comm;
     int procs;
     std::vector<int> recvcounts;
     std::vector<int> sdispls;
     std::vector<int> rdispls;
+};
+
+class GatherV {
+public:
+    GatherV(int sendcount, int root = 0, MPI_Comm comm = MPI_COMM_WORLD);
+
+    template <typename T>
+    [[nodiscard]] std::vector<T> exchange(T const* data,
+                                          MPI_Datatype const& type = mpi_type_t<T>()) const {
+        std::vector<T> recvd(recvcount());
+        exchange(data, recvd.data(), type);
+        return recvd;
+    }
+
+    template <typename T>
+    void exchange(T const* data, T* recvd, MPI_Datatype const& type = mpi_type_t<T>()) const {
+        MPI_Gatherv(data, sendcount_, type, recvd, recvcounts_.data(), displs_.data(), type, root_,
+                    comm_);
+    }
+
+    inline std::size_t recvcount() const {
+        return std::accumulate(recvcounts_.begin(), recvcounts_.end(), static_cast<std::size_t>(0));
+    }
+
+private:
+    int sendcount_;
+    int root_;
+    MPI_Comm comm_;
+    std::vector<int> recvcounts_;
+    std::vector<int> displs_;
 };
 
 } // namespace tndm
