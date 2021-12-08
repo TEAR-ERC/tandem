@@ -4,6 +4,8 @@
 #include "DataType.h"
 #include "basis/Equidistant.h"
 #include "basis/NumberingConvention.h"
+#include "parallel/CommPattern.h"
+#include "parallel/MPITraits.h"
 
 #include <mpi.h>
 #include <stdexcept>
@@ -14,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -23,21 +26,48 @@ template <std::size_t D> class FiniteElementFunction;
 template <std::size_t D> class VTUAdapter;
 template <std::size_t D> class VTUPiece;
 
-template <std::size_t D> class VTUWriter {
+class VTKDataArray {
 public:
-    static constexpr std::size_t PointDim = 3u;
     using header_t = uint64_t;
 
-    static int32_t VTKType(bool linear);
+    VTKDataArray() {}
 
-    VTUWriter(unsigned degree = 1u, bool zlibCompress = true, MPI_Comm comm = MPI_COMM_WORLD)
-        : refNodes_(EquidistantNodesFactory<D>(NumberingConvention::VTK)(degree)),
-          zlibCompress_(zlibCompress), comm_(comm) {
-        auto grid = doc_.NewElement("UnstructuredGrid");
-        doc_.InsertFirstChild(grid);
+    template <typename T>
+    VTKDataArray(std::string const& name, std::size_t num_components, T const* data,
+                 std::size_t dataSize, bool zlibCompress)
+        : type_(DataType(T{})), name_(name), num_components_(num_components) {
+        unsigned const char* d = reinterpret_cast<unsigned const char*>(data);
+        header_t size = dataSize * sizeof(T);
+        make_appended(d, size, zlibCompress);
     }
 
-    VTUPiece<D> addPiece(VTUAdapter<D>& adapter);
+    template <typename T>
+    VTKDataArray(std::string const& name, std::size_t num_components, std::vector<T> const& data,
+                 bool zlibCompress)
+        : type_(DataType(T{})), name_(name), num_components_(num_components) {
+        unsigned const char* d = reinterpret_cast<unsigned const char*>(data.data());
+        header_t size = data.size() * sizeof(T);
+        make_appended(d, size, zlibCompress);
+    }
+
+    uint64_t make_xml(tinyxml2::XMLElement* parent, uint64_t offset) const;
+    void write_appended(FILE* fp) const;
+
+private:
+    void make_appended(unsigned char const* data, header_t size, bool zlibCompress);
+
+    DataType type_;
+    std::string name_;
+    uint64_t num_components_;
+    std::vector<unsigned char> appended_;
+};
+
+template <std::size_t D> class VTUWriter {
+public:
+    VTUWriter(unsigned degree = 1u, bool zlibCompress = true, MPI_Comm comm = MPI_COMM_WORLD);
+    ~VTUWriter();
+
+    VTUPiece<D>& addPiece(VTUAdapter<D>& adapter);
 
     /**
      * @brief Write VTU to disk.
@@ -56,89 +86,36 @@ public:
      */
     template <typename T>
     void addFieldData(std::string const& name, T const* data, std::size_t numElements) {
-        auto cdata = doc_.RootElement()->LastChildElement("FieldData");
-        if (!cdata) {
-            cdata = doc_.RootElement()->InsertNewChildElement("FieldData");
-        }
-        auto da = addDataArray<T>(cdata, name, 1, data, numElements);
-        da->SetAttribute("NumberOfTuples", 1);
+        field_data_.emplace_back(VTKDataArray(name, 1, data, numElements, zlibCompress_));
     }
     /**
      * @brief Wrapper for addFieldData(std::string const&, double const*, std::size_t)
      */
     template <typename T> void addFieldData(std::string const& name, std::vector<T> const& data) {
-        addFieldData(name, data.data(), data.size());
+        field_data_.emplace_back(VTKDataArray(name, 1, data, zlibCompress_));
     }
+
+    uint64_t make_xml(tinyxml2::XMLElement* parent, uint64_t offset = 0) const;
+    void write_appended(FILE* fp) const;
 
 private:
-    friend class VTUPiece<D>;
-
-    template <typename T>
-    tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
-                                       std::size_t numComponents, T const* data,
-                                       std::size_t dataSize) {
-        auto da = parent->InsertNewChildElement("DataArray");
-        auto dataType = DataType(T{});
-        da->SetAttribute("type", dataType.vtkIdentifier().c_str());
-        da->SetAttribute("Name", name.c_str());
-        da->SetAttribute("NumberOfComponents", static_cast<uint64_t>(numComponents));
-        da->SetAttribute("format", "appended");
-
-        auto offset = appended_.size();
-        da->SetAttribute("offset", static_cast<uint64_t>(offset));
-
-        header_t size = dataSize * sizeof(T);
-
-        T dummy_data = 0;
-        if (data == nullptr) {
-            if (dataSize == 0) {
-                data = &dummy_data;
-            } else {
-                throw std::logic_error("addDataArray got nullptr but dataSize != 0");
-            }
-        }
-
-        if (zlibCompress_) {
-            struct {
-                header_t blocks;
-                header_t blockSize;
-                header_t lastBlockSize;
-                header_t compressedBlocksizes;
-            } header{1, size, size, 0};
-            auto destLen = compressBound(size);
-            appended_.resize(offset + sizeof(header) + destLen);
-            unsigned char* app = appended_.data() + offset;
-            compress(app + sizeof(header), &destLen, reinterpret_cast<unsigned char const*>(data),
-                     size);
-            header.compressedBlocksizes = destLen;
-            memcpy(app, &header, sizeof(header));
-            appended_.resize(offset + sizeof(header) + destLen);
-        } else {
-            appended_.resize(appended_.size() + sizeof(size) + size);
-            unsigned char* app = appended_.data() + offset;
-            memcpy(app, &size, sizeof(size));
-            app += sizeof(size);
-            memcpy(app, data, size);
-        }
-        return da;
-    }
-
-    template <typename T>
-    tinyxml2::XMLElement* addDataArray(tinyxml2::XMLElement* parent, std::string const& name,
-                                       std::size_t numComponents, std::vector<T> const& data) {
-        return addDataArray(parent, name, numComponents, data.data(), data.size());
-    }
+    std::vector<VTKDataArray> field_data_;
+    std::vector<VTUPiece<D>> pieces_;
 
     std::vector<std::array<double, D>> refNodes_;
     bool zlibCompress_;
-    MPI_Comm comm_;
-    std::vector<unsigned char> appended_;
-    tinyxml2::XMLDocument doc_;
+    MPI_Comm comm_, group_comm_;
 };
 
 template <std::size_t D> class VTUPiece {
 public:
-    VTUPiece(tinyxml2::XMLElement* piece, VTUWriter<D>& writer) : piece_(piece), writer_(writer) {}
+    static constexpr std::size_t PointDim = 3u;
+    static int32_t VTKType(bool linear);
+
+    VTUPiece(VTUAdapter<D>& adapter, std::vector<std::array<double, D>> const& refNodes,
+             bool zlibCompress, MPI_Comm group_comm);
+
+    inline auto numElements() const { return num_elements_; }
 
     /**
      * @brief Samples FiniteElementFunction and adds point data to VTU file.
@@ -147,7 +124,7 @@ public:
     /**
      * @brief Samples Jacobian of FiniteElementFunction and adds point data to VTU file.
      */
-    void addJacobianData(FiniteElementFunction<D> const& function, VTUAdapter<D> const& adapter);
+    void addJacobianData(FiniteElementFunction<D> const& function, VTUAdapter<D>& adapter);
     /**
      * @brief Adds cell data with name "name" to VTU file.
      *
@@ -155,11 +132,7 @@ public:
      */
     template <typename T>
     void addCellData(std::string const& name, T const* data, std::size_t numElements) {
-        auto cdata = piece_->LastChildElement("CellData");
-        if (!cdata) {
-            cdata = piece_->InsertNewChildElement("CellData");
-        }
-        writer_.template addDataArray<T>(cdata, name, 1, data, numElements);
+        cell_data_.emplace_back(VTKDataArray(name, 1, gather(data, numElements), zlibCompress_));
     }
     /**
      * @brief Wrapper for addCellData(std::string const&, double const*, std::size_t)
@@ -168,11 +141,22 @@ public:
         addCellData(name, data.data(), data.size());
     }
 
-private:
-    tinyxml2::XMLElement* getPointDataRoot();
+    uint64_t make_xml(tinyxml2::XMLElement* parent, uint64_t offset) const;
+    void write_appended(FILE* fp) const;
 
-    VTUWriter<D>& writer_;
-    tinyxml2::XMLElement* piece_;
+private:
+    template <typename T> auto gather(T const* data, std::size_t numElements) -> std::vector<T> {
+        return GatherV(static_cast<int>(numElements), 0, group_comm_).exchange(data);
+    }
+
+    std::vector<std::array<double, D>> const* refNodes_;
+    bool zlibCompress_;
+    MPI_Comm group_comm_;
+
+    std::size_t num_elements_, gathered_num_elements_;
+    VTKDataArray points_, connectivity_, offsets_, types_;
+    std::vector<VTKDataArray> point_data_;
+    std::vector<VTKDataArray> cell_data_;
 };
 
 class ParallelVTUVisitor : public tinyxml2::XMLVisitor {
@@ -183,7 +167,7 @@ public:
                     tinyxml2::XMLAttribute const* attribute) override;
     bool VisitExit(tinyxml2::XMLElement const& element) override;
 
-    auto& parallelXML() { return pdoc_; }
+    auto parallelXML() -> tinyxml2::XMLDocument& { return pdoc_; }
 
 private:
     tinyxml2::XMLDocument pdoc_;
