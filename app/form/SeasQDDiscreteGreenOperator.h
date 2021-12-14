@@ -1,6 +1,7 @@
 #ifndef SEASQDDISCRETEGREENOPERATOR_20210907_H
 #define SEASQDDISCRETEGREENOPERATOR_20210907_H
 
+#include "mesh/LocalSimplexMesh.h"
 #include "common/PetscVector.h"
 #include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
@@ -24,6 +25,7 @@ public:
     SeasQDDiscreteGreenOperator(std::unique_ptr<typename base::dg_t> dgop,
                                 std::unique_ptr<AbstractAdapterOperator> adapter,
                                 std::unique_ptr<AbstractFrictionOperator> friction,
+LocalSimplexMesh<DomainDimension> const& mesh,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig(), std::string prefix = "");
     ~SeasQDDiscreteGreenOperator();
 
@@ -51,10 +53,12 @@ public:
     double get_checkpoint_time_interval(void);
     void set_checkpoint_filenames(std::string, std::string);
     void set_checkpoint_time_interval(double);
+    void prepend_checkpoint_path(std::string);
 
 protected:
     std::string gf_operator_filename_ = "gf_mat.bin";
     std::string gf_traction_filename_ = "gf_vec.bin";
+    std::string gf_facet_filename_ = "gf_facet_labels.bin";
     double checkpoint_every_nmins_ = 30.0;
 
     void update_traction(double time, BlockVector const& state);
@@ -63,21 +67,28 @@ private:
     void compute_discrete_greens_function();
     void compute_boundary_traction();
     void create_discrete_greens_function();
-    void partial_assemble_discrete_greens_function();
-    void write_discrete_greens_operator();
-    void load_discrete_greens_operator();
+    void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
+    void write_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh);
+    void load_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh);
     // all logic associated with matix craetion, loading / partial assembly is done here
-    void get_discrete_greens_function();
+    void get_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
     void write_discrete_greens_traction();
     void load_discrete_greens_traction();
     void get_boundary_traction();
 
+    void write_facet_labels_IS(LocalSimplexMesh<DomainDimension> const& mesh);
+    IS load_facet_labels_seq_IS(void);
+    void create_permutation_redundant_IS(LocalSimplexMesh<DomainDimension> const& mesh,IS is);
+    std::tuple<Mat, Mat> create_row_col_permutation_matrices(bool create_row, bool create_col);
+  
     bool checkpoint_enabled_ = false;
     PetscInt current_gf_ = 0;
     PetscInt n_gf_ = 0;
     Mat G_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;
+    bool repartition_gfs_ = false;
+    IS is_perm_ = nullptr;
 };
 
 } // namespace tndm

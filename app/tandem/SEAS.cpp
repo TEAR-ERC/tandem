@@ -112,7 +112,7 @@ template <typename seas_t> struct operator_specifics;
 template <typename T> struct qd_operator_specifics {
     using monitor_t = seas::MonitorQD;
 
-    static auto make(Config const& cfg, seas::ContextBase& ctx) {
+    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
         auto seasop = std::make_shared<T>(std::move(ctx.dg()), std::move(ctx.adapter()),
                                           std::move(ctx.friction()), cfg.matrix_free,
                                           MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
@@ -144,12 +144,12 @@ struct operator_specifics<SeasQDOperator>
 template <typename T> struct qd_green_operator_specifics {
   using monitor_t = seas::MonitorQD;
 
-  static auto make(Config const& cfg, seas::ContextBase& ctx) {
+  static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
     std::string prefix;
     if (cfg.gf_checkpoint_prefix) { prefix = *(cfg.gf_checkpoint_prefix); }
     else { prefix = ""; }
     auto seasop = std::make_shared<T>(std::move(ctx.dg()), std::move(ctx.adapter()),
-                                      std::move(ctx.friction()), cfg.matrix_free,
+                                      std::move(ctx.friction()), mesh, cfg.matrix_free,
                                       MGConfig(cfg.mg_coarse_level, cfg.mg_strategy), prefix);
     ctx.setup_seasop(*seasop);
     seasop->warmup();
@@ -179,7 +179,7 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
 template <> struct operator_specifics<SeasFDOperator> {
     using monitor_t = seas::MonitorFD;
 
-    static auto make(Config const& cfg, seas::ContextBase& ctx) {
+    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
         auto seasop = std::make_shared<SeasFDOperator>(
             std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()));
         ctx.setup_seasop(*seasop);
@@ -208,7 +208,7 @@ template <> struct operator_specifics<SeasFDOperator> {
 template <typename seas_t>
 void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
                         seas::ContextBase& ctx) {
-    auto seasop = operator_specifics<seas_t>::make(cfg, ctx);
+    auto seasop = operator_specifics<seas_t>::make(mesh, cfg, ctx);
 
     auto ts =
         PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
