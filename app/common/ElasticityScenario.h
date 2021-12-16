@@ -6,8 +6,6 @@
 #include "form/DGCurvilinearCommon.h"
 #include "localoperator/Elasticity.h"
 
-#include "util/Schema.h"
-
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -15,27 +13,19 @@
 
 namespace tndm {
 
-struct ElasticityScenarioConfig : ScenarioConfig {
-    std::optional<std::string> lam;
-    std::optional<std::string> mu;
-
-    template <typename PathConverter>
-    static void setSchema(TableSchema<ElasticityScenarioConfig>& schema,
-                          PathConverter path_converter) {
-        ScenarioConfig::setSchema(schema, std::move(path_converter));
-        schema.add_value("lam", &ElasticityScenarioConfig::lam);
-        schema.add_value("mu", &ElasticityScenarioConfig::mu);
-    }
-};
-
 class ElasticityScenario : public Scenario<Elasticity> {
 public:
-    ElasticityScenario(ElasticityScenarioConfig const& problem) : Scenario(problem) {
-        if (problem.lam) {
-            lam_ = lib_.getFunction<DomainDimension, 1>(*problem.lam);
+    constexpr static char Mu[] = "mu";
+    constexpr static char Lam[] = "lam";
+
+    ElasticityScenario(std::string const& lib, std::string const& scenario,
+                       std::array<double, DomainDimension> const& ref_normal)
+        : Scenario(lib, scenario, ref_normal) {
+        if (lib_.hasMember(scenario, Mu)) {
+            mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
         }
-        if (problem.mu) {
-            mu_ = lib_.getFunction<DomainDimension, 1>(*problem.mu);
+        if (lib_.hasMember(scenario, Lam)) {
+            lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
         }
     }
 

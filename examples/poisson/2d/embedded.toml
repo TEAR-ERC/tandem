@@ -1,10 +1,7 @@
 resolution = 0.125
-
-[poisson]
+type = "poisson"
 lib = "embedded.lua"
-boundary = "solution"
-slip = "slip"
-solution = "solution"
+scenario = "embedded"
 ref_normal = [1, 0]
 
 [generate_mesh]

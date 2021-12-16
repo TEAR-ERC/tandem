@@ -1,12 +1,7 @@
 resolution = 0.125
-
-[poisson]
+type = "poisson"
 lib = "manufactured_variable.lua"
-warp = "warp"
-force = "force"
-boundary = "solution"
-coefficient = "coefficient"
-solution = "solution"
+scenario = "manufactured_variable"
 
 [generate_mesh]
 intercepts = [
