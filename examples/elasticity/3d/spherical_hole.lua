@@ -32,26 +32,17 @@ function spherical(x, y, z)
 end
 
 function u_spherical(R, theta, beta)
-    local x0 = 5*nu
-    local x1 = x0 - 7
-    local x2 = x1^3
-    local x3 = 2*beta
-    local x4 = 3*math.cos(x3) + 1
-    local x5 = R^5
-    local x6 = 2*nu*x5
-    local x7 = nu + 1
-    local x8 = x1^2
-    local x9 = 3*a^5
-    local x10 = a^3
-    local x11 = x10*x7
-    local x12 = R^2
-    local x13 = 2*x12*x8
-    local x14 = R^3*x1
-    local x15 = S/(R^4*mu0*x7)
-    local x16 = x10*x12
-    local x17 = nu^2
-    local uR = (1.0/8.0)*x15*(-x11*x13*(x0 - 6) - x13*(10*x11 + x14 - (4*nu - 3)*(5*x11 - x14))*math.cos(beta)^2 + x2*x4*x6 + x4*x7*x8*x9)/x2
-    local ub = (1.0/4.0)*x15*(nu*x9 - x0*x16 - 10*x16*x17 + 5*x16 - 5*x17*x5 + 7*x5 + x6 + x9)*math.sin(x3)/x1
+    local x0 = nu + 1
+    local x1 = a^5
+    local x2 = R^5
+    local x3 = 5*nu - 7
+    local x4 = x2*x3
+    local x5 = 10*nu
+    local x6 = R^2*a^3
+    local x7 = 2*beta
+    local x8 = S/(R^4*mu0*x3)
+    local uR = (1.0/8.0)*x8*(x0*x6*(x5 - 13) + x0*(9*x1 + x2*(x5 - 14) + x6*(20*nu - 25))*math.cos(x7) + x1*(3*nu + 3) + 2*x4*(1 - nu))/x0
+    local ub = -1.0/4.0*x8*(-3*x1 + x4 + x6*(x5 - 5))*math.sin(x7)
     return uR, ub
 end
 
@@ -72,36 +63,27 @@ function SphericalHole:solution_jacobian(x, y, z)
     R, theta, beta = spherical(x, y, z)
     local uR, ub = u_spherical(R, theta, beta)
 
-    local x0 = a^5
-    local x1 = nu + 1
-    local x2 = 2*beta
-    local x3 = math.cos(x2)
-    local x4 = 3*x3 + 1
-    local x5 = 5*nu
-    local x6 = x5 - 7
-    local x7 = R^5
-    local x8 = nu*x7
-    local x9 = math.cos(beta)^2
-    local x10 = a^3
-    local x11 = R^2
-    local x12 = x10*x11
-    local x13 = 2*nu
-    local x14 = 10*x10
-    local x15 = S/(mu0*x6)
-    local x16 = (1.0/4.0)*x15
-    local x17 = x16/(x1*x7)
-    local x18 = R^(-4)
-    local x19 = 20*x12
-    local x20 = math.sin(x2)
-    local x21 = 7*x7
-    local x22 = 12*x0
-    local x23 = x11*x14
-    local x24 = nu^2
-    local x25 = nu*x23
-    local uR_R = x17*(-6*x0*x1*x4 + 2*x1*x12*(x5 + 15*x9 - 6) + 2*x11*x9*(1 - x13)*(R^3*x6 + x1*x14) + x4*x6*x8)
-    local uR_b = x16*x18*x20*(-nu*x19 - 9*x0 + 25*x12 + 14*x7 - 10*x8)
-    local ub_R = x17*x20*(-nu*x22 + x13*x7 + x19*x24 + x21 - x22 - x23 - 5*x24*x7 + x25)
-    local ub_b = (1.0/2.0)*x15*x18*x3*(3*x0 + 5*x12 + x21 - x25 - x5*x7)
+    local x0 = nu + 1
+    local x1 = a^5
+    local x2 = R^5
+    local x3 = 5*nu
+    local x4 = x3 - 7
+    local x5 = x2*x4
+    local x6 = 10*nu
+    local x7 = R^2*a^3
+    local x8 = 2*beta
+    local x9 = math.cos(x8)
+    local x10 = 20*nu
+    local x11 = x7*(x10 - 25)
+    local x12 = S/(mu0*x4)
+    local x13 = (1.0/4.0)*x12
+    local x14 = x13/x2
+    local x15 = R^(-4)
+    local x16 = math.sin(x8)
+    local uR_R = -x14*(x0*x7*(x6 - 13) + x0*x9*(18*x1 + x11 - x5) + x1*(6*nu + 6) + x5*(nu - 1))/x0
+    local uR_b = -x13*x15*x16*(9*x1 + x11 + x2*(x6 - 14))
+    local ub_R = x14*x16*(-12*x1 + x10*x7 - x2*x3 + 7*x2 - 10*x7)
+    local ub_b = -1.0/2.0*x12*x15*x9*(-3*x1 + x5 + x7*(x6 - 5))
 
     local ct = math.cos(theta)
     local st = math.sin(theta)

@@ -9,10 +9,11 @@
 
 namespace tndm {
 
-enum class BaseType { Float, Int, UInt };
+enum class BaseType { Float, Int, UInt, None };
 
 class DataType {
 public:
+    DataType() : type_(BaseType::None), bytes_(0) {}
     DataType(BaseType type, unsigned bytes) : type_(type), bytes_(bytes) {}
 
     template <typename T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
@@ -38,6 +39,9 @@ public:
             break;
         case BaseType::UInt:
             s << "UInt";
+            break;
+        case BaseType::None:
+            s << "None";
             break;
         default:
             break;

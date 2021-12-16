@@ -25,11 +25,14 @@ public:
               \__\/        \__\/                     \__\/        \__\/
 )LOGO";
 
-    static void print_logo(std::ostream& out) { out << Logo; }
+    static void print_logo(std::ostream& out);
     static void print_centered(std::ostream& out, std::string_view str,
                                std::size_t length = std::string_view::npos);
-    static void print_logo_and_version(std::ostream& out);
-    static void print_logo_version_and_affinity(std::ostream& out, Affinity const& affinity);
+    static void print_version(std::ostream& out);
+    static void print_stack_limit(std::ostream& out);
+    static void print_affinity(std::ostream& out, Affinity const& affinity);
+
+    static void standard(std::ostream& out, Affinity const& affinity);
 
 private:
     static constexpr std::size_t logo_width();

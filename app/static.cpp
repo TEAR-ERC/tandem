@@ -214,7 +214,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         auto coeffs = dgop.params();
         VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
         auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
-        auto piece = writer.addPiece(adapter);
+        auto& piece = writer.addPiece(adapter);
         piece.addPointData(numeric);
         piece.addJacobianData(numeric, adapter);
         piece.addPointData(coeffs);
@@ -323,7 +323,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
     if (rank == 0) {
-        Banner::print_logo_version_and_affinity(std::cout, affinity);
+        Banner::standard(std::cout, affinity);
     }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;

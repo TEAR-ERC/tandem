@@ -64,7 +64,7 @@ void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun trans
     VTUWriter<D> writer(degree);
     auto adapter = CurvilinearVTUAdapter(
         std::make_shared<Curvilinear<D>>(*mesh, *transform, degree), mesh->elements().localSize());
-    auto piece = writer.addPiece(adapter);
+    auto& piece = writer.addPiece(adapter);
     piece.addCellData("BC", bc);
     piece.addCellData("shared", shared);
     writer.write(baseName);
