@@ -1,4 +1,13 @@
-function gravity(x, y, z)
+local Beam = {}
+
+function Beam:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function Beam:force(x, y, z)
     local rho = 1.0
     local W = 0.2
     local L = 1.0
@@ -7,14 +16,16 @@ function gravity(x, y, z)
     return 0.0, 0.0, -rho * gamma
 end
 
-function left_boundary(x, y, z)
+function Beam:boundary(x, y, z)
     return 0.0, 0.0, 0.0
 end
 
-function lam(x, y, z)
+function Beam:lam(x, y, z)
     return 1.25
 end
 
-function mu(x, y, z)
+function Beam:mu(x, y, z)
     return 1.0
 end
+
+beam = Beam:new()

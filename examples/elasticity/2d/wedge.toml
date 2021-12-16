@@ -1,10 +1,6 @@
 mesh_file = "wedge.msh"
 output = "wedge"
-
-[elasticity]
+type = "elasticity"
 lib = "wedge.lua"
-boundary = "solution"
-solution = "solution"
-mu = "mat_mu"
-lam = "mat_lam"
+scenario = "wedge"
 

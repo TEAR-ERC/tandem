@@ -1,9 +1,5 @@
 mesh_file = "embedded_half.msh"
-
-[problem]
+type = "poisson"
 lib = "embedded_half.lua"
-force = "force"
-boundary = "solution"
-solution = "solution"
-
-
+scenario = "embedded_half"
+ref_normal = [1, 0]
