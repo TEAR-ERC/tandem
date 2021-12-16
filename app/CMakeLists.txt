@@ -67,6 +67,12 @@ include(../cmake/doctest.cmake)
 
 find_package(PETSc REQUIRED)
 
+if(PETSC_MEMALIGN LESS ALIGNMENT)
+    message(SEND_ERROR "The memory alignment of PETSc is ${PETSC_MEMALIGN} bytes but an alignment of "
+                       "at least ${ALIGNMENT} bytes is required for ARCH=${ARCH}. "
+                       "Please compile PETSc with --with-memalign=${ALIGNMENT}.")
+endif()
+
 add_library(global-flop-counter kernels/flop_counter.cpp)
 
 function(generate_code APP)
