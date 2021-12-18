@@ -2,22 +2,22 @@ local dip = -math.pi / 3.0
 local mu0 = 1.0
 local S = 1.0
 local nu = 0.25
-local lamda = 0.5
+local gamma = 0.5
 
 -- compute constants
 local A_1, A_2, A_3, A_4, B_1, B_2, B_3, B_4
 do
-    local x0 = math.pi*((1.0/3.0)*lamda + 1.0/3.0)
+    local x0 = math.pi*((1.0/3.0)*gamma + 1.0/3.0)
     local x1 = math.sin(x0)
     local x2 = 2*x1
-    local x3 = math.pi*((7.0/3.0)*lamda + 1.0/3.0)
+    local x3 = math.pi*((7.0/3.0)*gamma + 1.0/3.0)
     local x4 = math.sin(x3)
     local x5 = 2*x4
-    local x6 = 3*lamda
+    local x6 = 3*gamma
     local x7 = math.cos(x0)
-    local x8 = math.sqrt(3)*lamda
+    local x8 = math.sqrt(3)*gamma
     local x9 = math.cos(x3)
-    local x10 = math.pi*lamda
+    local x10 = math.pi*gamma
     local x11 = (8.0/3.0)*x10
     local x12 = math.sin(x11)
     local x13 = 2*x7
@@ -29,23 +29,23 @@ do
 end
 do
     B_2 = -B_4
-    B_1 = B_3*(1 - lamda)/(lamda + 1)
+    B_1 = B_3*(1 - gamma)/(gamma + 1)
 end
 do
     local x0 = nu - 1
     local x1 = 1.0/x0
-    local x2 = math.pi*((1.0/3.0)*lamda + 1.0/6.0)
+    local x2 = math.pi*((1.0/3.0)*gamma + 1.0/6.0)
     local x3 = (1.0/4.0)*S
     A_3 = x1*(B_3*x0 - x3*math.cos(x2))
     A_4 = x1*(B_4*x0 - x3*math.sin(x2))
 end
 do
-    local x0 = 1.0/(lamda + 1)
-    local x1 = 2*math.pi*lamda
+    local x0 = 1.0/(gamma + 1)
+    local x1 = 2*math.pi*gamma
     local x2 = math.cos(x1)
     local x3 = math.sin(x1)
-    A_1 = x0*(-A_3*lamda + A_3*x2 - A_4*x3)
-    A_2 = -x0*(A_3*x3 + A_4*lamda + A_4*x2)
+    A_1 = x0*(-A_3*gamma + A_3*x2 - A_4*x3)
+    A_2 = -x0*(A_3*x3 + A_4*gamma + A_4*x2)
 end
 
 function polar(x, y)
@@ -61,16 +61,16 @@ function uxy(r, theta, ur, ut)
 end
 
 function sol_A(r, theta)
-    local x0 = lamda - 1
+    local x0 = gamma - 1
     local x1 = theta*x0
     local x2 = math.sin(x1)
     local x3 = math.cos(x1)
     local x4 = A_3*x2 + A_4*x3
-    local x5 = lamda + 1
+    local x5 = gamma + 1
     local x6 = theta*x5
     local x7 = math.sin(x6)
     local x8 = math.cos(x6)
-    local x9 = (1.0/2.0)*r^lamda/mu0
+    local x9 = (1.0/2.0)*r^gamma/mu0
     local x10 = A_4*x2
     local x11 = A_3*x3
     local urA = x9*(4*x4*(1 - nu) - x5*(A_1*x7 + A_2*x8 + x4))
@@ -80,21 +80,21 @@ end
 
 function jac_A(r, theta)
     local x0 = 4*nu - 4
-    local x1 = lamda - 1
+    local x1 = gamma - 1
     local x2 = theta*x1
     local x3 = math.sin(x2)
     local x4 = A_3*x3
     local x5 = math.cos(x2)
     local x6 = A_4*x5
     local x7 = x4 + x6
-    local x8 = lamda + 1
+    local x8 = gamma + 1
     local x9 = theta*x8
     local x10 = math.sin(x9)
     local x11 = A_1*x10
     local x12 = math.cos(x9)
     local x13 = A_2*x12
     local x14 = (1.0/2.0)/mu0
-    local x15 = lamda*r^x1*x14
+    local x15 = gamma*r^x1*x14
     local x16 = A_3*x5
     local x17 = A_4*x3
     local x18 = x16 - x17
@@ -103,7 +103,7 @@ function jac_A(r, theta)
     local x21 = x1*x16
     local x22 = A_2*x10*x8
     local x23 = x1*x17
-    local x24 = r^lamda*x14
+    local x24 = r^gamma*x14
     local x25 = x8^2
     local x26 = x1^2
     local urA_r = -x15*(x0*x7 + x8*(x11 + x13 + x7))
@@ -114,16 +114,16 @@ function jac_A(r, theta)
 end
 
 function sol_B(r, theta)
-    local x0 = lamda - 1
+    local x0 = gamma - 1
     local x1 = theta*x0
     local x2 = math.sin(x1)
     local x3 = math.cos(x1)
     local x4 = B_3*x2 + B_4*x3
-    local x5 = lamda + 1
+    local x5 = gamma + 1
     local x6 = theta*x5
     local x7 = math.sin(x6)
     local x8 = math.cos(x6)
-    local x9 = (1.0/2.0)*r^lamda/mu0
+    local x9 = (1.0/2.0)*r^gamma/mu0
     local x10 = B_4*x2
     local x11 = B_3*x3
     local urB = x9*(4*x4*(1 - nu) - x5*(B_1*x7 + B_2*x8 + x4))
@@ -133,21 +133,21 @@ end
 
 function jac_B(r, theta)
     local x0 = 4*nu - 4
-    local x1 = lamda - 1
+    local x1 = gamma - 1
     local x2 = theta*x1
     local x3 = math.sin(x2)
     local x4 = B_3*x3
     local x5 = math.cos(x2)
     local x6 = B_4*x5
     local x7 = x4 + x6
-    local x8 = lamda + 1
+    local x8 = gamma + 1
     local x9 = theta*x8
     local x10 = math.sin(x9)
     local x11 = B_1*x10
     local x12 = math.cos(x9)
     local x13 = B_2*x12
     local x14 = (1.0/2.0)/mu0
-    local x15 = lamda*r^x1*x14
+    local x15 = gamma*r^x1*x14
     local x16 = B_3*x5
     local x17 = B_4*x3
     local x18 = x16 - x17
@@ -156,7 +156,7 @@ function jac_B(r, theta)
     local x21 = x1*x16
     local x22 = B_2*x10*x8
     local x23 = x1*x17
-    local x24 = r^lamda*x14
+    local x24 = r^gamma*x14
     local x25 = x8^2
     local x26 = x1^2
     local urB_r = -x15*(x0*x7 + x8*(x11 + x13 + x7))
@@ -185,7 +185,7 @@ end
 
 function DippingFault:slip(x, y)
     local r, theta = polar(x, y)
-    local ur = S * r^lamda / (2 * mu0)
+    local ur = S * r^gamma / (2 * mu0)
     local ut = 0
     return uxy(r, theta, ur, ut)
 end
