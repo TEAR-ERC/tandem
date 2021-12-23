@@ -6,6 +6,18 @@
 	A scalable discontinuous Galerkin code on unstructured curvilinear grids
     for linear elasticity problems and sequences of earthquakes and aseismic slip
  </h4>
+ 
+ <p align="center">
+ 	<a href="https://opensource.org/licenses/BSD-3-Clause">
+    	<img src="https://img.shields.io/badge/License-BSD%203--Clause-blue.svg" alt="License"/>
+    </a>
+    <a href="https://github.com/TEAR-ERC/tandem/stargazers">
+    	<img src="https://img.shields.io/github/stars/TEAR-ERC/tandem" alt="Stars"/>
+    </a>
+    <a href="https://github.com/TEAR-ERC/tandem/network/members">
+    	<img src="https://img.shields.io/github/forks/TEAR-ERC/tandem" alt="Forks"/>
+    </a>
+</p>
 
 <p align="center">
   <a href="#features">Features</a> •
