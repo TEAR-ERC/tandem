@@ -65,7 +65,7 @@ Here the following options where used:
 * POLYNOMIAL_DEGREE: The polynomial degree of the finite element spaces
 * DOMAIN_DIMENSION: Set 2 for triangle meshes and 3 for tetrahedral meshes
 
-Check out the detailed [instatllation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
+Check out the detailed [installation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
 
 ## Documentation
 
