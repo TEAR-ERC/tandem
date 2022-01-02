@@ -71,7 +71,7 @@ $ cd build
 $ cmake .. -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DARCH=hsw -DPOLYNOMIAL_DEGREE=4 -DDOMAIN_DIMENSION=2
 ```
 
-Here the following options where used:
+Here the following options were used:
 * CMAKE_C_COMPILER and CMAKE_CXX_COMPILER: Select MPI compiler wrappers
 * ARCH: Optimize for Intel Haswell (see [cpu_arch_flags.cmake](https://github.com/TEAR-ERC/tandem/blob/main/cmake/cpu_arch_flags.cmake) for more options)
 * POLYNOMIAL_DEGREE: The polynomial degree of the finite element spaces
