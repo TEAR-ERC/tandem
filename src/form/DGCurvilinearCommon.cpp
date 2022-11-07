@@ -10,9 +10,9 @@
 namespace tndm {
 
 template <std::size_t D>
-DGCurvilinearCommon<D>::DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl,
+DGCurvilinearCommon<D>::DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, const std::vector<int>& regions,
                                             unsigned minQuadOrder)
-    : cl_(std::move(cl)) {
+    : cl_(std::move(cl)), regions(regions) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 

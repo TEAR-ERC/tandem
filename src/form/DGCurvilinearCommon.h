@@ -28,13 +28,15 @@ template <std::size_t D> class DGCurvilinearCommon {
 public:
     template <std::size_t Q>
     using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
+    template <std::size_t Q>
+    using region_functional_t = std::function<std::array<double, Q>(std::array<double, D+1> const&)>;
     using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
 
     constexpr static std::size_t NumFacets = D + 1;
 
-    DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
+    DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, std::vector<int> const& regions, unsigned minQuadOrder);
 
     Curvilinear<D> const& cl() const { return *cl_; }
     std::shared_ptr<Curvilinear<D>> cl_ptr() const { return cl_; }
@@ -64,6 +66,24 @@ public:
             auto coords = this->vol[elNo].template get<Coords>();
             for (std::size_t q = 0; q < F.shape(1); ++q) {
                 auto fx = fun(coords[q]);
+                for (std::size_t p = 0; p < F.shape(0); ++p) {
+                    F(p, q) = fx[p];
+                }
+            }
+        };
+    }
+	
+    template <std::size_t Q>
+    auto make_volume_functional(region_functional_t<Q> fun) const -> volume_functional_t {
+        return [fun, this](std::size_t elNo, Matrix<double>& F) {
+            assert(Q == F.shape(0));
+            auto coords = this->vol[elNo].template get<Coords>();
+			auto region = this->regions[elNo];
+            for (std::size_t q = 0; q < F.shape(1); ++q) {
+				std::array<double,D+1> args;
+				args[0] = region;
+				std::copy_n(&coords[q][0], Q, &args[1]);
+                auto fx = fun(args);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
                     F(p, q) = fx[p];
                 }
@@ -159,6 +179,7 @@ protected:
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
+	std::vector<int> const& regions;
     std::vector<double> area_;
     std::vector<double> volume_;
 };

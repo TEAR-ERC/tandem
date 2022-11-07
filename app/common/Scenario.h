@@ -24,6 +24,8 @@ public:
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
+    template <std::size_t Q> using region_functional_t = typename LocalOperator::template region_functional_t<Q>;
+	
 
     constexpr static char Warp[] = "warp";
     constexpr static char Force[] = "force";
@@ -32,9 +34,9 @@ public:
     constexpr static char Solution[] = "solution";
     constexpr static char SolutionJacobian[] = "solution_jacobian";
 
-    Scenario(std::string const& lib, std::string const& scenario,
+    Scenario(LocalSimplexMesh<DomainDimension> const& mesh, std::string const& lib, std::string const& scenario,
              std::array<double, DomainDimension> const& ref_normal)
-        : ref_normal_(ref_normal) {
+        : ref_normal_(ref_normal), regions(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().regionData())->getData()) {
         lib_.loadFile(lib);
 
         if (lib_.hasMember(scenario, Warp)) {
@@ -107,6 +109,7 @@ public:
 
 protected:
     std::array<double, DomainDimension> ref_normal_;
+	std::vector<int> const& regions;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     std::optional<functional_t<NumQuantities>> force_ = std::nullopt;

@@ -362,12 +362,12 @@ int main(int argc, char** argv) {
 
     switch (cfg->type) {
     case LocalOpType::Poisson: {
-        auto scenario = PoissonScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
+        auto scenario = PoissonScenario(*mesh, cfg->lib, cfg->scenario, cfg->ref_normal);
         static_problem(*mesh, scenario, *cfg);
         break;
     }
     case LocalOpType::Elasticity: {
-        auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
+        auto scenario = ElasticityScenario(*mesh, cfg->lib, cfg->scenario, cfg->ref_normal);
         static_problem(*mesh, scenario, *cfg);
         break;
     }

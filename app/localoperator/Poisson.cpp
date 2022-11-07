@@ -24,9 +24,9 @@ namespace kernel = tndm::poisson::kernel;
 
 namespace tndm {
 
-Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
+Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> K,
                  DGMethod method)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), regions, MinQuadOrder()), method_(method),
       space_(PolynomialDegree, ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),

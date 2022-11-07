@@ -35,8 +35,8 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
 
-    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
+    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> lam,
+               region_functional_t<1> mu, std::optional<region_functional_t<1>> rho = std::nullopt,
                DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }

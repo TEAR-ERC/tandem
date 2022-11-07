@@ -16,11 +16,11 @@ class PoissonScenario : public Scenario<Poisson> {
 public:
     constexpr static char Mu[] = "mu";
 
-    PoissonScenario(std::string const& lib, std::string const& scenario,
+    PoissonScenario(LocalSimplexMesh<DomainDimension> const& mesh, std::string const& lib, std::string const& scenario,
                     std::array<double, DomainDimension> const& ref_normal)
-        : Scenario(lib, scenario, ref_normal) {
+        : Scenario(mesh, lib, scenario, ref_normal) {
         if (lib_.hasMember(scenario, Mu)) {
-            coefficient_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
+            coefficient_ = lib_.getMemberFunction<DomainDimension+1, 1>(scenario, Mu);
         }
     }
 
@@ -28,14 +28,14 @@ public:
 
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
-        auto poisson = std::make_shared<Poisson>(std::move(cl), coefficient_, method);
+        auto poisson = std::make_shared<Poisson>(std::move(cl), regions, coefficient_, method);
         set(*poisson);
         return poisson;
     }
 
 private:
-    functional_t<1> coefficient_ =
-        [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> { return {1.0}; };
+    region_functional_t<1> coefficient_ =
+        [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
 };
 
 } // namespace tndm

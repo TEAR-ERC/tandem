@@ -27,12 +27,12 @@ function BP1:boundary(x, y, t)
     end
 end
 
-function BP1:mu(x, y)
+function BP1:mu(r, x, y)
     return 32.038120320
 end
 
-function BP1:eta(x, y)
-    return math.sqrt(self:mu(x, y) * self.rho0) / 2.0
+function BP1:eta(r, x, y)
+    return math.sqrt(self:mu(r, x, y) * self.rho0) / 2.0
 end
 
 function BP1:L(x, y)

@@ -34,7 +34,7 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = 1;
 
-    Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
+    Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> K,
             DGMethod method = DGMethod::BR2);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }

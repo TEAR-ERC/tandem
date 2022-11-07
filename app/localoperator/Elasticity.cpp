@@ -24,9 +24,9 @@ namespace kernel = tndm::elasticity::kernel;
 
 namespace tndm {
 
-Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                       functional_t<1> mu, std::optional<functional_t<1>> rho, DGMethod method)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
+Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> lam,
+                       region_functional_t<1> mu, std::optional<region_functional_t<1>> rho, DGMethod method)
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), regions, MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_lam(make_volume_functional(std::move(lam))),
