@@ -55,7 +55,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
         std::array<uint64_t, NumVerts> elem;
         std::copy(node, node + NumVerts, elem.begin());
         elements.emplace_back(Simplex<D>(elem));
-		regions.emplace_back(tag)
+		regions.emplace_back(tag);
         if (numNodes > NumVerts) {
             if (high_order_nodes.size() == 0) {
                 preparePermutationTable(numNodes);
@@ -169,12 +169,14 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
         auto vertexData = std::make_unique<VertexData<D>>(std::move(new_vertices));
         auto elementData =
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
+        auto regionData = std::make_unique<ScalarMeshData<int>>(std::move(regions));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      std::move(elementData), std::move(regions), comm);
+                                                      std::move(elementData), std::move(regionData), comm);
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
+        auto regionData = std::make_unique<ScalarMeshData<int>>(std::move(regions));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      nullptr, std::move(regions), comm);
+                                                      nullptr, std::move(regionData), comm);
     }
 
     // boundary mesh

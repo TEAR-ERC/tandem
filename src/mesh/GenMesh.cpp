@@ -132,7 +132,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
                       elemsLocal.from);
     }
 	
-	std::vector<int> regions(elements.length(), 0); // default region = 0
+	std::vector<int> regions(elements.size(), 0); // default region = 0
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
 	auto regionData = std::make_unique<region_data_t>(std::move(regions));

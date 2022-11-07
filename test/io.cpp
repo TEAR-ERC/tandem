@@ -28,7 +28,7 @@ public:
         }
     }
     void setNumElements(std::size_t numElements) override { CHECK(numElements == 2); }
-    void addElement(long type, long tag, long* node, std::size_t numNodes) override {
+    void addElement(long type, int tag, long* node, std::size_t numNodes) override {
         REQUIRE(elNo < 2);
         if (elNo == 0) {
             CHECK(type == 3);
