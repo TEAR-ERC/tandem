@@ -330,7 +330,7 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
     auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedElems, a2a, &rankPerm);
     elems.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
 
-    if (elementData) {
+    if (elementData || regionData) {
         auto map = makeG2LMap();
         std::vector<std::size_t> lids;
         lids.reserve(requestedElems.size());
@@ -339,19 +339,8 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
             assert(it != map.end());
             lids.emplace_back(it->second);
         }
-        elems.setMeshData(elementData->redistributed(lids, a2a));
-    }
-	
-    if (regionData) {
-        auto map = makeG2LMap();
-        std::vector<std::size_t> lids;
-        lids.reserve(requestedElems.size());
-        for (auto& elem : requestedElems) {
-            auto it = map.find(elem);
-            assert(it != map.end());
-            lids.emplace_back(it->second);
-        }
-        elems.setRegionData(regionData->redistributed(lids, a2a));
+		if (elementData)   elems.setMeshData(elementData->redistributed(lids, a2a));
+		if ( regionData) elems.setRegionData( regionData->redistributed(lids, a2a));
     }
 }
 
