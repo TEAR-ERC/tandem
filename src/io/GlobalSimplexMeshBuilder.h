@@ -50,6 +50,7 @@ private:
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
     std::vector<BC> bcs;
+    std::vector<int> regions; 
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
 
@@ -69,9 +70,11 @@ public:
     inline void setNumElements(std::size_t numElements) {
         elements.reserve(numElements);
         facets.reserve(numElements);
+		regions.reserve(numElements);
+		bcs.reserve(numElements);
         type_ = 0;
     }
-    void addElement(long type, long tag, long* node, std::size_t numNodes);
+    void addElement(long type, int tag, long* node, std::size_t numNodes);
 
     inline auto getUnknownBC() const { return unknownBC; }
     std::unique_ptr<GlobalSimplexMesh<D>> create(MPI_Comm comm);

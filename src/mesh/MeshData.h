@@ -61,38 +61,37 @@ private:
     std::vector<vertex_t> vertices;
 };
 
-class BoundaryData : public MeshData {
+template<typename T> class ScalarMeshData : public MeshData {
 public:
-    BoundaryData(std::vector<BC>&& BCs) : boundaryConditions(std::move(BCs)) {}
-    virtual ~BoundaryData() {}
+    ScalarMeshData(std::vector<T>&& data) : scalarData(std::move(data)) {}
+    virtual ~ScalarMeshData() {}
 
-    std::size_t size() const override { return boundaryConditions.size(); }
+    std::size_t size() const override { return scalarData.size(); }
 
     std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
                                             AllToAllV const& a2a) const override {
-        std::vector<BC> requestedBCs;
-        requestedBCs.reserve(lids.size());
+        std::vector<T> requestedData;
+        requestedData.reserve(lids.size());
         for (auto& lid : lids) {
             if (lid == std::numeric_limits<std::size_t>::max()) {
-                requestedBCs.emplace_back(BC::None);
+                requestedData.emplace_back();
             } else {
-                requestedBCs.emplace_back(boundaryConditions[lid]);
+                requestedData.emplace_back(scalarData[lid]);
             }
         }
 
-        static_assert(sizeof(BC::None) == sizeof(int));
-        auto newBCs = a2a.exchange(requestedBCs, mpi_type_t<int>());
-        return std::make_unique<BoundaryData>(std::move(newBCs));
+        auto newData = a2a.exchange(requestedData, mpi_type_t<T>());
+        return std::make_unique<ScalarMeshData<T>>(std::move(newData));
     }
 
     void permute(std::vector<std::size_t> const& permutation) override {
-        apply_permutation(boundaryConditions, permutation);
+        apply_permutation(scalarData, permutation);
     }
 
-    std::vector<BC> const& getBoundaryConditions() const { return boundaryConditions; }
+    std::vector<T> const& getData() const { return scalarData; }
 
 private:
-    std::vector<BC> boundaryConditions;
+    std::vector<T> scalarData;
 };
 
 class ElementData : public MeshData {

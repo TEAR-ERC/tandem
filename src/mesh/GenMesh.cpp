@@ -104,7 +104,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
 
     const std::size_t numElements = elemsLocal.length();
     std::vector<simplex_t> elements(numElements);
-
+	
     uint64_t ecubeFrom = elemsLocal.from / TessInfo<D>::NumSimplices;
     uint64_t ecubeTo = 1 + (static_cast<int64_t>(elemsLocal.to) - 1) / TessInfo<D>::NumSimplices;
     for (uint64_t ecube = ecubeFrom; ecube < ecubeTo; ++ecube) {
@@ -131,10 +131,13 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
                   elements.begin() + ecube * TessInfo<D>::NumSimplices + firstPlex -
                       elemsLocal.from);
     }
+	
+	std::vector<int> regions(elements.length(), 0); // default region = 0
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
+	auto regionData = std::make_unique<region_data_t>(std::move(regions));
     auto mesh =
-        std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr, comm_);
+        std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr, std::move(regionData), comm_);
     auto boundaryMesh = extractBoundaryMesh(*mesh);
     mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
     return mesh;
@@ -182,7 +185,7 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     }
     auto boundaryData = std::make_unique<boundary_data_t>(std::move(boundaryConditions));
     return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
-                                             std::move(boundaryData), comm_);
+                                             std::move(boundaryData), nullptr, comm_);
 }
 
 template class GenMesh<2u>;

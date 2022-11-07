@@ -211,13 +211,13 @@ TEST_CASE("Point locator") {
     }
 
     SUBCASE("On boundary") {
-        auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
+        auto boundaryData = dynamic_cast<ScalarMeshData<BC> const*>(mesh->facets().data());
         if (!boundaryData) {
             throw std::runtime_error("Boundary conditions not set.");
         }
         std::vector<std::size_t> boundary;
         for (std::size_t fctNo = 0; fctNo < mesh->numFacets(); ++fctNo) {
-            if (boundaryData->getBoundaryConditions()[fctNo] == BC::Dirichlet) {
+            if (boundaryData->getData()[fctNo] == BC::Dirichlet) {
                 boundary.push_back(fctNo);
             }
         }

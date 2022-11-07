@@ -25,7 +25,8 @@
 #include <vector>
 
 using tndm::BC;
-using tndm::BoundaryData;
+using tndm::ScalarMeshData<BC>;
+using tndm::ScalarMeshData<int>;
 using tndm::Curvilinear;
 using tndm::CurvilinearVTUAdapter;
 using tndm::GenMesh;
@@ -44,7 +45,7 @@ void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun trans
 
     unsigned degree = 1;
 
-    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh->facets().data());
+    auto boundaryData = dynamic_cast<ScalarMeshData<BC> const*>(mesh->facets().data());
     if (!boundaryData) {
         return;
     }
@@ -52,7 +53,7 @@ void writeMesh(std::string const& baseName, GenMesh<D> const& meshGen, Fun trans
     for (std::size_t fid = 0; fid < mesh->numFacets(); ++fid) {
         auto& eids = mesh->template upward<D - 1>(fid);
         for (auto& eid : eids) {
-            bc[eid] += static_cast<int>(boundaryData->getBoundaryConditions()[fid]);
+            bc[eid] += static_cast<int>(boundaryData->GetData()[fid]);
         }
     }
 

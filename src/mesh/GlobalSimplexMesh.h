@@ -58,9 +58,10 @@ public:
     GlobalSimplexMesh(std::vector<simplex_t>&& elements,
                       std::unique_ptr<MeshData> vertexDat = nullptr,
                       std::unique_ptr<MeshData> elementDat = nullptr,
+                      std::unique_ptr<MeshData> regionDat = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
         : elems_(std::move(elements)), vertexData(std::move(vertexDat)),
-          elementData(std::move(elementDat)), comm(comm), isPartitionedByHash(false) {
+          elementData(std::move(elementDat)), regionData(std::move(regionDat)), comm(comm), isPartitionedByHash(false) {
         if (vertexData) {
             vtxdist = makeSortedDistribution(vertexData->size(), comm);
         }
@@ -282,7 +283,7 @@ private:
                     } else {
                         lids.emplace_back(it->second);
                     }
-                }
+                }  // NOTE: it's likely not necessary to have mesh faces inherit region information.
                 auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
                 lf.setMeshData(std::move(meshData));
             }
@@ -404,6 +405,7 @@ private:
     std::vector<simplex_t> elems_;
     std::unique_ptr<MeshData> vertexData;
     std::unique_ptr<MeshData> elementData;
+    std::unique_ptr<MeshData> regionData;
     MPI_Comm comm;
     bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;

@@ -18,7 +18,7 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
     int rank;
     MPI_Comm_rank(comm_, &rank);
 
-    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
+    auto boundaryData = dynamic_cast<ScalarMeshData<BC> const*>(mesh.facets().data());
     if (!boundaryData) {
         throw std::runtime_error("Boundary conditions not set.");
     }
@@ -57,7 +57,7 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             info.g_up[0] = mesh.elements().l2cg(elNos[0]);
             info.localNo[0] = localFctNo;
             info.inside[0] = elNos[0] < numLocalElems_;
-            info.bc = boundaryData->getBoundaryConditions()[fctNo];
+            info.bc = boundaryData->getData()[fctNo];
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);

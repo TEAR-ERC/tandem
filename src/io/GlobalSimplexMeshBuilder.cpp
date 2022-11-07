@@ -38,7 +38,7 @@ void GlobalSimplexMeshBuilder<D>::preparePermutationTable(std::size_t numNodes) 
 }
 
 template <std::size_t D>
-void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
+void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
                                              std::size_t numNodes) {
     if (is_gmsh_simplex<D>(type)) {
         if (type_ == 0) {
@@ -55,6 +55,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::array<uint64_t, NumVerts> elem;
         std::copy(node, node + NumVerts, elem.begin());
         elements.emplace_back(Simplex<D>(elem));
+		regions.emplace_back(tag)
         if (numNodes > NumVerts) {
             if (high_order_nodes.size() == 0) {
                 preparePermutationTable(numNodes);
@@ -169,17 +170,17 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
         auto elementData =
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      std::move(elementData), comm);
+                                                      std::move(elementData), std::move(regions), comm);
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      nullptr, comm);
+                                                      nullptr, std::move(regions), comm);
     }
 
     // boundary mesh
-    auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs));
+    auto boundaryData = std::make_unique<ScalarMeshData<BC>>(std::move(bcs));
     auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets), nullptr,
-                                                                    std::move(boundaryData), comm);
+                                                                    std::move(boundaryData), nullptr, comm);
 
     mesh->setBoundaryMesh(std::move(boundaryMesh));
     return mesh;
