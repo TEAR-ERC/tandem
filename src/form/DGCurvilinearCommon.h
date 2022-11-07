@@ -81,9 +81,9 @@ public:
 			auto region = this->regions[elNo];
             for (std::size_t q = 0; q < F.shape(1); ++q) {
 				std::array<double,D+1> args;
-				args[0] = region;
-				std::copy_n(&coords[q][0], Q, &args[1]);
-                auto fx = fun(args);
+				std::copy(coords[q].begin(), coords[q].end(), args.begin());
+				args[D] = region;
+				auto fx = fun(args);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
                     F(p, q) = fx[p];
                 }
