@@ -286,7 +286,7 @@ private:
                 }
                 auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
                 lf.setMeshData(std::move(meshData));
-            }  // NOTE: it's likely not necessary to have mesh faces inherit region information.
+            }
         }
 
         auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedFaces, a2a);
