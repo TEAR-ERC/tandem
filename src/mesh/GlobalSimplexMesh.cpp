@@ -351,7 +351,7 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
             assert(it != map.end());
             lids.emplace_back(it->second);
         }
-        elems.setMeshData(regionData->redistributed(lids, a2a));
+        elems.setRegionData(regionData->redistributed(lids, a2a));
     }
 }
 
