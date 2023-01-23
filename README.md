@@ -85,7 +85,9 @@ Check out the detailed [installation guide](https://tandem.readthedocs.io/en/lat
 
 ## Citing tandem
 
-A journal article is under preparation.
+If you use tandem for your research, please cite the following journal article:
+
+Carsten Uphoff, Dave A May, Alice-Agnes Gabriel, A discontinuous Galerkin method for sequences of earthquakes and aseismic slip on multiple faults using unstructured curvilinear grids, *Geophysical Journal International*, Volume 233, Issue 1, April 2023, Pages 586–626, [https://doi.org/10.1093/gji/ggac467](https://doi.org/10.1093/gji/ggac467)
 
 ## License
 
