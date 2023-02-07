@@ -23,11 +23,11 @@ public:
     static constexpr std::size_t PsiIndex = TangentialComponents;
 
     using param_fun_t =
-        std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
+        std::function<typename Law::Params(std::array<double, DomainDimension + 1> const&)>;
     using source_fun_t =
-        std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
+        std::function<std::array<double, 1>(std::array<double, DomainDimension + 2> const&)>;
     using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
-        std::array<double, DomainDimension + 1> const&)>;
+        std::array<double, DomainDimension + 2> const&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -36,7 +36,13 @@ public:
         auto num_nodes = fault_.storage().size();
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
-            auto params = pfun(fault_.storage()[index].template get<Coords>());
+			auto x = fault_.storage()[index].template get<Coords>();
+			const size_t D = std::tuple_size_v<toml::impl::remove_cvref_t<decltype(x)>>;
+			int tag = 0; // TODO: CPRANGER: FILL TAG INFO!!
+			std::array<double,D+1> args;
+			std::copy(x.begin(), x.end(), args.begin());
+			args[D] = tag;
+			auto params = pfun(args);
             law_.set_params(index, params);
         }
     }
@@ -76,11 +82,22 @@ private:
         return result;
     }
     auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
-        auto x = fault_[faultNo].template get<Coords>()[node];
-        std::array<double, DomainDimension + 1> xt;
-        std::copy(x.begin(), x.end(), xt.begin());
-        xt.back() = time;
-        return (*delta_tau_)(xt);
+        
+		
+		// auto x = fault_[faultNo].template get<Coords>()[node];
+		//         std::array<double, DomainDimension + 1> xt;
+		//         std::copy(x.begin(), x.end(), xt.begin());
+		//         xt.back() = time;
+		
+		auto x = fault_[faultNo].template get<Coords>()[node];
+		const size_t D = std::tuple_size_v<toml::impl::remove_cvref_t<decltype(x)>>;
+		int tag = 0; // TODO: CPRANGER: FILL TAG INFO!!
+		std::array<double,D+2> args;
+		std::copy(x.begin(), x.end(), args.begin());
+		args[D+0] = time;
+		args[D+1] = tag;
+		
+		return (*delta_tau_)(args);
     }
 
     Law law_;
@@ -154,10 +171,22 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
         auto coords = fault_[faultNo].template get<Coords>();
         std::array<double, DomainDimension + 1> xt;
         for (std::size_t node = 0; node < nbf; ++node) {
-            auto const& x = coords[node];
-            std::copy(x.begin(), x.end(), xt.begin());
-            xt.back() = time;
-            r_mat(node, PsiIndex) += (*source_)(xt)[0];
+            
+			
+			// auto const& x = coords[node];
+			//             std::copy(x.begin(), x.end(), xt.begin());
+			//             xt.back() = time;
+			
+			
+			auto const& x = coords[node];
+			const size_t D = std::tuple_size_v<toml::impl::remove_cvref_t<decltype(x)>>;
+			int tag = 0; // TODO: CPRANGER: FILL TAG INFO!!
+			std::array<double,D+2> args;
+			std::copy(x.begin(), x.end(), args.begin());
+			args[D+0] = time;
+			args[D+1] = tag;
+			
+            r_mat(node, PsiIndex) += (*source_)(args)[0];
         }
     }
     return VMax;

@@ -28,13 +28,13 @@ public:
 
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
-        auto poisson = std::make_shared<Poisson>(std::move(cl), regions, coefficient_, method);
+        auto poisson = std::make_shared<Poisson>(std::move(cl), coefficient_, method);
         set(*poisson);
         return poisson;
     }
 
 private:
-    region_functional_t<1> coefficient_ =
+    tagged_functional_t<1> coefficient_ =
         [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
 };
 

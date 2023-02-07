@@ -38,7 +38,7 @@ void GlobalSimplexMeshBuilder<D>::preparePermutationTable(std::size_t numNodes) 
 }
 
 template <std::size_t D>
-void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
+void GlobalSimplexMeshBuilder<D>::addElement(long type, int ptag, int etag, long* node,
                                              std::size_t numNodes) {
     if (is_gmsh_simplex<D>(type)) {
         if (type_ == 0) {
@@ -55,7 +55,8 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
         std::array<uint64_t, NumVerts> elem;
         std::copy(node, node + NumVerts, elem.begin());
         elements.emplace_back(Simplex<D>(elem));
-		regions.emplace_back(tag);
+		element_ptags.emplace_back(ptag);
+		element_etags.emplace_back(etag);
         if (numNodes > NumVerts) {
             if (high_order_nodes.size() == 0) {
                 preparePermutationTable(numNodes);
@@ -77,25 +78,27 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
-        BC bc = BC::None;
-        switch (tag) {
-        case static_cast<long>(BC::None):
-            bc = BC::None;
-            break;
-        case static_cast<long>(BC::Dirichlet):
-            bc = BC::Dirichlet;
-            break;
-        case static_cast<long>(BC::Fault):
-            bc = BC::Fault;
-            break;
-        case static_cast<long>(BC::Natural):
-            bc = BC::Natural;
-            break;
-        default:
-            ++unknownBC;
-            break;
-        }
-        bcs.push_back(bc);
+		facet_ptags.emplace_back(ptag);
+		facet_etags.emplace_back(etag);
+		// BC bc = BC::None;
+		//         switch (tag) {
+		//         case static_cast<long>(BC::None):
+		//             bc = BC::None;
+		//             break;
+		//         case static_cast<long>(BC::Dirichlet):
+		//             bc = BC::Dirichlet;
+		//             break;
+		//         case static_cast<long>(BC::Fault):
+		//             bc = BC::Fault;
+		//             break;
+		//         case static_cast<long>(BC::Natural):
+		//             bc = BC::Natural;
+		//             break;
+		//         default:
+		//             ++unknownBC;
+		//             break;
+		//         }
+		//         bcs.push_back(bc);
     } else {
         if (is_lower_dimensional_gmsh_simplex_v<D - 1u>(type)) {
             ++ignoredElems;
@@ -110,7 +113,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, int tag, long* node,
 
 template <std::size_t D>
 std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Comm comm) {
-    auto check_mesh = std::array<std::size_t, 2>{elements.size(), bcs.size()};
+    auto check_mesh = std::array<std::size_t, 3>{elements.size(), facets.size()};
     MPI_Allreduce(MPI_IN_PLACE, &check_mesh, 2, mpi_type_t<std::size_t>(), MPI_SUM, comm);
     if (check_mesh[0] == 0) {
         std::stringstream s;
@@ -119,7 +122,10 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
         throw std::runtime_error(s.str());
     }
     if (check_mesh[1] == 0) {
-        throw std::runtime_error("Boundary conditions are unspecified in the mesh.");
+        std::stringstream s;
+        s << "The mesh does not contain any " << (D-1)
+          << "-simplex. Does the domain dimension match the dimension of the mesh?";
+        throw std::runtime_error(s.str());
     }
 
     std::unique_ptr<GlobalSimplexMesh<D>> mesh;
@@ -166,25 +172,29 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
             }
             ++old_id;
         }
-        auto vertexData = std::make_unique<VertexData<D>>(std::move(new_vertices));
-        auto elementData =
-            std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
-        auto regionData = std::make_unique<ScalarMeshData<int>>(std::move(regions));
-        mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      std::move(elementData), std::move(regionData), comm);
+        auto vtexData = std::make_unique<VertexData<D>        >(std::move(new_vertices));
+        auto elemData = std::make_unique<ElementData          >(std::move(high_order_verts), NumberingConvention::GMSH);
+	    auto pTagData = std::make_unique<ScalarMeshData<int>  >(std::move(element_ptags));
+		auto eTagData = std::make_unique<ScalarMeshData<int>  >(std::move(element_etags));
+    	mesh          = std::make_unique<GlobalSimplexMesh<D> >(std::move(elements), std::move(vtexData),
+                                                                std::move(elemData), std::move(pTagData), std::move(eTagData), comm);
     } else {
-        auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
-        auto regionData = std::make_unique<ScalarMeshData<int>>(std::move(regions));
-        mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      nullptr, std::move(regionData), comm);
+        auto vtexData = std::make_unique<VertexData<D>        >(std::move(vertices));
+	    auto elemData = std::unique_ptr<MeshData>(nullptr);
+		auto pTagData = std::make_unique<ScalarMeshData<int>  >(std::move(element_ptags));
+		auto eTagData = std::make_unique<ScalarMeshData<int>  >(std::move(element_etags));
+    	mesh          = std::make_unique<GlobalSimplexMesh<D> >(std::move(elements), std::move(vtexData),
+                                                                std::move(elemData), std::move(pTagData), std::move(eTagData), comm);
     }
 
     // boundary mesh
-    auto boundaryData = std::make_unique<ScalarMeshData<BC>>(std::move(bcs));
-    auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets), nullptr,
-                                                                    std::move(boundaryData), nullptr, comm);
-
-    mesh->setBoundaryMesh(std::move(boundaryMesh));
+    auto vtexData = std::unique_ptr<MeshData>(nullptr);
+	auto elemData = std::unique_ptr<MeshData>(nullptr);
+	auto pTagData = std::make_unique<ScalarMeshData<int>      >(std::move(facet_ptags));
+	auto eTagData = std::make_unique<ScalarMeshData<int>      >(std::move(facet_etags));
+    auto bMesh    = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets),   std::move(vtexData),
+                                                                std::move(elemData), std::move(pTagData), std::move(eTagData), comm);
+    mesh->setBoundaryMesh(std::move(bMesh));
     return mesh;
 }
 

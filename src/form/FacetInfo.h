@@ -1,8 +1,6 @@
 #ifndef FACETINFO_20200910_H
 #define FACETINFO_20200910_H
 
-#include "form/BC.h"
-
 #include <array>
 #include <cstddef>
 
@@ -13,7 +11,8 @@ struct SideInfo {
     int side;
     std::size_t lid;
     std::size_t localNo;
-    BC bc;
+    int ptag;
+    int etag;
 };
 
 struct FacetInfo {
@@ -21,7 +20,13 @@ struct FacetInfo {
     std::array<std::size_t, 2> up;
     std::array<std::size_t, 2> g_up;
     std::array<std::size_t, 2> localNo;
-    BC bc;
+    int ptag;
+    int etag;
+};
+
+struct ElementInfo {
+    int ptag;
+    int etag;
 };
 
 } // namespace tndm

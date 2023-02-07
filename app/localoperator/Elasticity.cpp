@@ -24,9 +24,12 @@ namespace kernel = tndm::elasticity::kernel;
 
 namespace tndm {
 
-Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> lam,
-                       region_functional_t<1> mu, std::optional<region_functional_t<1>> rho, DGMethod method)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), regions, MinQuadOrder()), method_(method),
+Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                       tagged_functional_t<1> lam,
+                       tagged_functional_t<1> mu,
+					   std::optional<tagged_functional_t<1>> rho,
+					   DGMethod method)
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_lam(make_volume_functional(std::move(lam))),
@@ -100,8 +103,8 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     cfl_dt_.resize(numLocalElements, 0.0);
 }
 
-void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
-    base::prepare_volume(elNo, scratch);
+void Elasticity::prepare_volume(std::size_t elNo, ElementInfo const & info, LinearAllocator<double>& scratch) {
+    base::prepare_volume(elNo, info, scratch);
 
     alignas(ALIGNMENT) double lam_Q_raw[tensor::lam_Q::size()];
     auto lam_Q = Matrix<double>(lam_Q_raw, 1, volRule.size());
@@ -280,7 +283,7 @@ void Elasticity::prepare_penalty(std::size_t fctNo, FacetInfo const& info,
     auto const p = [&](int side) {
         const auto [c0, c1] = stiffness_tensor_bounds(info.up[side]);
         constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
-        return (Dim + 1) * c_N_1 * (area_[fctNo] / volume_[info.up[side]]) * (c1 * c1 / c0);
+        return (Dim + 1) * c_N_1 * (fct_area[fctNo] / vol_vlme[info.up[side]]) * (c1 * c1 / c0);
     };
 
     if (info.up[0] != info.up[1]) {
@@ -300,13 +303,13 @@ void Elasticity::prepare_cfl(std::size_t elNo, mneme::span<SideInfo> info,
         const auto fctNo = info[f].fctNo;
 
         constexpr double c_N = InverseInequality<Dim>::trace_constant(PolynomialDegree);
-        l_max += gamma * penalty_[fctNo] * c_N * area_[fctNo] / volume_[elNo];
-        bnd_area += area_[fctNo];
+        l_max += gamma * penalty_[fctNo] * c_N * fct_area[fctNo] / vol_vlme[elNo];
+        bnd_area += fct_area[fctNo];
     }
 
     const auto [c0, c1] = stiffness_tensor_bounds(elNo);
     const double ir1 = inverse_density_upper_bound(elNo);
-    const double h_1 = bnd_area / volume_[elNo];
+    const double h_1 = bnd_area / vol_vlme[elNo];
     constexpr double C_N = InverseInequality<Dim>::grad_constant(PolynomialDegree);
     l_max += c1 * ir1 * C_N * h_1 * h_1;
     l_max *= 2.0;
@@ -447,7 +450,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 
 bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                    LinearAllocator<double>& scratch) const {
-    if (info.bc == BC::Natural) {
+    if (info.ptag == static_cast<int>(BC::Natural)) {
         return false;
     }
 
@@ -541,29 +544,29 @@ bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
     return true;
 }
 
-bool Elasticity::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+bool Elasticity::bc_skeleton(std::size_t fctNo, int bc, double f_q_raw[]) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (bc == BC::Fault && fun_slip) {
+    if (bc == static_cast<int>(BC::Fault) && fun_slip) {
         (*fun_slip)(fctNo, f_q, false);
-    } else if (bc == BC::Dirichlet && fun_dirichlet) {
+    } else if (bc == static_cast<int>(BC::Dirichlet) && fun_dirichlet) {
         (*fun_dirichlet)(fctNo, f_q, false);
     } else {
         return false;
     }
     return true;
 }
-bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+bool Elasticity::bc_boundary(std::size_t fctNo, int bc, double f_q_raw[]) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
-    if (bc == BC::Fault && fun_slip) {
+    if (bc == static_cast<int>(BC::Fault) && fun_slip) {
         (*fun_slip)(fctNo, f_q, true);
         for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
             for (std::size_t p = 0; p < NumQuantities; ++p) {
                 f_q(p, q) *= 0.5;
             }
         }
-    } else if (bc == BC::Dirichlet && fun_dirichlet) {
+    } else if (bc == static_cast<int>(BC::Dirichlet) && fun_dirichlet) {
         (*fun_dirichlet)(fctNo, f_q, true);
     } else {
         return false;
@@ -575,7 +578,7 @@ bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<d
                               Vector<double>& B1, LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    if (!bc_skeleton(fctNo, info.bc, f_q_raw)) {
+    if (!bc_skeleton(fctNo, info.ptag, f_q_raw)) {
         return false;
     }
 
@@ -645,7 +648,7 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
                               LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
+    if (!bc_boundary(fctNo, info.ptag, f_q_raw)) {
         return false;
     }
 
@@ -719,7 +722,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
     alignas(ALIGNMENT) double n_unit_q_flipped[tensor::n_unit_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
         bool is_skeleton_face = elNo != info[f].lid;
-        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+        bool is_fault_or_dirichlet = info[f].ptag == static_cast<int>(BC::Fault) || info[f].ptag == static_cast<int>(BC::Dirichlet);
 
         auto fctNo = info[f].fctNo;
         double const* n_q = fct[fctNo].get<Normal>().data()->data();
@@ -748,7 +751,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
         alignas(ALIGNMENT) double u_hat_minus_u_q[tensor::u_hat_minus_u_q::size()] = {};
         alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
 
-        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
+        if (info[f].ptag == static_cast<int>(BC::None) || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
@@ -780,7 +783,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
 
             if constexpr (WithRHS) {
                 alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-                if (bc_skeleton(fctNo, info[f].bc, f_q_raw)) {
+                if (bc_skeleton(fctNo, info[f].ptag, f_q_raw)) {
                     double sign = info[f].side == 1 ? -1.0 : 1.0;
                     kernel::flux_u_add_bc fub;
                     fub.c00 = 0.5 * sign;
@@ -819,7 +822,7 @@ void Elasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
 
             if constexpr (WithRHS) {
                 alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-                if (bc_boundary(fctNo, info[f].bc, f_q_raw)) {
+                if (bc_boundary(fctNo, info[f].ptag, f_q_raw)) {
                     kernel::flux_u_add_bc fub;
                     fub.c00 = 1.0;
                     fub.f_q = f_q_raw;
@@ -913,8 +916,8 @@ std::size_t Elasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info
     std::size_t flops = kernel::apply_volume::HardwareFlops;
     for (std::size_t f = 0; f < NumFacets; ++f) {
         bool is_skeleton_face = elNo != info[f].lid;
-        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
-        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
+        bool is_fault_or_dirichlet = info[f].ptag == static_cast<int>(BC::Fault) || info[f].ptag == static_cast<int>(BC::Dirichlet);
+        if (info[f].ptag == static_cast<int>(BC::None) || (is_skeleton_face && is_fault_or_dirichlet)) {
             flops += kernel::flux_u_skeleton::HardwareFlops;
             flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (is_fault_or_dirichlet) {
@@ -966,7 +969,7 @@ void Elasticity::traction_skeleton(std::size_t fctNo, FacetInfo const& info,
     }
 
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    bc_skeleton(fctNo, info.bc, f_q_raw);
+    bc_skeleton(fctNo, info.ptag, f_q_raw);
 
     kernel::compute_traction krnl;
     krnl.c00 = -penalty(fctNo);
@@ -1001,7 +1004,7 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
     dxKrnl.execute(0);
 
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    bc_boundary(fctNo, info.bc, f_q_raw);
+    bc_boundary(fctNo, info.ptag, f_q_raw);
 
     kernel::compute_traction_bnd krnl;
     krnl.c00 = -penalty(fctNo);

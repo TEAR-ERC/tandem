@@ -10,9 +10,9 @@
 namespace tndm {
 
 template <std::size_t D>
-DGCurvilinearCommon<D>::DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, const std::vector<int>& regions,
+DGCurvilinearCommon<D>::DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl,
                                             unsigned minQuadOrder)
-    : cl_(std::move(cl)), regions(regions) {
+    : cl_(std::move(cl)) {
     fctRule = simplexQuadratureRule<D - 1u>(minQuadOrder);
     volRule = simplexQuadratureRule<D>(minQuadOrder);
 
@@ -33,12 +33,19 @@ void DGCurvilinearCommon<D>::begin_preparation(std::size_t numElements,
                    fctRule.size());
     vol.setStorage(std::make_shared<vol_t>(numElements * volRule.size()), 0u, numElements,
                    volRule.size());
-    area_.resize(numLocalFacets);
-    volume_.resize(numElements);
+				   
+    fct_area.resize(numLocalFacets);
+    fct_ptag.resize(numLocalFacets);
+    fct_etag.resize(numLocalFacets);
+	
+    vol_vlme.resize(numElements);
+    vol_ptag.resize(numElements);
+    vol_etag.resize(numElements);
 }
 
 template <std::size_t D>
-void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
+void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, ElementInfo const & info,
+                                            LinearAllocator<double>& scratch) {
     double* Jmem = scratch.allocate(volRule.size() * D * D);
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(volRule.size()));
     auto jInv = Tensor(vol[elNo].template get<JInv>().data()->data(),
@@ -56,7 +63,11 @@ void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<do
     for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
         volume += volRule.weights()[i] * absDetJ(i);
     }
-    volume_[elNo] = volume;
+	
+    vol_vlme[elNo] = volume;
+	
+	vol_ptag[elNo] = info.ptag;
+	vol_etag[elNo] = info.etag;
 }
 
 template <std::size_t D>
@@ -91,7 +102,9 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     for (std::ptrdiff_t i = 0; i < length.size(); ++i) {
         area += fctRule.weights()[i] * length[i];
     }
-    area_[fctNo] = area;
+    fct_area[fctNo] = area;
+	fct_ptag[fctNo] = info.ptag;
+	fct_etag[fctNo] = info.etag;
 
     auto jInv1 = Tensor(fct[fctNo].template get<JInv1>().data()->data(),
                         cl_->jacobianResultInfo(fctRule.size()));
@@ -102,8 +115,11 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 
 template <std::size_t D>
 void DGCurvilinearCommon<D>::end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan) {
-    auto scatter = SimpleScatter<double>(std::move(elementScatterPlan));
-    scatter.scatter(volume_.data());
+    auto dbl_scatter = SimpleScatter<double>(std::move(elementScatterPlan));
+    auto int_scatter =    SimpleScatter<int>(std::move(elementScatterPlan));
+    dbl_scatter.scatter(vol_vlme.data());
+    int_scatter.scatter(vol_ptag.data());
+    int_scatter.scatter(vol_etag.data());
 }
 
 template class DGCurvilinearCommon<2u>;

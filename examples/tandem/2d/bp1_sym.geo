@@ -2,6 +2,10 @@ DefineConstant[ hf = {0.200, Min 0, Max 1000, Name "Fault resolution" } ];
 DefineConstant[ h = {50.0, Min 0, Max 1000, Name "Far boundary resolution" } ];
 DefineConstant[ D = {400, Min 0, Max 10000, Name "Domain size" } ];
 
+BC_Natural = 1
+BC_Fault = 3
+BC_Dirichlet = 5
+
 w = D;
 d = D;
 d1 = 15;
@@ -26,8 +30,8 @@ Line(10) = {10, 9};
 Line(11) = {6, 10};
 Curve Loop(1) = {11, 10, 9, 8, 7, -4, -3, -2};
 Plane Surface(1) = {1};
-Physical Curve(1) = {2, 4};
-Physical Curve(3) = {8, 9, 10, 11};
-Physical Curve(5) = {3, 7};
+Physical Curve(BC_Natural) = {2, 4};
+Physical Curve(BC_Fault) = {8, 9, 10, 11};
+Physical Curve(BC_Dirichlet) = {3, 7};
 Physical Surface(1) = {1};
 Mesh.MshFileVersion = 2.2;

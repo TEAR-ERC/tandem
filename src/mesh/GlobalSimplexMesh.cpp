@@ -58,8 +58,9 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     mpi_array_type<uint64_t> mpi_simplex_t(D + 1);
     elems_ = a2a.exchange(elemsToSend, mpi_simplex_t.get());
 
-    if (elementData) elementData = elementData->redistributed(enumeration, a2a);
-	if ( regionData)  regionData =  regionData->redistributed(enumeration, a2a);
+    if (elemData) elemData = elemData->redistributed(enumeration, a2a);
+	if (pTagData) pTagData = pTagData->redistributed(enumeration, a2a);
+	if (eTagData) eTagData = eTagData->redistributed(enumeration, a2a);
 }
 
 template <std::size_t D>
@@ -78,7 +79,7 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
         auto owner = std::vector<int>(cGIDs.size());
         std::fill(owner.begin(), owner.end(), rank);
         auto lf = LocalFaces<D>(std::move(elems), std::move(owner), std::move(cGIDs), elems.size());
-        setSharedRanksAndElementData(lf, elemDist);
+        setSharedRanksAndElemData(lf, elemDist);
         return lf;
     }
 
@@ -298,13 +299,13 @@ GlobalSimplexMesh<D>::getGhostElements(std::vector<Simplex<D>> elems, unsigned o
     std::transform(cGIDs.begin(), cGIDs.end(), owner.begin(), gid2owner);
 
     auto lf = LocalFaces<D>(std::move(elems), std::move(owner), std::move(cGIDs), numLocal);
-    setSharedRanksAndElementData(lf, elemDist);
+    setSharedRanksAndElemData(lf, elemDist);
 
     return lf;
 }
 
 template <std::size_t D>
-void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
+void GlobalSimplexMesh<D>::setSharedRanksAndElemData(
     LocalFaces<D>& elems, std::vector<std::size_t> const& elemDist) const {
     int rank, procs;
     MPI_Comm_rank(comm, &rank);
@@ -330,7 +331,7 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
     auto [sharedRanks, sharedRanksDispls] = getSharedRanks(requestedElems, a2a, &rankPerm);
     elems.setSharedRanks(std::move(sharedRanks), std::move(sharedRanksDispls));
 
-    if (elementData || regionData) {
+    if (elemData || pTagData || eTagData) {
         auto map = makeG2LMap();
         std::vector<std::size_t> lids;
         lids.reserve(requestedElems.size());
@@ -339,8 +340,9 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
             assert(it != map.end());
             lids.emplace_back(it->second);
         }
-		if (elementData)   elems.setMeshData(elementData->redistributed(lids, a2a));
-		if ( regionData) elems.setRegionData( regionData->redistributed(lids, a2a));
+		if (elemData) elems.setMeshData(elemData->redistributed(lids, a2a));
+		if (pTagData) elems.setPTagData(pTagData->redistributed(lids, a2a));
+		if (eTagData) elems.setETagData(eTagData->redistributed(lids, a2a));
     }
 }
 

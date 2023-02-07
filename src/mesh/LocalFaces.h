@@ -78,8 +78,11 @@ public:
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
 
-    void setRegionData(std::unique_ptr<MeshData> data) { regionData_ = std::move(data); }
-    MeshData const* regionData() const { return regionData_.get(); }
+    void setPTagData(std::unique_ptr<MeshData> data) { pTagData_ = std::move(data); }
+    MeshData const* pTagData() const { return pTagData_.get(); }
+
+    void setETagData(std::unique_ptr<MeshData> data) { eTagData_ = std::move(data); }
+    MeshData const* eTagData() const { return eTagData_.get(); }
 	
 	void permute(std::vector<std::size_t> const& permutation) {
         assert(permutation.size() == faces_.size());
@@ -126,8 +129,9 @@ private:
     g2l_t g2l_;
     std::vector<int> sharedRanks_;
     Displacements<int> sharedRanksDispls_;
-    std::unique_ptr<MeshData> meshData_;
-    std::unique_ptr<MeshData> regionData_;
+    std::unique_ptr<MeshData> meshData_; // can be either element data or vertex data
+    std::unique_ptr<MeshData> pTagData_;
+    std::unique_ptr<MeshData> eTagData_;
 };
 
 } // namespace tndm

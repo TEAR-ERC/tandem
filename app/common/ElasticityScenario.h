@@ -35,15 +35,15 @@ public:
     auto make_local_operator(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                              DGMethod method) const {
         auto elasticity =
-            std::make_shared<Elasticity>(std::move(cl), regions, lam_, mu_, std::nullopt, method);
+            std::make_shared<Elasticity>(std::move(cl), lam_, mu_, std::nullopt, method);
         set(*elasticity);
         return elasticity;
     }
 
 private:
-    region_functional_t<1> lam_ =
+    tagged_functional_t<1> lam_ =
         [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
-    region_functional_t<1> mu_ =
+    tagged_functional_t<1> mu_ =
         [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
 };
 

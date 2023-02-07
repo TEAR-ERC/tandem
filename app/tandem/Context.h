@@ -27,15 +27,15 @@ namespace tndm::seas::detail {
 
 template <typename Type> struct make_lop;
 template <> struct make_lop<Poisson> {
-    static auto dg(LocalSimplexMesh<DomainDimension> const& mesh, std::shared_ptr<Curvilinear<DomainDimension>> cl,
+    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Poisson> const& scenario) {
-        return std::make_shared<Poisson>(std::move(cl), dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().regionData())->getData(), scenario.mu(), DGMethod::IP);
+        return std::make_shared<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
     }
 };
 template <> struct make_lop<Elasticity> {
-    static auto dg(LocalSimplexMesh<DomainDimension> const& mesh, std::shared_ptr<Curvilinear<DomainDimension>> cl,
+    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Elasticity> const& scenario) {
-        return std::make_shared<Elasticity>(std::move(cl), dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().regionData())->getData(), scenario.lam(), scenario.mu(),
+        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
                                             scenario.rho(), DGMethod::IP);
     }
 };
@@ -57,7 +57,7 @@ public:
             std::array<double, DomainDimension> up, std::array<double, DomainDimension> ref_normal)
         : ContextBase(mesh, seas_sc->transform()), scenario(std::move(seas_sc)),
           friction_scenario(std::move(friction_sc)),
-          dg_lop(detail::make_lop<Type>::dg(mesh, cl, *scenario)), up(up), ref_normal(ref_normal) {}
+          dg_lop(detail::make_lop<Type>::dg(cl, *scenario)), up(up), ref_normal(ref_normal) {}
 
     auto dg() -> std::unique_ptr<AbstractDGOperator<DomainDimension>> override {
         return std::make_unique<dg_t>(topo, dg_lop);

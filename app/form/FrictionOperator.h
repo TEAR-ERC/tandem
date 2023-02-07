@@ -31,7 +31,7 @@ public:
         lop_->begin_preparation(num_local_elements());
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto fctNo = fault_map_->fctNo(faultNo);
-            lop_->prepare(faultNo, topo_->info(fctNo), scratch_);
+            lop_->prepare(faultNo, topo_->facet_info(fctNo), scratch_);
         }
         lop_->end_preparation();
     }

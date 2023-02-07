@@ -14,14 +14,17 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
     : numElems_(mesh.numElements()), numLocalElems_(mesh.elements().localSize()),
       numLocalFacets_(mesh.facets().localSize()),
       elementScatterPlan_(std::make_shared<ScatterPlan>(mesh.elements(), comm)), comm_(comm),
-      fctInfo(mesh.facets().localSize()), volInfo(mesh.numElements()) {
+      fctInfo(mesh.facets().localSize()), eltInfo(mesh.numElements()), volInfo(mesh.numElements()) {
     int rank;
     MPI_Comm_rank(comm_, &rank);
 
-    auto boundaryData = dynamic_cast<ScalarMeshData<BC> const*>(mesh.facets().data());
-    if (!boundaryData) {
-        throw std::runtime_error("Boundary conditions not set.");
-    }
+    auto fctPTagData = dynamic_cast<ScalarMeshData<int> const*>(mesh.facets().pTagData());
+	auto fctETagData = dynamic_cast<ScalarMeshData<int> const*>(mesh.facets().eTagData());
+	
+    auto volPTagData = dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().pTagData());
+	auto volETagData = dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().eTagData());
+    
+	if (!fctPTagData) throw std::runtime_error("Boundary conditions not set.");
 
     numInteriorElems_ = 0;
     std::size_t lastElNoInInterior = 0;
@@ -57,7 +60,8 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             info.g_up[0] = mesh.elements().l2cg(elNos[0]);
             info.localNo[0] = localFctNo;
             info.inside[0] = elNos[0] < numLocalElems_;
-            info.bc = boundaryData->getData()[fctNo];
+            info.ptag = fctPTagData->getData()[fctNo];
+            info.etag = fctETagData->getData()[fctNo];
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);
@@ -85,7 +89,8 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
                     si[l].side = i;
                     si[l].lid = info.up[(i + 1) % 2];
                     si[l].localNo = info.localNo[(i + 1) % 2];
-                    si[l].bc = info.bc;
+                    si[l].ptag = info.ptag;
+                    si[l].etag = info.etag;
                 }
             }
         }
@@ -115,6 +120,9 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             assert(numLocal + numGhost <= D + 2u);
             volInfo[elNo].template get<NumLocalNeighbours>() = numLocal;
             volInfo[elNo].template get<NumGhostNeighbours>() = numGhost;
+			
+			eltInfo[elNo].ptag = volPTagData->getData()[elNo];
+			eltInfo[elNo].etag = volETagData->getData()[elNo];
         }
     }
 }

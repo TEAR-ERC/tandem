@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
         return -1;
     }
     globalMesh->repartition();
-    auto mesh = globalMesh->getLocalMesh(1);
+    auto mesh = globalMesh->getLocalMesh(1); // -> (LocalSimplexMesh <- LocalFaces)
 
     solveSEASProblem(*mesh, *cfg);
 

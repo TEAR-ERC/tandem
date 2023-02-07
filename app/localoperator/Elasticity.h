@@ -35,8 +35,10 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
 
-    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> lam,
-               region_functional_t<1> mu, std::optional<region_functional_t<1>> rho = std::nullopt,
+    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+	           tagged_functional_t<1> lam,
+               tagged_functional_t<1> mu,
+			   std::optional<tagged_functional_t<1>> rho = std::nullopt,
                DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
@@ -48,7 +50,7 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
-    void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
+    void prepare_volume(std::size_t elNo, ElementInfo const & info, LinearAllocator<double>& scratch);
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch);
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
@@ -105,19 +107,22 @@ public:
     }
     void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator<double>&) const;
 
-    void set_force(functional_t<NumQuantities> fun) {
+    void set_force(tagged_functional_t<NumQuantities> fun) {
         fun_force = make_volume_functional(std::move(fun));
     }
     void set_force(volume_functional_t fun) { fun_force = std::move(fun); }
-    void set_dirichlet(functional_t<NumQuantities> fun) {
+    
+	void set_dirichlet(tagged_functional_t<NumQuantities> fun) {
         fun_dirichlet = make_facet_functional(std::move(fun));
     }
-    void set_dirichlet(functional_t<NumQuantities> fun,
+    
+	void set_dirichlet(tagged_functional_t<NumQuantities> fun,
                        std::array<double, DomainDimension> const& refNormal) {
         fun_dirichlet = make_facet_functional(std::move(fun), refNormal);
     }
     void set_dirichlet(facet_functional_t fun) { fun_dirichlet = std::move(fun); }
-    void set_slip(functional_t<NumQuantities> fun,
+    
+	void set_slip(tagged_functional_t<NumQuantities> fun,
                   std::array<double, DomainDimension> const& refNormal) {
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
@@ -138,8 +143,8 @@ private:
     double inverse_density_upper_bound(std::size_t elNo) const;
     void compute_mass_matrix(std::size_t elNo, double* M) const;
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
-    bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
-    bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+    bool bc_skeleton(std::size_t fctNo, int bc, double f_q_raw[]) const;
+    bool bc_boundary(std::size_t fctNo, int bc, double f_q_raw[]) const;
     void transpose_JInv(std::size_t fctNo, int side);
 
     DGMethod method_;

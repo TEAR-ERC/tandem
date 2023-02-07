@@ -12,7 +12,7 @@ template <std::size_t D>
 BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) {
     auto const& elements = mesh.elements();
     auto const& facets = mesh.facets();
-    auto boundaryData = dynamic_cast<ScalarMeshData<BC> const*>(facets.data());
+    auto boundaryData = dynamic_cast<ScalarMeshData<int> const*>(facets.pTagData());
     if (!boundaryData) {
         throw std::runtime_error("Boundary conditions not set.");
     }
@@ -24,7 +24,7 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
     theFctNos.reserve(numLocalFacets);
 
     for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
-        if (boundaryData->getData()[fctNo] == bc) {
+        if (boundaryData->getData()[fctNo] == static_cast<int>(bc)) {
             auto elNos = mesh.template upward<D - 1u>(fctNo);
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             int other_rank = -1;

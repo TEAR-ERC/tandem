@@ -23,8 +23,8 @@ public:
     using solution_jacobian_t =
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
-    template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
-    template <std::size_t Q> using region_functional_t = typename LocalOperator::template region_functional_t<Q>;
+    // template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
+    template <std::size_t Q> using tagged_functional_t = typename LocalOperator::template tagged_functional_t<Q>;
 	
 
     constexpr static char Warp[] = "warp";
@@ -36,7 +36,9 @@ public:
 
     Scenario(LocalSimplexMesh<DomainDimension> const& mesh, std::string const& lib, std::string const& scenario,
              std::array<double, DomainDimension> const& ref_normal)
-        : ref_normal_(ref_normal), regions(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().regionData())->getData()) {
+        : ref_normal_(ref_normal),
+		  ptags(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().pTagData())->getData()),
+		  etags(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().eTagData())->getData()) {
         lib_.loadFile(lib);
 
         if (lib_.hasMember(scenario, Warp)) {
@@ -44,10 +46,10 @@ public:
         }
 
         auto functional = [&](char const opt[],
-                              std::optional<functional_t<NumQuantities>>& target) {
+                              std::optional<tagged_functional_t<NumQuantities>>& target) {
             if (lib_.hasMember(scenario, opt)) {
                 target = std::make_optional(
-                    lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, opt));
+                    lib_.getMemberFunction<DomainDimension+1u, NumQuantities>(scenario, opt));
             }
         };
         functional(Force, force_);
@@ -109,12 +111,13 @@ public:
 
 protected:
     std::array<double, DomainDimension> ref_normal_;
-	std::vector<int> const& regions;
+	std::vector<int> const& ptags;
+	std::vector<int> const& etags;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
-    std::optional<functional_t<NumQuantities>> force_ = std::nullopt;
-    std::optional<functional_t<NumQuantities>> boundary_ = std::nullopt;
-    std::optional<functional_t<NumQuantities>> slip_ = std::nullopt;
+    std::optional<tagged_functional_t<NumQuantities>> force_ = std::nullopt;
+    std::optional<tagged_functional_t<NumQuantities>> boundary_ = std::nullopt;
+    std::optional<tagged_functional_t<NumQuantities>> slip_ = std::nullopt;
     std::optional<solution_t> solution_ = std::nullopt;
     std::optional<solution_jacobian_t> solution_jacobian_ = std::nullopt;
 };

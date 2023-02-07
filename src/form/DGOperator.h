@@ -62,16 +62,15 @@ public:
         if constexpr (std::experimental::is_detected_v<prepare_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
                 scratch_.reset();
-                lop_->prepare_volume(elNo, scratch_);
+                auto const& info = topo_->element_info(elNo);
+                lop_->prepare_volume(elNo, info, scratch_);
             }
         }
         if constexpr (std::experimental::is_detected_v<prepare_skeleton_t, LocalOperator> ||
                       std::experimental::is_detected_v<prepare_boundary_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
-                auto const& info = topo_->info(fctNo);
-                auto ib0 = info.g_up[0];
-                auto ib1 = info.g_up[1];
+                auto const& info = topo_->facet_info(fctNo);
                 if (info.up[0] != info.up[1]) {
                     lop_->prepare_skeleton(fctNo, info, scratch_);
                 } else {
@@ -91,7 +90,7 @@ public:
         if constexpr (std::experimental::is_detected_v<prepare_penalty_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
-                auto const& info = topo_->info(fctNo);
+                auto const& info = topo_->facet_info(fctNo);
                 lop_->prepare_penalty(fctNo, info, scratch_);
             }
         }
@@ -144,7 +143,7 @@ public:
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
                 a_scratch.reset();
-                auto const& info = topo_->info(fctNo);
+                auto const& info = topo_->facet_info(fctNo);
                 auto ib0 = info.up[0];
                 auto ib1 = info.up[1];
                 if (info.up[0] != info.up[1]) {
@@ -209,7 +208,7 @@ public:
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
                 a_scratch.reset();
-                auto const& info = topo_->info(fctNo);
+                auto const& info = topo_->facet_info(fctNo);
                 auto ib0 = info.up[0];
                 auto ib1 = info.up[1];
                 if (info.up[0] != info.up[1]) {

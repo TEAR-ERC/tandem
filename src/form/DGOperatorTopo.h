@@ -40,7 +40,8 @@ public:
     std::size_t numLocalFacets() const { return numLocalFacets_; }
     std::shared_ptr<ScatterPlan> elementScatterPlan() const { return elementScatterPlan_; }
 
-    FacetInfo const& info(std::size_t fctNo) const { return fctInfo[fctNo]; }
+    FacetInfo   const&   facet_info(std::size_t fctNo) const { return fctInfo[fctNo]; }
+	ElementInfo const& element_info(std::size_t eltNo) const { return eltInfo[eltNo]; }
     std::size_t gid(std::size_t elNo) const { return volInfo[elNo].template get<GID>(); }
     std::size_t const* gids() const { return &volInfo[0].template get<GID>(); }
     unsigned numLocalNeighbours(std::size_t elNo) const {
@@ -67,7 +68,8 @@ protected:
     std::shared_ptr<ScatterPlan> elementScatterPlan_;
     MPI_Comm comm_;
 
-    std::vector<FacetInfo> fctInfo;
+    std::vector<FacetInfo>   fctInfo;
+	std::vector<ElementInfo> eltInfo;
 
     struct GID {
         using type = std::size_t;

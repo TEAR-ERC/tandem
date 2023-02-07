@@ -24,9 +24,10 @@ namespace kernel = tndm::poisson::kernel;
 
 namespace tndm {
 
-Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, std::vector<int> const& regions, region_functional_t<1> K,
+Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                 tagged_functional_t<1> K,
                  DGMethod method)
-    : DGCurvilinearCommon<DomainDimension>(std::move(cl), regions, MinQuadOrder()), method_(method),
+    : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
@@ -130,8 +131,8 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
     penalty_.resize(numLocalFacets);
 }
 
-void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
-    base::prepare_volume(elNo, scratch);
+void Poisson::prepare_volume(std::size_t elNo, ElementInfo const & info, LinearAllocator<double>& scratch) {
+    base::prepare_volume(elNo, info, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
     alignas(ALIGNMENT) double K_Q_raw[tensor::K_Q::size()];
@@ -212,7 +213,7 @@ void Poisson::prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAl
         auto k0 = *std::min_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
         auto k1 = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
         constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
-        return (Dim + 1) * c_N_1 * (area_[fctNo] / volume_[info.up[side]]) * (k1 * k1 / k0);
+        return (Dim + 1) * c_N_1 * (fct_area[fctNo] / vol_vlme[info.up[side]]) * (k1 * k1 / k0);
     };
 
     if (info.up[0] != info.up[1]) {
@@ -330,7 +331,7 @@ bool Poisson::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Matrix
 
 bool Poisson::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                 LinearAllocator<double>& scratch) const {
-    if (info.bc == BC::Natural) {
+    if (info.ptag == static_cast<int>(BC::Natural)) {
         return false;
     }
 
@@ -403,27 +404,27 @@ bool Poisson::rhs_volume(std::size_t elNo, Vector<double>& B,
     return true;
 }
 
-bool Poisson::bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+bool Poisson::bc_skeleton(std::size_t fctNo, int bc, double f_q_raw[]) const {
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    if (bc == BC::Fault) {
+    if (bc == static_cast<int>(BC::Fault)) {
         fun_slip(fctNo, f_q, false);
-    } else if (bc == BC::Dirichlet) {
+    } else if (bc == static_cast<int>(BC::Dirichlet)) {
         fun_dirichlet(fctNo, f_q, false);
     } else {
         return false;
     }
     return true;
 }
-bool Poisson::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+bool Poisson::bc_boundary(std::size_t fctNo, int bc, double f_q_raw[]) const {
     assert(tensor::f_q::size() == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, 1, tensor::f_q::Shape[0]);
-    if (bc == BC::Fault) {
+    if (bc == static_cast<int>(BC::Fault)) {
         fun_slip(fctNo, f_q, true);
         for (std::size_t q = 0; q < tensor::f_q::Shape[0]; ++q) {
             f_q(0, q) *= 0.5;
         }
-    } else if (bc == BC::Dirichlet) {
+    } else if (bc == static_cast<int>(BC::Dirichlet)) {
         fun_dirichlet(fctNo, f_q, true);
     } else {
         return false;
@@ -434,7 +435,7 @@ bool Poisson::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
 bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            Vector<double>& B1, LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    if (!bc_skeleton(fctNo, info.bc, f_q_raw)) {
+    if (!bc_skeleton(fctNo, info.ptag, f_q_raw)) {
         return false;
     }
 
@@ -500,7 +501,7 @@ bool Poisson::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<doub
 bool Poisson::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                            LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
+    if (!bc_boundary(fctNo, info.ptag, f_q_raw)) {
         return false;
     }
 
@@ -566,7 +567,7 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
     alignas(ALIGNMENT) double n_unit_q_flipped[tensor::n_unit_q::size()];
     for (std::size_t f = 0; f < NumFacets; ++f) {
         bool is_skeleton_face = elNo != info[f].lid;
-        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
+        bool is_fault_or_dirichlet = info[f].ptag == static_cast<int>(BC::Fault) || info[f].ptag == static_cast<int>(BC::Dirichlet);
 
         auto fctNo = info[f].fctNo;
         double const* n_q = fct[fctNo].get<Normal>().data()->data();
@@ -588,7 +589,7 @@ void Poisson::apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double 
 
         alignas(ALIGNMENT) double u_hat_q[tensor::u_hat_q::size()] = {};
         alignas(ALIGNMENT) double sigma_hat_q[tensor::sigma_hat_q::size()] = {};
-        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
+        if (info[f].ptag == static_cast<int>(BC::None) || (is_skeleton_face && is_fault_or_dirichlet)) {
             kernel::flux_u_skeleton fu;
             fu.negative_E_q_T(0) = negative_E_q_T[f].data();
             fu.E_q_T(1) = E_q_T[info[f].localNo].data();
@@ -647,8 +648,8 @@ std::size_t Poisson::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) c
     std::size_t flops = kernel::apply_volume::HardwareFlops;
     for (std::size_t f = 0; f < NumFacets; ++f) {
         bool is_skeleton_face = elNo != info[f].lid;
-        bool is_fault_or_dirichlet = info[f].bc == BC::Fault || info[f].bc == BC::Dirichlet;
-        if (info[f].bc == BC::None || (is_skeleton_face && is_fault_or_dirichlet)) {
+        bool is_fault_or_dirichlet = info[f].ptag == static_cast<int>(BC::Fault) || info[f].ptag == static_cast<int>(BC::Dirichlet);
+        if (info[f].ptag == static_cast<int>(BC::None) || (is_skeleton_face && is_fault_or_dirichlet)) {
             flops += kernel::flux_u_skeleton::HardwareFlops;
             flops += kernel::flux_sigma_skeleton::HardwareFlops;
         } else if (is_fault_or_dirichlet) {
@@ -680,7 +681,7 @@ void Poisson::traction_skeleton(std::size_t fctNo, FacetInfo const& info, Vector
     assert(result.size() == tensor::grad_u::size());
 
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    bc_skeleton(fctNo, info.bc, f_q_raw);
+    bc_skeleton(fctNo, info.ptag, f_q_raw);
 
     alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     alignas(ALIGNMENT) double K_Dx_q1[tensor::K_Dx_q::size(1)];
@@ -705,7 +706,7 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     assert(result.size() == tensor::grad_u::size());
 
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
-    bc_boundary(fctNo, info.bc, f_q_raw);
+    bc_boundary(fctNo, info.ptag, f_q_raw);
 
     alignas(ALIGNMENT) double K_Dx_q0[tensor::K_Dx_q::size(0)];
     compute_K_Dx_q(fctNo, info, {K_Dx_q0, nullptr});

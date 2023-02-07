@@ -28,11 +28,11 @@ public:
         }
     }
     void setNumElements(std::size_t numElements) override { CHECK(numElements == 2); }
-    void addElement(long type, int tag, long* node, std::size_t numNodes) override {
+    void addElement(long type, int ptag, int etag, long* node, std::size_t numNodes) override {
         REQUIRE(elNo < 2);
         if (elNo == 0) {
             CHECK(type == 3);
-            CHECK(tag == 99);
+            CHECK(ptag == 99);
             REQUIRE(numNodes == 4);
             CHECK(node[0] == 0);
             CHECK(node[1] == 1);
@@ -40,7 +40,7 @@ public:
             CHECK(node[3] == 3);
         } else {
             CHECK(type == 1);
-            CHECK(tag == 97);
+            CHECK(ptag == 97);
             REQUIRE(numNodes == 2);
             CHECK(node[0] == 5);
             CHECK(node[1] == 4);

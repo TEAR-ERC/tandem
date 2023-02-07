@@ -25,7 +25,8 @@ template <typename LocalOperator> class AdapterOperator : public AbstractAdapter
 public:
     AdapterOperator(std::shared_ptr<LocalOperator> adapted_lop,
                     std::unique_ptr<Adapter<LocalOperator>> lop,
-                    std::shared_ptr<DGOperatorTopo> topo, std::shared_ptr<BoundaryMap> fault_map)
+                    std::shared_ptr<DGOperatorTopo> topo,
+					std::shared_ptr<BoundaryMap> fault_map)
         : adapted_lop_(std::move(adapted_lop)), lop_(std::move(lop)), topo_(std::move(topo)),
           fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
 
@@ -33,7 +34,7 @@ public:
         lop_->begin_preparation(num_elements());
         for (std::size_t faultNo = 0, num = num_elements(); faultNo < num; ++faultNo) {
             auto fctNo = fault_map_->fctNo(faultNo);
-            lop_->prepare(faultNo, topo_->info(fctNo), scratch_);
+            lop_->prepare(faultNo, topo_->facet_info(fctNo), scratch_);
         }
         lop_->end_preparation();
     }
@@ -62,7 +63,7 @@ public:
         auto result_handle = result.begin_access();
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto fctNo = fault_map_->fctNo(faultNo);
-            auto const& info = topo_->info(fctNo);
+            auto const& info = topo_->facet_info(fctNo);
             auto u0 = displacement.get_block(info.up[0]);
             auto u1 = displacement.get_block(info.up[1]);
             if (info.up[0] == info.up[1]) {

@@ -23,11 +23,11 @@ public:
 
     struct ConstantParams {
         double V0;
-        double b;
         double f0;
     };
     struct Params {
         double a;
+		double b;
         double eta;
         double L;
         double sn_pre;
@@ -40,6 +40,7 @@ public:
     void set_constant_params(ConstantParams const& params) { cp_ = params; }
     void set_params(std::size_t index, Params const& params) {
         p_[index].get<A>() = params.a;
+        p_[index].get<B>() = params.b;
         p_[index].get<Eta>() = params.eta;
         p_[index].get<L>() = params.L;
         p_[index].get<SnPre>() = params.sn_pre;
@@ -114,16 +115,18 @@ public:
     }
 
     double state_rhs(std::size_t index, double V, double psi) const {
-        double myL = p_[index].get<L>();
-        return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
+        auto l = p_[index].get<L>();
+		auto b = p_[index].get<B>();
+        return b * cp_.V0 / l * (exp((cp_.f0 - psi) / b) - V / cp_.V0);
     }
 
     auto param_names() const {
-        auto names = std::vector<std::string>(4 + TangentialComponents);
+        auto names = std::vector<std::string>(5 + TangentialComponents);
         char buf[100];
 
         std::size_t i = 0;
         names[i++] = "a";
+		names[i++] = "b";
         names[i++] = "eta";
         names[i++] = "L";
         names[i++] = "sn_pre";
@@ -135,9 +138,10 @@ public:
     }
 
     template <typename VecT> void params(std::size_t index, VecT& result) const {
-        assert(result.shape(0) == 4 + TangentialComponents);
+        assert(result.shape(0) == 5 + TangentialComponents);
         std::ptrdiff_t i = 0;
         result(i++) = p_[index].get<A>();
+        result(i++) = p_[index].get<B>();
         result(i++) = p_[index].get<Eta>();
         result(i++) = p_[index].get<L>();
         result(i++) = p_[index].get<SnPre>();
@@ -176,6 +180,9 @@ private:
     struct A {
         using type = double;
     };
+    struct B {
+        using type = double;
+    };
     struct Eta {
         using type = double;
     };
@@ -188,7 +195,7 @@ private:
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, B, Eta, L, Vinit, Sinit> p_;
 };
 
 } // namespace tndm
