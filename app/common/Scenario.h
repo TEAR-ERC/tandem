@@ -36,9 +36,9 @@ public:
 
     Scenario(LocalSimplexMesh<DomainDimension> const& mesh, std::string const& lib, std::string const& scenario,
              std::array<double, DomainDimension> const& ref_normal)
-        : ref_normal_(ref_normal),
+        : ref_normal_(ref_normal)/*,
 		  ptags(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().pTagData())->getData()),
-		  etags(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().eTagData())->getData()) {
+		  etags(dynamic_cast<ScalarMeshData<int> const*>(mesh.elements().eTagData())->getData())*/ {
         lib_.loadFile(lib);
 
         if (lib_.hasMember(scenario, Warp)) {
@@ -111,8 +111,8 @@ public:
 
 protected:
     std::array<double, DomainDimension> ref_normal_;
-	std::vector<int> const& ptags;
-	std::vector<int> const& etags;
+	// std::vector<int> const& ptags;
+	// std::vector<int> const& etags;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     std::optional<tagged_functional_t<NumQuantities>> force_ = std::nullopt;

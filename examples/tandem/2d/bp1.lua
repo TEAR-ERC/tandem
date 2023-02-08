@@ -1,12 +1,12 @@
 local BP1 = {}
 
 BP1.a0 = 0.010
+BP1.b0 = 0.015
 BP1.amax = 0.025
 BP1.H = 15.0
 BP1.h = 3.0
 BP1.Vp = 1e-9
 BP1.rho0 = 2.670
-BP1.b = 0.015
 BP1.V0 = 1.0e-6
 BP1.f0 = 0.6
 
@@ -58,10 +58,15 @@ function BP1:a(x, y)
     end
 end
 
+function BP1:b(x, y)
+    return self.b0
+end
+
 function BP1:tau_pre(x, y)
     local Vi = self:Vinit(x, y)
     local sn = self:sn_pre(x, y)
-    local e = math.exp((self.f0 + self.b * math.log(self.V0 / Vi)) / self.amax)
+	local b  = self:b(x, y)
+    local e = math.exp((self.f0 + b * math.log(self.V0 / Vi)) / self.amax)
     return -(sn * self.amax * math.asinh((Vi / (2.0 * self.V0)) * e) + self:eta(x, y) * Vi)
 end
 

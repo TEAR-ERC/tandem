@@ -39,10 +39,11 @@ void clean_duplicate_probes(std::vector<Probe<D>> const& probes,
         if (min_dist[i] == std::numeric_limits<double>::max() ||
             min_rank[i] == std::numeric_limits<int>::max()) {
             std::stringstream ss;
-            ss << "Could not closest face for probe at ";
+            ss << "Could not closest face [sic -- cpranger] for probe at ";
             for (auto x : probes[i].x) {
                 ss << x << " ";
             }
+			ss << "-- min_dist[i] = " << min_dist[i] << ",  min_rank[i] = " << min_rank[i];
             throw std::runtime_error(ss.str());
         }
     }

@@ -115,8 +115,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
 
 template <std::size_t D>
 void DGCurvilinearCommon<D>::end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan) {
-    auto dbl_scatter = SimpleScatter<double>(std::move(elementScatterPlan));
-    auto int_scatter =    SimpleScatter<int>(std::move(elementScatterPlan));
+    auto dbl_scatter = SimpleScatter<double>(elementScatterPlan);
+    auto int_scatter =    SimpleScatter<int>(elementScatterPlan);
     dbl_scatter.scatter(vol_vlme.data());
     int_scatter.scatter(vol_ptag.data());
     int_scatter.scatter(vol_etag.data());

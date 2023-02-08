@@ -60,8 +60,9 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             info.g_up[0] = mesh.elements().l2cg(elNos[0]);
             info.localNo[0] = localFctNo;
             info.inside[0] = elNos[0] < numLocalElems_;
-            info.ptag = fctPTagData->getData()[fctNo];
-            info.etag = fctETagData->getData()[fctNo];
+			
+			info.ptag = fctPTagData ? fctPTagData->getData()[fctNo] : 0;
+			info.etag = fctETagData ? fctETagData->getData()[fctNo] : 0;
 
             if (elNos.size() > 1) {
                 auto dwsOther = mesh.template downward<D - 1u, D>(elNos[1]);
@@ -121,8 +122,8 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             volInfo[elNo].template get<NumLocalNeighbours>() = numLocal;
             volInfo[elNo].template get<NumGhostNeighbours>() = numGhost;
 			
-			eltInfo[elNo].ptag = volPTagData->getData()[elNo];
-			eltInfo[elNo].etag = volETagData->getData()[elNo];
+			eltInfo[elNo].ptag = volPTagData ? volPTagData->getData()[elNo] : 0;
+			eltInfo[elNo].etag = volETagData ? volETagData->getData()[elNo] : 0;
         }
     }
 }

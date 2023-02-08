@@ -276,7 +276,7 @@ private:
             }
         } else if constexpr (0 < DD && DD < D) {
             auto& boundaryMesh = std::get<DD>(boundaryMeshes);
-            if (boundaryMesh && boundaryMesh->pTagData && boundaryMesh->eTagData) {
+            if (boundaryMesh) {
                 boundaryMesh->repartitionByHash();
                 auto map = boundaryMesh->makeG2LMap();
                 std::vector<std::size_t> lids;
@@ -289,10 +289,15 @@ private:
                         lids.emplace_back(it->second);
                     }
                 }
-                auto pTagData = boundaryMesh->pTagData->redistributed(lids, a2a);
-                auto eTagData = boundaryMesh->eTagData->redistributed(lids, a2a);
-                lf.setPTagData(std::move(pTagData));
-				lf.setETagData(std::move(eTagData));
+				
+				if (boundaryMesh->pTagData) {
+					auto pTagData = boundaryMesh->pTagData->redistributed(lids, a2a);
+					lf.setPTagData(std::move(pTagData));
+				}
+				if (boundaryMesh->eTagData) {
+					auto eTagData = boundaryMesh->eTagData->redistributed(lids, a2a);
+					lf.setETagData(std::move(eTagData));
+				}
             }
         }
 
