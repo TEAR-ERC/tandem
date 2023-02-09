@@ -23,9 +23,9 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
     std::vector<std::pair<int, std::size_t>> theFctNos;
     theFctNos.reserve(numLocalFacets);
 
-    for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
-        if (boundaryData->getData()[fctNo] == static_cast<int>(bc)) {
-            auto elNos = mesh.template upward<D - 1u>(fctNo);
+	for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
+		if (boundaryData->getData()[fctNo] == static_cast<int>(bc)) {
+			auto elNos = mesh.template upward<D - 1u>(fctNo);
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             int other_rank = -1;
             for (int i = 0; i < elNos.size(); ++i) {

@@ -92,6 +92,12 @@ public:
         if (meshData_) {
             meshData_->permute(permutation);
         }
+        if (pTagData_) {
+            pTagData_->permute(permutation);
+        }
+        if (eTagData_) {
+            eTagData_->permute(permutation);
+        }
         permuteSharedRanks(permutation);
         makeG2LMap();
     }
