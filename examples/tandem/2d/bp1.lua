@@ -17,7 +17,8 @@ function BP1:new(o)
     return o
 end
 
-function BP1:boundary(x, y, t)
+function BP1:boundary(x, y, t, r)
+	-- print("BP1:boundary(x, y, t, r) -> ", r)
     if x > 1.0 then
         return self.Vp/2.0 * t
     elseif x < -1.0 then
@@ -27,27 +28,33 @@ function BP1:boundary(x, y, t)
     end
 end
 
-function BP1:mu(r, x, y)
+function BP1:mu(x, y, r)
+	-- print("BP1:mu(x, y, r) -> ", r)
     return 32.038120320
 end
 
-function BP1:eta(r, x, y)
-    return math.sqrt(self:mu(r, x, y) * self.rho0) / 2.0
+function BP1:eta(x, y, r)
+	-- print("BP1:eta(x, y, r) -> ", r)
+    return math.sqrt(self:mu(x, y, r) * self.rho0) / 2.0
 end
 
-function BP1:L(x, y)
+function BP1:L(x, y, r)
+	-- print("BP1:L(x, y, r) -> ", r)
     return 0.008
 end
 
-function BP1:sn_pre(x, y)
+function BP1:sn_pre(x, y, r)
+	-- print("BP1:sn_pre(x, y, r) -> ", r)
     return 50.0
 end
 
-function BP1:Vinit(x, y)
+function BP1:Vinit(x, y, r)
+	-- print("BP1:Vinit(x, y, r) -> ", r)
     return 1.0e-9
 end
 
-function BP1:a(x, y)
+function BP1:a(x, y, r)
+	-- print("BP1:a(x, y, r) -> ", r)
     local z = -y
     if z < self.H then
         return self.a0
@@ -58,11 +65,13 @@ function BP1:a(x, y)
     end
 end
 
-function BP1:b(x, y)
+function BP1:b(x, y, r)
+	-- print("BP1:b(x, y, r) -> ", r)
     return self.b0
 end
 
-function BP1:tau_pre(x, y)
+function BP1:tau_pre(x, y, r)
+	-- print("BP1:tau_pre(x, y, r) -> ", r)
     local Vi = self:Vinit(x, y)
     local sn = self:sn_pre(x, y)
 	local b  = self:b(x, y)
@@ -73,7 +82,8 @@ end
 bp1 = BP1:new()
 
 bp1_sym = BP1:new()
-function bp1_sym:boundary(x, y, t)
+function bp1_sym:boundary(x, y, t, r)
+	-- print("bp1_sym:boundary(x, y, t, r) -> ", r)
     return self.Vp/2.0 * t
 end
 
