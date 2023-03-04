@@ -97,3 +97,13 @@ E.g.
 .. code:: console
 
    $ gmsh -2 tutorial.geo -setnumber res_f 0.5
+
+Implementing curvilinear mesh
+-------------------------------
+
+As suggested by `Uphoff et al. (2023) <https://academic.oup.com/gji/article/233/1/586/6847163?login=false>`_, curvilinear meshing can suppress numerical artefacts (e.g., localization of strain and traction) that can be introduced near fault intersections/junctions. Curvilinear meshing can be implemented by setting the order of mesh to be 2 in Gmsh, using the option :code:`-order 2`.
+E.g.
+
+.. code:: console
+
+   $ gmsh -2 tutorial.geo -setnumber res_f 0.5 -order 2
