@@ -9,6 +9,8 @@ BP1.Vp = 1e-9
 BP1.rho0 = 2.670
 BP1.V0 = 1.0e-6
 BP1.f0 = 0.6
+BP1.mu_intact = 32.038120320
+BP1.mu_damage = 22.1235123
 
 function BP1:new(o)
     o = o or {}
@@ -29,13 +31,17 @@ function BP1:boundary(x, y, t, r)
 end
 
 function BP1:mu(x, y, r)
-	-- print("BP1:mu(x, y, r) -> ", r)
-    return 32.038120320
+	print("BP1:mu(x, y, r) -> ", r)
+	if r == 1 then
+		return self.mu_intact
+	else 
+    	return self.mu_damage
+	end
 end
 
 function BP1:eta(x, y, r)
 	-- print("BP1:eta(x, y, r) -> ", r)
-    return math.sqrt(self:mu(x, y, r) * self.rho0) / 2.0
+    return math.sqrt(self.mu_damage * self.rho0) / 2.0
 end
 
 function BP1:L(x, y, r)

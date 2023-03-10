@@ -65,7 +65,7 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-			auto tag    = this->vol_etag[elNo];
+			auto tag    = this->vol_ptag[elNo];
             for (std::size_t q = 0; q < F.shape(1); ++q) {
 				std::array<double,D+1> args;
 				std::copy(coords[q].begin(), coords[q].end(), args.begin());

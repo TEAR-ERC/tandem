@@ -1,0 +1,4 @@
+mesh_file = "cross_static_4r.msh"
+type = "elasticity"
+lib = "cross_static_4r.lua"
+scenario = "cross_static_4r"

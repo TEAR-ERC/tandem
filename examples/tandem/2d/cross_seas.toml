@@ -1,0 +1,8 @@
+final_time = 1
+mesh_file = "cross_seas.msh"
+mode = "QD"
+type = "poisson"
+lib = "cross_seas.lua"
+scenario = "cs"
+ref_normal = [-1, 0]
+boundary_linear = true
