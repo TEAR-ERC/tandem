@@ -48,13 +48,16 @@ private:
 
     std::vector<std::array<double, D>> vertices;
     std::vector<Simplex<D>> elements;
+    std::vector<int> element_ptags;
+    std::vector<int> element_etags;
     std::vector<Simplex<D - 1u>> facets;
-    std::vector<BC> bcs;
+    std::vector<int> facet_ptags;
+    std::vector<int> facet_etags;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
 
     std::size_t ignoredElems = 0;
-    std::size_t unknownBC = 0;
+    // std::size_t unknownBC = 0;
     std::size_t type_ = 0;
 
     void preparePermutationTable(std::size_t numNodes);
@@ -68,12 +71,16 @@ public:
     }
     inline void setNumElements(std::size_t numElements) {
         elements.reserve(numElements);
+		element_ptags.reserve(numElements);
+		element_etags.reserve(numElements);
         facets.reserve(numElements);
+		facet_ptags.reserve(numElements);
+		facet_etags.reserve(numElements);
         type_ = 0;
     }
-    void addElement(long type, long tag, long* node, std::size_t numNodes);
+    void addElement(long type, int ptag, int etag, long* node, std::size_t numNodes);
 
-    inline auto getUnknownBC() const { return unknownBC; }
+    // inline auto getUnknownBC() const { return unknownBC; }
     std::unique_ptr<GlobalSimplexMesh<D>> create(MPI_Comm comm);
 };
 

@@ -52,7 +52,7 @@ template <std::size_t D>
 auto find_facets(LocalSimplexMesh<D> const& mesh)
     -> std::pair<std::vector<std::size_t>, std::vector<int>> {
     auto const& facets = mesh.facets();
-    auto boundaryData = dynamic_cast<BoundaryData const*>(facets.data());
+    auto boundaryData = dynamic_cast<ScalarMeshData<int> const*>(facets.pTagData());
     if (!boundaryData) {
         throw std::runtime_error("Boundary conditions not set.");
     }
@@ -63,11 +63,11 @@ auto find_facets(LocalSimplexMesh<D> const& mesh)
     theFctNos.reserve(numLocalFacets);
     theBcs.reserve(numLocalFacets);
 
-    auto const& bc = boundaryData->getBoundaryConditions();
+    auto const& bc = boundaryData->getData();
     for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
-        if (bc[fctNo] != BC::None) {
+        if (bc[fctNo] != static_cast<int>(BC::None)) {
             theFctNos.emplace_back(fctNo);
-            theBcs.emplace_back(static_cast<int>(bc[fctNo]));
+            theBcs.emplace_back(bc[fctNo]);
         }
     }
     return std::make_pair(std::move(theFctNos), std::move(theBcs));

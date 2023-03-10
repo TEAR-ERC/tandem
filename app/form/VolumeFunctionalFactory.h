@@ -22,10 +22,10 @@ template <typename LocalOperator>
 class VolumeFunctionalFactory : public AbstractVolumeFunctionalFactory {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
-    using functional_t = std::function<std::array<double, NumQuantities>(
-        std::array<double, LocalOperator::Dim> const&)>;
+    using tagged_functional_t = std::function<std::array<double, NumQuantities>(
+        std::array<double, LocalOperator::Dim + 1> const&)>;
 
-    VolumeFunctionalFactory(std::shared_ptr<LocalOperator> lop, functional_t function)
+    VolumeFunctionalFactory(std::shared_ptr<LocalOperator> lop, tagged_functional_t function)
         : lop_(std::move(lop)), function_(std::move(function)) {}
 
     auto operator()() const -> volume_functional_t override {
@@ -34,7 +34,7 @@ public:
 
 private:
     std::shared_ptr<LocalOperator> lop_;
-    functional_t function_;
+    tagged_functional_t function_;
 };
 
 } // namespace tndm

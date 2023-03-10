@@ -156,7 +156,8 @@ bool GMSHParser::parseElements() {
 
     constexpr std::size_t MaxElementType = sizeof(NumNodes) / sizeof(std::size_t);
     constexpr std::size_t MaxNodes = *std::max_element(NumNodes, NumNodes + MaxElementType);
-    long tag = -1;
+    long   physical_tag = -1;
+	long elementary_tag = -1;
     std::array<long, MaxNodes> nodes;
 
     builder->setNumElements(numElements);
@@ -187,7 +188,10 @@ bool GMSHParser::parseElements() {
                 return logErrorAnnotated<bool>("Expected tag (integer)");
             }
             if (i == 0) {
-                tag = lexer.getInteger();
+                physical_tag = lexer.getInteger();
+            }
+            if (i == 1) {
+                elementary_tag = lexer.getInteger();
             }
         }
 
@@ -202,7 +206,7 @@ bool GMSHParser::parseElements() {
             nodes[i] = lexer.getInteger() - 1;
         }
 
-        builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
+        builder->addElement(type, physical_tag, elementary_tag, nodes.data(), NumNodes[type - 1]);
     }
     getNextToken();
     if (curTok != GMSHToken::end_elements) {

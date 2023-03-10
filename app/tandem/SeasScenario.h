@@ -23,10 +23,10 @@ template <class LocalOperator> class SeasScenario {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
-    using functional_t = LuaLib::functional_t<DomainDimension, 1>;
-    using time_functional_t = LuaLib::functional_t<DomainDimension + 1, NumQuantities>;
-    using vector_functional_t = LuaLib::functional_t<DomainDimension, NumQuantities>;
-
+    using tagged_functional_t = LuaLib::functional_t<DomainDimension + 1, 1>;
+    using tagged_time_functional_t = LuaLib::functional_t<DomainDimension + 2, NumQuantities>;
+    using tagged_vector_functional_t = LuaLib::functional_t<DomainDimension+1, NumQuantities>;
+    
     constexpr static char Warp[] = "warp";
     constexpr static char Mu[] = "mu";
     constexpr static char Lam[] = "lam";
@@ -43,33 +43,33 @@ public:
             warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
         if (lib_.hasMember(scenario, Mu)) {
-            mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
+            mu_ = lib_.getMemberFunction<DomainDimension + 1u, 1>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
-            lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
+            lam_ = lib_.getMemberFunction<DomainDimension + 1u, 1>(scenario, Lam);
         }
         if (lib_.hasMember(scenario, Rho)) {
-            rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension, 1>(scenario, Rho));
+            rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension + 1u, 1>(scenario, Rho));
         }
 
         if (lib_.hasMember(scenario, Boundary)) {
             boundary_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Boundary));
+                lib_.getMemberFunction<DomainDimension + 2u, NumQuantities>(scenario, Boundary));
         }
 
         if (lib_.hasMember(scenario, Solution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
-                lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario, Solution)));
+                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Solution)));
         }
 
         if (lib_.hasMember(scenario, InitialDisplacement)) {
-            u_ini_ = std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities>(
+            u_ini_ = std::make_optional(lib_.getMemberFunction<DomainDimension+1, NumQuantities>(
                 scenario, InitialDisplacement));
         }
 
         if (lib_.hasMember(scenario, InitialVelocity)) {
             v_ini_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, InitialVelocity));
+                lib_.getMemberFunction<DomainDimension+1, NumQuantities>(scenario, InitialVelocity));
         }
     }
 
@@ -92,17 +92,17 @@ public:
 protected:
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
-    functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
+    tagged_functional_t mu_ = [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> {
         return {1.0};
     };
-    functional_t lam_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
+    tagged_functional_t lam_ = [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> {
         return {0.0};
     };
-    std::optional<functional_t> rho_ = std::nullopt;
-    std::optional<time_functional_t> boundary_ = std::nullopt;
+    std::optional<tagged_functional_t> rho_ = std::nullopt;
+    std::optional<tagged_time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
-    std::optional<vector_functional_t> u_ini_ = std::nullopt;
-    std::optional<vector_functional_t> v_ini_ = std::nullopt;
+    std::optional<tagged_vector_functional_t> u_ini_ = std::nullopt;
+    std::optional<tagged_vector_functional_t> v_ini_ = std::nullopt;
 };
 
 } // namespace tndm

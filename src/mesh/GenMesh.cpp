@@ -104,7 +104,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
 
     const std::size_t numElements = elemsLocal.length();
     std::vector<simplex_t> elements(numElements);
-
+	
     uint64_t ecubeFrom = elemsLocal.from / TessInfo<D>::NumSimplices;
     uint64_t ecubeTo = 1 + (static_cast<int64_t>(elemsLocal.to) - 1) / TessInfo<D>::NumSimplices;
     for (uint64_t ecube = ecubeFrom; ecube < ecubeTo; ++ecube) {
@@ -131,10 +131,12 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
                   elements.begin() + ecube * TessInfo<D>::NumSimplices + firstPlex -
                       elemsLocal.from);
     }
+	
+	std::vector<int> regions(elements.size(), 0); // default region = 0
 
-    auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
-    auto mesh =
-        std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr, comm_);
+    auto vtexData = std::make_unique<vertex_data_t>(std::move(vertices));
+	auto mesh =
+        std::make_unique<mesh_t>(std::move(elements), std::move(vtexData), nullptr, nullptr, nullptr, comm_);
     auto boundaryMesh = extractBoundaryMesh(*mesh);
     mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
     return mesh;
@@ -144,7 +146,7 @@ template <std::size_t D>
 std::unique_ptr<typename GenMesh<D>::boundary_mesh_t>
 GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     std::vector<boundary_simplex_t> boundaryElements;
-    std::vector<BC> boundaryConditions;
+    std::vector<int> pTags;
     for (auto& elem : mesh.getElements()) {
         for (auto& face : elem.downward()) {
             auto v0 = unflatten(face[0], Np1);
@@ -175,14 +177,14 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
                             }
                         }
                     }
-                    boundaryConditions.emplace_back(bcs_[dim](plane, otherRegions));
+                    pTags.emplace_back(static_cast<int>(bcs_[dim](plane, otherRegions)));
                 }
             }
         }
     }
-    auto boundaryData = std::make_unique<boundary_data_t>(std::move(boundaryConditions));
+    auto pTagData = std::make_unique<tag_data_t>(std::move(pTags));
     return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
-                                             std::move(boundaryData), comm_);
+                                             nullptr, std::move(pTagData), nullptr, comm_);
 }
 
 template class GenMesh<2u>;

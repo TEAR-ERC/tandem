@@ -55,14 +55,20 @@ public:
     static_assert(sizeof(simplex_t) == (D + 1) * sizeof(uint64_t));
     template <std::size_t DD> using global_mesh_ptr = std::unique_ptr<GlobalSimplexMesh<DD>>;
 
-    GlobalSimplexMesh(std::vector<simplex_t>&& elements,
-                      std::unique_ptr<MeshData> vertexDat = nullptr,
-                      std::unique_ptr<MeshData> elementDat = nullptr,
+    GlobalSimplexMesh(std::vector<simplex_t>&& elems,
+                      std::unique_ptr<MeshData> vtexDat = nullptr,
+                      std::unique_ptr<MeshData> elemDat = nullptr,
+                      std::unique_ptr<MeshData> pTagDat = nullptr,
+                      std::unique_ptr<MeshData> eTagDat = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
-        : elems_(std::move(elements)), vertexData(std::move(vertexDat)),
-          elementData(std::move(elementDat)), comm(comm), isPartitionedByHash(false) {
-        if (vertexData) {
-            vtxdist = makeSortedDistribution(vertexData->size(), comm);
+        :   elems_(std::move(elems)),
+		  vtexData(std::move(vtexDat)),
+          elemData(std::move(elemDat)),
+		  pTagData(std::move(pTagDat)),
+		  eTagData(std::move(eTagDat)),
+		  comm(comm), isPartitionedByHash(false) {
+        if (vtexData) {
+            vtxdist = makeSortedDistribution(vtexData->size(), comm);
         }
     }
 
@@ -156,8 +162,8 @@ private:
 
     LocalFaces<D> getGhostElements(std::vector<Simplex<D>> elems, unsigned overlap,
                                    std::vector<std::size_t> const& elemDist) const;
-    void setSharedRanksAndElementData(LocalFaces<D>& elems,
-                                      std::vector<std::size_t> const& elemDist) const;
+    void setSharedRanksAndElemData(LocalFaces<D>& elems,
+                                   std::vector<std::size_t> const& elemDist) const;
 
     auto makeUpwardMap(std::vector<Simplex<D>> const& elems) const {
         // Construct upward map from faces to local element ids
@@ -259,18 +265,18 @@ private:
                                  localSize);
 
         if constexpr (DD == 0) {
-            if (vertexData) {
+            if (vtexData) {
                 std::vector<std::size_t> lids;
                 lids.reserve(requestedFaces.size());
                 for (auto& face : requestedFaces) {
                     lids.emplace_back(getVertexLID(face));
                 }
-                auto meshData = vertexData->redistributed(lids, a2a);
+                auto meshData = vtexData->redistributed(lids, a2a);
                 lf.setMeshData(std::move(meshData));
             }
         } else if constexpr (0 < DD && DD < D) {
             auto& boundaryMesh = std::get<DD>(boundaryMeshes);
-            if (boundaryMesh && boundaryMesh->elementData) {
+            if (boundaryMesh) {
                 boundaryMesh->repartitionByHash();
                 auto map = boundaryMesh->makeG2LMap();
                 std::vector<std::size_t> lids;
@@ -283,8 +289,15 @@ private:
                         lids.emplace_back(it->second);
                     }
                 }
-                auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
-                lf.setMeshData(std::move(meshData));
+				
+				if (boundaryMesh->pTagData) {
+					auto pTagData = boundaryMesh->pTagData->redistributed(lids, a2a);
+					lf.setPTagData(std::move(pTagData));
+				}
+				if (boundaryMesh->eTagData) {
+					auto eTagData = boundaryMesh->eTagData->redistributed(lids, a2a);
+					lf.setETagData(std::move(eTagData));
+				}
             }
         }
 
@@ -402,8 +415,10 @@ private:
     }
 
     std::vector<simplex_t> elems_;
-    std::unique_ptr<MeshData> vertexData;
-    std::unique_ptr<MeshData> elementData;
+    std::unique_ptr<MeshData> vtexData;
+    std::unique_ptr<MeshData> elemData;
+    std::unique_ptr<MeshData> pTagData;
+    std::unique_ptr<MeshData> eTagData;
     MPI_Comm comm;
     bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;

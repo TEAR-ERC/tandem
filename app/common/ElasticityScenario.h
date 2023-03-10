@@ -18,14 +18,14 @@ public:
     constexpr static char Mu[] = "mu";
     constexpr static char Lam[] = "lam";
 
-    ElasticityScenario(std::string const& lib, std::string const& scenario,
+    ElasticityScenario(LocalSimplexMesh<DomainDimension> const& mesh, std::string const& lib, std::string const& scenario,
                        std::array<double, DomainDimension> const& ref_normal)
-        : Scenario(lib, scenario, ref_normal) {
+        : Scenario(mesh, lib, scenario, ref_normal) {
         if (lib_.hasMember(scenario, Mu)) {
-            mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
+            mu_ = lib_.getMemberFunction<DomainDimension+1, 1>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
-            lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
+            lam_ = lib_.getMemberFunction<DomainDimension+1, 1>(scenario, Lam);
         }
     }
 
@@ -41,10 +41,10 @@ public:
     }
 
 private:
-    functional_t<1> lam_ =
-        [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> { return {1.0}; };
-    functional_t<1> mu_ =
-        [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> { return {1.0}; };
+    tagged_functional_t<1> lam_ =
+        [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
+    tagged_functional_t<1> mu_ =
+        [](std::array<double, DomainDimension+1> const& v) -> std::array<double, 1> { return {1.0}; };
 };
 
 } // namespace tndm

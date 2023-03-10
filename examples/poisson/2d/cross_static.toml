@@ -1,0 +1,4 @@
+mesh_file = "cross_static.msh"
+type = "poisson"
+lib = "cross_static.lua"
+scenario = "cross_static"

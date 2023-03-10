@@ -26,12 +26,14 @@ enum class DGMethod { IP, BR2, Unknown };
 
 template <std::size_t D> class DGCurvilinearCommon {
 public:
+    // template <std::size_t Q>
+    // using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
     template <std::size_t Q>
-    using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
-    using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
-    using facet_functional_t =
-        std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
-
+    using tagged_functional_t = std::function<std::array<double, Q>(std::array<double, D+1> const&)>;
+	
+	using volume_functional_t = std::function<void(std::size_t elNo,  Matrix<double>& F)>;
+    using facet_functional_t  = std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
+	
     constexpr static std::size_t NumFacets = D + 1;
 
     DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
@@ -45,7 +47,8 @@ public:
 
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
-    void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
+	
+	void prepare_volume(std::size_t elNo, ElementInfo const & info, LinearAllocator<double>& scratch);
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch) {
         prepare_bndskl(fctNo, info, scratch);
@@ -58,12 +61,16 @@ public:
     void end_preparation(std::shared_ptr<ScatterPlan> elementScatterPlan);
 
     template <std::size_t Q>
-    auto make_volume_functional(functional_t<Q> fun) const -> volume_functional_t {
+    auto make_volume_functional(tagged_functional_t<Q> fun) const -> volume_functional_t {
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
+			auto tag    = this->vol_ptag[elNo];
             for (std::size_t q = 0; q < F.shape(1); ++q) {
-                auto fx = fun(coords[q]);
+				std::array<double,D+1> args;
+				std::copy(coords[q].begin(), coords[q].end(), args.begin());
+				args[D] = tag;
+				auto fx = fun(args);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
                     F(p, q) = fx[p];
                 }
@@ -72,12 +79,16 @@ public:
     }
 
     template <std::size_t Q>
-    auto make_facet_functional(functional_t<Q> fun) const -> facet_functional_t {
+    auto make_facet_functional(tagged_functional_t<Q> fun) const -> facet_functional_t {
         return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
+			auto tag = this->fct_etag[fctNo];
             for (std::size_t q = 0; q < f.shape(1); ++q) {
-                auto fx = fun(coords[q]);
+				std::array<double,D+1> args;
+				std::copy(coords[q].begin(), coords[q].end(), args.begin());
+				args[D] = tag;
+				auto fx = fun(args);
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
                     f(p, q) = fx[p];
                 }
@@ -85,13 +96,17 @@ public:
         };
     }
     template <std::size_t Q>
-    auto make_facet_functional(functional_t<Q> fun, std::array<double, D> const& refNormal) const
+    auto make_facet_functional(tagged_functional_t<Q> fun, std::array<double, D> const& refNormal) const
         -> facet_functional_t {
         return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
+			auto tag = this->fct_etag[fctNo];
             for (std::size_t q = 0; q < f.shape(1); ++q) {
-                auto fx = fun(coords[q]);
+				std::array<double,D+1> args;
+				std::copy(coords[q].begin(), coords[q].end(), args.begin());
+				args[D] = tag;
+				auto fx = fun(args);
                 if (!is_boundary) {
                     auto normal = this->fct[fctNo].template get<Normal>()[q];
                     if (dot(refNormal, normal) < 0) {
@@ -159,8 +174,15 @@ protected:
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
-    std::vector<double> area_;
-    std::vector<double> volume_;
+    
+	
+	std::vector<double> fct_area;
+	std::vector<int>    fct_ptag;
+	std::vector<int>    fct_etag;
+	std::vector<double> vol_vlme;
+	std::vector<int>    vol_ptag;
+	std::vector<int>    vol_etag;
+	
 };
 
 } // namespace tndm

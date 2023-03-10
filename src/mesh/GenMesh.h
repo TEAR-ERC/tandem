@@ -44,7 +44,7 @@ public:
     using simplex_t = typename mesh_t::simplex_t;
     using boundary_mesh_t = GlobalSimplexMesh<D - 1>;
     using boundary_simplex_t = typename boundary_mesh_t::simplex_t;
-    using boundary_data_t = BoundaryData;
+    using tag_data_t = ScalarMeshData<int>;
     using vertex_data_t = VertexData<D>;
     using vertex_t = typename vertex_data_t::vertex_t;
     using bc_fun_t = std::function<BC(std::size_t, std::array<std::size_t, D - 1u> const&)>;
