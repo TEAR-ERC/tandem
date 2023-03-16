@@ -1,0 +1,11 @@
+- BP1: SCEC BP1 example provided with the software
+- LnF16: Benchmakring Lindsey&Fialko (2016) - failed
+- Thakur20_reproduce: Benchmarking Thakur et al. (2020) but with higher initial shear-stress at the surface (0.01 MPa -> 10 MPa)
+- DZ_triangular_homogeneous: A triangular damage zone, but with homogeneous matrial properties
+- Thakur20_smalltmax: Same with Thakur20, but with halved tmax
+- Thakur20_positivetau: Same with Thakur20, but with positive signs for the initial shear-stress
+- Thakur20_L8: Same with Thakur20, but with doubled L (0.004 -> 0.008)
+- DZ_triangular: Same with DZ_triangular_homogeneous, but with lower mu (10 GPa) within the DZ
+- Thakur20_hetero_stress: Same with Thakur20, but with fractal normal stress profile
+- newBP1: SCEC BP1 example provided with the software, after region tagging update
+- DZ_curve: Curvilinear edge at the end of the DZ

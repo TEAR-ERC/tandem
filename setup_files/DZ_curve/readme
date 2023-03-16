@@ -1,0 +1,9 @@
+*** File description
+
+--- the ones used in bug report
+DZcurve02.msh: Fine mesh (~15000 elements)
+DZcurve_coarse02.msh: Coarse mesh (3700 elements)
+message.out: Log file when using coarse mesh that records region tag r = 0 (only expecting 1 or 2)
+matfric.lua, parameters.toml, lu_mumps.cfg, rk45.cfg: Used for simulation
+run_Tandem.sh: Execute file to run tandem, showing some options that I use
+

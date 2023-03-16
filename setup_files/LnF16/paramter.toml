@@ -1,0 +1,31 @@
+final_time = 47304000000
+mesh_file = "geometry.msh"
+mode = "QDGreen"
+type = "poisson"
+lib = "matfric.lua"
+scenario = "bp1_sym"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[fault_probe_output]
+prefix = "receiver_"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [0.0, -0.0] },
+    { name = "dp015", x = [0.0, -1.5] },
+    { name = "dp030", x = [0.0, -3.0] },
+    { name = "dp045", x = [0.0, -4.5] },
+    { name = "dp060", x = [0.0, -6.0] },
+    { name = "dp075", x = [0.0, -7.5] },
+    { name = "dp090", x = [0.0, -9.0] },
+    { name = "dp105", x = [0.0, -10.5] },
+    { name = "dp120", x = [0.0, -12.0] },
+    { name = "dp135", x = [0.0, -13.5] },
+    { name = "dp150", x = [0.0, -15.0] },
+    { name = "dp165", x = [0.0, -16.5] },
+    { name = "dp180", x = [0.0, -18.0] },
+    { name = "dp195", x = [0.0, -19.5] },
+    { name = "dp210", x = [0.0, -21.0] },
+    { name = "dp225", x = [0.0, -22.5] },
+    { name = "dp240", x = [0.0, -24.0] }
+]
