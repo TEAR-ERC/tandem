@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <utility>
-
+#include <limits>
 #include "util/Combinatorics.h"
 
 namespace tndm {
