@@ -1,7 +1,103 @@
 Installation
 ============
 
-In order to compile tandem natively you need to install dependencies.
+Tandem and its dependencies can be installed automatically with `Spack <https://github.com/spack/spack/wiki>`_, or manually.
+
+Spack installation
+------------------
+
+`Spack <https://github.com/spack/spack/wiki>`_ is an HPC software package manager.
+It automates the process of installing, upgrading, configuring, and removing computer programs.
+In particular, the spack package ``tandem`` allows automatically installing tandem and all its dependencies, and creating environment modules.
+First, install spack with, e.g.
+
+.. code-block:: bash
+
+    cd $HOME
+    git clone --depth 1 https://github.com/spack/spack.git
+    cd spack
+    echo "export SPACK_ROOT=$PWD" >> $HOME/.bashrc
+    echo "export PATH=\$SPACK_ROOT/bin:\$PATH" >> $HOME/.bashrc
+
+Then install tandem with:
+
+.. code-block:: bash
+
+    spack install tandem polynomial_degree=3 domain_dimension=2
+
+tandem can then be already loaded with ``spack load tandem``.
+Alternatively, we might prefer loading tandem from environment modules. We therefore now detail the procedure to generate such a module.
+The path where the module file should be installed and the name of the generated module files can be enhanced by updating ``~/.spack/modules.yaml`` with:
+
+.. code-block:: yaml
+
+    modules:
+      default:
+        roots:
+         tcl: your_custom_path_2_modules
+      default:
+        tcl:
+          all:
+            suffixes:
+              domain_dimension=2: 'd2'
+              domain_dimension=3: 'd3'
+              polynomial_degree=1: 'p1'
+              polynomial_degree=2: 'p2'
+              polynomial_degree=3: 'p3'
+              polynomial_degree=4: 'p4'
+              polynomial_degree=5: 'p5'
+              polynomial_degree=6: 'p6
+
+Note that a custom install directory for spack packages can also be set, by changing ``~/.spack/config.yaml``:
+
+.. code-block:: yaml
+
+    config:
+      install_tree: path_2_packages
+
+We can then generate a module file with:
+
+.. code-block:: bash
+
+    spack module tcl refresh tandem
+
+to access the module at start up, add to your ``~/.bashrc``:
+
+.. code-block:: bash
+
+    module use your_custom_path_2_modules/your_spack_arch_string
+
+e.g.:
+
+.. code-block:: bash
+
+    module use $HOME/spack/modules/x86_avx512/linux-sles15-skylake_avx512/
+
+SuperMUC-NG installation
+------------------------
+
+SuperMUC-NG modules have been installed with spack, but the version is too old and does not know natively how to compile tandem. We then need to add it using a repository:
+
+.. code-block:: bash
+
+    # load spack
+    module load user_spack
+    # clone seissol-spack-aid and add the repository
+    git clone --branch supermuc_NG https://github.com/SeisSol/seissol-spack-aid.git
+    cd seissol-spack-aid
+    spack repo add ./spack
+
+Then tandem can be installed, e.g. with:
+
+.. code-block:: bash
+
+    spack install tandem polynomial_degree=3 domain_dimension=2 target=skylake_avx512 %intel@21.4.0 ^intel-mpi@2019.12.320
+
+The procedure to create an environment module is the same as detailed above.
+
+Manual installation
+-------------------
+
 The following dependencies are likely available via your package manager:
 
 - A recent C++-17 capable compiler (we recommend GCC ≥ 8.0 or clang ≥ 8)
@@ -17,6 +113,7 @@ The following dependencies likely need to be installed manually:
 - `METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`_ (≥ 5.1) and `ParMETIS <http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview>`_ (≥ 4.0)
 - `PETSc <https://www.mcs.anl.gov/petsc/>`_ (≥ 3.13)
 - (Optional) `libxsmm <https://github.com/hfp/libxsmm>`_ (= 1.16.1)
+
 
 Dependencies via package manager
 --------------------------------
