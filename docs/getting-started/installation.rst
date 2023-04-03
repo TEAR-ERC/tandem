@@ -23,11 +23,11 @@ Then install tandem with:
 
 .. code-block:: bash
 
-    spack install tandem polynomial_degree=3 domain_dimension=2
+    spack install tandem@main polynomial_degree=3 domain_dimension=2
 
 tandem can then be already loaded with ``spack load tandem``.
 Alternatively, we might prefer loading tandem from environment modules. We therefore now detail the procedure to generate such a module.
-The path where the module file should be installed and the name of the generated module files can be enhanced by updating ``~/.spack/modules.yaml`` with:
+The path where the module file should be installed (if e.g. you do not want to install on /home because you want to share your installation with other users), and the name of the generated module files can be enhanced by updating ``~/.spack/modules.yaml`` with:
 
 .. code-block:: yaml
 
@@ -91,7 +91,7 @@ Then tandem can be installed, e.g. with:
 
 .. code-block:: bash
 
-    spack install tandem polynomial_degree=3 domain_dimension=2 target=skylake_avx512 %intel@21.4.0 ^intel-mpi@2019.12.320
+    spack install@main tandem polynomial_degree=3 domain_dimension=2 target=skylake_avx512 %intel@21.4.0 ^intel-mpi@2019.12.320
 
 The procedure to create an environment module is the same as detailed above.
 
