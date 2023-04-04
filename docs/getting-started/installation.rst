@@ -91,7 +91,7 @@ Then tandem can be installed, e.g. with:
 
 .. code-block:: bash
 
-    spack install@main tandem polynomial_degree=3 domain_dimension=2 target=skylake_avx512 %intel@21.4.0 ^intel-mpi@2019.12.320
+    spack install tandem@main polynomial_degree=3 domain_dimension=2 target=skylake_avx512 %intel@21.4.0 ^intel-mpi@2019.12.320
 
 The procedure to create an environment module is the same as detailed above.
 
