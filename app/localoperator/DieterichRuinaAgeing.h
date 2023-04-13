@@ -66,7 +66,11 @@ public:
     /**
      * @brief Absolute normal stress on fault (positive in compression)
      */
-    double sn_hat(std::size_t index, double sn) const { return -sn + p_[index].get<SnPre>(); }
+     double sn_hat(std::size_t index, double sn) const {
+       double _sn = -sn + p_[index].get<SnPre>();
+       if (_sn < 0.0) { _sn = 0.0; }
+       return _sn;
+     }
     /**
      * @brief Absolute shear stress on fault.
      *
@@ -89,6 +93,13 @@ public:
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
+           if (snAbs <= 0.0) {
+ 
+             snAbs = 0.0; /* just to illustrate what we are doing */
+            /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
+             V = tauAbs / eta;
+ 
+           } else {
             double a = 0.0;
             double b = tauAbs / eta;
             if (a > b) {
@@ -109,6 +120,7 @@ public:
                           << "F(U) = " << fF(b) << std::endl;
                 throw;
             }
+           }
         }
         return -(V / tauAbs) * tauAbsVec;
     }
