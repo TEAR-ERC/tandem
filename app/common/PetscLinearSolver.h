@@ -4,6 +4,7 @@
 #include "common/MGConfig.h"
 #include "common/PetscDGMatrix.h"
 #include "common/PetscDGShell.h"
+#include "common/PetscDGShellPtAP.h"
 #include "common/PetscInterplMatrix.h"
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
@@ -54,6 +55,8 @@ public:
     void dump() const;
 
 private:
+    void setup_mg_default_asm(AbstractDGOperator<DomainDimension>& dgop, PC pc, MGConfig const& mg_config);
+    void setup_mg_default_mf(AbstractDGOperator<DomainDimension>& dgop, PC pc, MGConfig const& mg_config);
     void setup_mg(AbstractDGOperator<DomainDimension>& dgop, PC pc, MGConfig const& mg_config);
 
     void warmup_ksp(KSP ksp);
