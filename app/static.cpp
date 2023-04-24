@@ -128,6 +128,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     if (rank == 0) {
         std::cout << "DOFs: " << num_dofs_domain << std::endl;
+	std::cout << "Elements: " << num_dofs_domain / dgop.block_size() << std::endl;
+	std::cout << "Block size: " << dgop.block_size() << std::endl;
         std::cout << "Mesh size: " << mesh_size << std::endl;
     }
 
