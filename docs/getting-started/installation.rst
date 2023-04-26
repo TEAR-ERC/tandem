@@ -25,9 +25,9 @@ Then install tandem with:
 
     spack install tandem@main polynomial_degree=3 domain_dimension=2
 
-tandem can then be already loaded with ``spack load tandem``.
-Alternatively, we might prefer loading tandem from environment modules. We therefore now detail the procedure to generate such a module.
-The path where the module file should be installed (if e.g. you do not want to install on /home because you want to share your installation with other users), and the name of the generated module files can be enhanced by updating ``~/.spack/modules.yaml`` with:
+tandem can then be loaded with ``spack load tandem``.
+Alternatively, we might prefer loading tandem from environment modules. We therefore now detail the procedure to generate such module(s).
+You may want to update ``~/.spack/modules.yaml``, to specify the path where the module file(s) should be installed (if e.g. if want to share your installation with other users and they cannot access your $HOME), and to generate module files with more readable names:
 
 .. code-block:: yaml
 
@@ -55,7 +55,7 @@ Note that a custom install directory for spack packages can also be set, by chan
     config:
       install_tree: path_2_packages
 
-We can then generate a module file with:
+We can then generate a tandem module file with:
 
 .. code-block:: bash
 
@@ -76,7 +76,9 @@ e.g.:
 SuperMUC-NG installation
 ------------------------
 
-SuperMUC-NG modules have been installed with spack, but the version is too old and does not know natively how to compile tandem. We then need to add it using a repository:
+The software stack on SuperMUC-NG has been installed with spack.
+Yet, spack on SuperMUC-NG is not recent enough to natively know how to compile tandem. 
+The recipe for compiling spack should then be added from a repository:
 
 .. code-block:: bash
 
@@ -87,7 +89,7 @@ SuperMUC-NG modules have been installed with spack, but the version is too old a
     cd seissol-spack-aid
     spack repo add ./spack
 
-Then tandem can be installed, e.g. with:
+tandem can be then installed, e.g. with:
 
 .. code-block:: bash
 
@@ -149,9 +151,9 @@ Install PETSc
 
 .. code:: console
 
-    # wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.13.3.tar.gz
-    # tar -xvf petsc-lite-3.13.3.tar.gz
-    # cd petsc-3.13.3
+    # wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.6.tar.gz
+    # tar -xvf petsc-lite-3.14.6.tar.gz
+    # cd petsc-3.14.6
     # ./configure --with-fortran-bindings=0 --with-debugging=0 \
          --with-memalign=32 --with-64-bit-indices \
          CC=mpicc CXX=mpicxx FC=mpif90 --prefix=/usr/local/ \
