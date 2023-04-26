@@ -76,6 +76,8 @@ e.g.:
 SuperMUC-NG installation
 ------------------------
 
+First, have a look at `this page <https://seissol.readthedocs.io/en/latest/behind_firewall.html>`_ to best configure git on SuperMUC-NG.
+
 The software stack on SuperMUC-NG has been installed with spack.
 Yet, spack on SuperMUC-NG is not recent enough to natively know how to compile tandem. 
 The recipe for compiling spack should then be added from a repository:
