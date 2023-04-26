@@ -46,7 +46,7 @@ You may want to update ``~/.spack/modules.yaml``, to specify the path where the 
               polynomial_degree=3: 'p3'
               polynomial_degree=4: 'p4'
               polynomial_degree=5: 'p5'
-              polynomial_degree=6: 'p6
+              polynomial_degree=6: 'p6'
 
 Note that a custom install directory for spack packages can also be set, by changing ``~/.spack/config.yaml``:
 
