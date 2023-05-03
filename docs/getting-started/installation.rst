@@ -147,6 +147,7 @@ Install METIS and ParMETIS
     # make config && make && make install
     # cd ../parmetis-4.0.3
     # make config && make && make install
+    # cd ..
 
 Install PETSc
 -------------
@@ -163,6 +164,7 @@ Install PETSc
          COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3"
     # make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j
     # make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
+    # cd ..
 
 (Optional) Install libxsmm
 --------------------------
@@ -174,6 +176,7 @@ Install PETSc
     # cd libxsmm-1.16.1
     # make -j generator
     # cp bin/libxsmm_gemm_generator /usr/local/bin/
+    # cd ..
 
 Compile tandem
 --------------
