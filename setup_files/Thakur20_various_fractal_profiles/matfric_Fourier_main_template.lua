@@ -40,7 +40,6 @@ if _y ~= nil then
 end
 
 for line in lines do
-    -- print(line)
     _y,_var = fractal_file:read('*number', '*number')
     if _y ~= nil then
         table.insert(fault_y,_y)
@@ -65,9 +64,12 @@ end
 
 -------------------- Here is the template for your target fractal variation
 -- function BP1:var(x, y)
---     local het_var = linear_interpolation(fault_y, var, y)
---     print(x,y,het_var)
---     return het_var
+    -- local het_var = linear_interpolation(fault_y, var, y)
+    -- if y > 0 then
+    --     het_var = self.var
+    -- end
+    -- print(x,y,het_var)
+    -- return het_var
 -- end
 
 -------------------- Define your domain: below is the base values for all the parameters
@@ -135,7 +137,7 @@ end
 
 function BP1:a(x, y)
     local z = -y
-    local _ab = self:var(x,y)
+    local _ab = self:ab(x,y)
     return _ab + self.b
 end
 
