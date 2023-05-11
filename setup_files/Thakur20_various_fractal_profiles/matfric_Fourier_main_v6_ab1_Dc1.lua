@@ -29,25 +29,33 @@ BP1.V0 = 1.0e-6         -- Reference slip rate [m/s]
 BP1.f0 = 0.6            -- Reference friction coefficient
 BP1.Dc = 0.004
 
--------------------- Define your input data
-fractal_file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/fractal_Dc_01','r')
-lines = fractal_file:lines()
-local fault_y = {}
-local var = {}
-_y,_var = fractal_file:read('*number', '*number')
-if _y ~= nil then
-    table.insert(fault_y,_y)
-    table.insert(var,_var)
-end
-
-for line in lines do
-    _y,_var = fractal_file:read('*number', '*number')
+-------------------- Define a function that reads in your input fractal profile
+function read_fractal(fname)
+    local fractal_file = io.open (fname,'r')
+    local lines = fractal_file:lines()
+    local fault_y = {}
+    local var = {}
+    local _y,_var = fractal_file:read('*number', '*number')
     if _y ~= nil then
         table.insert(fault_y,_y)
         table.insert(var,_var)
     end
+
+    for line in lines do
+        _y,_var = fractal_file:read('*number', '*number')
+        if _y ~= nil then
+            table.insert(fault_y,_y)
+            table.insert(var,_var)
+        end
+    end
+    io.close(fractal_file)
+    return fault_y,var
 end
-io.close(fractal_file)
+
+-------------------- Define your input data
+y_sn,fractal_sn = read_fractal('/home/jyun/Tandem/Thakur20_hetero_stress/fractal_snpre_06')
+y_ab,fractal_ab = read_fractal('/home/jyun/Tandem/Thakur20_various_fractal_profiles/fractal_ab_01')
+y_dc,fractal_dc = read_fractal('/home/jyun/Tandem/Thakur20_various_fractal_profiles/fractal_Dc_01')
 
 -------------------- Define linear interpolation function
 function linear_interpolation(x, y, x0)
@@ -90,26 +98,23 @@ function BP1:eta(x, y)
 end
 
 function BP1:L(x, y)
-    local het_var = linear_interpolation(fault_y, var, y)
+    local het_L = linear_interpolation(y_dc, fractal_dc, y)
     if y > 0 then
-        het_var = self.Dc
+        het_L = self.Dc
     end
-    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/dc_profile_Dc1','a')
+    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/dc_profile_v6_ab1_Dc1','a')
     io.output(file)
-    io.write(y,'\t',het_var,'\n')
+    io.write(y,'\t',het_L,'\n')
     io.close(file)
-    -- print(x,y,het_var)
-    return het_var
+    return het_L
 end
 
 function BP1:sn_pre(x, y)
-    local z = -y
-    local _sigma1 = self.sigma2 + (self.sigma2 - self.sigma1) * (z - self.H2) / self.H2
-    if z < self.H2 then
-        return _sigma1
-    else
-        return self.sigma2
+    local het_sigma = linear_interpolation(y_sn, fractal_sn, y)
+    if het_sigma == nil then
+        het_sigma = self.sigma1
     end
+    return het_sigma
 end
 
 function BP1:Vinit(x, y)
@@ -117,44 +122,44 @@ function BP1:Vinit(x, y)
 end
 
 function BP1:ab(x, y)
-    local z = -y
-    local _ab1 = self.a_b2 + (self.a_b2 - self.a_b1) * (z - self.H2) / self.H2
-    local _ab2 = self.a_b2 + (self.a_b3 - self.a_b2) * (z - self.H) / self.h
-    local _ab3 = self.a_b3 + (self.a_b4 - self.a_b3) * (z - self.h - self.H) / (self.Wf - self.h - self.H)
-
-    if z < self.H2 then
-        return _ab1
-    elseif z < self.H then
-        return self.a_b2
-    elseif z < self.H + self.h then
-        return _ab2
-    elseif z < self.Wf then
-        return _ab3
-    else
-        return self.a_b4
+    local het_ab = linear_interpolation(y_ab, fractal_ab, y)
+    if y > 0 then
+        het_ab = self.a_b1
     end
+    return het_ab
 end
 
 function BP1:a(x, y)
     local z = -y
     local _ab = self:ab(x,y)
-    return _ab + self.b
+    local _a = _ab + self.b
+    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/ab_profile_v6_ab1_Dc1','a')
+    io.output(file)
+    io.write(y,'\t',_a,'\t',self.b,'\n')
+    io.close(file)
+    return _a
 end
 
 function BP1:tau_pre(x, y)
     local z = -y
     local _tau1 = self.tau2 + (self.tau2 - self.tau1) * (z - self.H2) / self.H2
     local _tau2 = self.tau2 + (self.tau3 - self.tau2) * (z - self.H) / self.h
+    local _tau = self.tau3
+    local _sn = self:sn_pre(x,y)
 
     if z < self.H2 then
-        return _tau1
+        _tau = _tau1
     elseif z < self.H then
-        return self.tau2
+        _tau = self.tau2
     elseif z < self.H + self.h then
-        return _tau2
-    else
-        return self.tau3
+        _tau = _tau2
     end
+
+    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/stress_profile_v6_ab1_Dc1','a')
+    io.output(file)
+    io.write(y,'\t',_sn,'\t',_tau,'\n')
+    io.close(file)
+    return _tau
 end
 
 bp1 = BP1:new()
