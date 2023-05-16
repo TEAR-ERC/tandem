@@ -65,7 +65,7 @@ def plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax):
         vmax = np.max(var)
 
     if lab == 'sliprate':
-        cb = plt.pcolormesh(X,Y,var,cmap='magma',norm=colors.LogNorm())
+        cb = plt.pcolormesh(X,Y,var,cmap='magma',norm=colors.LogNorm(vmin,vmax))
     else:
         cb = plt.pcolormesh(X,Y,var,cmap='magma',vmin=vmin,vmax=vmax)
     plt.ylabel('Depth [km]',fontsize=17)

@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: added image plot
-Last modification: 2023.05.15.
+Last modification: 2023.05.16.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -146,7 +146,10 @@ if abs(args.state_var)>0:
 if args.image_sliprate or args.image_shearT or args.image_normalT or args.image_state_var:
     from faultoutputs_image import fout_image
     if not args.vmin:
-        vmin = None
+        if args.image_sliprate:
+            vmin = 1e-13
+        else:
+            vmin = None
     else:
         vmin = args.vmin
     if not args.vmax:
