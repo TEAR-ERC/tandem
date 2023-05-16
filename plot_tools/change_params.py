@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Tools for making varitions from the base model
-Last modification: 2023.05.01.
+Last modification: 2023.05.16.
 by Jeena Yun
 """
 
@@ -14,7 +14,8 @@ class variate:
     def __init__(self):
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
-        self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/'
+        self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
+        # self.setup_dir = '/home/jyun/Tandem'
 
     def load_parameter(self,prefix):
         fsigma,ff0,fab,fdc,newb,newL = self.what_is_varied(prefix)
