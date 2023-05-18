@@ -2,7 +2,7 @@
 '''
 Functions related to plotting initial stress conditions
 By Jeena Yun
-Last modification: 2023.05.03.
+Last modification: 2023.05.16.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -30,7 +30,7 @@ def read_output(outputs,dep):
     return z,tau,sigma
 
 # ------------------ Initial stress check
-def plot_stress_vs_depth(save_dir,prefix,outputs,dep):
+def plot_stress_vs_depth(save_dir,prefix,outputs,dep,save_on=True):
     plt.rcParams['font.size'] = '15'
     fig,ax = plt.subplots(figsize=(9,7))
     y,Hs,a,b,_a_b,tau0,_sigma0,L,others = ch.load_parameter(prefix)
@@ -55,10 +55,8 @@ def plot_stress_vs_depth(save_dir,prefix,outputs,dep):
     plt.grid(True)
     ax.legend(fontsize=13,loc='lower left')
     plt.tight_layout()
-    plt.savefig('%s/stress_profile.png'%(save_dir))
-    plt.show(block=False)
-    plt.pause(0.1)
-    plt.close()
+    if save_on:
+        plt.savefig('%s/stress_profile.png'%(save_dir))
 
 # ------------------ With cumslip plot
 def stress_with_cumslip(ax,prefix,outputs,dep,fs_label=30,fs_legend=15,ytick_on=False):
@@ -92,7 +90,7 @@ def stress_with_cumslip(ax,prefix,outputs,dep,fs_label=30,fs_legend=15,ytick_on=
     ax.legend(fontsize=fs_legend,loc='lower left')
 
 # ------------------ Histogram
-def plot_hist(save_dir,outputs,dep,save_on=1):
+def plot_hist(save_dir,outputs,dep,save_on=True):
     y_ret,tau,sigma = read_output(outputs,dep)
     plt.rcParams['font.size'] = '15'
     fig,ax=plt.subplots(ncols=2,figsize=(18,7))
@@ -108,6 +106,3 @@ def plot_hist(save_dir,outputs,dep,save_on=1):
     plt.tight_layout()
     if save_on:
         plt.savefig('%s/sigma_hist.png'%(save_dir))
-    plt.show(block=False)
-    plt.pause(0.1)
-    plt.close()

@@ -2,7 +2,7 @@
 '''
 Functions related to plotting variables as time series
 By Jeena Yun
-Last modification: 2023.04.21.
+Last modification: 2023.05.16.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ wk2sec = 7*24*60*60
 # fields: Time [s] | state [s?] | cumslip0 [m] | traction0 [MPa] | slip-rate0 [m/s] | normal-stress [MPa]
 # Index:     0     |      1     |       2      |        3        |         4        |          5 
 
-def sliprate_time(save_dir,outputs,dep,sliprate,plot_in_sec):
+def sliprate_time(save_dir,outputs,dep,sliprate,plot_in_sec,save_on=True):
     target_depth = sliprate # in km
     indx = np.argmin(abs(abs(dep) - abs(target_depth)))
     print('Depth = %1.1f [km]'%abs(dep[indx]))
@@ -45,9 +45,10 @@ def sliprate_time(save_dir,outputs,dep,sliprate,plot_in_sec):
     else:
         plt.title('Depth = %1.1f [km]'%abs(dep[indx]),fontsize=20,fontweight = 'bold')
     plt.tight_layout()
-    plt.savefig('%s/sliprate.png'%(save_dir),dpi=300)
+    if save_on:
+        plt.savefig('%s/sliprate.png'%(save_dir),dpi=300)
 
-def slip_time(save_dir,outputs,dep,slip,plot_in_sec):
+def slip_time(save_dir,outputs,dep,slip,plot_in_sec,save_on=True):
     target_depth = slip # in km
     indx = np.argmin(abs(abs(dep) - abs(target_depth)))
     print('Depth = %1.1f [km]'%abs(dep[indx]))
@@ -68,9 +69,10 @@ def slip_time(save_dir,outputs,dep,slip,plot_in_sec):
     else:
         plt.title('Depth = %1.1f [km]'%abs(dep[indx]),fontsize=20,fontweight = 'bold')
     plt.tight_layout()
-    plt.savefig('%s/slip.png'%(save_dir))
+    if save_on:
+        plt.savefig('%s/slip.png'%(save_dir))
 
-def stress_time(save_dir,outputs,dep,stress,plot_in_sec):
+def stress_time(save_dir,outputs,dep,stress,plot_in_sec,save_on=True):
     target_depth = stress # in km
     indx = np.argmin(abs(abs(dep) - abs(target_depth)))
     print('Depth = %1.1f [km]'%abs(dep[indx]))
@@ -96,22 +98,22 @@ def stress_time(save_dir,outputs,dep,stress,plot_in_sec):
         ax[0].set_title('Depth = %1.1f [km]'%abs(dep[indx]),fontsize=20,fontweight = 'bold')
         ax[1].set_title('Depth = %1.1f [km]'%abs(dep[indx]),fontsize=20,fontweight = 'bold')
     plt.tight_layout()
-    plt.savefig('%s/stresses.png'%(save_dir))
+    if save_on:
+        plt.savefig('%s/stresses.png'%(save_dir))
 
-def state_time(save_dir,outputs,dep,slip,plot_in_sec):
-    target_depth = slip # in km
+def state_time(save_dir,outputs,dep,state_var,plot_in_sec,save_on=True):
+    target_depth = state_var # in km
     indx = np.argmin(abs(abs(dep) - abs(target_depth)))
     print('Depth = %1.1f [km]'%abs(dep[indx]))
     time = np.array(outputs[indx])[:,0]
-    state_var = np.array(outputs[indx])[:,1]
 
     plt.rcParams['font.size'] = '15'
     plt.figure(figsize=(8,6))
     if plot_in_sec:        # --- Plot in seconds
-        plt.plot(time,state_var, color='k', lw=2.5)
+        plt.plot(time,np.array(outputs[indx])[:,1], color='k', lw=2.5)
         plt.xlabel('Time [s]',fontsize=17)
     else:        # --- Plot in years
-        plt.plot(time/yr2sec,state_var, color='k', lw=2.5)
+        plt.plot(time/yr2sec,np.array(outputs[indx])[:,1], color='k', lw=2.5)
         plt.xlabel('Time [s]',fontsize=17)
     plt.ylabel('State Variable',fontsize=17)
     if target_depth < 1e-1:
@@ -119,4 +121,5 @@ def state_time(save_dir,outputs,dep,slip,plot_in_sec):
     else:
         plt.title('Depth = %1.1f [km]'%abs(dep[indx]),fontsize=20,fontweight = 'bold')
     plt.tight_layout()
-    plt.savefig('%s/state.png'%(save_dir))
+    if save_on:
+        plt.savefig('%s/state.png'%(save_dir))

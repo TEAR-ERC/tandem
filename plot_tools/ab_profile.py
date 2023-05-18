@@ -2,7 +2,7 @@
 '''
 Functions related to plotting a-b profile
 By Jeena Yun
-Last modification: 2023.04.21.
+Last modification: 2023.05.18.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -39,16 +39,14 @@ def read_output(fname):
     fid.close()
     idx = np.argsort(np.array(mesh_y))
     mesh_y = np.array(mesh_y)[idx]; a = np.array(a)[idx]; b = np.array(b)[idx]
-    return mesh_y,a,b
+    return mesh_y,a,b        
 
 # ------------------ Initial profile check
-def plot_ab_vs_depth(save_dir,prefix):
+def plot_ab_vs_depth(save_dir,prefix,save_on=True):
     y,Hs,a0,b0,_a_b = ch.load_parameter(prefix)[0:5]
     if len(_a_b) == 2:
-        a_b0 = _a_b[0]
         y_in = _a_b[1]
     else:
-        a_b0 = _a_b
         y_in = y
     if len(prefix.split('/')) > 1:
         fname = '%s/%s/ab_profile_%s'%(ch.setup_dir,prefix.split('/')[0],prefix.split('/')[-1])
@@ -77,25 +75,22 @@ def plot_ab_vs_depth(save_dir,prefix):
     plt.grid(True)
     ax.legend(fontsize=13,loc='lower left')
     plt.tight_layout()
-    plt.savefig('%s/ab_profile.png'%(save_dir))
-    plt.show(block=False)
-    plt.pause(0.1)
-    plt.close()
+    if save_on:
+        plt.savefig('%s/ab_profile.png'%(save_dir))
 
 # ------------------ With cumslip plot
 def ab_with_cumslip(ax,prefix,fs_label=30,fs_legend=15,ytick_on=False):
     y,Hs,a0,b0,_a_b = ch.load_parameter(prefix)[0:5]
     if len(_a_b) == 2:
-        a_b0 = _a_b[0]
         y_in = _a_b[1]
     else:
-        a_b0 = _a_b
         y_in = y
     if len(prefix.split('/')) > 1:
         fname = '%s/%s/ab_profile_%s'%(ch.setup_dir,prefix.split('/')[0],prefix.split('/')[-1])
     else:
         fname = '%s/%s/ab_profile'%(ch.setup_dir,prefix)
     y_ret,a,b = read_output(fname)
+    asp = -_a_b[1][np.logical_and(_a_b[0]>0,np.logical_and(abs(_a_b[1])>Hs[3],abs(_a_b[1])<Hs[1]))]
 
     # ---------- Inputs
     ax.plot(b0,abs(y_in),color=myblue,lw=3,label='b (Input)',zorder=3)
@@ -117,3 +112,4 @@ def ab_with_cumslip(ax,prefix,fs_label=30,fs_legend=15,ytick_on=False):
     ax.set_ylim(0,Hs[0])
     ax.invert_yaxis()
     ax.legend(fontsize=fs_legend,loc='lower left')
+    return asp

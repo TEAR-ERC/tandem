@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: added image plot
-Last modification: 2023.05.16.
+Last modification: 2023.05.18.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,7 +29,7 @@ parser.add_argument("-sr","--sliprate", type=float, help=": If used, depth of sl
 parser.add_argument("-sl","--slip", type=float, help=": If used, depth of slip vs. time plot [km]", default=0)
 parser.add_argument("-st","--stress", type=float, help=": If used, depth of stress vs. time plot [km]", default=0)
 parser.add_argument("-sv","--state_var", type=float, help=": If used, depth of state variable vs. time plot [km]", default=0)
-parser.add_argument("-sec","--plot_in_sec", action="store_true", help=": Time axis in seconds")
+parser.add_argument("-sec","--plot_in_sec", action="store_true", help=": Time axis in seconds",default=False)
 
 # Input variable profile
 parser.add_argument("-ist","--stressprof", action="store_true", help=": ON/OFF in & out stress profile")
@@ -53,11 +53,12 @@ parser.add_argument("-dtco","--dt_coseismic", type=float, help=": Contour interv
 parser.add_argument("-dtint","--dt_interm", type=float, help=": Contour interval for INTERMEDIATE section [wk]")
 parser.add_argument("-Vths","--Vths", type=float, help=": Slip-rate threshold to define coseismic section [m/s]")
 parser.add_argument("-Vlb","--Vlb", type=float, help=": When used with --Vth becomes lower bound of slip rate of intermediate section [m/s]")
-parser.add_argument("-dd","--depth_dist", action="store_true", help=": Plot cumslip plot with hypocenter depth distribution")
-parser.add_argument("-abio","--ab_inout", action="store_true", help=": Plot cumslip plot with a-b profile")
-parser.add_argument("-stio","--stress_inout", action="store_true", help=": Plot cumslip plot with stress profile")
-parser.add_argument("-dcio","--dc_inout", action="store_true", help=": Plot cumslip plot with Dc profile")
+parser.add_argument("-dd","--depth_dist", action="store_true", help=": Plot cumslip plot with hypocenter depth distribution",default=False)
+parser.add_argument("-abio","--ab_inout", action="store_true", help=": Plot cumslip plot with a-b profile",default=False)
+parser.add_argument("-stio","--stress_inout", action="store_true", help=": Plot cumslip plot with stress profile",default=False)
+parser.add_argument("-dcio","--dc_inout", action="store_true", help=": Plot cumslip plot with Dc profile",default=False)
 parser.add_argument("-spup","--spin_up", type=float, help=": Plot with spin-up after given slip amount",default=0)
+parser.add_argument("-rths","--rths", type=float, help=": Rupture length threshold to define system wide event [m]",default=10)
 parser.add_argument("-ct","--cuttime", type=float, help=": Show result up until to the given time to save computation time [yr]", default=0)
 parser.add_argument("-mg","--mingap", type=float, help=": Minimum seperation time between two different events [s]", default=60)
 
@@ -140,7 +141,7 @@ if abs(args.stress)>0:
 
 if abs(args.state_var)>0:
     from faultoutputs_vs_time import state_time
-    state_time(save_dir,outputs,dep,args.stress,args.plot_in_sec)
+    state_time(save_dir,outputs,dep,args.state_var,args.plot_in_sec)
 
 # Fault output image ---------------------------------------------------------------------------------------------------------------------
 if args.image_sliprate or args.image_shearT or args.image_normalT or args.image_state_var:
@@ -156,7 +157,7 @@ if args.image_sliprate or args.image_shearT or args.image_normalT or args.image_
         vmax = None
     else:
         vmax = args.vmax
-    fout_image(args.image_sliprate,args.image_shearT,args.image_normalT,args.image_state_var,outputs,dep,args.plot_in_timestep,save_dir,prefix,vmin,vmax)
+    fout_image(args.image_sliprate,args.image_shearT,args.image_normalT,args.image_state_var,outputs,dep,args.plot_in_timestep,save_dir,prefix,vmin,vmax,args.plot_in_sec)
 
 # Input variable profile -----------------------------------------------------------------------------------------------------------------
 if args.stressprof:
@@ -176,31 +177,18 @@ if args.cumslip:
     from cumslip_compute import *
     from cumslip_plot import *
     cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
-    w_ab,w_stress,w_dc,w_dd = 0,0,0,0
-    if args.ab_inout:
-        w_ab = 1
-    if args.stress_inout:
-        w_stress = 1
-    if args.dc_inout:
-        w_dc = 1
-    if args.depth_dist:
-        w_dd = 1
+    plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
 
     # --- Plot the result
     if args.spin_up > 0:
-        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap,args.spin_up)
-        if sum([w_ab,w_stress,w_dc,w_dd]) == 0:
-            only_cumslip(save_dir,prefix,cumslip_outputs,args.Vths,dt_coseismic,spup_cumslip_outputs)
-        elif sum([w_ab,w_stress,w_dc,w_dd]) == 1:
-            two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,w_dd,w_ab,w_stress,w_dc,spup_cumslip_outputs)
-        elif sum([w_ab,w_stress,w_dc,w_dd]) == 2:
-            three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,w_dd,w_ab,w_stress,w_dc,spup_cumslip_outputs)
-        spup_where(save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,args.Vths,dt_coseismic)
+        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)
+        spup_where(save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,args.Vths,dt_coseismic,args.rths)
     else:
-        if sum([w_ab,w_stress,w_dc,w_dd]) == 0:
-            only_cumslip(save_dir,prefix,cumslip_outputs,args.Vths,dt_coseismic,spup_cumslip_outputs=None)
-        elif sum([w_ab,w_stress,w_dc,w_dd]) == 1:
-            two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,w_dd,w_ab,w_stress,w_dc,spup_cumslip_outputs=None)
-        elif sum([w_ab,w_stress,w_dc,w_dd]) == 2:
-            three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,w_dd,w_ab,w_stress,w_dc,spup_cumslip_outputs=None)
-        
+        spup_cumslip_outputs = None
+
+    if sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 0:
+        only_cumslip(save_dir,prefix,cumslip_outputs,args.Vths,dt_coseismic,args.rths,spup_cumslip_outputs)
+    elif sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 1:
+        two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)
+    elif sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 2:
+        three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)

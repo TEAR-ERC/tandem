@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.04.18.
+Last modification: 2023.05.18.
 '''
 import numpy as np
 from scipy import interpolate
@@ -10,7 +10,7 @@ from scipy import interpolate
 yr2sec = 365*24*60*60
 wk2sec = 7*24*60*60
 
-def event_times(dep,outputs,Vlb,Vths,cuttime,mingap):
+def event_times(dep,outputs,Vlb,Vths,cuttime,mingap,print_on=True):
     c = 0
     for i in np.argsort(abs(dep)):
         z = abs(dep[i])
@@ -32,7 +32,7 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,mingap):
             events = np.where(sliprate > Vths)[0]
 
         if len(events) == 0:
-            print('Depth',z,' - no events')
+            if print_on: print('Depth',z,' - no events')
             continue
         else:
             # Get indexes for the dynamic rupture components
@@ -171,31 +171,32 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,mingap):
 
     return tstart, tend, evdep
 
-def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap):
-    print('Cumulative slip vs. Depth plot >>> ',end='')
+def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap,print_on=True):
+    if print_on: print('Cumulative slip vs. Depth plot >>> ',end='')
 
-    if abs(cuttime) < 1e-3:
-        print('No cutting')
-    else:
-        print('Cut at %2.1f yr'%(cuttime/yr2sec))
-
-    if Vlb > 0:
-        print('%1.0e < Slip rate < %1.0e'%(Vlb,Vths))
-    else:
-        print('Slip rate > %1.0e'%(Vths))
+    if print_on: 
+        if abs(cuttime) < 1e-3:
+            print('No cutting')
+        else:
+            print('Cut at %2.1f yr'%(cuttime/yr2sec))
+        if Vlb > 0:
+            print('%1.0e < Slip rate < %1.0e'%(Vlb,Vths))
+        else:
+            print('Slip rate > %1.0e'%(Vths))
 
     cscreep = []
     depcreep = []
     cscoseis = []
     depcoseis = []
+    fault_slip = []
     if dt_interm > 0:        
         csinterm = []
         depinterm = []
 
     # Obtain globally min. event start times and max. event tend times
     if dt_interm > 0:
-        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,mingap)
-    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,mingap)
+        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,mingap,print_on)
+    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,mingap,print_on)
     evslip = np.zeros(tstart_coseis.shape)
 
     # Now interpolate the cumulative slip using given event time ranges
@@ -232,13 +233,16 @@ def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm
         # -------------------- Coseismic
         cs = []
         depth = []
+        Dbar = []
         for j in range(len(tstart_coseis)):
             tcoseis = np.arange(tstart_coseis[j],tend_coseis[j],dt_coseismic)
             cs.append(f(tcoseis))
             depth.append(z*np.ones(len(tcoseis)))
+            Dbar.append(f(tcoseis)[-1]-f(tcoseis)[0])
 
         cscoseis.append([item for sublist in cs for item in sublist])
         depcoseis.append([item for sublist in depth for item in sublist])
+        fault_slip.append(Dbar)
 
         # -------------------- Event detph
         if np.isin(z,evdep):
@@ -246,7 +250,7 @@ def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm
             evslip[indx] = f(tstart_coseis)[indx]
 
     timeout = [tstart_coseis,tend_coseis]
-    evout = [evslip,evdep]
+    evout = [evslip,evdep,fault_slip]
     creepout = [cscreep,depcreep]
     coseisout = [cscoseis,depcoseis]
     if dt_interm > 0:
@@ -257,11 +261,10 @@ def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm
     else:
         return [timeout, evout, creepout, coseisout]
     
-def compute_spinup(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap,spin_up):
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap)
+def compute_spinup(outputs,dep,cuttime,cumslip_outputs,spin_up,print_on=True):
     # cumslip_outputs = [timeout, evout, creepout, coseisout, intermout]
     # cumslip_outputs[0] = [tstart_coseis,tend_coseis]
-    # cumslip_outputs[1] = [evslip,evdep]
+    # cumslip_outputs[1] = [evslip,evdep,fault_slip]
     # cumslip_outputs[2] = [cscreep,depcreep]
     # cumslip_outputs[3] = [cscoseis,depcoseis]
     # cumslip_outputs[4] = [csinterm,depinterm]
@@ -269,7 +272,7 @@ def compute_spinup(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,
         interm = True
     else:
         interm = False
-    print('Spin-up applied after slip > %2.2f m'%(spin_up))
+    if print_on: print('Spin-up applied after slip > %2.2f m'%(spin_up))
     spin_up_idx = np.where(cumslip_outputs[1][0]>spin_up)[0][0]
     spup_cscreep = np.copy(cumslip_outputs[2][0])
     if interm:
@@ -306,6 +309,20 @@ def compute_spinup(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,
     new_inits = [new_init_Sl,new_init_dp]
 
     if interm:
-        return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spup_csinterm]
+        return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spup_csinterm, spin_up_idx]
     else:
-        return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis]
+        return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spin_up_idx]
+    
+def analyze_events(cumslip_outputs,rths):
+    rupture_length = []
+    fault_z = np.array(cumslip_outputs[3][1]).T[0]
+    for ti in range(np.array(cumslip_outputs[1][2]).shape[1]):
+        fault_slip = np.array(cumslip_outputs[1][2]).T[ti]
+        Sths = max(fault_slip)*0.01
+        rupture_length.append(max(fault_z[fault_slip>Sths])-min(fault_z[fault_slip>Sths]))
+    rupture_length = np.array(rupture_length)
+    av_slip = np.mean(cumslip_outputs[1][2],axis=0)
+
+    partial_rupture = np.where(rupture_length<rths)[0]
+    system_wide = np.where(rupture_length>=rths)[0]
+    return rupture_length,av_slip,system_wide,partial_rupture
