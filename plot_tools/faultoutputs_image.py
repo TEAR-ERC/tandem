@@ -2,7 +2,7 @@
 '''
 Functions related to plotting spatio-temporal evolution of variables as an image
 By Jeena Yun
-Last modification: 2023.05.16.
+Last modification: 2023.05.18.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,8 +24,12 @@ wk2sec = 7*24*60*60
 # Index:     0     |      1     |       2      |        3        |         4        |          5 
 
 def fout_image(sliprate,shearT,normalT,state_var,outputs,dep,plot_in_timestep,save_dir,prefix,vmin,vmax,plot_in_sec=False,save_on=True):
-    X,Y,var,lab = get_var(sliprate,shearT,normalT,state_var,outputs,dep,plot_in_timestep,plot_in_sec)
-    plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax,plot_in_sec,save_on)
+    which = np.where([sliprate,shearT,normalT,state_var])[0]
+    for w in which:
+        tf = [False,False,False,False]
+        tf[w] = True
+        X,Y,var,lab = get_var(tf[0],tf[1],tf[2],tf[3],outputs,dep,plot_in_timestep,plot_in_sec)
+        plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax,plot_in_sec,save_on)
 
 def get_var(sliprate,shearT,normalT,state_var,outputs,dep,plot_in_timestep,plot_in_sec):
     if sliprate:
@@ -86,7 +90,7 @@ def plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax,plot_in_se
     else:
         cb = plt.pcolormesh(X,Y,var,cmap=cmap_n,vmin=vmin,vmax=vmax)
         
-    plt.colorbar(cb).set_label(cb_label,fontsize=30,rotation=270,labelpad=25)
+    plt.colorbar(cb).set_label(cb_label,fontsize=30,rotation=270,labelpad=30)
 
     fsigma,ff0,fab,fdc,newb,newL = ch.what_is_varied(prefix)
     ver_info = ''
