@@ -1,0 +1,12 @@
+========= Summary =========
+date_time=Mon May 15 02:30:50 2023
+code_version=v1.0-3-gf08abeb
+solve_time=24999.8
+time_steps=705747
+step_rejections=38067
+min_time_step=0.000204086
+max_time_step=570756
+dofs_domain=542080
+dofs_fault=14028
+mesh_size=55.9475
+===========================
