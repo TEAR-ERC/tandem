@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.05.18.
+Last modification: 2023.05.22.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -42,7 +42,7 @@ def version_info(prefix):
     if newb is not None:
         ver_info += '+ b = %2.4f '%newb
     if newL is not None:
-        ver_info += '+ L = %2.4f'%newL
+        ver_info += '+ L = %2.4f'%newL/10000
     if ver_info[:2] == '+ ':
         ver_info = ver_info[2:]
     return ver_info
@@ -94,9 +94,11 @@ def cumslip_basic(ax,prefix,cumslip_outputs,rths):
     ax.plot(cumslip_outputs[2][0],cumslip_outputs[2][1],color='0.62',lw=1)
     ax.set_ylabel('Depth [km]',fontsize=30)
     ax.set_xlabel('Cumulative Slip [m]',fontsize=30)
-    ev_part = ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3)
-    ev_sys = ax.scatter(cumslip_outputs[1][0][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3)
-    ax.legend([ev_sys,ev_part],['System-wide events','Partial rupture events'],fontsize=25,framealpha=1,loc='lower right')
+    if len(partial_rupture) > 0:
+        ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+    if len(system_wide) > 0:
+        ax.scatter(cumslip_outputs[1][0][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
+    ax.legend(fontsize=25,framealpha=1,loc='lower right')
     xl = ax.get_xlim()
     if len(ver_info) > 0:
         ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=45,fontweight='bold',ha='left',va='bottom')
@@ -115,9 +117,11 @@ def cumslip_spinup(ax,prefix,cumslip_outputs,spup_cumslip_outputs,rths):
         ax.plot(spup_cumslip_outputs[4],cumslip_outputs[4][1],color='yellowgreen',lw=1)
     ax.plot(spup_cumslip_outputs[3],cumslip_outputs[3][1],color=mydarkpink,lw=1)
     ax.plot(spup_cumslip_outputs[2],cumslip_outputs[2][1],color='0.62',lw=1)
-    ev_part = ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3)
-    ev_sys = ax.scatter(spup_cumslip_outputs[1][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3)
-    ax.legend([ev_sys,ev_part],['System-wide events','Partial rupture events'],fontsize=25,framealpha=1,loc='lower right')
+    if len(partial_rupture) > 0:
+        ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+    if len(system_wide) > 0:
+        ax.scatter(spup_cumslip_outputs[1][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
+    ax.legend(fontsize=25,framealpha=1,loc='lower right')
     xl = ax.get_xlim()
     if len(ver_info) > 0:
         ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=45,fontweight='bold',ha='left',va='bottom')
@@ -221,25 +225,10 @@ def only_cumslip(save_dir,prefix,cumslip_outputs,Vths,dt_coseismic,rths,spup_cum
             plt.savefig('%s/spinup_cumslip_%d_%d.png'%(save_dir,int(Vths*100),int(dt_coseismic*10)),dpi=300)
 
 def spup_where(save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,Vths,dt_coseismic,rths,save_on=True):
-    system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:]
-    Hs = ch.load_parameter(prefix)[1]
     plt.rcParams['font.size'] = '27'
-    plt.figure(figsize=(19,11))
-
-    if len(cumslip_outputs) > 4:
-        plt.plot(cumslip_outputs[4][0],cumslip_outputs[4][1],color='yellowgreen',lw=1)
-    plt.plot(cumslip_outputs[3][0],cumslip_outputs[3][1],color=mydarkpink,lw=1)
-    plt.plot(cumslip_outputs[2][0],cumslip_outputs[2][1],color='0.62',lw=1)
-    plt.plot(spup_cumslip_outputs[0][0],spup_cumslip_outputs[0][1],color='yellowgreen',lw=5)
-    ev_part = plt.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3)
-    ev_sys = plt.scatter(cumslip_outputs[1][0][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3)
-    plt.legend([ev_sys,ev_part],['System-wide events','Partial rupture events'],fontsize=25,framealpha=1,loc='lower right')
-    plt.ylabel('Depth [km]',fontsize=30)
-    plt.xlabel('Cumulative Slip [m]',fontsize=30)
-    xl = plt.gca().get_xlim()
-    plt.xlim(0,xl[1])
-    plt.ylim(0,Hs[0])
-    plt.gca().invert_yaxis()
+    fig,ax=plt.subplots(figsize=(19,11))
+    cumslip_basic(ax,prefix,cumslip_outputs,rths)
+    ax.plot(spup_cumslip_outputs[0][0],spup_cumslip_outputs[0][1],color='yellowgreen',lw=5)
     plt.tight_layout()
     if save_on:
         plt.savefig('%s/spinup_cumslip_%d_%d_where.png'%(save_dir,int(Vths*100),int(dt_coseismic*10)),dpi=300)
@@ -267,10 +256,11 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths,save_on=True):
     plt.setp(stemlines, color='k', linewidth=2.5)
     plt.setp(markers, color='k')
     plt.setp(baseline, color='0.62')
-    for i in range(len(system_wide)):
-        markers, stemlines, baseline = ax1.stem(system_wide[i]+1,rupture_length[system_wide[i]])
-        plt.setp(stemlines, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]), linewidth=2.6)
-        plt.setp(markers, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]))
+    if len(system_wide) > 0:
+        for i in range(len(system_wide)):
+            markers, stemlines, baseline = ax1.stem(system_wide[i]+1,rupture_length[system_wide[i]])
+            plt.setp(stemlines, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]), linewidth=2.6)
+            plt.setp(markers, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]))
     ax1.hlines(y=rths,xmax=len(rupture_length)+1,xmin=0,color=mynavy,lw=1.5,linestyles='--')
     ax1.set_xticks(np.arange(-5,len(rupture_length)+5,5), minor=True)
     ax1.set_xlim(1-len(rupture_length)*0.05,len(rupture_length)*1.05)
@@ -278,29 +268,17 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths,save_on=True):
     ax1.set_ylabel('Rupture Length [km]',fontsize=17)
     ax1.grid(True,alpha=0.4,which='both')
 
-    # ------ Average slip
-    # markers, stemlines, baseline = ax2.stem(np.arange(1,len(av_slip)+1),av_slip)
-    # plt.setp(stemlines, color='k', linewidth=2.5)
-    # plt.setp(markers, color='k')
-    # plt.setp(baseline, color='0.62')
-    # for i in range(len(system_wide)):
-    #     markers, stemlines, baseline = ax2.stem(system_wide[i]+1,av_slip[system_wide[i]])
-    #     plt.setp(stemlines, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]), linewidth=2.6)
-    #     plt.setp(markers, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]))
-    # ax2.set_xticks(np.arange(-5,len(av_slip)+5,5), minor=True)
-    # ax2.set_xlim(ax1.get_xlim())
-    # ax2.set_xlabel('Event Index',fontsize=17)
-    # ax2.set_ylabel('Average Slip [m]',fontsize=17)
-    # ax2.grid(True,alpha=0.4,which='both')
+    # ------ Hypocenter depth
     evdep = cumslip_outputs[1][1]
     markers, stemlines, baseline = ax2.stem(np.arange(1,len(evdep)+1),evdep)
     plt.setp(stemlines, color='k', linewidth=2.5)
     plt.setp(markers, color='k')
     plt.setp(baseline, color='0.62')
-    for i in range(len(system_wide)):
-        markers, stemlines, baseline = ax2.stem(system_wide[i]+1,evdep[system_wide[i]])
-        plt.setp(stemlines, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]), linewidth=2.6)
-        plt.setp(markers, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]))
+    if len(system_wide) > 0:
+        for i in range(len(system_wide)):
+            markers, stemlines, baseline = ax2.stem(system_wide[i]+1,evdep[system_wide[i]])
+            plt.setp(stemlines, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]), linewidth=2.6)
+            plt.setp(markers, color=cmap(np.linspace(0.5,0.9,len(system_wide))[i]))
     ax2.set_xticks(np.arange(-5,len(evdep)+5,5), minor=True)
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_xlabel('Event Index',fontsize=17)
@@ -309,14 +287,18 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths,save_on=True):
 
     # ------ Slip along fault for each event
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
-    ax3.set_prop_cycle('color',[cmap(i) for i in np.linspace(0.5,0.9,len(system_wide))])
-    ax3.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[0]].T,fault_z,lw=2.5,color='0.62',label='Partial rupture events')
-    ax3.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[1:]].T,np.array([fault_z for i in range(len(partial_rupture[1:]))]).T,lw=2.5,color='0.62')
-    ax3.plot(np.array(cumslip_outputs[1][2]).T[system_wide].T,np.array([fault_z for i in range(len(system_wide))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i+1,av_slip[i]) for i in system_wide])
-    hyp_dep = cumslip_outputs[1][1][system_wide]
-    hyp_slip = [np.array(cumslip_outputs[1][2]).T[system_wide][i][np.where(fault_z==hyp_dep[i])[0][0]] for i in range(len(system_wide))]
-    ax3.scatter(hyp_slip,hyp_dep,marker='*',s=300,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Hypocenter')
-    ax3.legend(fontsize=13)
+    if len(partial_rupture) > 0:
+        ax3.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[0]].T,fault_z,lw=2.5,color='0.62',label='Partial rupture events')
+        if len(partial_rupture) > 1:
+            ax3.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[1:]].T,np.array([fault_z for i in range(len(partial_rupture[1:]))]).T,lw=2.5,color='0.62')
+    if len(system_wide) > 0:       
+        ax3.set_prop_cycle('color',[cmap(i) for i in np.linspace(0.5,0.9,len(system_wide))]) 
+        ax3.plot(np.array(cumslip_outputs[1][2]).T[system_wide].T,np.array([fault_z for i in range(len(system_wide))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i+1,av_slip[i]) for i in system_wide])
+        hyp_dep = cumslip_outputs[1][1][system_wide]
+        hyp_slip = [np.array(cumslip_outputs[1][2]).T[system_wide][i][np.where(fault_z==hyp_dep[i])[0][0]] for i in range(len(system_wide))]
+        ax3.scatter(hyp_slip,hyp_dep,marker='*',s=300,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Hypocenter')
+    if len(partial_rupture) > 0 or len(system_wide) > 0:
+        ax3.legend(fontsize=13)
     xl = ax3.get_xlim()
     ax3.hlines(y=Hs[1],xmax=max(xl)*1.2,xmin=min(xl)*1.2,color='0.62',lw=1.5,linestyles='--')
     ax3.hlines(y=(Hs[1]+Hs[2]),xmax=max(xl)*1.2,xmin=min(xl)*1.2,color='0.62',lw=1.5,linestyles='--')

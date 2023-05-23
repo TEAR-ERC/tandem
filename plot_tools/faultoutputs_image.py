@@ -2,7 +2,7 @@
 '''
 Functions related to plotting spatio-temporal evolution of variables as an image
 By Jeena Yun
-Last modification: 2023.05.18.
+Last modification: 2023.05.22.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,8 +25,8 @@ wk2sec = 7*24*60*60
 
 def fout_image(sliprate,shearT,normalT,state_var,outputs,dep,plot_in_timestep,save_dir,prefix,vmin,vmax,plot_in_sec=False,save_on=True):
     which = np.where([sliprate,shearT,normalT,state_var])[0]
+    tf = [False,False,False,False]
     for w in which:
-        tf = [False,False,False,False]
         tf[w] = True
         X,Y,var,lab = get_var(tf[0],tf[1],tf[2],tf[3],outputs,dep,plot_in_timestep,plot_in_sec)
         plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax,plot_in_sec,save_on)

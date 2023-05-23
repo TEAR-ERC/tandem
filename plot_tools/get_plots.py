@@ -114,6 +114,7 @@ if args.compute:
                 dat.append(np.asarray(row).astype(float))
         
         outputs = outputs + (dat,)
+    outputs = np.array(outputs)
     dep = np.array(dep)
     print('done!')
 

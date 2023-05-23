@@ -2,7 +2,7 @@
 '''
 Functions related to plotting initial stress conditions
 By Jeena Yun
-Last modification: 2023.05.16.
+Last modification: 2023.05.22.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -43,9 +43,9 @@ def plot_stress_vs_depth(save_dir,prefix,outputs,dep,save_on=True):
         y_in = y
     y_ret,tau,sigma = read_output(outputs,dep)
 
-    ax.plot(abs(tau0),abs(y_in),lw=2.5,color=mypink,label='Shear Stress')
-    ax.plot(abs(sigma0),abs(y_in),lw=2.5,color=myblue,label='Normal Stress')
-    ax.scatter(abs(tau),abs(y_ret),lw=2.5,color=myburgundy,label='Shear Stress (retrieved)',zorder=3)
+    ax.plot(-tau0,abs(y_in),lw=2.5,color=mypink,label='Shear Stress')
+    ax.plot(sigma0,abs(y_in),lw=2.5,color=myblue,label='Normal Stress')
+    ax.scatter(-tau,abs(y_ret),lw=2.5,color=myburgundy,label='Shear Stress (retrieved)',zorder=3)
     ax.scatter(sigma,abs(y_ret),lw=2.5,color=mynavy,label='Normal Stress (retrieved)',zorder=3)
     ax.set_xlabel('Stress [MPa]',fontsize=17)
     ax.set_ylabel('Depth [km]',fontsize=17)
@@ -70,9 +70,9 @@ def stress_with_cumslip(ax,prefix,outputs,dep,fs_label=30,fs_legend=15,ytick_on=
         y_in = y
     y_ret,tau,sigma = read_output(outputs,dep)
 
-    ax.plot(abs(tau0),abs(y_in),lw=3,color=mypink,label='Shear Stress')
-    ax.plot(abs(sigma0),abs(y_in),lw=3,color=myblue,label='Normal Stress')
-    ax.scatter(abs(tau),abs(y_ret),lw=2.5,color=myburgundy,label='Shear Stress (retrieved)',zorder=3)
+    ax.plot(-tau0,abs(y_in),lw=3,color=mypink,label='Shear Stress')
+    ax.plot(sigma0,abs(y_in),lw=3,color=myblue,label='Normal Stress')
+    ax.scatter(-tau,abs(y_ret),lw=2.5,color=myburgundy,label='Shear Stress (retrieved)',zorder=3)
     ax.scatter(sigma,abs(y_ret),lw=2.5,color=mynavy,label='Normal Stress (retrieved)',zorder=3)
     if not ytick_on:
         ax.axes.yaxis.set_ticklabels([])
@@ -106,3 +106,29 @@ def plot_hist(save_dir,outputs,dep,save_on=True):
     plt.tight_layout()
     if save_on:
         plt.savefig('%s/sigma_hist.png'%(save_dir))
+
+# ------------------ Only input profile check
+def plot_stress_init(save_dir,prefix,save_on=True):
+    plt.rcParams['font.size'] = '15'
+    fig,ax = plt.subplots(figsize=(9,7))
+    y,Hs,a,b,_a_b,tau0,_sigma0,L,others = ch.load_parameter(prefix)
+    if len(_sigma0) == 2:
+        sigma0 = _sigma0[0]
+        y_in = _sigma0[1]
+        tau0 = ch.same_length(y,tau0,y_in)
+    else:
+        sigma0 = _sigma0
+        y_in = y
+
+    ax.plot(-tau0,abs(y_in),lw=2.5,color=mypink,label='Shear Stress')
+    ax.plot(sigma0,abs(y_in),lw=2.5,color=myblue,label='Normal Stress')
+    ax.set_xlabel('Stress [MPa]',fontsize=17)
+    ax.set_ylabel('Depth [km]',fontsize=17)
+    # ax.set_xlim(-2,60)
+    ax.set_ylim(0,Hs[0])
+    ax.invert_yaxis()
+    plt.grid(True)
+    ax.legend(fontsize=13,loc='lower left')
+    plt.tight_layout()
+    if save_on:
+        plt.savefig('%s/stress_profile.png'%(save_dir))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Define general setups and often used values
-Last modification: 2023.05.01.
+Last modification: 2023.05.22.
 by Jeena Yun
 """
 
@@ -99,6 +99,9 @@ class setups:
             Vinit = 1.0e-9
             f0 = 0.6
             V0 = 1.0e-6
+            Dc = 0.008
+            Vp = 1e-9
+            others = [Vp,rho0,V0,f0]
 
             sigma0 = sigma01*np.ones(z.shape)
             mu = mu0*np.ones(z.shape)
@@ -107,6 +110,7 @@ class setups:
             
             e = np.exp((f0 + b * np.log(V0 / Vi)) / amax)
             tau0 = -(sigma0 * amax * np.arcsinh((Vi / (2.0 * V0)) * e) + eta * Vi)
+            L = Dc*np.ones(z.shape)
             
         elif prefix == 'test01':
             Wf = 40
@@ -176,6 +180,20 @@ class setups:
             b = 0.015
             b = b*np.ones(a_b.shape)
             a = a_b + b
+
+        elif prefix == 'lithostatic_sn':
+            y,Hs,a,b,a_b,_tau0,_sigma0,L,others = self.base_val()
+            
+            f0 = others[-1]
+            surf = 10
+            sigma_grad = 15
+
+            sigma0 = sigma_grad*abs(y)
+            tau0 = -sigma0*f0
+
+            sigma0 += surf
+            tau0 -= surf
+
         else:
             y,Hs,a,b,a_b,tau0,sigma0,L,others = self.base_val()
 

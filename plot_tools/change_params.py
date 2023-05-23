@@ -30,7 +30,9 @@ class variate:
         return output_var
 
     def get_model_n(self,prefix,indicator):
-        if len(prefix.split('/')[-1].split(indicator)) > 1:
+        if 'BP1' in prefix:
+            model_n = None
+        elif len(prefix.split('/')[-1].split(indicator)) > 1:
             if len(prefix.split('/')[-1].split(indicator)[-1].split('_')) > 1:
                 model_n = int(prefix.split('/')[-1].split(indicator)[-1].split('_')[0])
             else:
@@ -117,6 +119,8 @@ class variate:
         if fsigma is not None:
             if fsigma == 0:
                 fname = '%s/Thakur20_hetero_stress/fractal_snpre'%(self.setup_dir)
+            elif 'litho' in prefix:
+                fname = '%s/lithostatic_sn/fractal_litho_snpre_%02d'%(self.setup_dir,fsigma)
             else:
                 fname = '%s/Thakur20_hetero_stress/fractal_snpre_%02d'%(self.setup_dir,fsigma)
             sigma0 = self.read_fractal_file(fname)
