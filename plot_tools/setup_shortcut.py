@@ -194,6 +194,50 @@ class setups:
             sigma0 += surf
             tau0 -= surf
 
+        elif prefix == 'small_domain':
+            Wf = 14
+            y = np.linspace(0,-Wf*2,1000)
+            z = -y
+
+            H = 12.0
+            H2 = 2.0
+            Hs = [Wf,H,H2]
+
+            Vp = 1e-9
+            rho0 = 2.670
+            V0 = 1.0e-6
+            f0 = 0.6
+            others = [Vp,rho0,V0,f0]
+
+            Dc = 0.004
+
+            b = 0.019
+            a_b1 = 0.015
+            a_b2 = -0.004
+
+            tau01 = -10
+            tau02 = -30
+
+            sigma01 = 10
+            sigma02 = 50
+            
+            a_b = a_b1*np.ones(z.shape)
+            a_b[z < Wf] = a_b2 + (a_b1-a_b2)*(z[z < Wf]-H)/(Wf-H)
+            a_b[z < H] =a_b2*np.ones(z[z < H].shape)
+            a_b[z < H2] = a_b2 + (a_b2 - a_b1)*(z[z < H2]-H2)/H2
+
+            b = b*np.ones(a_b.shape)
+            a = a_b + b
+
+            tau0 = tau02*np.ones(z.shape)
+            tau0[z < H2] = tau02 + (tau02 - tau01)*(z[z < H2]-H2)/H2
+
+            sigma0 = sigma02*np.ones(z.shape)
+            sigma0[z < H2] = sigma02 + (sigma02 - sigma01)*(z[z < H2]-H2)/H2
+
+            L = Dc*np.ones(z.shape)
+            return y,Hs,a,b,a_b,tau0,sigma0,L,others
+
         else:
             y,Hs,a,b,a_b,tau0,sigma0,L,others = self.base_val()
 
