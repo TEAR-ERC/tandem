@@ -314,15 +314,21 @@ def compute_spinup(outputs,dep,cuttime,cumslip_outputs,spin_up,print_on=True):
         return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spin_up_idx]
     
 def analyze_events(cumslip_outputs,rths):
+    from scipy import integrate
     rupture_length = []
+    av_slip = []
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
-    for ti in range(np.array(cumslip_outputs[1][2]).shape[1]):
-        fault_slip = np.array(cumslip_outputs[1][2]).T[ti]
-        Sths = max(fault_slip)*0.01
-        rupture_length.append(max(fault_z[fault_slip>Sths])-min(fault_z[fault_slip>Sths]))
-    rupture_length = np.array(rupture_length)
-    av_slip = np.mean(cumslip_outputs[1][2],axis=0)
+    fault_slip = np.array(cumslip_outputs[1][2]).T
 
+    for ti in range(fault_slip.shape[0]):
+        fs = fault_slip[ti]
+        Sths = max(fs)*0.01
+        rl = max(fault_z[fs>Sths])-min(fault_z[fs>Sths])        
+        Dbar = integrate.simpson(fs[fs>Sths],fault_z[fs>Sths])/rl
+        rupture_length.append(rl)
+        av_slip.append(Dbar)
+
+    rupture_length = np.array(rupture_length)
     partial_rupture = np.where(rupture_length<rths)[0]
     system_wide = np.where(rupture_length>=rths)[0]
     return rupture_length,av_slip,system_wide,partial_rupture
