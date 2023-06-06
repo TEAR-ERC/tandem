@@ -87,6 +87,7 @@ if args.cumslip:        # When args.cumslip are true
 
 save_dir = args.save_dir
 prefix = save_dir.split('models/')[-1]
+# prefix = save_dir.split('di75weg/')[-1]
 # prefix = save_dir.split('jyun/')[-1]
 cuttime = args.cuttime*yr2sec
 
