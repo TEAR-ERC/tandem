@@ -53,9 +53,9 @@ function read_fractal(fname)
 end
 
 -------------------- Define your input data
-y_sn,fractal_sn = read_fractal('/home/jyun/Tandem/Thakur20_hetero_stress/fractal_snpre_06')
-y_ab,fractal_ab = read_fractal('/home/jyun/Tandem/Thakur20_various_fractal_profiles/fractal_ab_02')
-y_dc,fractal_dc = read_fractal('/home/jyun/Tandem/Thakur20_various_fractal_profiles/fractal_Dc_01')
+y_sn,fractal_sn = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_hetero_stress/fractal_snpre_06')
+y_ab,fractal_ab = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_ab_02')
+y_dc,fractal_dc = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_Dc_01')
 
 -------------------- Define linear interpolation function
 function linear_interpolation(x, y, x0)
@@ -102,7 +102,7 @@ function BP1:L(x, y)
     if y > 0 then
         het_L = self.Dc
     end
-    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/dc_profile_v6_ab2_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_ab2_Dc1','a')
     io.output(file)
     io.write(y,'\t',het_L,'\n')
     io.close(file)
@@ -133,7 +133,7 @@ function BP1:a(x, y)
     local z = -y
     local _ab = self:ab(x,y)
     local _a = _ab + self.b
-    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/ab_profile_v6_ab2_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/ab_profile_v6_ab2_Dc1','a')
     io.output(file)
     io.write(y,'\t',_a,'\t',self.b,'\n')
     io.close(file)
@@ -155,7 +155,7 @@ function BP1:tau_pre(x, y)
         _tau = _tau2
     end
 
-    file = io.open ('/home/jyun/Tandem/Thakur20_various_fractal_profiles/stress_profile_v6_ab2_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/stress_profile_v6_ab2_Dc1','a')
     io.output(file)
     io.write(y,'\t',_sn,'\t',_tau,'\n')
     io.close(file)
