@@ -12,3 +12,7 @@ docs/_build/
 
 # Mesh files
 examples/**/*.msh
+
+# log files
+*.log
+*.err

@@ -14,7 +14,7 @@ BP1.sigma1 = 10
 BP1.sigma2 = 50
 
 -- Depths where parameters vary [km]
-BP1.Wf = 24
+BP1.Wf = 14
 BP1.H = 12.0
 BP1.H2 = 2.0
 
@@ -77,17 +77,20 @@ function BP1:ab(x, y)
         return _ab1
     elseif z < self.H then
         return self.a_b2
-    elseif z < self.Wf then
-        return _ab3
     else
-        return self.a_b1
+        return _ab3
     end
 end
 
 function BP1:a(x, y)
     local z = -y
     local _ab = self:ab(x,y)
-    return _ab + self.b
+    local _a = _ab + self.b
+    file = io.open ('/home/jyun/Tandem/small_domain/ab_profile_standard','a')
+    io.output(file)
+    io.write(y,'\t',_a,'\t',self.b,'\n')
+    io.close(file)
+    return _a
 end
 
 function BP1:tau_pre(x, y)
