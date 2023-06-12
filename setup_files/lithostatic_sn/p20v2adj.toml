@@ -1,4 +1,4 @@
-final_time = 22075200000
+final_time = 35000000000
 mesh_file = "ridgecrest_hf20.msh"
 mode = "QDGreen"
 type = "poisson"
