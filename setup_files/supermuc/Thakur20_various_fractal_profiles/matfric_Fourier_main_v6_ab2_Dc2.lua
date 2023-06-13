@@ -27,7 +27,7 @@ BP1.Vp = 1e-9           -- Plate rate [m/s]
 BP1.rho0 = 2.670        -- Density []
 BP1.V0 = 1.0e-6         -- Reference slip rate [m/s]
 BP1.f0 = 0.6            -- Reference friction coefficient
-BP1.Dc = 0.004
+BP1.Dc = 0.002
 
 -------------------- Define a function that reads in your input fractal profile
 function read_fractal(fname)
@@ -54,7 +54,8 @@ end
 
 -------------------- Define your input data
 y_sn,fractal_sn = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_hetero_stress/fractal_snpre_06')
-y_dc,fractal_dc = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_Dc_01')
+y_ab,fractal_ab = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_ab_02')
+y_dc,fractal_dc = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_Dc_02')
 
 -------------------- Define linear interpolation function
 function linear_interpolation(x, y, x0)
@@ -89,7 +90,7 @@ function BP1:boundary(x, y, t)
 end
 
 function BP1:mu(x, y)
-    return 10.0
+    return 20.0
 end
 
 function BP1:eta(x, y)
@@ -101,7 +102,7 @@ function BP1:L(x, y)
     if y > 0 then
         het_L = self.Dc
     end
-    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_ab2_Dc2','a')
     io.output(file)
     io.write(y,'\t',het_L,'\n')
     io.close(file)
@@ -121,28 +122,22 @@ function BP1:Vinit(x, y)
 end
 
 function BP1:ab(x, y)
-    local z = -y
-    local _ab1 = self.a_b2 + (self.a_b2 - self.a_b1) * (z - self.H2) / self.H2
-    local _ab2 = self.a_b2 + (self.a_b3 - self.a_b2) * (z - self.H) / self.h
-    local _ab3 = self.a_b3 + (self.a_b4 - self.a_b3) * (z - self.h - self.H) / (self.Wf - self.h - self.H)
-
-    if z < self.H2 then
-        return _ab1
-    elseif z < self.H then
-        return self.a_b2
-    elseif z < self.H + self.h then
-        return _ab2
-    elseif z < self.Wf then
-        return _ab3
-    else
-        return self.a_b4
+    local het_ab = linear_interpolation(y_ab, fractal_ab, y)
+    if y > 0 then
+        het_ab = self.a_b1
     end
+    return het_ab
 end
 
 function BP1:a(x, y)
     local z = -y
     local _ab = self:ab(x,y)
-    return _ab + self.b
+    local _a = _ab + self.b
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/ab_profile_v6_ab2_Dc2','a')
+    io.output(file)
+    io.write(y,'\t',_a,'\t',self.b,'\n')
+    io.close(file)
+    return _a
 end
 
 function BP1:tau_pre(x, y)
@@ -159,11 +154,6 @@ function BP1:tau_pre(x, y)
     elseif z < self.H + self.h then
         _tau = _tau2
     end
-
-    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/stress_profile_v6_Dc1','a')
-    io.output(file)
-    io.write(y,'\t',_sn,'\t',_tau,'\n')
-    io.close(file)
     return _tau
 end
 

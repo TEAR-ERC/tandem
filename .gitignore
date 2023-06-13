@@ -11,7 +11,8 @@ docs/_build/
 **/.ipynb_checkpoints/
 
 # Mesh files
-examples/**/*.msh
+#examples/**/*.msh
+*.msh
 
 # log files
 *.log

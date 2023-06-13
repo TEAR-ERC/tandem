@@ -22,6 +22,12 @@ BP1.H = 12.0
 BP1.h = 5.0
 BP1.H2 = 2.0
 
+-- DZ-related parameters (r = 1: DZ, 2: elsewhere)
+BP1.fzw = 0.5           -- Damage zone width [km]
+BP1.fzd = 10.5          -- Damage zone depth [km]
+BP1.mu_default = 32     -- Default shear modulus [GPa]
+BP1.mu_damage = 10      -- DZ shear modulus [GPa]
+
 -- Others
 BP1.Vp = 1e-9           -- Plate rate [m/s]
 BP1.rho0 = 2.670        -- Density []
@@ -54,7 +60,7 @@ end
 
 -------------------- Define your input data
 y_sn,fractal_sn = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_hetero_stress/fractal_snpre_06')
-y_dc,fractal_dc = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_Dc_01')
+y_dc,fractal_dc = read_fractal('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/fractal_Dc_02')
 
 -------------------- Define linear interpolation function
 function linear_interpolation(x, y, x0)
@@ -89,7 +95,22 @@ function BP1:boundary(x, y, t)
 end
 
 function BP1:mu(x, y)
-    return 10.0
+    local z = -y
+    local region = 2.    
+    if x <= self.fzw then
+        if z <= self.fzd-self.fzw then
+            region = 1.
+        elseif z <= self.fzd then
+            if x <= math.sqrt(self.fzw^2 - (z-(self.fzd-self.fzw))^2) then
+                region = 1.
+            end
+        end
+    end
+    if region == 1. then
+        return self.mu_damage
+    elseif region == 2. then
+        return self.mu_default
+    end
 end
 
 function BP1:eta(x, y)
@@ -101,7 +122,7 @@ function BP1:L(x, y)
     if y > 0 then
         het_L = self.Dc
     end
-    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_Dc2_DZ','a')
     io.output(file)
     io.write(y,'\t',het_L,'\n')
     io.close(file)
@@ -160,7 +181,7 @@ function BP1:tau_pre(x, y)
         _tau = _tau2
     end
 
-    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/stress_profile_v6_Dc1','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/stress_profile_v6_Dc2_DZ','a')
     io.output(file)
     io.write(y,'\t',_sn,'\t',_tau,'\n')
     io.close(file)
