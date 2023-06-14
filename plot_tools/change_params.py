@@ -19,7 +19,7 @@ class variate:
         # self.setup_dir = '/home/jyun/Tandem'
 
     def load_parameter(self,prefix):
-        fsigma,ff0,fab,fdc,newb,newL = self.what_is_varied(prefix)
+        fsigma,ff0,fab,fdc,newb,newL,dz = self.what_is_varied(prefix)
         y,Hs,a,b,a_b,tau0,sigma0,L,others = self.fractal_param(prefix,fsigma,fab,fdc,ff0)
         y,Hs,a,b,a_b,tau0,sigma0,L,others = self.change_uniform(y,Hs,a,b,a_b,tau0,sigma0,L,others,newb,newL)
         return y,Hs,a,b,a_b,tau0,sigma0,L,others
@@ -35,9 +35,17 @@ class variate:
             model_n = None
         elif len(prefix.split('/')[-1].split(indicator)) > 1:
             if len(prefix.split('/')[-1].split(indicator)[-1].split('_')) > 1:
-                model_n = int(prefix.split('/')[-1].split(indicator)[-1].split('_')[0])
+                try:
+                    model_n = int(prefix.split('/')[-1].split(indicator)[-1].split('_')[0])
+                except ValueError:
+                    print('might not be a fractal model - returning None')
+                    model_n = None
             else:
-                model_n = int(prefix.split('/')[-1].split(indicator)[-1])
+                try:
+                    model_n = int(prefix.split('/')[-1].split(indicator)[-1])
+                except ValueError:
+                    print('might not be a fractal model - returning None')
+                    model_n = None
         else:
             model_n = None
 
@@ -53,6 +61,7 @@ class variate:
         fdc = self.get_model_n(prefix,'Dc')
         newb = self.get_model_n(prefix,'B')
         newL = self.get_model_n(prefix,'L')
+        dz = self.get_model_n(prefix,'DZ')
 
         if fsigma is not None:
             print('Fractal normal stress model ver.%d'%(fsigma))
@@ -62,11 +71,13 @@ class variate:
             print('Fractal a-b model ver.%d'%(fab))
         if fdc is not None:
             print('Fractal Dc model ver.%d'%(fdc))
+        if dz is not None:
+            print('DZ included')
 
-        if fsigma is None and ff0 is None and fab is None and newb is None and fdc is None and newL is None:
+        if fsigma is None and ff0 is None and fab is None and newb is None and fdc is None and newL is None and dz is None:
             print('No parameters changed - returning regular output')   
 
-        return fsigma,ff0,fab,fdc,newb,newL  
+        return fsigma,ff0,fab,fdc,newb,newL,dz
 
     def change_uniform(self,y,Hs,_a,_b,a_b,tau0,sigma0,_L,others,newb=None,newL=None):
         if newb is not None:
@@ -223,3 +234,26 @@ class variate:
             mesh_y = np.linspace(start_y,-abs(end_y),npoints)
             
         return mesh_y
+    
+    def version_info(self,prefix):
+        fsigma,ff0,fab,fdc,newb,newL,dz = self.what_is_varied(prefix)
+        ver_info = ''
+        if fsigma is not None:
+            ver_info += 'Stress ver.%d '%fsigma
+        if ff0 is not None: 
+            ver_info += '+ f0 ver.%d '%fsigma
+        if fab is not None:
+            ver_info += '+ a-b ver.%d '%fab
+        if fdc is not None:
+            ver_info += '+ Dc ver.%d '%fdc
+        if newb is not None:
+            ver_info += '+ b = %2.4f '%newb
+        if newL is not None:
+            ver_info += '+ L = %2.4f'%newL/10000
+        if dz is not None:
+            ver_info += '+ DZ'
+
+        if ver_info[:2] == '+ ':
+            ver_info = ver_info[2:]
+            
+        return ver_info

@@ -2,8 +2,8 @@
 '''
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
-Update note: added image plot
-Last modification: 2023.05.18.
+Update note: added STF plot
+Last modification: 2023.06.13.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -53,7 +53,6 @@ parser.add_argument("-dtco","--dt_coseismic", type=float, help=": Contour interv
 parser.add_argument("-dtint","--dt_interm", type=float, help=": Contour interval for INTERMEDIATE section [wk]")
 parser.add_argument("-Vths","--Vths", type=float, help=": Slip-rate threshold to define coseismic section [m/s]")
 parser.add_argument("-Vlb","--Vlb", type=float, help=": When used with --Vth becomes lower bound of slip rate of intermediate section [m/s]")
-# parser.add_argument("-evan","--ev_anal", action="store_true", help=": ON/OFF event analyzation plot")
 parser.add_argument("-dd","--depth_dist", action="store_true", help=": Plot cumslip plot with hypocenter depth distribution",default=False)
 parser.add_argument("-abio","--ab_inout", action="store_true", help=": Plot cumslip plot with a-b profile",default=False)
 parser.add_argument("-stio","--stress_inout", action="store_true", help=": Plot cumslip plot with stress profile",default=False)
@@ -63,10 +62,14 @@ parser.add_argument("-rths","--rths", type=float, help=": Rupture length thresho
 parser.add_argument("-ct","--cuttime", type=float, help=": Show result up until to the given time to save computation time [yr]", default=0)
 parser.add_argument("-mg","--mingap", type=float, help=": Minimum seperation time between two different events [s]", default=60)
 
+# Miscellaneous plots
+parser.add_argument("-evan","--ev_anal", action="store_true", help=": ON/OFF event analyzation plot")
+parser.add_argument("-stf","--STF", action="store_true", help=": ON/OFF STF plot")
+
 args = parser.parse_args()
 
 # --- Check dependencies
-if args.cumslip:        # When args.cumslip are true
+if args.cumslip or args.ev_anal or args.STF:        # When args.cumslip are true
     if not args.dt_creep:
         parser.error('Required field \'dt_creep\' is not defined - check again')
     if not args.dt_coseismic:
@@ -97,7 +100,6 @@ if args.compute:
     fnames = glob.glob('%s/outputs/*dp*.csv'%(save_dir))
     if len(fnames) == 0:
         raise NameError('No such file found - check the input')
-
     outputs = ()
     dep = []
     for fn in fnames:
@@ -119,15 +121,19 @@ if args.compute:
     dep = np.array(dep)
     print('done!')
 
+    params = sc.extract_from_lua(prefix,save_on=True)
+
     print('Save data...',end=' ')
     np.save('%s/outputs'%(save_dir),outputs)
     np.save('%s/outputs_depthinfo'%(save_dir),dep)
     print('done!')
 else:
-    print('Load saved data: %s/outputs'%(save_dir))
+    print('Load saved data: %s/outputs.npy'%(save_dir))
     outputs = np.load('%s/outputs.npy'%(save_dir))
-    print('Load saved data: %s/outputs_depthinfo'%(save_dir))
+    print('Load saved data: %s/outputs_depthinfo.npy'%(save_dir))
     dep = np.load('%s/outputs_depthinfo.npy'%(save_dir))
+    print('Load saved data: %s/const_params.npy'%(save_dir))
+    params = np.load('%s/const_params.npy'%(save_dir),allow_pickle=True)
 
 # Fault output vs. time at certain depth -------------------------------------------------------------------------------------------------
 if abs(args.sliprate)>0:
@@ -180,7 +186,6 @@ if args.cumslip:
     from cumslip_compute import *
     from cumslip_plot import *
     cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
-    plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
 
     # --- Plot the result
     if args.spin_up > 0:
@@ -195,3 +200,17 @@ if args.cumslip:
         two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)
     elif sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 2:
         three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)
+
+# Miscellaneous --------------------------------------------------------------------------------------------------------------------------
+if args.ev_anal:
+    from cumslip_compute import *
+    from misc_plots import plot_event_analyze
+    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+    plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
+
+if args.STF:
+    from misc_plots import plot_STF
+    from cumslip_compute import *
+    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+    spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+    plot_STF(save_dir,outputs,dep,cumslip_outputs,args.rths)

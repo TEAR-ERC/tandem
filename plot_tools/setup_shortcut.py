@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Define general setups and often used values
-Last modification: 2023.05.22.
+Last modification: 2023.06.13.
 by Jeena Yun
 """
 
@@ -11,6 +11,7 @@ class setups:
     def __init__(self):
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
+        self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/'
 
     def sec2hms(self,sec):
         import mycustom
@@ -242,3 +243,44 @@ class setups:
             y,Hs,a,b,a_b,tau0,sigma0,L,others = self.base_val()
 
         return y,Hs,a,b,a_b,tau0,sigma0,L,others
+    
+    def extract_from_lua(self,prefix,save_on=True):
+        import change_params
+        ch = change_params.variate()
+        save_dir = 'models/' + prefix
+
+        fname = 'matfric_Fourier_main'
+        if len(prefix.split('/')) == 1:
+            fname = prefix + '/' + fname + '.lua'
+        elif 'hetero_stress' in prefix and ch.get_model_n(prefix,'v') == 0:
+            fname = prefix.split('/')[0] + '/' + fname + '.lua'
+        elif '_long' in prefix.split('/')[-1]:
+            strr = prefix.split('/')[-1].split('_long')
+            fname = prefix.split('/')[0] + '/' + fname + '_'+strr[0]+'.lua'
+        else:
+            fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
+        fname = self.setup_dir + fname
+
+        here = False
+        fid = open(fname,'r')
+        lines = fid.readlines()
+        params = {}
+        for line in lines:
+            if here:
+                var = line.split('return ')[-1]
+                params['mu'] = float(var)
+                here = False
+
+            if 'BP1.' in line:
+                var = line.split('BP1.')[-1].split(' = ')
+                if len(var[1].split('--')) > 1:
+                    params[var[0]] = float(var[1].split('--')[0])            
+                else:
+                    params[var[0]] = float(var[1])
+            elif 'BP1:mu' in line:
+                here = True            
+        fid.close()
+
+        if save_on:
+            np.save('%s/const_params'%(save_dir),params)
+        return params

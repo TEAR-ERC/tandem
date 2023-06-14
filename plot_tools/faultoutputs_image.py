@@ -92,20 +92,7 @@ def plot_image(X,Y,var,lab,save_dir,prefix,plot_in_timestep,vmin,vmax,plot_in_se
         
     plt.colorbar(cb).set_label(cb_label,fontsize=30,rotation=270,labelpad=30)
 
-    fsigma,ff0,fab,fdc,newb,newL = ch.what_is_varied(prefix)
-    ver_info = ''
-    if fsigma is not None:
-        ver_info += 'Stress ver.%d '%fsigma
-    if ff0 is not None: 
-        ver_info += '+ f0 ver.%d '%fsigma
-    if fab is not None:
-        ver_info += '+ a-b ver.%d '%fab
-    if fdc is not None:
-        ver_info += '+ Dc ver.%d '%fdc
-    if newb is not None:
-        ver_info += '+ b = %2.4f '%newb
-    if newL is not None:
-        ver_info += '+ L = %2.4f'%newL
+    ver_info = ch.version_info(prefix)
 
     xl = plt.gca().get_xlim()
     if len(ver_info) > 0:

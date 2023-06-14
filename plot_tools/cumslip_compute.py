@@ -10,7 +10,7 @@ from scipy import interpolate
 yr2sec = 365*24*60*60
 wk2sec = 7*24*60*60
 
-def event_times(dep,outputs,Vlb,Vths,cuttime,mingap,print_on=True):
+def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,mingap=60,print_on=True):
     c = 0
     for i in np.argsort(abs(dep)):
         z = abs(dep[i])

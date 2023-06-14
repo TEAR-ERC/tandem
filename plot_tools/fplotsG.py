@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.patches import Rectangle
 from cumslip_compute import *
-from fcompute import *
+from fcomputeG import *
 import myplots
 mp = myplots.Figpref()
 
@@ -54,7 +54,7 @@ def G_prof_single(ax,G,dep,iev,Hs):
     ax.grid(True,alpha=0.5)
     ax.invert_yaxis()
 
-def G_prof_all(ax,G,cumslip_outputs,av_slip,ev_idx,ev_type,Hs):
+def G_prof_all(ax,G,cumslip_outputs,avD,ev_idx,ev_type,Hs,var_mode):
     if ev_type == 'sw':
         # system-wide
         cmap = mpl.colormaps['gnuplot']
@@ -66,7 +66,7 @@ def G_prof_all(ax,G,cumslip_outputs,av_slip,ev_idx,ev_type,Hs):
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
     if len(ev_idx) > 0:
         ax.set_prop_cycle('color',[cmap(i) for i in np.linspace(0.5,0.9,len(ev_idx))]) 
-        ax.plot(G[ev_idx].T,np.array([fault_z for i in range(len(ev_idx))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i,av_slip[i]) for i in ev_idx])
+        ax.plot(G[ev_idx].T,np.array([fault_z for i in range(len(ev_idx))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i,avD[i]) for i in ev_idx])
         hyp_dep = cumslip_outputs[1][1][ev_idx]
         hyp_slip = [G[ev_idx][i][np.where(fault_z==hyp_dep[i])[0][0]] for i in range(len(ev_idx))]
         # ax.scatter(hyp_slip,hyp_dep,marker='*',s=300,facecolor=mp.mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Hypocenter')
@@ -76,20 +76,33 @@ def G_prof_all(ax,G,cumslip_outputs,av_slip,ev_idx,ev_type,Hs):
         IndexError('No event for chosen type')
     ax.set_xscale('log')
     ax.set_ylim(0,Hs[0])
-    ax.set_xlabel('G [J/m$^2$]',fontsize=17)
+    if var_mode == 'Wb':
+        ax.set_xlabel('Wb [J/m$^2$]',fontsize=17)
+    elif var_mode == 'Wr':
+        ax.set_xlabel('Wr [J/m$^2$]',fontsize=17)
     ax.set_ylabel('Depth [km]',fontsize=17)
     ax.grid(True,alpha=0.5)
     ax.invert_yaxis()
 
-def scaling(ax,D,G,col,lab=None,s=4,marker='o',ec=None,lw=1.5,zord=1,alpha=None,xl=[1e-9,1e2],yl=[1e-6,1e9]):
+def scaling(ax,D,G,col,lab=None,s=4,marker='o',ec=None,lw=1.5,zord=1,alpha=None,xl=[1e-9,1e2],yl=[1e-6,1e9],av=True):
+    if len(col) == len(D):
+        cmap = mpl.colormaps['magma_r']
+        col = cmap(col.flatten())
+    if len(ec) == len(D):
+        cmap = mpl.colormaps['magma_r']
+        ec = cmap(ec.flatten())
     if ec is not None:
         psc = ax.scatter(D,G,s=s,marker=marker,fc=col,label=lab,zorder=zord,ec=ec,lw=lw,alpha=alpha)
     else:
         psc = ax.scatter(D,G,s=s,marker=marker,fc=col,label=lab,zorder=zord,alpha=alpha)
     if lab is not None:
         ax.legend(fontsize=13,loc='lower right')
-    ax.set_xlabel('Average Slip [m]',fontsize=17)
-    ax.set_ylabel('Fracture Energy Density [J/m$^2$]',fontsize=17)
+    if av:
+        ax.set_xlabel('Average Slip [m]',fontsize=17)
+        ax.set_ylabel('Average Fracture Energy Density [J/m$^2$]',fontsize=17)
+    else:
+        ax.set_xlabel('Slip [m]',fontsize=17)
+        ax.set_ylabel('Fracture Energy Density [J/m$^2$]',fontsize=17)
     if xl != 'auto':
         ax.set_xlim(xl)
     if yl != 'auto':
@@ -152,3 +165,16 @@ def avG_event(ax,var,tstart,system_wide,partial_rupture,type,spin_up_idx,c1=mp.m
     ax.set_xticks(np.arange(0,len(tstart),1))
     ax.set_xlim(-len(tstart)*0.05,(len(tstart)-1)*1.05)
     ax.set_ylim(yl)
+
+def scatter_xy(ax,x,y,col,lab=None,s=4,marker='o',ec=None,lw=1.5,zord=1,alpha=None,xl='auto',yl='auto',labx='Wr [J/m$^2$]',laby='Wb [J/m$^2$]'):
+    psc = ax.scatter(x,y,s=s,marker=marker,fc=col,label=lab,zorder=zord,ec=ec,lw=lw,alpha=alpha)
+    ax.set_xlabel(labx,fontsize=17)
+    ax.set_ylabel(laby,fontsize=17)
+    if xl != 'auto':
+        ax.set_xlim(xl)
+    if yl != 'auto':
+        ax.set_ylim(yl)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.grid(True,alpha=0.5)
+    return psc

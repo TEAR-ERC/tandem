@@ -6,13 +6,13 @@ from cumslip_compute import *
 import pandas as pd
 
 def compute_G(dep,time,tstart,tend,cumslip,shearT,quiet=True):
-    G,D,sd = [],[],[]
+    G,Wr,D,ssd,dsd,Dtot = [],[],[],[],[],[]
     for iev in range(len(tstart)):
         if not quiet:
             print('Event',iev+1)
-        Gev,Dev,sdev = [],[],[]
+        Gev,Wev,Dev,ssdev,dsdev,dtotev = [],[],[],[],[],[]
         for idep in np.argsort(abs(dep)):
-            its,ite = np.argmin(abs(time[idep]-tstart[iev])), np.argmin(abs(time[idep]-tend[iev]))
+            its,ite = np.argmin(abs(time[idep]-tstart[iev]))-20, np.argmin(abs(time[idep]-tend[iev]))+20
             x=cumslip[idep][its:ite] - cumslip[idep][its]
             y=shearT[idep][its:ite]
             xb,yb,xr,yr,err_note = get_xy(x,y)
@@ -21,26 +21,45 @@ def compute_G(dep,time,tstart,tend,cumslip,shearT,quiet=True):
 
             if len(xb) == 0:
                 Gev.append(np.nan)
+                Wev.append(np.nan)
                 Dev.append(np.nan)
-                sdev.append(np.nan)
+                dsdev.append(np.nan)
+                ssdev.append(np.nan)
+                dtotev.append(np.nan)
             else:
-                area = integrate.simpson(yb-np.min(yb),xb)
-                Gev.append(area*1e6)
+                area_b = integrate.simpson(yb-np.min(yb),xb)
+                area_r = integrate.simpson(yr-np.min(yr),xr)
+                Gev.append(area_b*1e6)
+                Wev.append(area_r*1e6)
                 Dev.append(xb[-1]-xb[0])
-                sdev.append((yb[0]-np.min(yb))*1e6)
+                dsdev.append((yb[0]-np.min(yb))*1e6)
+                dtotev.append(np.max(x))
+                if len(yr)>0:
+                    ssdev.append((yb[0]-yr[-1])*1e6)
+                else:
+                    ssdev.append((yb[0]-yb[-1])*1e6)
         Gev = np.array(Gev)
+        Wev = np.array(Wev)
         Dev = np.array(Dev)
-        sdev = np.array(sdev)
+        dsdev = np.array(dsdev)
+        ssdev = np.array(ssdev)
+        dtotev = np.array(dtotev)
 
         if len(G) == 0:
             G = Gev.copy()
+            Wr = Wev.copy()
             D = Dev.copy()
-            sd = sdev.copy()
+            dsd = dsdev.copy()
+            ssd = ssdev.copy()
+            Dtot = dtotev.copy()
         else:
             G = np.vstack((G,Gev))
+            Wr = np.vstack((Wr,Wev))
             D = np.vstack((D,Dev))
-            sd = np.vstack((sd,sdev))
-    return G,D,sd
+            dsd = np.vstack((dsd,dsdev))
+            ssd = np.vstack((ssd,ssdev))
+            Dtot = np.vstack((Dtot,dtotev))
+    return G,D,dsd,Wr,ssd,Dtot
 
 def load_csv(fnames):
     G,D,L = [],[],[]
@@ -108,3 +127,14 @@ def get_xy(x,y):
 def logxy(xr,b1,b0):
     y = np.power(10,b0 + b1*np.log10(xr))
     return y
+
+def minmax(rmin,rmax,var,zero_out=False):
+    if zero_out:
+        varmin = np.nanmin(var[abs(var)>0])
+    else:
+        varmin = np.nanmin(var)
+    if varmin < rmin:
+        rmin = varmin
+    if np.nanmax(var) > rmax:
+        rmax = np.nanmax(var)
+    return rmin,rmax
