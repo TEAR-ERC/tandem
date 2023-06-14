@@ -14,7 +14,7 @@ class setups:
 
     def setup_dir(self,save_dir):
         if 'models' in save_dir: # local
-            setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/'
+            setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
         if 'di75weg' in save_dir: # supermuc
             setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
         else: # LMU server

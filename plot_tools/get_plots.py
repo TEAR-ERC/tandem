@@ -124,7 +124,7 @@ if args.compute:
     dep = np.array(dep)
     print('done!')
 
-    params = sc.extract_from_lua(prefix,save_on=True)
+    params = sc.extract_from_lua(save_dir,prefix,save_on=True)
 
     print('Save data...',end=' ')
     np.save('%s/outputs'%(save_dir),outputs)
