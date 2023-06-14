@@ -91,7 +91,7 @@ if args.cumslip or args.ev_anal or args.STF:        # When args.cumslip are true
 save_dir = args.save_dir
 if 'models' in save_dir: # local
     prefix = save_dir.split('models/')[-1]
-if 'di75weg' in save_dir: # supermuc
+elif 'di75weg' in save_dir: # supermuc
     prefix = save_dir.split('di75weg/')[-1]
 else: # LMU server
     prefix = save_dir.split('jyun/')[-1]

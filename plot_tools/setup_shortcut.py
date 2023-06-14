@@ -15,7 +15,7 @@ class setups:
     def setup_dir(self,save_dir):
         if 'models' in save_dir: # local
             setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
-        if 'di75weg' in save_dir: # supermuc
+        elif 'di75weg' in save_dir: # supermuc
             setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
         else: # LMU server
             setup_dir = '/home/jyun/Tandem'
@@ -267,6 +267,7 @@ class setups:
         else:
             fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
         fname = self.setup_dir(save_dir) + '/' + fname
+        print(fname)
 
         here = False
         fid = open(fname,'r')
