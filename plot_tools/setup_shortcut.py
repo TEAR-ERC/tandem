@@ -252,10 +252,9 @@ class setups:
 
         return y,Hs,a,b,a_b,tau0,sigma0,L,others
     
-    def extract_from_lua(self,prefix,save_on=True):
+    def extract_from_lua(self,save_dir,prefix,save_on=True):
         import change_params
         ch = change_params.variate()
-        save_dir = 'models/' + prefix
 
         fname = 'matfric_Fourier_main'
         if len(prefix.split('/')) == 1:
@@ -267,7 +266,7 @@ class setups:
             fname = prefix.split('/')[0] + '/' + fname + '_'+strr[0]+'.lua'
         else:
             fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
-        fname = self.setup_dir + fname
+        fname = self.setup_dir(save_dir) + fname
 
         here = False
         fid = open(fname,'r')
