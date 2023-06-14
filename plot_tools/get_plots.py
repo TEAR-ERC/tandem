@@ -2,8 +2,8 @@
 '''
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
-Update note: added STF plot
-Last modification: 2023.06.13.
+Update note: adjust directory header
+Last modification: 2023.06.14.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -89,9 +89,12 @@ if args.cumslip or args.ev_anal or args.STF:        # When args.cumslip are true
         args.Vlb = 0
 
 save_dir = args.save_dir
-prefix = save_dir.split('models/')[-1]
-# prefix = save_dir.split('di75weg/')[-1]
-# prefix = save_dir.split('jyun/')[-1]
+if 'models' in save_dir: # local
+    prefix = save_dir.split('models/')[-1]
+if 'di75weg' in save_dir: # supermuc
+    prefix = save_dir.split('di75weg/')[-1]
+else: # LMU server
+    prefix = save_dir.split('jyun/')[-1]
 cuttime = args.cuttime*yr2sec
 
 # Extract data ---------------------------------------------------------------------------------------------------------------------------

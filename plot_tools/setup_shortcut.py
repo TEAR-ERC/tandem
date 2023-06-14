@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Define general setups and often used values
-Last modification: 2023.06.13.
+Last modification: 2023.06.14.
 by Jeena Yun
 """
 
@@ -11,8 +11,16 @@ class setups:
     def __init__(self):
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
-        self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/'
 
+    def setup_dir(self,save_dir):
+        if 'models' in save_dir: # local
+            setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/'
+        if 'di75weg' in save_dir: # supermuc
+            setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
+        else: # LMU server
+            setup_dir = '/home/jyun/Tandem'
+        return setup_dir
+    
     def sec2hms(self,sec):
         import mycustom
         mf = mycustom.Customs()

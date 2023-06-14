@@ -14,9 +14,7 @@ class variate:
     def __init__(self):
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
-        self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
-        # self.setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
-        # self.setup_dir = '/home/jyun/Tandem'
+        self.setup_dir = sc.setup_dir
 
     def load_parameter(self,prefix):
         fsigma,ff0,fab,fdc,newb,newL,dz = self.what_is_varied(prefix)
