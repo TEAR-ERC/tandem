@@ -266,7 +266,7 @@ class setups:
             fname = prefix.split('/')[0] + '/' + fname + '_'+strr[0]+'.lua'
         else:
             fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
-        fname = self.setup_dir(save_dir) + fname
+        fname = self.setup_dir(save_dir) + '/' + fname
 
         here = False
         fid = open(fname,'r')
