@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: adjust directory header
-Last modification: 2023.06.14.
+Last modification: 2023.06.15.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -91,10 +91,14 @@ if args.cumslip or args.ev_anal or args.STF:        # When args.cumslip are true
 save_dir = args.save_dir
 if 'models' in save_dir: # local
     prefix = save_dir.split('models/')[-1]
+    # setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
 elif 'di75weg' in save_dir: # supermuc
     prefix = save_dir.split('di75weg/')[-1]
-else: # LMU server
+    # setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
+elif 'jyun' in save_dir: # LMU server
     prefix = save_dir.split('jyun/')[-1]
+    # setup_dir = '/home/jyun/Tandem'
+
 cuttime = args.cuttime*yr2sec
 
 # Extract data ---------------------------------------------------------------------------------------------------------------------------
