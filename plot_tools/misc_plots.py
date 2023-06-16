@@ -1,7 +1,7 @@
 '''
 Miscellaneous plotting scripts
 By Jeena Yun
-Last modification: 2023.06.13.
+Last modification: 2023.06.16.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -51,8 +51,8 @@ def plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,rths=10,save_on=Tr
     ax[1].set_prop_cycle('color',[cmap1(i) for i in np.linspace(0.5,0.9,len(partial_rupture[partial_rupture>=spin_up_idx]))]) 
     ax[1].plot(t[partial_rupture[partial_rupture>=spin_up_idx]].T,Fdot[partial_rupture[partial_rupture>=spin_up_idx]].T/1e12,lw=2,
             label=[r'Event %d'%(i) for i in partial_rupture[partial_rupture>=spin_up_idx]])
-    if len(partial_rupture) > 0:
-        ax[1].legend(fontsize=11,loc='upper right',framealpha=0)
+    # if len(partial_rupture) > 0:
+    #     ax[1].legend(fontsize=11,loc='upper right',framealpha=0)
     ax[1].set_xlabel('Time [s]',fontsize=17)
     ax[1].set_ylabel('Force rate [$10^{12}$ N/s]',fontsize=17)
     ax[1].grid(True,alpha=0.4)
