@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: adjust directory header
-Last modification: 2023.06.15.
+Last modification: 2023.06.16.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -210,14 +210,16 @@ if args.cumslip:
 
 # Miscellaneous --------------------------------------------------------------------------------------------------------------------------
 if args.ev_anal:
-    from cumslip_compute import *
     from misc_plots import plot_event_analyze
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+    if not args.cumslip:
+        from cumslip_compute import *
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
     plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
 
 if args.STF:
     from misc_plots import plot_STF
-    from cumslip_compute import *
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
-    spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
-    plot_STF(save_dir,outputs,dep,cumslip_outputs,args.rths)
+    if not args.cumslip:
+        from cumslip_compute import *
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+        spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+    plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,args.rths)
