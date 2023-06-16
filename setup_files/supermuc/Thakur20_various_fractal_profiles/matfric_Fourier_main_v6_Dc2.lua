@@ -22,12 +22,6 @@ BP1.H = 12.0
 BP1.h = 5.0
 BP1.H2 = 2.0
 
--- DZ-related parameters (r = 1: DZ, 2: elsewhere)
-BP1.fzw = 0.5           -- Damage zone width [km]
-BP1.fzd = 10.5          -- Damage zone depth [km]
-BP1.mu_default = 32     -- Default shear modulus [GPa]
-BP1.mu_damage = 20      -- DZ shear modulus [GPa]
-
 -- Others
 BP1.Vp = 1e-9           -- Plate rate [m/s]
 BP1.rho0 = 2.670        -- Density []
@@ -95,22 +89,7 @@ function BP1:boundary(x, y, t)
 end
 
 function BP1:mu(x, y)
-    local z = -y
-    local region = 2.    
-    if x <= self.fzw then
-        if z <= self.fzd-self.fzw then
-            region = 1.
-        elseif z <= self.fzd then
-            if x <= math.sqrt(self.fzw^2 - (z-(self.fzd-self.fzw))^2) then
-                region = 1.
-            end
-        end
-    end
-    if region == 1. then
-        return self.mu_damage
-    elseif region == 2. then
-        return self.mu_default
-    end
+    return 20.0
 end
 
 function BP1:eta(x, y)
@@ -122,7 +101,7 @@ function BP1:L(x, y)
     if y > 0 then
         het_L = self.Dc
     end
-    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_Dc2_DZ','a')
+    file = io.open ('/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/dc_profile_v6_Dc2','a')
     io.output(file)
     io.write(y,'\t',het_L,'\n')
     io.close(file)
@@ -132,9 +111,6 @@ end
 function BP1:sn_pre(x, y)
     local het_sigma = linear_interpolation(y_sn, fractal_sn, y)
     if het_sigma == nil then
-        het_sigma = self.sigma1
-    end
-    if y > 0 then
         het_sigma = self.sigma1
     end
     return het_sigma

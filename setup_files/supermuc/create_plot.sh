@@ -38,6 +38,7 @@ ulimit -Ss 2097152
 
 model_n=Thakur20_various_fractal_profiles
 branch_n=v6_ab2_Dc2
+output_dir=$SCRATCH/$model_n/$branch_n/outputs_$branch_n
 plottool_dir=$WORK/jeena-tandem/plot_tools
 save_dir=$SCRATCH/$model_n/$branch_n
 mv $output_dir $save_dir/outputs
