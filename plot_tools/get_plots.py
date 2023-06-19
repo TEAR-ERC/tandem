@@ -221,5 +221,10 @@ if args.STF:
     if not args.cumslip:
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
-        spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+
+    if args.spin_up > 0:
+        if not args.cumslip:
+            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+    else:
+        spin_up_idx = 0
     plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,args.rths)
