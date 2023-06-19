@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Define general setups and often used values
-Last modification: 2023.06.15.
+Last modification: 2023.06.19.
 by Jeena Yun
 """
 
@@ -21,9 +21,21 @@ class setups:
             self.setup_dir = '/home/jyun/Tandem'
     
     def sec2hms(self,sec):
-        import mycustom
-        mf = mycustom.Customs()
-        mf.sec2hms(sec)
+        """
+        Convert seconds into hour-minute-second format
+        """
+        m, s = divmod(sec, 60)
+        h, m = divmod(m, 60)
+
+        print('Input time: %2.2f s'%sec)
+        print('=',end=' ')
+
+        if h != 0:
+            print('%d h'%h,end=' ')            
+        if m != 0:
+            print('%d m'%m,end=' ')
+        if s != 0:
+            print('%d s'%s)
 
     def base_val(self):
         # Base value used most commonly used
@@ -284,10 +296,11 @@ class setups:
                     params[var[0]] = float(var[1].split('--')[0])            
                 else:
                     params[var[0]] = float(var[1])
-            elif 'BP1:mu' in line:
-                here = True            
+            elif 'BP1:mu' in line and 'DZ' not in prefix:
+                here = True
         fid.close()
 
         if save_on:
             np.save('%s/const_params'%(save_dir),params)
         return params
+    
