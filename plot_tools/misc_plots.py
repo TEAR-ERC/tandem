@@ -1,7 +1,7 @@
 '''
 Miscellaneous plotting scripts
 By Jeena Yun
-Last modification: 2023.06.16.
+Last modification: 2023.06.19.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -24,7 +24,10 @@ def compute_STF(save_dir,outputs,dep):
     time = np.array([outputs[i][:,0] for i in np.argsort(abs(dep))])
     sr = abs(np.array([outputs[i][:,4] for i in np.argsort(abs(dep))]))
     z = np.sort(abs(dep))*1e3
-    mu = params.item().get('mu')*1e9
+    if 'DZ' in save_dir:
+        mu = params.item().get('mu_damage')*1e9
+    else:
+        mu = params.item().get('mu')*1e9
 
     npoints = 500
     f = np.array([mu * integrate.simpson(sr[:,t],z) for t in range(sr.shape[1])])
