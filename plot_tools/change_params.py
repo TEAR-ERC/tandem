@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Tools for making varitions from the base model
-Last modification: 2023.06.15.
+Last modification: 2023.06.19.
 by Jeena Yun
 """
 
@@ -28,31 +28,33 @@ class variate:
         output_var = f_var(target_y)
         return output_var
 
-    def get_model_n(self,prefix,indicator):
+    def get_model_n(self,prefix,indicator,print_on=True):
         if 'BP1' in prefix:
             model_n = None
+        elif indicator == 'DZ' and indicator in prefix:
+            model_n = 0
         elif len(prefix.split('/')[-1].split(indicator)) > 1:
             if len(prefix.split('/')[-1].split(indicator)[-1].split('_')) > 1:
                 try:
                     model_n = int(prefix.split('/')[-1].split(indicator)[-1].split('_')[0])
                 except ValueError:
-                    print('might not be a fractal model - returning None')
+                    if print_on: print('might not be a fractal model - returning None')
                     model_n = None
             else:
                 try:
                     model_n = int(prefix.split('/')[-1].split(indicator)[-1])
                 except ValueError:
-                    print('might not be a fractal model - returning None')
+                    if print_on: print('might not be a fractal model - returning None')
                     model_n = None
         else:
             model_n = None
 
         if 'hetero_stress' in prefix and indicator == 'v' and model_n is None:
             model_n = 0
-            
+
         return model_n
 
-    def what_is_varied(self,prefix):
+    def what_is_varied(self,prefix,print_on=True):
         fsigma = self.get_model_n(prefix,'v')
         ff0 = self.get_model_n(prefix,'f0')
         fab = self.get_model_n(prefix,'ab')
@@ -61,25 +63,25 @@ class variate:
         newL = self.get_model_n(prefix,'L')
         dz = self.get_model_n(prefix,'DZ')
 
-        if fsigma is not None:
-            print('Fractal normal stress model ver.%d'%(fsigma))
-        if ff0 is not None:
-            print('Fractal f0 model ver.%d'%(ff0))
-        if fab is not None:
-            print('Fractal a-b model ver.%d'%(fab))
-        if fdc is not None:
-            print('Fractal Dc model ver.%d'%(fdc))
-        if dz is not None:
-            print('DZ included')
-
-        if fsigma is None and ff0 is None and fab is None and newb is None and fdc is None and newL is None and dz is None:
-            print('No parameters changed - returning regular output')   
+        if print_on:
+            if fsigma is not None:
+                print('Fractal normal stress model ver.%d'%(fsigma))
+            if ff0 is not None:
+                print('Fractal f0 model ver.%d'%(ff0))
+            if fab is not None:
+                print('Fractal a-b model ver.%d'%(fab))
+            if fdc is not None:
+                print('Fractal Dc model ver.%d'%(fdc))
+            if dz is not None:
+                print('DZ included')
+            if fsigma is None and ff0 is None and fab is None and newb is None and fdc is None and newL is None and dz is None:
+                print('No parameters changed - returning regular output')   
 
         return fsigma,ff0,fab,fdc,newb,newL,dz
 
-    def change_uniform(self,y,Hs,_a,_b,a_b,tau0,sigma0,_L,others,newb=None,newL=None):
+    def change_uniform(self,y,Hs,_a,_b,a_b,tau0,sigma0,_L,others,newb=None,newL=None,print_on=True):
         if newb is not None:
-            print('Value for b changed:',_b[0],'->',newb/1000)
+            if print_on: print('Value for b changed:',_b[0],'->',newb/1000)
             b = newb / 1000 * np.ones(len(_b))
             a = a_b + b
         else:
@@ -87,7 +89,7 @@ class variate:
             a = _a
 
         if newL is not None:
-            print('Value for Dc homogeneously changed:',_L[0],'->',newL/10000)
+            if print_on: print('Value for Dc homogeneously changed:',_L[0],'->',newL/10000)
             L = newL / 10000 * np.ones(len(_L))
         else:
             L = _L
@@ -100,8 +102,8 @@ class variate:
         
         return y,Hs,a,b,a_b,tau0,sigma0,L,others
 
-    def read_fractal_file(self,fname):
-        print('Using file %s'%(fname.split('/')[-1]))
+    def read_fractal_file(self,fname,print_on=True):
+        if print_on: print('Using file %s'%(fname.split('/')[-1]))
         fid = open(fname,'r')
         lines = fid.readlines()
         mesh_y = []
