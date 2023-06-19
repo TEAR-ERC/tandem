@@ -1,0 +1,5 @@
+num_nodes: 1 ntasks: 1 cpus_per_task:
+Thakur20_various_fractal_profiles / v6_Dc2_DZ
+Required field 'Vths' not defined - using default value 1e-2 m/s
+Compute on - extract outputs... done!
+/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc/Thakur20_various_fractal_profiles/matfric_Fourier_main_v6_Dc2_DZ.lua

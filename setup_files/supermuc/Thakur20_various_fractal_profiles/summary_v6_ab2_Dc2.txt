@@ -1,12 +1,12 @@
-========= Summary =========
-date_time=Wed Jun  7 05:11:46 2023
-code_version=507729a
-solve_time=11182.6
-time_steps=1362510
-step_rejections=92392
-min_time_step=0.000121593
-max_time_step=578091
-dofs_domain=336112
-dofs_fault=8400
-mesh_size=56.5165
-===========================
+2520119 TS dt 3522.34 time 3.80103e+10
+2520120 TS dt 3437.83 time 3.80103e+10
+2520121 TS dt 3453.68 time 3.80103e+10
+2520122 TS dt 3572.45 time 3.80103e+10
+2520123 TS dt 3676.09 time 3.80103e+10
+2520124 TS dt 3655.23 time 3.80103e+10
+2520125 TS dt 3551.62 time 3.80103e+10
+2520126 TS dt 3510.06 time 3.80103e+10
+2520127 TS dt 3604.05 time 3.80103e+10
+2520128 TS dt 3753.74 time 3.80103e+10
+2520129 TS dt 3805.31 time 3.80103e+10
+2520130 TS dt 3716.27 time 3.80103e+10
