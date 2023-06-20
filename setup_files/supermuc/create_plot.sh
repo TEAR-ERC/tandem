@@ -38,7 +38,7 @@ echo 'num_nodes:' $SLURM_JOB_NUM_NODES 'ntasks:' $SLURM_NTASKS 'cpus_per_task:' 
 ulimit -Ss 2097152
 
 model_n=Thakur20_various_fractal_profiles
-branch_n=v6_Dc2
+branch_n=v4_ab2
 output_dir=$SCRATCH/$model_n/$branch_n/outputs_$branch_n
 plottool_dir=$WORK/jeena-tandem/plot_tools
 save_dir=$SCRATCH/$model_n/$branch_n
@@ -47,4 +47,4 @@ mv $output_dir $save_dir/outputs
 echo $model_n'/'$branch_n
 
 source $SCRATCH/$envn/bin/activate
-mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -c -csl -dtcr 2 -dtco 0.5 -stio -dcio -imsr -ts -stf -evan
+mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -c -csl -dtcr 2 -dtco 0.5 -stio -abio -imsr -ts -stf -evan
