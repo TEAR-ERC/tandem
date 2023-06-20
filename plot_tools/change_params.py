@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Tools for making varitions from the base model
-Last modification: 2023.06.19.
+Last modification: 2023.06.20.
 by Jeena Yun
 """
 
@@ -171,7 +171,12 @@ class variate:
         if Nmax >= N / 2:
             ValueError(f"Nmax={Nmax}>=N/2({N/2}), increase N")
 
-        np.random.seed(3)
+        # np.random.seed(3) # all profiles except Dc_04,05,06 or snpre_07
+        # rs = np.random.randint(100); print(rs) # fractal_Dc_04
+        # np.random.seed(rs)
+        # np.random.seed(50) # fractal_Dc_04 / 98 for Dc_05, 30 for Dc_06
+        np.random.seed(12) # fractal_snpre_07 / 62 for snpre_08
+
         a = np.zeros(N, dtype=complex)
         beta = 2 * H + 1.0
         for i in range(0, Nmax + 1):
