@@ -1,0 +1,20 @@
+310427 TS dt 361881. time 2.20735e+10
+310428 TS dt 382908. time 2.20738e+10
+310429 TS dt 370666. time 2.20742e+10
+310430 TS dt 308107. time 2.20746e+10
+310431 TS dt 308107. time 2.20749e+10
+310432 TS dt 418600. time 2.20752e+10
+
+
+========= Summary =========
+date_time=Tue Apr 18 03:23:58 2023
+code_version=v1.0-3-gf08abeb
+solve_time=1163.71
+time_steps=310432
+step_rejections=14465
+min_time_step=0.000937462
+max_time_step=882014
+dofs_domain=167048
+dofs_fault=3878
+mesh_size=58.1913
+===========================
