@@ -1,0 +1,12 @@
+========= Summary =========
+date_time=Wed Jun 21 03:55:20 2023
+code_version=507729a
+solve_time=19679.9
+time_steps=1737417
+step_rejections=87614
+min_time_step=0.000167847
+max_time_step=292499
+dofs_domain=525700
+dofs_fault=13440
+mesh_size=57.4715
+===========================
