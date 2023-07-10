@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.06.13.
+Last modification: 2023.07.10.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -75,14 +75,16 @@ def cumslip_basic(ax,prefix,cumslip_outputs,rths):
     ax.plot(cumslip_outputs[2][0],cumslip_outputs[2][1],color='0.62',lw=1)
     ax.set_ylabel('Depth [km]',fontsize=30)
     ax.set_xlabel('Cumulative Slip [m]',fontsize=30)
-    if len(partial_rupture) > 0:
-        ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
     if len(system_wide) > 0:
         ax.scatter(cumslip_outputs[1][0][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
-    ax.legend(fontsize=25,framealpha=1,loc='lower right')
+    if len(partial_rupture) > 0:
+        # ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+        ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+    # ax.legend(fontsize=25,framealpha=1,loc='lower right')
+    ax.legend(fontsize=20,framealpha=1,loc='lower right')
     xl = ax.get_xlim()
     if len(ver_info) > 0:
-        ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=45,fontweight='bold',ha='left',va='bottom')
+        ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=35,fontweight='bold',ha='left',va='bottom')
     ax.set_xlim(0,xl[1])
     ax.set_ylim(0,Hs[0])
     ax.invert_yaxis()
@@ -98,14 +100,16 @@ def cumslip_spinup(ax,prefix,cumslip_outputs,spup_cumslip_outputs,rths):
         ax.plot(spup_cumslip_outputs[4],cumslip_outputs[4][1],color='yellowgreen',lw=1)
     ax.plot(spup_cumslip_outputs[3],cumslip_outputs[3][1],color=mydarkpink,lw=1)
     ax.plot(spup_cumslip_outputs[2],cumslip_outputs[2][1],color='0.62',lw=1)
-    if len(partial_rupture) > 0:
-        ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
     if len(system_wide) > 0:
         ax.scatter(spup_cumslip_outputs[1][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
-    ax.legend(fontsize=25,framealpha=1,loc='lower right')
+    if len(partial_rupture) > 0:
+        # ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+        ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+    # ax.legend(fontsize=25,framealpha=1,loc='lower right')
+    ax.legend(fontsize=20,framealpha=1,loc='lower right')
     xl = ax.get_xlim()
     if len(ver_info) > 0:
-        ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=45,fontweight='bold',ha='left',va='bottom')
+        ax.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color='k',fontsize=35,fontweight='bold',ha='left',va='bottom')
     ax.set_xlim(0,xl[1])
     ax.set_ylabel('Depth [km]',fontsize=30)
     ax.set_xlabel('Cumulative Slip [m]',fontsize=30)

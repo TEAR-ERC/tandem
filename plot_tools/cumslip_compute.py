@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.05.18.
+Last modification: 2023.07.05.
 '''
 import numpy as np
 from scipy import interpolate
@@ -10,7 +10,80 @@ from scipy import interpolate
 yr2sec = 365*24*60*60
 wk2sec = 7*24*60*60
 
-def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,mingap=60,print_on=True):
+def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,dt_coseismic=0.5,print_on=True):
+    time = np.array(outputs[0][:,0])
+    sliprate = abs(np.array([outputs[i][:,4] for i in np.argsort(abs(dep))]))
+    z = np.sort(abs(dep))
+
+    if abs(cuttime) >= 1e-3:
+        if cuttime > np.max(time):
+            raise ValueError('Cuttime larger than total simulation time - check again')
+        sliprate = sliprate[:,time <= cuttime]
+        time = time[time <= cuttime]
+
+    psr = np.max(sliprate,axis=0)
+    pd = np.argmax(sliprate,axis=0)
+
+    # Define events by peak sliprate
+    if Vlb > 0:
+        events = np.where(np.logical_and(psr < Vths,psr > Vlb))[0]
+    else:
+        events = np.where(psr > Vths)[0]
+
+    jumps = np.where(np.diff(events)>1)[0]+1
+
+    if False:
+        tmp_tstart = np.zeros(len(jumps)+1)
+        tmp_tend = np.zeros(len(jumps)+1)
+        tmp_evdep = np.zeros(len(jumps)+1)
+        if len(jumps) > 0:
+            for j in range(len(jumps)+1):
+                if j==0:
+                    tmp_tstart[j] = time[events][0]
+                    tmp_tend[j] = time[events][jumps[0]-1]
+                    tmp_evdep[j] = pd[events][0]
+                elif j == len(jumps):
+                    tmp_tstart[j] = time[events][jumps[j-1]]
+                    tmp_tend[j] = time[events][len(events)-1]
+                else:
+                    tmp_tstart[j] = time[events][jumps[j-1]]
+                    tmp_tend[j] = time[events][jumps[j]-1]
+    else:
+        tmp_tstart = time[events][np.hstack(([0],jumps))]
+        tmp_tend = time[events][np.hstack((jumps-1,len(events)-1))]
+        tmp_evdep = pd[events][np.hstack(([0],jumps))]
+
+    ii = np.where(tmp_tend-tmp_tstart>=dt_coseismic)[0]
+    tstart = tmp_tstart[ii]
+    tend = tmp_tend[ii]
+    amax = tmp_evdep[ii]
+    evdep = z[tmp_evdep[ii]]
+
+    its_all = np.array([np.argmin(abs(time-t)) for t in tstart])
+    ite_all = np.array([np.argmin(abs(time-t)) for t in tend])
+    diffcrit = np.quantile(abs(np.diff(np.log10(psr[events]))),0.98)
+    new_its_all = its_all.copy()
+    if False:
+        for k,ts in enumerate(its_all):
+            psr_inc = abs(np.diff(np.log10(psr)))[ts-1]
+            newts = ts.copy()
+            while psr_inc < diffcrit:
+                newts += 1
+                psr_inc = abs(np.diff(np.log10(psr)))[newts-1]
+            new_its_all[k] = newts
+    else:
+        for k,ts in enumerate(its_all):
+            psr_inc = abs(np.diff(np.log10(psr)))[ts-1]
+            width = int((ite_all[k] - ts)*0.23)
+            large_diffs = np.where(abs(np.diff(np.log10(psr)))[ts-1:ts-1+width]>=diffcrit)[0]
+            if psr_inc < diffcrit and len(large_diffs) > 0:
+                new_its_all[k] = large_diffs[0] + ts
+    evdep = z[pd[new_its_all]]
+    tstart = time[new_its_all]
+
+    return tstart, tend, evdep
+
+def old_event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,mingap=60,print_on=True):
     c = 0
     for i in np.argsort(abs(dep)):
         z = abs(dep[i])
@@ -171,7 +244,7 @@ def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,mingap=60,print_on=True):
 
     return tstart, tend, evdep
 
-def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap,print_on=True):
+def old_compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap,print_on=True):
     if print_on: print('Cumulative slip vs. Depth plot >>> ',end='')
 
     if print_on: 
@@ -195,8 +268,98 @@ def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm
 
     # Obtain globally min. event start times and max. event tend times
     if dt_interm > 0:
-        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,mingap,print_on)
-    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,mingap,print_on)
+        tstart_interm, tend_interm, evdep = old_event_times(dep,outputs,Vlb,Vths,cuttime,mingap,print_on)
+    tstart_coseis, tend_coseis, evdep = old_event_times(dep,outputs,0,Vths,cuttime,mingap,print_on)
+    evslip = np.zeros(tstart_coseis.shape)
+
+    # Now interpolate the cumulative slip using given event time ranges
+    for i in np.argsort(abs(dep)):
+        z = abs(dep[i])
+        time = np.array(outputs[i])[:,0]
+        sliprate = np.array(outputs[i])[:,4]
+        cumslip = np.array(outputs[i])[:,2]
+
+        if abs(cuttime) >= 1e-3:
+            sliprate = sliprate[time <= cuttime]
+            cumslip = cumslip[time <= cuttime]
+            time = time[time <= cuttime]
+
+        f = interpolate.interp1d(time,cumslip)
+
+        # -------------------- Creep
+        tcreep = np.arange(time[0],time[-1],dt_creep)
+        cscreep.append(f(tcreep))
+        depcreep.append(z*np.ones(len(tcreep)))
+        
+        # -------------------- Inter
+        if dt_interm > 0:
+            cs = []
+            depth = []
+            for j in range(len(tstart_interm)):
+                tinterm = np.arange(tstart_interm[j],tend_interm[j],dt_interm)
+                cs.append(f(tinterm))
+                depth.append(z*np.ones(len(tinterm)))
+
+            csinterm.append([item for sublist in cs for item in sublist])
+            depinterm.append([item for sublist in depth for item in sublist])
+
+        # -------------------- Coseismic
+        cs = []
+        depth = []
+        Dbar = []
+        for j in range(len(tstart_coseis)):
+            tcoseis = np.arange(tstart_coseis[j],tend_coseis[j],dt_coseismic)
+            cs.append(f(tcoseis))
+            depth.append(z*np.ones(len(tcoseis)))
+            Dbar.append(f(tcoseis)[-1]-f(tcoseis)[0])
+
+        cscoseis.append([item for sublist in cs for item in sublist])
+        depcoseis.append([item for sublist in depth for item in sublist])
+        fault_slip.append(Dbar)
+
+        # -------------------- Event detph
+        if np.isin(z,evdep):
+            indx = np.where(z==evdep)[0]
+            evslip[indx] = f(tstart_coseis)[indx]
+
+    timeout = [tstart_coseis,tend_coseis]
+    evout = [evslip,evdep,fault_slip]
+    creepout = [cscreep,depcreep]
+    coseisout = [cscoseis,depcoseis]
+    if dt_interm > 0:
+        intermout = [csinterm,depinterm]
+    
+    if dt_interm > 0:
+        return [timeout, evout, creepout, coseisout, intermout]
+    else:
+        return [timeout, evout, creepout, coseisout]
+    
+def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,print_on=True):
+    if print_on: print('Cumulative slip vs. Depth plot >>> ',end='')
+
+    if print_on: 
+        if abs(cuttime) < 1e-3:
+            print('No cutting')
+        else:
+            print('Cut at %2.1f yr'%(cuttime/yr2sec))
+        if Vlb > 0:
+            print('%1.0e < Slip rate < %1.0e'%(Vlb,Vths))
+        else:
+            print('Slip rate > %1.0e'%(Vths))
+
+    cscreep = []
+    depcreep = []
+    cscoseis = []
+    depcoseis = []
+    fault_slip = []
+    if dt_interm > 0:        
+        csinterm = []
+        depinterm = []
+
+    # Obtain globally min. event start times and max. event tend times
+    if dt_interm > 0:
+        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,print_on)
+    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,dt_coseismic,print_on)
     evslip = np.zeros(tstart_coseis.shape)
 
     # Now interpolate the cumulative slip using given event time ranges

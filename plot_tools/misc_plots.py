@@ -1,7 +1,7 @@
 '''
 Miscellaneous plotting scripts
 By Jeena Yun
-Last modification: 2023.06.19.
+Last modification: 2023.07.10.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -83,10 +83,12 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     # cmap = mpl.colormaps('ocean')
     cmap = mpl.colormaps['gnuplot']
 
-    # ------ Rupture length
+    # ------ Ax0: Rupture length
     markers, stemlines, baseline = ax1.stem(np.arange(1,len(rupture_length)+1),rupture_length)
-    plt.setp(stemlines, color='k', linewidth=2.5)
-    plt.setp(markers, color='k')
+    # plt.setp(stemlines, color='k', linewidth=2.5)
+    # plt.setp(markers, color='k')
+    plt.setp(stemlines, color='0.62', linewidth=2.5)
+    plt.setp(markers, color='0.62')
     plt.setp(baseline, color='0.62')
     if len(system_wide) > 0:
         for i in range(len(system_wide)):
@@ -100,11 +102,13 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     ax1.set_ylabel('Rupture Length [km]',fontsize=17)
     ax1.grid(True,alpha=0.4,which='both')
 
-    # ------ Hypocenter depth
+    # ------ Ax1: Hypocenter depth
     evdep = cumslip_outputs[1][1]
     markers, stemlines, baseline = ax2.stem(np.arange(1,len(evdep)+1),evdep)
-    plt.setp(stemlines, color='k', linewidth=2.5)
-    plt.setp(markers, color='k')
+    # plt.setp(stemlines, color='k', linewidth=2.5)
+    # plt.setp(markers, color='k')
+    plt.setp(stemlines, color='0.62', linewidth=2.5)
+    plt.setp(markers, color='0.62')
     plt.setp(baseline, color='0.62')
     if len(system_wide) > 0:
         for i in range(len(system_wide)):
@@ -117,7 +121,7 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     ax2.set_ylabel('Hypocenter Depth [km]',fontsize=17)
     ax2.grid(True,alpha=0.4,which='both')
 
-    # ------ Slip along fault for each event
+    # ------ Ax2: Slip along fault for each event
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
     if len(partial_rupture) > 0:
         ax3.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[0]].T,fault_z,lw=2.5,color='0.62',label='Partial rupture events')
