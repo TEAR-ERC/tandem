@@ -137,7 +137,7 @@ else:
 if args.cumslip:
     from cumslip_compute import *
     from cumslip_plot import *
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
 
     # --- Plot the result
     if args.spin_up > 0:
@@ -176,7 +176,7 @@ if args.image:
         vmax = args.vmax
     if not 'cumslip_outputs' in locals():   # No event outputs computed
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
     fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec)
 
 # Miscellaneous --------------------------------------------------------------------------------------------------------------------------
@@ -184,14 +184,14 @@ if args.ev_anal:
     from misc_plots import plot_event_analyze
     if not 'cumslip_outputs' in locals():
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
     plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
 
 if args.STF:
     from misc_plots import plot_STF
     if not 'cumslip_outputs' in locals():
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.mingap)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
 
     if args.spin_up > 0:
         if not 'spin_up_idx' in locals():
