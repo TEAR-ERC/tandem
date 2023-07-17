@@ -1,42 +1,16 @@
 num_nodes: 1 ntasks: 1 cpus_per_task:
 lithostatic_sn/v2_ab2_Dc2_adjusted
-Required field 'Vths' not defined - using default value 1e-2 m/s
 Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/outputs.npy
 Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/outputs_depthinfo.npy
 Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/const_params.npy
-Plot in time steps
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
-Using file fractal_ab_02
-Using file fractal_Dc_02
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
 Cumulative slip vs. Depth plot >>> No cutting
-Slip rate > 1e-02
-Depth 14.2  - no events
-Depth 14.4  - no events
-Depth 14.6  - no events
-Depth 14.8  - no events
-Depth 15.0  - no events
-Depth 15.2  - no events
-Depth 16.7  - no events
-Depth 18.2  - no events
-Depth 19.7  - no events
-Depth 21.2  - no events
-Depth 22.7  - no events
-Depth 24.0  - no events
+Slip rate > 1e-01
 Fractal normal stress model ver.2
 Fractal a-b model ver.2
 Fractal Dc model ver.2
 Using file fractal_litho_snpre_02
 Using file fractal_ab_02
 Using file fractal_Dc_02
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
 Fractal normal stress model ver.2
 Fractal a-b model ver.2
 Fractal Dc model ver.2
@@ -50,6 +24,14 @@ Fractal Dc model ver.2
 Using file fractal_litho_snpre_02
 Using file fractal_ab_02
 Using file fractal_Dc_02
+Full image
+Plot in time steps
+Fractal normal stress model ver.2
+Fractal a-b model ver.2
+Fractal Dc model ver.2
+Using file fractal_litho_snpre_02
+Using file fractal_ab_02
+Using file fractal_Dc_02
 Rupture length criterion: 10 m
 Fractal normal stress model ver.2
 Fractal a-b model ver.2
@@ -57,7 +39,4 @@ Fractal Dc model ver.2
 Using file fractal_litho_snpre_02
 Using file fractal_ab_02
 Using file fractal_Dc_02
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
 Rupture length criterion: 10 m

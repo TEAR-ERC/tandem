@@ -42,10 +42,12 @@ branch_n=v2_ab2_Dc2_adjusted
 output_dir=$SCRATCH/$model_n/$branch_n/outputs_$branch_n
 plottool_dir=$WORK/jeena-tandem/plot_tools
 save_dir=$SCRATCH/$model_n/$branch_n
-mv $output_dir $save_dir/outputs
+# mv $output_dir $save_dir/outputs
 
 echo $model_n'/'$branch_n
 
 source $SCRATCH/$envn/bin/activate
-mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -csl -dtcr 2 -dtco 0.5 -stio -abio -imsr -ts -stf -evan
-# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -csl -dtcr 2 -dtco 0.5 -abio -dcio
+# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -c -csl -dtcr 2 -dtco 0.5 -stio -abio -imsr -ts -stf -evan
+# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -dtcr 2 -dtco 0.5 -Vths 0.1 -im sliprate -ts
+# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -dtcr 2 -dtco 0.5 -Vths 0.1 -im sliprate -zf 200000 300000 -ts
+mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -csl -dtcr 2 -dtco 0.5 -Vths 0.1 -abio -stio -im sliprate -ts -evan -stf
