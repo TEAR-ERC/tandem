@@ -1,0 +1,16 @@
+final_time = 40000000000
+mesh_file = "ridgecrest_hf25.msh"
+mode = "QDGreen"
+type = "poisson"
+lib = "matfric_Fourier_main_v6_ab2_Dc2.lua"
+scenario = "bp1_sym"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[fault_output]
+prefix = "fault"
+rtol = 0.1
+
+[domain_output]
+prefix = "domain"
+rtol = 0.1

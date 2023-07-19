@@ -1,42 +1,21 @@
 num_nodes: 1 ntasks: 1 cpus_per_task:
-lithostatic_sn/v2_ab2_Dc2_adjusted
-Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/outputs.npy
-Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/outputs_depthinfo.npy
-Load saved data: /hppfs/scratch/06/di75weg/lithostatic_sn/v2_ab2_Dc2_adjusted/const_params.npy
+scaling_test/v6_ab2_Dc2_n20
+Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n20/outputs.npy
+Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n20/outputs_depthinfo.npy
+Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n20/const_params.npy
 Cumulative slip vs. Depth plot >>> No cutting
 Slip rate > 1e-01
-Fractal normal stress model ver.2
+Fractal normal stress model ver.6
 Fractal a-b model ver.2
 Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
-Using file fractal_ab_02
-Using file fractal_Dc_02
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
-Using file fractal_ab_02
-Using file fractal_Dc_02
-Total 15288 points
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
+Using file fractal_snpre_06
 Using file fractal_ab_02
 Using file fractal_Dc_02
 Full image
-Plot in time steps
-Fractal normal stress model ver.2
+Plot in time [s]
+Fractal normal stress model ver.6
 Fractal a-b model ver.2
 Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
+Using file fractal_snpre_06
 Using file fractal_ab_02
 Using file fractal_Dc_02
-Rupture length criterion: 10 m
-Fractal normal stress model ver.2
-Fractal a-b model ver.2
-Fractal Dc model ver.2
-Using file fractal_litho_snpre_02
-Using file fractal_ab_02
-Using file fractal_Dc_02
-Rupture length criterion: 10 m

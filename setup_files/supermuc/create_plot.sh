@@ -37,17 +37,17 @@ source /etc/profile.d/modules.sh
 echo 'num_nodes:' $SLURM_JOB_NUM_NODES 'ntasks:' $SLURM_NTASKS 'cpus_per_task:' $SLURM_CPUS_PER_TASK
 ulimit -Ss 2097152
 
-model_n=lithostatic_sn
-branch_n=v2_ab2_Dc2_adjusted
+model_n=Thakur20_various_fractal_profiles
+branch_n=v6_ab1_Dc2
 output_dir=$SCRATCH/$model_n/$branch_n/outputs_$branch_n
 plottool_dir=$WORK/jeena-tandem/plot_tools
 save_dir=$SCRATCH/$model_n/$branch_n
-# mv $output_dir $save_dir/outputs
+mv $output_dir $save_dir/outputs
 
 echo $model_n'/'$branch_n
 
 source $SCRATCH/$envn/bin/activate
-# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -c -csl -dtcr 2 -dtco 0.5 -stio -abio -imsr -ts -stf -evan
 # mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -dtcr 2 -dtco 0.5 -Vths 0.1 -im sliprate -ts
 # mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -dtcr 2 -dtco 0.5 -Vths 0.1 -im sliprate -zf 200000 300000 -ts
-mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -csl -dtcr 2 -dtco 0.5 -Vths 0.1 -abio -stio -im sliprate -ts -evan -stf
+mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -c -csl -dtcr 2 -dtco 0.5 -Vths 0.1 -abio -stio -im sliprate -ts -evan -stf
+# mpiexec -n $SLURM_NTASKS python3.8 $plottool_dir/get_plots.py $save_dir -csl -dtcr 2 -dtco 0.5 -Vths 0.1 -im sliprate -sec
