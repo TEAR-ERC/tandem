@@ -1,0 +1,12 @@
+========= Summary =========
+date_time=Mon Jun 19 21:27:34 2023
+code_version=v1.0-13-gbcdda11
+solve_time=484.036
+time_steps=179729
+step_rejections=11088
+min_time_step=0.00115013
+max_time_step=1.62479e+06
+dofs_domain=88670
+dofs_fault=3504
+mesh_size=56.0799
+===========================

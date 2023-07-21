@@ -25,7 +25,7 @@ BP1.V0 = 1.0e-6         -- Reference slip rate [m/s]
 BP1.f0 = 0.6            -- Reference friction coefficient
 
 ------------ Load your input fractal profile data ------------
-snprefile = io.open ('/home/jyun/Tandem/Thakur20_hetero_stress/fractal_snpre_04','r')
+snprefile = io.open ('/home/jyun/Tandem/Thakur20_hetero_stress/fractal_snpre_06','r')
 -- snprefile = io.open ('fractal_snpre_04','r')
 lines = snprefile:lines()
 local fault_y = {}
@@ -103,12 +103,12 @@ function BP1:eta(x, y)
 end
 
 function BP1:L(x, y)
-    return 0.0015
+    return 0.004
 end
 
 function BP1:sn_pre(x, y)
     local het_sigma = linear_interpolation(fault_y, sigma, y)
-    if y > 0 then
+    if het_sigma == nil then
         het_sigma = 10
     end
     return het_sigma

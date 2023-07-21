@@ -1,8 +1,8 @@
 final_time = 22075200000
-mesh_file = "Thakur20_n8.msh"
+mesh_file = "Thakur20_n16.msh"
 mode = "QDGreen"
 type = "poisson"
-lib = "matfric_Fourier_main_v3.lua"
+lib = "matfric_Fourier_main.lua"
 scenario = "bp1_sym"
 ref_normal = [-1, 0]
 boundary_linear = true

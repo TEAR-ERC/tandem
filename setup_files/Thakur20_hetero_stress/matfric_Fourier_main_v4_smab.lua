@@ -103,7 +103,7 @@ function BP1:eta(x, y)
 end
 
 function BP1:L(x, y)
-    return 0.0015
+    return 0.004
 end
 
 function BP1:sn_pre(x, y)
