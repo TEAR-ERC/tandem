@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Tools for making varitions from the base model
-Last modification: 2023.06.27.
+Last modification: 2023.07.18
 by Jeena Yun
 """
-
 import numpy as np
 import setup_shortcut
+import os
 
 sc = setup_shortcut.setups()
 
@@ -14,8 +14,16 @@ class variate:
     def __init__(self):
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
-        self.setup_dir = sc.setup_dir
 
+    def get_setup_dir(self):
+        if 'j4yun' in os.getcwd(): # local
+            setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/supermuc'
+        elif 'di75weg' in os.getcwd(): # supermuc
+            setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
+        elif 'jyun' in os.getcwd(): # LMU server
+            setup_dir = '/home/jyun/Tandem'
+        return setup_dir
+    
     def load_parameter(self,prefix,print_on=True):
         fsigma,ff0,fab,fdc,newb,newL,dz = self.what_is_varied(prefix,print_on)
         y,Hs,a,b,a_b,tau0,sigma0,L,others = self.fractal_param(prefix,fsigma,fab,fdc,ff0,print_on)
@@ -130,17 +138,17 @@ class variate:
 
         if fsigma is not None:
             if fsigma == 0:
-                fname = '%s/Thakur20_hetero_stress/fractal_snpre'%(self.setup_dir)
+                fname = '%s/Thakur20_hetero_stress/fractal_snpre'%(self.get_setup_dir())
             elif 'litho' in prefix:
-                fname = '%s/lithostatic_sn/fractal_litho_snpre_%02d'%(self.setup_dir,fsigma)
+                fname = '%s/lithostatic_sn/fractal_litho_snpre_%02d'%(self.get_setup_dir(),fsigma)
             else:
-                fname = '%s/Thakur20_hetero_stress/fractal_snpre_%02d'%(self.setup_dir,fsigma)
+                fname = '%s/Thakur20_hetero_stress/fractal_snpre_%02d'%(self.get_setup_dir(),fsigma)
             sigma0 = self.read_fractal_file(fname,print_on)
         else:
             sigma0 = _sigma0
 
         if fab is not None:
-            fname = '%s/Thakur20_various_fractal_profiles/fractal_ab_%02d'%(self.setup_dir,fab)
+            fname = '%s/Thakur20_various_fractal_profiles/fractal_ab_%02d'%(self.get_setup_dir(),fab)
             a_b = self.read_fractal_file(fname,print_on)
             b = self.same_length(y,_b,a_b[1])
             a = a_b[0] + b
@@ -150,12 +158,12 @@ class variate:
             b = _b
 
         if ff0 is not None:
-            fname = '%s/Thakur20_various_fractal_profiles/fractal_f0_%02d'%(self.setup_dir,ff0)
+            fname = '%s/Thakur20_various_fractal_profiles/fractal_f0_%02d'%(self.get_setup_dir(),ff0)
             het_f0 = self.read_fractal_file(fname,print_on)
             others[-1] = het_f0
 
         if fdc is not None:
-            fname = '%s/Thakur20_various_fractal_profiles/fractal_Dc_%02d'%(self.setup_dir,fdc)
+            fname = '%s/Thakur20_various_fractal_profiles/fractal_Dc_%02d'%(self.get_setup_dir(),fdc)
             het_dc = self.read_fractal_file(fname,print_on)
             L = het_dc
         else:
@@ -215,7 +223,7 @@ class variate:
         # ----- Mesh points where normal stress will be evaluated
         if based_on_mesh:
             print('Method 1) Read in actaul mesh points')  # - not used anymore
-            fid = open('%s/Thakur20_hetero_stress/meshpoints.txt'%(self.setup_dir),'r')
+            fid = open('%s/Thakur20_hetero_stress/meshpoints.txt'%(self.get_setup_dir()),'r')
             lines = fid.readlines()
             mesh_x = []
             mesh_y = []

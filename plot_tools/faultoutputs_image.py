@@ -70,7 +70,10 @@ def gen_cmap(lab,params,vmin,vmax,Vths):
         col_list.insert(0,(0,0,0))
         col_list.insert(3,mpl.colors.to_rgb('w'))
         col_list.append(mpl.colormaps['turbo'](0))
-        float_list = [0,mpl.colors.LogNorm(vmin,vmax)(params.item().get('Vp')),mpl.colors.LogNorm(vmin,vmax)(params.item().get('V0'))]
+        if params is None:
+            float_list = [0,mpl.colors.LogNorm(vmin,vmax)(1e-9),mpl.colors.LogNorm(vmin,vmax)(1e-6)]
+        else:
+            float_list = [0,mpl.colors.LogNorm(vmin,vmax)(params.item().get('Vp')),mpl.colors.LogNorm(vmin,vmax)(params.item().get('V0'))]
         [float_list.append(k) for k in np.linspace(mpl.colors.LogNorm(vmin,vmax)(Vths),1,4)]
         cmap_n = get_continuous_cmap(col_list,input_hex=False,float_list=float_list)
     elif lab == 'shearT':

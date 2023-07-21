@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: implement new faultout image plots
-Last modification: 2023.07.10.
+Last modification: 2023.07.19.
 '''
 import numpy as np
 import glob
@@ -17,6 +17,7 @@ sc = setup_shortcut.setups()
 parser = argparse.ArgumentParser()
 parser.add_argument("save_dir", help=": directory to output files and to save plots")
 parser.add_argument("-c","--compute", action="store_true", help=": Activate only when you want to compute")
+parser.add_argument("-ot","--output_type", type=str.lower, choices=['fault_probe','fault','domain'], help=": Type of output to process ['fault_probe','fault','domain']",default='fault_probe')
 
 # Fault output vs. time at certain depth
 parser.add_argument("-sr","--sliprate", type=float, help=": If used, depth of slip rate vs. time plot [km]", default=0)
@@ -31,7 +32,7 @@ parser.add_argument("-ab","--abprof", action="store_true", help=": ON/OFF in & o
 parser.add_argument("-dc","--dcprof", action="store_true", help=": ON/OFF in & out Dc profile")
 
 # Fault output image
-parser.add_argument("-im","--image", type=str.lower, choices=['sliprate','shearT','normalT','state_var'], help=": Type of image plot ['sliprate','shearT','normalT','state_var']")
+parser.add_argument("-im","--image", type=str, choices=['sliprate','shearT','normalT','state_var'], help=": Type of image plot ['sliprate','shearT','normalT','state_var']")
 parser.add_argument("-ts","--plot_in_timestep", action="store_true", help=": Time axis in timesteps",default=False)
 parser.add_argument("-zf","--zoom_frame", nargs='+', type=int, help=": When used, event indexes or timestep ranges you want to zoom in",default=[])
 parser.add_argument("-vmin","--vmin", type=float, help=": vmin for the plot")
@@ -93,45 +94,20 @@ elif 'jyun' in save_dir: # LMU server
 cuttime = args.cuttime*sc.yr2sec
 
 # Extract data ---------------------------------------------------------------------------------------------------------------------------
+from read_outputs import *
 if args.compute:
-    print('Compute on - extract outputs...',end=' ')
-    fnames = glob.glob('%s/outputs/*dp*.csv'%(save_dir))
-    if len(fnames) == 0:
-        raise NameError('No such file found - check the input')
-    outputs = ()
-    dep = []
-    for fn in fnames:
-        with open(fn, 'r') as csvfile:
-            csvreader = csv.reader(csvfile)
-            stloc = next(csvreader)
-            r_x = float(stloc[0].split('[')[-1])
-            r_z = float(stloc[1].split(']')[0])
-            dep.append(r_z)
-                
-            next(csvreader)
-
-            dat = []
-            for row in csvreader:
-                dat.append(np.asarray(row).astype(float))
-        
-        outputs = outputs + (dat,)
-    outputs = np.array(outputs)
-    dep = np.array(dep)
-    print('done!')
-
-    params = sc.extract_from_lua(save_dir,prefix,save_on=True)
-
-    print('Save data...',end=' ')
-    np.save('%s/outputs'%(save_dir),outputs)
-    np.save('%s/outputs_depthinfo'%(save_dir),dep)
-    print('done!')
+    print('Compute on - extract outputs')
+    if args.output_type == 'fault_probe':
+        outputs,dep = read_fault_probe_outputs(save_dir)
+    elif args.output_type == 'fault':
+        outputs,dep = read_fault_outputs(save_dir)
+    params = extract_from_lua(save_dir,prefix)
 else:
-    print('Load saved data: %s/outputs.npy'%(save_dir))
-    outputs = np.load('%s/outputs.npy'%(save_dir))
-    print('Load saved data: %s/outputs_depthinfo.npy'%(save_dir))
-    dep = np.load('%s/outputs_depthinfo.npy'%(save_dir))
-    print('Load saved data: %s/const_params.npy'%(save_dir))
-    params = np.load('%s/const_params.npy'%(save_dir),allow_pickle=True)
+    if args.output_type == 'fault_probe':
+        outputs,dep = load_fault_probe_outputs(save_dir)
+    elif args.output_type == 'fault':
+        outputs,dep = load_fault_outputs(save_dir)
+    params = load_params(save_dir)
 
 # Cumslip vs. Depth ----------------------------------------------------------------------------------------------------------------------
 if args.cumslip:

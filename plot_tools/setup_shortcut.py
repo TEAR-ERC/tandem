@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Define general setups and often used values
-Last modification: 2023.06.19.
+Last modification: 2023.07.18.
 by Jeena Yun
 """
 
@@ -13,12 +13,17 @@ class setups:
         self.yr2sec = 365*24*60*60
         self.wk2sec = 7*24*60*60
 
+    def get_setup_dir(self):
         if 'j4yun' in os.getcwd(): # local
-            self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
+            # self.setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
+            setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files/supermuc'
         elif 'di75weg' in os.getcwd(): # supermuc
-            self.setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
+            # self.setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
+            setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
         elif 'jyun' in os.getcwd(): # LMU server
-            self.setup_dir = '/home/jyun/Tandem'
+            # self.setup_dir = '/home/jyun/Tandem'
+            setup_dir = '/home/jyun/Tandem'
+        return setup_dir
     
     def sec2hms(self,sec):
         """
@@ -277,7 +282,7 @@ class setups:
             fname = prefix.split('/')[0] + '/' + fname + '_'+strr[0]+'.lua'
         else:
             fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
-        fname = self.setup_dir + '/' + fname
+        fname = self.get_setup_dir() + '/' + fname
         print(fname)
 
         here = False
@@ -302,5 +307,5 @@ class setups:
 
         if save_on:
             np.save('%s/const_params'%(save_dir),params)
-        return params
+        return np.array(params)
     
