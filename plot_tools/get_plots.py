@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: implement new faultout image plots
-Last modification: 2023.07.19.
+Last modification: 2023.07.22.
 '''
 import numpy as np
 import glob
@@ -44,7 +44,8 @@ parser.add_argument("-dtcr","--dt_creep", type=float, help=": Contour interval f
 parser.add_argument("-dtco","--dt_coseismic", type=float, help=": Contour interval for COSEISMIC section [s]")
 parser.add_argument("-dtint","--dt_interm", type=float, help=": Contour interval for INTERMEDIATE section [wk]")
 parser.add_argument("-Vths","--Vths", type=float, help=": Slip-rate threshold to define coseismic section [m/s]")
-parser.add_argument("-Vlb","--Vlb", type=float, help=": When used with --Vth becomes lower bound of slip rate of intermediate section [m/s]")
+parser.add_argument("-Vlb","--Vlb", type=float, help=": When used with --Vths becomes lower bound of slip rate of intermediate section [m/s]")
+parser.add_argument("-srvar","--SRvar", type=float, help=": Criterion for SR variation within a detected event")
 parser.add_argument("-dd","--depth_dist", action="store_true", help=": Plot cumslip plot with hypocenter depth distribution",default=False)
 parser.add_argument("-abio","--ab_inout", action="store_true", help=": Plot cumslip plot with a-b profile",default=False)
 parser.add_argument("-stio","--stress_inout", action="store_true", help=": Plot cumslip plot with stress profile",default=False)
@@ -69,6 +70,9 @@ if args.cumslip or args.ev_anal or args.STF or args.image:        # When args.cu
     if not args.Vths:
         print('Required field \'Vths\' not defined - using default value 1e-2 m/s')
         args.Vths = 1e-2
+    if args.SRvar is None:
+        print('Field \'SRvar\' not defined - using default value 0.15')
+        args.SRvar = 0.15
     dt_creep = args.dt_creep*sc.yr2sec
     dt_coseismic = args.dt_coseismic
     if args.dt_interm:
@@ -113,7 +117,7 @@ else:
 if args.cumslip:
     from cumslip_compute import *
     from cumslip_plot import *
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
+    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
 
     # --- Plot the result
     if args.spin_up > 0:
@@ -152,7 +156,7 @@ if args.image:
         vmax = args.vmax
     if not 'cumslip_outputs' in locals():   # No event outputs computed
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
     fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec)
 
 # Miscellaneous --------------------------------------------------------------------------------------------------------------------------
@@ -160,14 +164,14 @@ if args.ev_anal:
     from misc_plots import plot_event_analyze
     if not 'cumslip_outputs' in locals():
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
     plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
 
 if args.STF:
     from misc_plots import plot_STF
     if not 'cumslip_outputs' in locals():
         from cumslip_compute import *
-        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm)
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
 
     if args.spin_up > 0:
         if not 'spin_up_idx' in locals():

@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.07.05.
+Last modification: 2023.07.22.
 '''
 import numpy as np
 from scipy import interpolate
@@ -10,7 +10,7 @@ from scipy import interpolate
 yr2sec = 365*24*60*60
 wk2sec = 7*24*60*60
 
-def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,dt_coseismic=0.5,print_on=True):
+def event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on=True):
     time = np.array(outputs[0][:,0])
     sliprate = abs(np.array([outputs[i][:,4] for i in np.argsort(abs(dep))]))
     z = np.sort(abs(dep))
@@ -74,12 +74,22 @@ def event_times(dep,outputs,Vlb=0,Vths=1e-2,cuttime=0,dt_coseismic=0.5,print_on=
     else:
         for k,ts in enumerate(its_all):
             psr_inc = abs(np.diff(np.log10(psr)))[ts-1]
-            width = int((ite_all[k] - ts)*0.23)
+            width = int((ite_all[k] - ts)*intv)
             large_diffs = np.where(abs(np.diff(np.log10(psr)))[ts-1:ts-1+width]>=diffcrit)[0]
             if psr_inc < diffcrit and len(large_diffs) > 0:
                 new_its_all[k] = large_diffs[0] + ts
     evdep = z[pd[new_its_all]]
     tstart = time[new_its_all]
+
+    varsr = np.array([np.log10(psr[its_all[k]:ite_all[k]+1]).max()-np.log10(psr[its_all[k]:ite_all[k]+1]).min() for k in range(len(tstart))])
+    ii = np.where(varsr/abs(np.log10(Vths))>=0.1)[0]
+    if len(ii) < len(tstart):
+        print('Negligible events with SR variation < 0.1Vths:',np.where(varsr/abs(np.log10(Vths))<0.1)[0])
+        tstart = tstart[ii]
+        tend = tend[ii]
+        evdep = evdep[ii]
+    else:
+        print('All safe from the SR variation criterion')
 
     return tstart, tend, evdep
 
@@ -334,7 +344,7 @@ def old_compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_in
     else:
         return [timeout, evout, creepout, coseisout]
     
-def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,print_on=True):
+def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,intv,print_on=True):
     if print_on: print('Cumulative slip vs. Depth plot >>> ',end='')
 
     if print_on: 
@@ -358,8 +368,8 @@ def compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm
 
     # Obtain globally min. event start times and max. event tend times
     if dt_interm > 0:
-        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,print_on)
-    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,dt_coseismic,print_on)
+        tstart_interm, tend_interm, evdep = event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on)
+    tstart_coseis, tend_coseis, evdep = event_times(dep,outputs,0,Vths,cuttime,dt_coseismic,intv,print_on)
     evslip = np.zeros(tstart_coseis.shape)
 
     # Now interpolate the cumulative slip using given event time ranges

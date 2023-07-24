@@ -35,13 +35,24 @@ def extract_from_lua(save_dir,prefix,save_on=True):
     elif '_long' in prefix.split('/')[-1]:
         strr = prefix.split('/')[-1].split('_long')
         fname = prefix.split('/')[0] + '/' + fname + '_'+strr[0]+'.lua'
+    elif 'hetero_stress' in prefix and 'n' in prefix.split('/')[-1]:
+        strr = prefix.split('/')[-1].split('_')
+        tails = ''
+        for k in range(1,len(strr)):
+            tails += '_%s'%(strr[k])
+        fname = prefix.split('/')[0] + '/' + fname + tails +'.lua'
     else:
         fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
     fname = ch.get_setup_dir() + '/' + fname
     print(fname)
 
     here = False
-    fid = open(fname,'r')
+    try:
+        fid = open(fname,'r')
+    except FileNotFoundError:
+        new_fname_list = fname.split('/supermuc')
+        fname = new_fname_list[0] + new_fname_list[1]
+        fid = open(fname,'r')
     lines = fid.readlines()
     params = {}
     for line in lines:

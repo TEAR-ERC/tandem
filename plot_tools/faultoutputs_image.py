@@ -2,7 +2,7 @@
 '''
 Functions related to plotting spatio-temporal evolution of variables as an image
 By Jeena Yun
-Last modification: 2023.07.14.
+Last modification: 2023.07.22.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -110,7 +110,7 @@ def class_figtype(zoom_frame,outputs,cumslip_outputs,print_on=True):
         name_opt = 1
     elif len(zoom_frame) == 2: # Zoom in of full image
         if print_on: print('Zoom in of full image')
-        tsmin,tsmax = zoom_frame[0],zoom_frame[1]
+        tsmin,tsmax = int(zoom_frame[0]),int(zoom_frame[1])
         if tsmin > outputs.shape[1]:
             ValueError('tmin > max. timestep - check input')
         elif tsmax > outputs.shape[1]:
@@ -126,28 +126,29 @@ def class_figtype(zoom_frame,outputs,cumslip_outputs,print_on=True):
         xlab_opt = 2
         name_opt = 2
     else:
-        buffer1,buffer2 = zoom_frame[-2],zoom_frame[-1]
+        buffer1,buffer2 = int(zoom_frame[-2]),int(zoom_frame[-1])
         xl_opt = 3
         ver_info_opt = False
-        scatter_opt = 1
+        scatter_opt = 3
         xlab_opt = 1
         if len(zoom_frame) == 3: # Single coseismic event
             if print_on: print('Single coseismic event')
-            iev1,iev2 = zoom_frame[0],[]
+            iev1,iev2 = int(zoom_frame[0]),[]
             its,ite = its_all[iev1],ite_all[iev1]
             vlines_opt = 1
             txt_opt = 2
             name_opt = 3
         elif len(zoom_frame) == 4 and zoom_frame[0]>=0: # Multiple coseismic event
             if print_on: print('Multiple coseismic events')
-            iev1,iev2 = zoom_frame[0],zoom_frame[1]
+            iev1,iev2 = int(zoom_frame[0]),int(zoom_frame[1])
             its,ite = its_all[iev1],ite_all[iev2]
             vlines_opt = 2
-            txt_opt = 4
+            # txt_opt = 4
+            txt_opt = 1
             name_opt = 4
         elif len(zoom_frame) == 4 and zoom_frame[0]<0: # Interseismic event
             if print_on: print('Interseismic period')
-            iev1,iev2 = abs(zoom_frame[0]),abs(zoom_frame[1])
+            iev1,iev2 = abs(int(zoom_frame[0])),abs(int(zoom_frame[1]))
             if iev2 == len(its_all):
                 its,ite = ite_all[iev1],outputs.shape[1]-1
             else:
@@ -161,7 +162,7 @@ def class_figtype(zoom_frame,outputs,cumslip_outputs,print_on=True):
     return processed_outputs,evdep,its_all,ite_all,tsmin,tsmax,its,ite,buffer1,buffer2,iev1,iev2,fig_opts
 
 def decoration(time,zoom_frame,outputs,cumslip_outputs,ver_info,Hs,acolor,system_wide,partial_rupture,plot_in_timestep,plot_in_sec):
-    evdep,its_all,ite_all,tsmin,tsmax,its,ite,buffer1,buffer2,iev1,iev2,fig_opts = class_figtype(zoom_frame,outputs,cumslip_outputs,print_on=False)[1:]    
+    evdep,its_all,ite_all,tsmin,tsmax,its,ite,buffer1,buffer2,iev1,iev2,fig_opts = class_figtype(zoom_frame,outputs,cumslip_outputs,print_on=False)[1:]
     xl_opt,ver_info_opt,scatter_opt,vlines_opt,txt_opt,xlab_opt,name_opt = fig_opts
 
     if xl_opt == 1 or xl_opt == 2:
@@ -173,11 +174,18 @@ def decoration(time,zoom_frame,outputs,cumslip_outputs,ver_info,Hs,acolor,system
     if ver_info_opt and len(ver_info) > 0:
         if ver_info[:2] == '+ ':
             ver_info = ver_info[2:]
-        # plt.text(xl[1]*0.025,Hs[0]*0.975,ver_info,color=acolor,fontsize=35,fontweight='bold',ha='left',va='bottom')
         plt.text(xl[0]+(xl[1]-xl[0])*0.025,Hs[0]*0.975,ver_info,color=acolor,fontsize=35,fontweight='bold',ha='left',va='bottom')
 
+    if scatter_opt == 2:
+        lim_s, lim_e = tsmin, tsmax
+    elif scatter_opt == 3:
+        lim_s, lim_e = its, ite
+
     if plot_in_timestep:
-        xs = its_all
+        if scatter_opt == 1:
+            xs = its_all
+        else:
+            xs = its_all - lim_s
     else:
         xs = time[its_all]
 
@@ -187,15 +195,11 @@ def decoration(time,zoom_frame,outputs,cumslip_outputs,ver_info,Hs,acolor,system
         if len(partial_rupture) > 0:
             plt.scatter(xs[partial_rupture],evdep[partial_rupture],s=100,marker='d',facecolor='w',edgecolor='k',lw=1.5,zorder=3,label='Partial rupture events')
     else:
-        if scatter_opt == 2:
-            isys = np.where(np.logical_and(its_all[system_wide]>=tsmin,its_all[system_wide]<=tsmax))[0]
-            if len(partial_rupture) > 0:
-                ipart = np.where(np.logical_and(its_all[partial_rupture]>=tsmin,its_all[partial_rupture]<=tsmax))[0]
-            else:
-                ipart = []
-        # elif scatter_opt == 3:
-        #     isys = np.where(np.logical_and(its[system_wide]>=0,its[system_wide]<=tsmax-tsmin))[0]
-        #     ipart = np.where(np.logical_and(its[partial_rupture]>=0,its[partial_rupture]<=tsmax-tsmin))[0]
+        isys = np.where(np.logical_and(its_all[system_wide]>=lim_s,its_all[system_wide]<=lim_e))[0]
+        if len(partial_rupture) > 0:
+            ipart = np.where(np.logical_and(its_all[partial_rupture]>=lim_s,its_all[partial_rupture]<=lim_e))[0]
+        else:
+            ipart = []
         
         if len(system_wide[isys]) > 0:
             plt.scatter(xs[system_wide][isys],evdep[system_wide][isys],s=300,marker='*',facecolor='w',edgecolor='k',lw=1.5,zorder=3,label='Full rupture events')
@@ -208,23 +212,25 @@ def decoration(time,zoom_frame,outputs,cumslip_outputs,ver_info,Hs,acolor,system
     plt.hlines(y=Hs[-1],xmin=xl[0],xmax=xl[1],linestyles='--',color=acolor,lw=1.5)
 
     if vlines_opt == 1:
-        plt.vlines(x=[time[its],time[ite]],ymin=0,ymax=Hs[0],linestyles='--',color=acolor,lw=1.5)
+        if plot_in_timestep:
+            plt.vlines(x=[0,ite-its],ymin=0,ymax=Hs[0],linestyles='--',color=acolor,lw=1.5)
+        else:
+            plt.vlines(x=[time[its],time[ite]],ymin=0,ymax=Hs[0],linestyles='--',color=acolor,lw=1.5)
     elif vlines_opt == 2:
-        plt.vlines(x=time[its_all[iev1:iev2+1]],ymin=0,ymax=Hs[0],linestyles='--',color=acolor,lw=1.5)
+        plt.vlines(x=xs[iev1:iev2+1],ymin=0,ymax=Hs[0],linestyles='--',color=acolor,lw=1.5)
 
     if txt_opt == 1:
         for k in range(len(its_all)):
-            if its_all[k]>=tsmin and its_all[k]<=tsmax:
+            if its_all[k]>=lim_s and its_all[k]<=lim_e:
                 plt.text(xs[k],evdep[k]-0.2,'%d'%(k),color=acolor,fontsize=20,ha='right',va='bottom')
     elif txt_opt == 2:
-        plt.text(time[its]+width/18,23,'Event %d'%(iev1),fontsize=30,fontweight='bold',color=acolor,ha='left',va='bottom') # coseismic
+        plt.text(xs[iev1]+width/18,23,'Event %d'%(iev1),fontsize=30,fontweight='bold',color=acolor,ha='left',va='bottom') # coseismic
     elif txt_opt == 3:
-        plt.text(time[its]-width/150,12,'Event %d'%(iev1),fontsize=30,fontweight='bold',color=acolor,ha='right',va='bottom',rotation=90)
-        plt.text(time[ite]+width/150,12,'Event %d'%(iev2),fontsize=30,fontweight='bold',color=acolor,ha='left',va='bottom',rotation=90)
-    elif txt_opt == 4:
-        for k,evts in enumerate(its_all):
-            if evts>=its-buffer1 and evts<=ite+buffer2:
-                plt.text(time[evts],evdep[k]-0.2,'%d'%(k),color=acolor,fontsize=20,ha='right',va='bottom')
+        plt.text(xs[iev1]-width/150,12,'Event %d'%(iev1),fontsize=30,fontweight='bold',color=acolor,ha='right',va='bottom',rotation=90)
+        if plot_in_timestep:
+            plt.text(ite-its+width/150,12,'Event %d'%(iev2),fontsize=30,fontweight='bold',color=acolor,ha='left',va='bottom',rotation=90)
+        else:
+            plt.text(time[ite]+width/150,12,'Event %d'%(iev2),fontsize=30,fontweight='bold',color=acolor,ha='left',va='bottom',rotation=90)
 
     if xl_opt == 1:
         plt.xlim(0,xl[1])
