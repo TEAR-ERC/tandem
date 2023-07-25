@@ -53,9 +53,9 @@ def plot_Dc_vs_depth(save_dir,prefix,save_on=True):
         Dc0 = _Dc
         y_in = y
     if len(prefix.split('/')) > 1:
-        fname = '%s/%s/dc_profile_%s'%(ch.setup_dir,prefix.split('/')[0],prefix.split('/')[-1])
+        fname = '%s/%s/dc_profile_%s'%(ch.get_setup_dir(),prefix.split('/')[0],prefix.split('/')[-1])
     else:
-        fname = '%s/%s/dc_profile'%(ch.setup_dir,prefix)
+        fname = '%s/%s/dc_profile'%(ch.get_setup_dir(),prefix)
     # ---------- Outputs
     y_ret,Dc = read_output(fname)
     
@@ -91,9 +91,9 @@ def Dc_with_cumslip(ax,prefix,fs_label=30,fs_legend=15,ytick_on=False):
         Dc0 = _Dc
         y_in = y
     if len(prefix.split('/')) > 1:
-        fname = '%s/%s/dc_profile_%s'%(ch.setup_dir,prefix.split('/')[0],prefix.split('/')[-1])
+        fname = '%s/%s/dc_profile_%s'%(ch.get_setup_dir(),prefix.split('/')[0],prefix.split('/')[-1])
     else:
-        fname = '%s/%s/dc_profile'%(ch.setup_dir,prefix)
+        fname = '%s/%s/dc_profile'%(ch.get_setup_dir(),prefix)
     # ---------- Outputs
     y_ret,Dc = read_output(fname)
 
