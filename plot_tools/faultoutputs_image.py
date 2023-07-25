@@ -2,7 +2,7 @@
 '''
 Functions related to plotting spatio-temporal evolution of variables as an image
 By Jeena Yun
-Last modification: 2023.07.22.
+Last modification: 2023.07.24.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ mynavy = (17/255,34/255,133/255)
 def fout_image(lab,outputs,dep,params,cumslip_outputs,save_dir,prefix,
                rths,vmin,vmax,Vths,zoom_frame,plot_in_timestep=True,plot_in_sec=False,cb_on=True,save_on=True):
     from cumslip_compute import analyze_events
-    system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:]
+    system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:4]
     processed_outputs = class_figtype(zoom_frame,outputs,cumslip_outputs)[0]
     X,Y,var = get_var(lab,processed_outputs,dep,plot_in_timestep,plot_in_sec)
     if vmin is None:

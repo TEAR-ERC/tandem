@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.07.22.
+Last modification: 2023.07.24.
 '''
 import numpy as np
 from scipy import interpolate
@@ -485,13 +485,27 @@ def compute_spinup(outputs,dep,cuttime,cumslip_outputs,spin_up,print_on=True):
         return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spup_csinterm, spin_up_idx]
     else:
         return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spin_up_idx]
-    
+
+def cluster_events(cumslip_outputs):
+    tstart = cumslip_outputs[0][0]
+    event_gap = np.diff(tstart)/yr2sec
+    event_cluster = [[0,0]]
+    ci = 0
+    for k,eg in enumerate(event_gap):
+        if eg > 1:
+            event_cluster.append([k+1,k+1])
+            ci += 1
+        else:
+            event_cluster[ci][1] = k+1
+    return np.array(event_cluster)
+
 def analyze_events(cumslip_outputs,rths):
     from scipy import integrate
     rupture_length = []
     av_slip = []
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
     fault_slip = np.array(cumslip_outputs[1][2]).T
+    event_cluster = cluster_events(cumslip_outputs)
 
     for ti in range(fault_slip.shape[0]):
         fs = fault_slip[ti]
@@ -504,4 +518,17 @@ def analyze_events(cumslip_outputs,rths):
     rupture_length = np.array(rupture_length)
     partial_rupture = np.where(rupture_length<rths)[0]
     system_wide = np.where(rupture_length>=rths)[0]
-    return rupture_length,av_slip,system_wide,partial_rupture
+
+    lead_fs,major_pr,minor_pr = [],[],[]
+    for k,ec in enumerate(event_cluster):
+        if sum([np.logical_and(sw>=ec[0],sw<=ec[1]) for sw in system_wide]) >= 1:
+            if ec[0] not in system_wide:
+                lead_fs.append(ec[0])
+        elif ec[1]-ec[0]<=4:
+            # minor_pr.append(ec[0])
+            minor_pr.append(k)
+        else:
+            # major_pr.append(ec[0])
+            major_pr.append(k)
+
+    return rupture_length,av_slip,system_wide,partial_rupture,event_cluster,lead_fs,major_pr,minor_pr

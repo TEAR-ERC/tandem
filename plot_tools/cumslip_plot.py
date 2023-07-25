@@ -2,7 +2,7 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.07.10.
+Last modification: 2023.07.24.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -65,7 +65,7 @@ def cumslip_basic(ax,prefix,cumslip_outputs,rths):
     # cumslip_outputs[2] = [cscreep,depcreep]
     # cumslip_outputs[3] = [cscoseis,depcoseis]
     # cumslip_outputs[4] = [csinterm,depinterm]
-    system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:]
+    system_wide,partial_rupture,event_cluster,lead_fs = analyze_events(cumslip_outputs,rths)[2:6]
     Hs = ch.load_parameter(prefix)[1]
     ver_info = ch.version_info(prefix)
 
@@ -77,9 +77,11 @@ def cumslip_basic(ax,prefix,cumslip_outputs,rths):
     ax.set_xlabel('Cumulative Slip [m]',fontsize=30)
     if len(system_wide) > 0:
         ax.scatter(cumslip_outputs[1][0][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
+    if len(lead_fs) > 0:
+        ax.scatter(cumslip_outputs[1][0][lead_fs],cumslip_outputs[1][1][lead_fs],marker='d',s=250,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Leading foreshocks')
     if len(partial_rupture) > 0:
         # ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
-        ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+        ax.scatter(cumslip_outputs[1][0][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=2,label='Partial rupture events')
     # ax.legend(fontsize=25,framealpha=1,loc='lower right')
     ax.legend(fontsize=20,framealpha=1,loc='lower right')
     xl = ax.get_xlim()
@@ -92,7 +94,7 @@ def cumslip_basic(ax,prefix,cumslip_outputs,rths):
 def cumslip_spinup(ax,prefix,cumslip_outputs,spup_cumslip_outputs,rths):
     # spup_cumslip_outputs = [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spup_csinterm, spin_up_idx]
     # new_inits = [new_init_Sl,new_init_dp]
-    system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:]
+    system_wide,partial_rupture,event_cluster,lead_fs = analyze_events(cumslip_outputs,rths)[2:6]
     Hs = ch.load_parameter(prefix)[1]
     ver_info = ch.version_info(prefix)
 
@@ -102,9 +104,11 @@ def cumslip_spinup(ax,prefix,cumslip_outputs,spup_cumslip_outputs,rths):
     ax.plot(spup_cumslip_outputs[2],cumslip_outputs[2][1],color='0.62',lw=1)
     if len(system_wide) > 0:
         ax.scatter(spup_cumslip_outputs[1][system_wide],cumslip_outputs[1][1][system_wide],marker='*',s=700,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='System-wide events')
+    if len(lead_fs) > 0:
+        ax.scatter(spup_cumslip_outputs[1][lead_fs],cumslip_outputs[1][1][lead_fs],marker='d',s=250,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Leading foreshocks')
     if len(partial_rupture) > 0:
         # ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='*',s=700,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
-        ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=3,label='Partial rupture events')
+        ax.scatter(spup_cumslip_outputs[1][partial_rupture],cumslip_outputs[1][1][partial_rupture],marker='d',s=250,facecolor=mylightblue,edgecolors='k',lw=1,zorder=2,label='Partial rupture events')
     # ax.legend(fontsize=25,framealpha=1,loc='lower right')
     ax.legend(fontsize=20,framealpha=1,loc='lower right')
     xl = ax.get_xlim()

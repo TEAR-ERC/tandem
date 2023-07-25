@@ -3,12 +3,10 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: implement new faultout image plots
-Last modification: 2023.07.22.
+Last modification: 2023.07.24.
 '''
 import numpy as np
-import glob
 import argparse
-import csv
 import setup_shortcut
 
 sc = setup_shortcut.setups()
@@ -58,11 +56,13 @@ parser.add_argument("-mg","--mingap", type=float, help=": Minimum seperation tim
 # Miscellaneous plots
 parser.add_argument("-evan","--ev_anal", action="store_true", help=": ON/OFF event analyzation plot")
 parser.add_argument("-stf","--STF", action="store_true", help=": ON/OFF STF plot")
+parser.add_argument("-M0","--M0", type=str.lower, choices=['1d','approx2d'], help=": Produce M0 plot of your choice ['1d','approx2d']")
+parser.add_argument("-Mw","--Mw", action="store_true", help="When used with --M0, plots output in Mw scale")
 
 args = parser.parse_args()
 
 # --- Check dependencies
-if args.cumslip or args.ev_anal or args.STF or args.image:        # When args.cumslip are true
+if args.cumslip or args.ev_anal or args.STF or args.image or args.M0:        # When args.cumslip are true
     if not args.dt_creep:
         parser.error('Required field \'dt_creep\' is not defined - check again')
     if not args.dt_coseismic:
@@ -179,6 +179,20 @@ if args.STF:
     else:
         spin_up_idx = 0
     plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,args.rths)
+
+if args.M0:
+    from misc_plots import plot_M0
+    if not 'cumslip_outputs' in locals():
+        from cumslip_compute import *
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
+
+    if args.spin_up > 0:
+        if not 'spin_up_idx' in locals():
+            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+    else:
+        spin_up_idx = 0
+    plot_M0(save_dir,cumslip_outputs,spin_up_idx,args.rths,args.M0,args.Mw)
+
 
 # Input variable profile -----------------------------------------------------------------------------------------------------------------
 if args.stressprof:
