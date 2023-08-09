@@ -65,10 +65,12 @@ Then install using the following commands:
 
 ```bash
 $ git clone https://github.com/TEAR-ERC/tandem
-$ cd tandem
+$ cd tandem/
+$ git submodule update --init
 $ mkdir build
 $ cd build
 $ cmake .. -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DARCH=hsw -DPOLYNOMIAL_DEGREE=4 -DDOMAIN_DIMENSION=2
+$ make -j
 ```
 
 Here the following options were used:
