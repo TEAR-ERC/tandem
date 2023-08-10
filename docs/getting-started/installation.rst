@@ -197,3 +197,5 @@ cannot find your libraries, try to set the `CMAKE_PREFIX_PATH <https://cmake.org
 .. code:: console
 
    $ cmake .. -DPOLYNOMIAL_DEGREE=6 -DCMAKE_PREFIX_PATH=/path/to/your/libs
+
+If you require multiple paths to CMake, the syntax is as follows :code:`-DCMAKE_PREFIX_PATH="/usr/local/path_1;/usr/local/path_2"` 
