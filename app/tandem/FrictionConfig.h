@@ -40,6 +40,7 @@ public:
     constexpr static char Sinit[] = "Sinit";
     constexpr static char Source[] = "source";
     constexpr static char DeltaTau[] = "delta_tau";
+    constexpr static char DeltaSn[] = "delta_sn";
     constexpr static char FaultSolution[] = "fault_solution";
 
     DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
@@ -74,6 +75,12 @@ public:
                                        DieterichRuinaAgeing::TangentialComponents>(scenario,
                                                                                    DeltaTau));
         }
+        if (lib_.hasMember(scenario, DeltaSn)) {
+            delta_sn_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension + 1,
+                                       1>(scenario,
+                                                                                   DeltaSn));
+        }
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
         cp_.b = lib_.getMemberConstant(scenario, B);
@@ -102,6 +109,7 @@ public:
     }
     auto const& source_fun() const { return source_; }
     auto const& delta_tau_fun() const { return delta_tau_; }
+    auto const& delta_sn_fun() const { return delta_sn_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
             auto sol = *solution_;
@@ -124,6 +132,7 @@ protected:
         -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_ = std::nullopt;
     std::optional<vector_functional_t<DomainDimension + 1>> delta_tau_ = std::nullopt;
+    std::optional<functional_t<DomainDimension + 1>> delta_sn_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
 };
 
