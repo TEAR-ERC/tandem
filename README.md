@@ -59,7 +59,7 @@ tandem relies on the following open-source projects:
 
 ## Installation
 
-For information on installing the dependencies and a detailed guide to installing Tandem, check out [installation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
+For information on installing the dependencies and a detailed guide to installing Tandem, check out the [installation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
 
 You need a recent C++17 compiler (GCC ≥ 8.0 or clang ≥ 8)) and you need to install
 the [dependencies](#dependencies).
