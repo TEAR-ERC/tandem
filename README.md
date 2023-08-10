@@ -59,6 +59,8 @@ tandem relies on the following open-source projects:
 
 ## Installation
 
+For information on installing the dependencies and a detailed guide to installing Tandem, check out [installation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
+
 You need a recent C++17 compiler (GCC ≥ 8.0 or clang ≥ 8)) and you need to install
 the [dependencies](#dependencies).
 Then install using the following commands:
@@ -79,7 +81,6 @@ Here the following options were used:
 * POLYNOMIAL_DEGREE: The polynomial degree of the finite element spaces
 * DOMAIN_DIMENSION: Set 2 for triangle meshes and 3 for tetrahedral meshes
 
-Check out the detailed [installation guide](https://tandem.readthedocs.io/en/latest/getting-started/installation.html).
 
 ## Documentation
 
