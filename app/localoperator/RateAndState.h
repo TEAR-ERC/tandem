@@ -28,6 +28,7 @@ public:
         std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
     using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
         std::array<double, DomainDimension + 1> const&)>;
+    using delta_sn_fun_t = std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -44,6 +45,9 @@ public:
     void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }
     void set_delta_tau_fun(delta_tau_fun_t delta_tau) {
         delta_tau_ = std::make_optional(std::move(delta_tau));
+    }
+    void set_delta_sn_fun(delta_sn_fun_t delta_sn) {
+        delta_sn_ = std::make_optional(std::move(delta_sn));
     }
 
     void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator<double>&) const;
@@ -75,6 +79,10 @@ private:
         }
         return result;
     }
+    template <typename T> auto get_sn(std::size_t node, Matrix<T> const& traction) const {
+        std::array<double, 1> result;
+        return result;
+    }
     auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
         std::array<double, DomainDimension + 1> xt;
@@ -82,10 +90,19 @@ private:
         xt.back() = time;
         return (*delta_tau_)(xt);
     }
+    auto get_delta_sn(double time, std::size_t faultNo, std::size_t node) const {
+        auto x = fault_[faultNo].template get<Coords>()[node];
+        std::array<double, DomainDimension + 1> xt;
+        std::copy(x.begin(), x.end(), xt.begin());
+        xt.back() = time;
+        return (*delta_sn_)(xt)[0];
+    }
+
 
     Law law_;
     std::optional<source_fun_t> source_;
     std::optional<delta_tau_fun_t> delta_tau_;
+    std::optional<delta_sn_fun_t> delta_sn_;
 };
 
 template <class Law>
@@ -113,6 +130,9 @@ double RateAndState<Law>::init(double time, std::size_t faultNo,
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
+        if (delta_sn_) {
+            sn = sn + get_delta_sn(time, faultNo, node);
+        }
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
@@ -137,6 +157,9 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto t_mat = traction_mat(traction);
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
+	if (delta_sn_) {
+            sn = sn + get_delta_sn(time, faultNo, node);
+	}
         auto psi = s_mat(node, PsiIndex);
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
@@ -195,6 +218,9 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
+	if (delta_sn_) {
+            sn = sn + get_delta_sn(time, faultNo, node);
+	}
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
