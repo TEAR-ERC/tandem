@@ -89,25 +89,31 @@ public:
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
-            double a = 0.0;
-            double b = tauAbs / eta;
-            if (a > b) {
-                std::swap(a, b);
-            }
-            auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
-                return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
-            };
-            try {
-                V = zeroIn(a, b, fF);
-            } catch (std::exception const&) {
-                std::cout << "sigma_n = " << snAbs << std::endl
-                          << "|tau| = " << tauAbs << std::endl
-                          << "psi = " << psi << std::endl
-                          << "L = " << a << std::endl
-                          << "U = " << b << std::endl
-                          << "F(L) = " << fF(a) << std::endl
-                          << "F(U) = " << fF(b) << std::endl;
-                throw;
+            if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
+                snAbs = 0.0; /* Just to illustrate what we are doing */
+                /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
+                V = tauAbs / eta;
+            } else {
+                double a = 0.0;
+                double b = tauAbs / eta;
+                if (a > b) {
+                    std::swap(a, b);
+                }
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
+                    return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+                };
+                try {
+                    V = zeroIn(a, b, fF);
+                } catch (std::exception const&) {
+                    std::cout << "sigma_n = " << snAbs << std::endl
+                              << "|tau| = " << tauAbs << std::endl
+                              << "psi = " << psi << std::endl
+                              << "L = " << a << std::endl
+                              << "U = " << b << std::endl
+                              << "F(L) = " << fF(a) << std::endl
+                              << "F(U) = " << fF(b) << std::endl;
+                    throw;
+                }
             }
         }
         return -(V / tauAbs) * tauAbsVec;
