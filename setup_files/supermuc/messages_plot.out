@@ -1,15 +1,29 @@
 num_nodes: 1 ntasks: 1 cpus_per_task:
-scaling_test/v6_ab2_Dc2_n40_p3
-Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n40_p3/outputs.npy
-Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n40_p3/outputs_depthinfo.npy
-Load saved data: /hppfs/scratch/06/di75weg/scaling_test/v6_ab2_Dc2_n40_p3/const_params.npy
+Thakur20_various_fractal_profiles/v6_Dc2
+Required field 'Vths' not defined - using default value 1e-2 m/s
+Field 'SRvar' not defined - using default value 0.15
+Load saved data: /hppfs/scratch/06/di75weg/Thakur20_various_fractal_profiles/v6_Dc2/outputs.npy
+Load saved data: /hppfs/scratch/06/di75weg/Thakur20_various_fractal_profiles/v6_Dc2/outputs_depthinfo.npy
+Load saved data: /hppfs/scratch/06/di75weg/Thakur20_various_fractal_profiles/v6_Dc2/const_params.npy
 Cumulative slip vs. Depth plot >>> No cutting
-Slip rate > 1e-01
-Full image
-Plot in time [s]
+Slip rate > 1e-02
+Negligible events with SR variation < 0.1Vths: [ 3 10 11 14 15 18 19 22 23 26 27 30 31 34 35 38 39 42 43 46 47 50 51]
 Fractal normal stress model ver.6
-Fractal a-b model ver.2
 Fractal Dc model ver.2
 Using file fractal_snpre_06
-Using file fractal_ab_02
+Using file fractal_Dc_02
+Fractal normal stress model ver.6
+Fractal Dc model ver.2
+Using file fractal_snpre_06
+Using file fractal_Dc_02
+Fractal normal stress model ver.6
+Fractal Dc model ver.2
+Using file fractal_snpre_06
+Using file fractal_Dc_02
+Total 6720 points
+Full image
+Plot in time steps
+Fractal normal stress model ver.6
+Fractal Dc model ver.2
+Using file fractal_snpre_06
 Using file fractal_Dc_02
