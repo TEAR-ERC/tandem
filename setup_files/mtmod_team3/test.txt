@@ -1,0 +1,9 @@
+how the linear eq is solved
+
+matrix_free: 
+mg_strategy: monolithic vs. logarithmic (degree /2); may not be necessary for 2D
+
+type tecplot:
+
+
+

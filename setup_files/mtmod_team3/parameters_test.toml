@@ -1,0 +1,33 @@
+final_time = 10000000
+mesh_file = "planar_02_10.msh"
+mode = "QDGreen"
+type = "elasticity"
+lib = "matfric_Fourier_main.lua"
+scenario = "test"
+ref_normal = [1, 0]
+boundary_linear = true
+
+gf_checkpoint_prefix = "/home/jyun/Tandem/mtmod_team3/gf_base/planar_02_10_homref"
+
+[domain_probe_output]
+prefix = "domain_probe_"
+probes = [
+    { name = "l001", x = [-400.0000, -0.0000] },
+    { name = "l002", x = [-400.0000, -100.0000] },
+    { name = "l003", x = [-400.0000, -200.0000] },
+    { name = "l004", x = [-200.0000, -0.0000] },
+    { name = "l005", x = [-200.0000, -100.0000] },
+    { name = "l006", x = [-200.0000, -200.0000] },
+    { name = "l007", x = [0.0000, -100.0000] },
+    { name = "l008", x = [0.0000, -200.0000] },
+    { name = "r001", x = [746.4101, -0.0000] },
+    { name = "r002", x = [746.4101, -100.0000] },
+    { name = "r003", x = [746.4101, -200.0000] },
+    { name = "r004", x = [350.0, -0.0000] },
+    { name = "r005", x = [350.0, -100.0000] },
+    { name = "r006", x = [350.0, -200.0000] },
+    { name = "r007", x = [100.0, -0.0000] },
+    { name = "r008", x = [100.0, -100.0000] },
+    { name = "r009", x = [100.0, -200.0000] }
+]
+rtol = 0.1
