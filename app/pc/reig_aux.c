@@ -8,6 +8,7 @@ PetscErrorCode VecOrthonormalize_ModifiedGramSchmidt(PetscInt n,const Vec X[])
   PetscInt       j,k;
   PetscReal      nrm,dot;
   
+  PetscFunctionBegin;
   for (j=0; j<n; j++) {
     q = X[j];
     ierr = VecNorm(q,NORM_2,&nrm);CHKERRQ(ierr);
@@ -24,6 +25,7 @@ PetscErrorCode VecOrthonormalize_ModifiedGramSchmidt(PetscInt n,const Vec X[])
 PetscErrorCode VecOrthonormalize(PetscInt n,const Vec X[])
 {
   PetscErrorCode ierr;
+  PetscFunctionBegin;
   ierr = VecOrthonormalize_ModifiedGramSchmidt(n,X);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -36,6 +38,7 @@ PetscErrorCode MatDenseOrthonormalize(Mat Q)
   Vec            *q;
   PetscScalar    *array;
 
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -77,6 +80,7 @@ PetscErrorCode MatDenseCopyFast(Mat A,Mat B)
   Mat            lA;
   PetscScalar    *_a,*_b;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -102,6 +106,7 @@ PetscErrorCode _MatDenseCreateEmptyColumnVec(Mat A,Vec *v)
   PetscInt       M,N,m,n,bs;
   PetscMPIInt    commsize;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -129,6 +134,7 @@ PetscErrorCode _MatDenseSetColumnVec(Mat A,PetscInt j,Vec v)
   PetscInt       lda;
   PetscScalar    *array;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -147,6 +153,7 @@ PetscErrorCode _MatDenseSetColumnVec(Mat A,PetscInt j,Vec v)
 PetscErrorCode _MatDenseResetColumnVec(Mat A,PetscInt j,Vec v)
 {
   PetscErrorCode ierr;
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -171,6 +178,7 @@ PetscErrorCode MatSetRandomConsistent(Mat Q)
   PetscRandom       randObj;
   const PetscScalar *_q;
 
+  PetscFunctionBegin;
   ierr = MatZeroEntries(Q);CHKERRQ(ierr);
   ierr = MatGetSize(Q,&M,&N);CHKERRQ(ierr);
   ierr = VecCreate(PETSC_COMM_SELF,&q);CHKERRQ(ierr);
@@ -210,6 +218,7 @@ PetscErrorCode MatDenseSetRandomConsistent(Mat Q)
   const PetscScalar *_q;
   PetscScalar       *_Q;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -265,6 +274,7 @@ PetscErrorCode MatMultRedundant_MatDenseVecSeq(Mat A,Vec x,Vec y)
   PetscInt       m,bs;
   PetscScalar    *_y;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -301,6 +311,7 @@ PetscErrorCode MatMatMult_MatDense(Mat A,Mat X,MatReuse scall,Mat *_Y)
   Vec            Xj,Yj;
   Mat            Y;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -372,6 +383,7 @@ PetscErrorCode KSPMatMult_MatDense(KSP ksp,Mat X,MatReuse scall,Mat *_Y)
   Vec            Xj,Yj;
   Mat            Y;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -454,6 +466,7 @@ PetscErrorCode MatMatMult_MatDense_InPlace(Mat A,Mat X)
   PetscInt       j,N;
   Vec            Xj,Yj;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -494,6 +507,7 @@ PetscErrorCode KSPMatMult_MatDense_InPlace(KSP ksp,Mat X,PetscBool use_nonzero_g
   Vec            Xj,Yj;
   PetscBool      flg;
 
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -547,6 +561,7 @@ PetscErrorCode MatPtAP_MatDense(Mat A,Mat P,MatReuse scall,Mat *_Y)
   Vec            Pj,APj,Ptj,Yj;
   Mat            Y;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -621,6 +636,7 @@ PetscErrorCode MatPtInvAP_MatDense(KSP ksp,Mat P,MatReuse scall,Mat *_Y)
   Vec            Pj,APj,Ptj,Yj;
   Mat            Y;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense[] = {PETSC_FALSE,PETSC_FALSE};
@@ -693,6 +709,7 @@ PetscErrorCode MatDenseSymmetrizeSEQ(Mat A)
   PetscInt       m,i,j;
   PetscErrorCode ierr;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense = PETSC_FALSE;
@@ -728,6 +745,7 @@ PetscErrorCode lapackeigs(Mat R,Vec eigs)
   double         wkopt;
   double         *work,*w,*a;
   
+  PetscFunctionBegin;
 #if defined(PETSC_USE_DEBUG)
   {
     PetscBool isdense = PETSC_FALSE;
@@ -773,6 +791,7 @@ PetscErrorCode RandEigsMax_3_InPlace(Mat A,PetscInt k,PetscInt o,PetscInt power_
   PetscMPIInt    commsize;
   MPI_Comm       comm;
   
+  PetscFunctionBegin;
   ierr = PetscObjectGetComm((PetscObject)A,&comm);CHKERRQ(ierr);
   ierr = MPI_Comm_size(comm,&commsize);CHKERRQ(ierr);
   
@@ -892,6 +911,7 @@ PetscErrorCode RandEigsMin_3_InPlace(KSP ksp,PetscInt k,PetscInt o,PetscInt powe
   PetscMPIInt    commsize;
   PetscBool      flg = PETSC_FALSE;
   
+  PetscFunctionBegin;
   ierr = KSPGetOperators(ksp,&A,NULL);CHKERRQ(ierr);
   ierr = MatGetSize(A,&M,NULL);CHKERRQ(ierr);
   ierr = MatGetLocalSize(A,&m,NULL);CHKERRQ(ierr);
@@ -1069,6 +1089,7 @@ PetscErrorCode RandEigsMax(Mat A,PetscInt k,PetscInt o,PetscInt pits,PetscRandom
   PetscMPIInt    commsize;
   PetscInt       M,N;
   
+  PetscFunctionBegin;
   comm = PetscObjectComm((PetscObject)A);
   ierr = MPI_Comm_size(comm,&commsize);CHKERRQ(ierr);
   ierr = MatGetSize(A,&M,&N);CHKERRQ(ierr);
@@ -1086,6 +1107,7 @@ PetscErrorCode RandEigsMin(KSP ksp,PetscInt k,PetscInt o,PetscInt pits,PetscRand
   Mat            A;
   PetscInt       M,N;
   
+  PetscFunctionBegin;
   ierr = KSPGetOperators(ksp,&A,NULL);CHKERRQ(ierr);
   comm = PetscObjectComm((PetscObject)A);
   ierr = MPI_Comm_size(comm,&commsize);CHKERRQ(ierr);
