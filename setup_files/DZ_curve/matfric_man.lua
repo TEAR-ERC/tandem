@@ -52,24 +52,14 @@ function BP1:boundary(x, y, t)
 end
 
 function BP1:mu(x, y)
-	-- print("BP1:mu(x, y) -> ", r)
-    -- if r == 1.0 then
-    --     print("BP1: r, mu ->",r,self.mu_damage)
-    --     return self.mu_damage
-    -- else
-    --     print("BP1: r, mu ->",r,self.mu_default)
-    --     return self.mu_default
-    -- end
     local z = -y
     local region = 2.
     
     if x <= self.fzw then
         if z <= self.fzd-self.fzw then
-            -- return self.mu_damage
             region = 1.
         elseif z <= self.fzd then
             if x <= math.sqrt(self.fzw^2 - (z-(self.fzd-self.fzw))^2) then
-                -- return self.mu_damage
                 region = 1.
             end
         end
@@ -83,8 +73,6 @@ function BP1:mu(x, y)
 end
 
 function BP1:eta(x, y)
-    -- print("BP1:eta")
-	-- print("BP1:eta(y, r) -> (", y, ",", r, ")")
     local z = -y
     if z <= self.fzd then
         return math.sqrt(self.mu_damage * self.rho0) / 2.0
@@ -94,12 +82,10 @@ function BP1:eta(x, y)
 end
 
 function BP1:L(x, y)
-    -- print("BP1:L")
     return 0.004
 end
 
 function BP1:sn_pre(x, y)
-    -- print("BP1:sn_pre")
     local z = -y
     local _sigma1 = self.sig2 + (self.sig2 - self.sig1) * (z - self.H2) / self.H2
     if z < self.H2 then
@@ -110,12 +96,10 @@ function BP1:sn_pre(x, y)
 end
 
 function BP1:Vinit(x, y)
-    -- print("BP1:Vinit")
     return 1.0e-9
 end
 
 function BP1:ab(x, y)
-    -- print("BP1:ab")
     local z = -y
     local _ab1 = self.a_b2 + (self.a_b2 - self.a_b1) * (z - self.H2) / self.H2
     local _ab2 = self.a_b2 + (self.a_b3 - self.a_b2) * (z - self.H) / self.h
@@ -135,12 +119,10 @@ function BP1:ab(x, y)
 end
 
 function BP1:b(x, y)
-    -- print("BP1:b")
     return self.b0
 end
 
 function BP1:a(x, y)
-    -- print("BP1:a")
     local z = -y
     local _ab = self:ab(x, y)
     local _b = self:b(x, y)
@@ -148,7 +130,6 @@ function BP1:a(x, y)
 end
 
 function BP1:tau_pre(x, y)
-    -- print("BP1:tau_pre")
     local z = -y
     local _tau1 = self.tau2 + (self.tau2 - self.tau1) * (z - self.H2) / self.H2
     local _tau2 = self.tau2 + (self.tau3 - self.tau2) * (z - self.H) / self.h

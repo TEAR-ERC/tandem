@@ -1,5 +1,5 @@
-DefineConstant[ hd = {0.010, Min 0, Max 1000, Name "Damage zone resolution" } ];
-DefineConstant[ hf = {0.030, Min 0, Max 1000, Name "Fault resolution" } ];
+DefineConstant[ hd = {0.01, Min 0, Max 1000, Name "Damage zone resolution" } ];
+DefineConstant[ hf = {0.03, Min 0, Max 1000, Name "Fault resolution" } ];
 DefineConstant[ h = {50.0, Min 0, Max 1000, Name "Far boundary resolution" } ];
 DefineConstant[ D = {400, Min 0, Max 10000, Name "Domain size" } ];
 

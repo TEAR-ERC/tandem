@@ -5,7 +5,7 @@ BP1.a_b1 = 0.012
 BP1.a_b2 = -0.004
 BP1.a_b3 = 0.015
 BP1.a_b4 = 0.024
-BP1.b0 = 0.019
+BP1.b = 0.019
 
 -- Shear stress [MPa]: negative for right-lateral
 BP1.tau1 = -10
@@ -23,6 +23,7 @@ BP1.h = 5.0
 BP1.H2 = 2.0
 
 -- DZ-related parameters (r = 1: DZ, 2: elsewhere)
+BP1.fzw = 0.5           -- Damage zone width [km]
 BP1.fzd = 10.5          -- Damage zone depth [km]
 BP1.mu_default = 32     -- Default shear modulus [GPa]
 BP1.mu_damage = 10      -- DZ shear modulus [GPa]
@@ -40,7 +41,7 @@ function BP1:new(o)
     return o
 end
 
-function BP1:boundary(x, y, t, r)
+function BP1:boundary(x, y, t)
     if x > 1.0 then
         return self.Vp/2.0 * t
     elseif x < -1.0 then
@@ -50,35 +51,43 @@ function BP1:boundary(x, y, t, r)
     end
 end
 
-function BP1:mu(x, y, r)
-	-- print("BP1:mu(x, y, r) -> ", r)
-    if r == 1.0 then
-        print("BP1: r, mu ->",r,self.mu_damage)
+function BP1:mu(x, y)
+    local z = -y
+    local region = 2.
+    
+    if x <= self.fzw then
+        if z <= self.fzd-self.fzw then
+            region = 1.
+        elseif z <= self.fzd then
+            if x <= math.sqrt(self.fzw^2 - (z-(self.fzd-self.fzw))^2) then
+                region = 1.
+            end
+        end
+    end
+
+    if region == 1. then
         return self.mu_damage
-    else
-        print("BP1: r, mu ->",r,self.mu_default)
+    elseif region == 2. then
         return self.mu_default
     end
 end
 
-function BP1:eta(x, y, r)
-    print("BP1:eta")
-	-- print("BP1:eta(y, r) -> (", y, ",", r, ")")
+function BP1:eta(x, y)
     local z = -y
-    if z < self.fzd then
+    if z <= self.fzd then
         return math.sqrt(self.mu_damage * self.rho0) / 2.0
     else
         return math.sqrt(self.mu_default * self.rho0) / 2.0
     end
 end
 
-function BP1:L(x, y, r)
-    print("BP1:L")
-    return 0.008
+function BP1:L(x, y)
+    -- print("BP1:L")
+    return 0.004
 end
 
-function BP1:sn_pre(x, y, r)
-    print("BP1:sn_pre")
+function BP1:sn_pre(x, y)
+    -- print("BP1:sn_pre")
     local z = -y
     local _sigma1 = self.sig2 + (self.sig2 - self.sig1) * (z - self.H2) / self.H2
     if z < self.H2 then
@@ -88,13 +97,13 @@ function BP1:sn_pre(x, y, r)
     end
 end
 
-function BP1:Vinit(x, y, r)
-    print("BP1:Vinit")
+function BP1:Vinit(x, y)
+    -- print("BP1:Vinit")
     return 1.0e-9
 end
 
-function BP1:ab(x, y, r)
-    print("BP1:ab")
+function BP1:ab(x, y)
+    -- print("BP1:ab")
     local z = -y
     local _ab1 = self.a_b2 + (self.a_b2 - self.a_b1) * (z - self.H2) / self.H2
     local _ab2 = self.a_b2 + (self.a_b3 - self.a_b2) * (z - self.H) / self.h
@@ -113,21 +122,16 @@ function BP1:ab(x, y, r)
     end
 end
 
-function BP1:b(x, y, r)
-    print("BP1:b")
-    return self.b0
-end
-
-function BP1:a(x, y, r)
-    print("BP1:a")
+function BP1:a(x, y)
+    -- print("BP1:a")
     local z = -y
-    local _ab = self:ab(x, y, r)
-    local _b = self:b(x, y, r)
+    local _ab = self:ab(x, y)
+    local _b = self.b
     return _ab + _b
 end
 
-function BP1:tau_pre(x, y, r)
-    print("BP1:tau_pre")
+function BP1:tau_pre(x, y)
+    -- print("BP1:tau_pre")
     local z = -y
     local _tau1 = self.tau2 + (self.tau2 - self.tau1) * (z - self.H2) / self.H2
     local _tau2 = self.tau2 + (self.tau3 - self.tau2) * (z - self.H) / self.h
@@ -146,7 +150,7 @@ end
 bp1 = BP1:new()
 
 bp1_sym = BP1:new()
-function bp1_sym:boundary(x, y, t, r)
+function bp1_sym:boundary(x, y, t)
     return self.Vp/2.0 * t
 end
 

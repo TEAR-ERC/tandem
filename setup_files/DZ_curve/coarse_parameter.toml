@@ -1,8 +1,8 @@
-final_time = 22075200000
-mesh_file = "DZcurve03.msh"
+final_time = 22075200000 
+mesh_file = "DZcurve_coarse02.msh"
 mode = "QDGreen"
 type = "poisson"
-lib = "matfric_main.lua"
+lib = "matfric_man.lua"
 scenario = "bp1_sym"
 ref_normal = [-1, 0]
 boundary_linear = true
