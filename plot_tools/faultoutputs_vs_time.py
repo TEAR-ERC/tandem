@@ -77,8 +77,8 @@ def stress_time(save_dir,outputs,dep,stress,plot_in_sec,save_on=True):
     indx = np.argmin(abs(abs(dep) - abs(target_depth)))
     print('Depth = %1.1f [km]'%abs(dep[indx]))
 
-    fig,ax = plt.subplots(ncols=2,figsize=(14,6))
     plt.rcParams['font.size'] = '15'
+    fig,ax = plt.subplots(ncols=2,figsize=(14,6))
     if plot_in_sec:        # --- Plot in seconds
         ax[0].plot(np.array(outputs[indx])[:,0], np.array(outputs[indx])[:,3], color='k', lw=2.5)
         ax[0].set_xlabel('Time [s]',fontsize=17)

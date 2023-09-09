@@ -25,6 +25,37 @@ class setups:
             setup_dir = '/home/jyun/Tandem'
         return setup_dir
     
+    def faultprobe_loc(self,prefix,dtmin,dtmax,dip=90,write_on=False):
+        import change_params
+        ch = change_params.variate()
+        Hs = ch.load_parameter(prefix)[1]
+        dep = []
+        c,d = 0,0
+        if write_on: fid = open('%s/fp.txt'%(prefix.split('/')[0]),'w')
+        if dip == 90:
+            while d <= Hs[0]:
+                if d < Hs[1]+Hs[2]:
+                    dt = dtmin
+                else:
+                    dt = dtmax
+                if write_on: fid.write('{ name = "fp%03d", x = [0.0, %1.4f] },\n'%(c,-d))
+                dep.append(-d)
+                d += dt
+                c += 1
+        else:
+            dip = np.deg2rad(dip)
+            while d <= Hs[0]:
+                if d < Hs[1]:
+                    dt = dtmin # 0.5
+                else:
+                    dt = dtmax #5
+                x = -d/np.tan(np.pi-dip)
+                if write_on: fid.write('{ name = "fp%03d", x = [%1.4f, %1.4f] },\n'%(c,x,-d))
+                dep.append([x,-d])
+                d += dt
+                c += 1
+        if write_on: fid.close()
+        return np.array(dep)
     def sec2hms(self,sec):
         """
         Convert seconds into hour-minute-second format
@@ -58,7 +89,8 @@ class setups:
         V0 = 1.0e-6
         Dc = 0.004
         f0 = 0.6
-        others = [Vp,rho0,V0,f0]
+        dtmin,dtmax=0.02,1
+        others = [dtmin,dtmax,Vp,rho0,V0,f0]
 
         b = 0.019
         a_b1 = 0.012
@@ -99,7 +131,7 @@ class setups:
         else:
             prefix = prefix_in
 
-        if prefix == 'BP1' or prefix == 'newBP1':
+        if 'BP1' in prefix:
             Wf = 40
             y = np.linspace(0,-Wf,1000)
             z = -y
@@ -261,6 +293,107 @@ class setups:
             sigma0[z < H2] = sigma02 + (sigma02 - sigma01)*(z[z < H2]-H2)/H2
 
             L = Dc*np.ones(z.shape)
+
+        elif prefix == 'mtmod_team3':
+            Wf = 100
+            y = np.linspace(0,-Wf,2500)
+            z = -y
+
+            dip = np.deg2rad(30)
+            x = np.linspace(0,Wf/np.tan(dip),2500)
+            H2 = 80 * np.sin(dip)
+            H = 60 * np.sin(dip)
+            h = 20 * np.sin(dip)
+            Hs = [Wf,H,h]
+
+            avs = 0.025
+            if 'shallowVS' in prefix_in:
+                avw_shallow = 0.02
+            else:
+                avw_shallow = 0.012
+            avw_asperity = 0.011
+            b = 0.015
+
+            a = avs*np.ones(z.shape)
+            if 'lina' in prefix_in or 'linear_base' in prefix_in:
+                a[z < H2] = avs + (avs-avw_asperity)*(z[z < H2]-H2)/(H2-H)
+                a[z < H] = avw_asperity*np.ones(z[z < H].shape)
+                a[z < h] = avw_asperity + (avw_asperity-avw_shallow)*(z[z < h]-h)/h
+            else:
+                a[z < H] = avw_asperity*np.ones(z[z < H].shape)
+                a[z < h] = avw_shallow*np.ones(z[z < h].shape)
+            b = b*np.ones(a.shape)
+            a_b = a - b
+
+            if 'highsn' in prefix_in or 'linear_base' in prefix_in or 'linearsn' in prefix_in:
+                sigma_vs = 50
+                sigma_asperity = 50
+            elif 'lowsn' in prefix_in:
+                sigma_vs = 30
+                sigma_asperity = 30                
+            else:
+                sigma_vs = 20
+                sigma_asperity = 50
+            sigma_shallow = 5
+            cs0 = 3.464e3
+            rho0 = 2.670
+            if 'patchmu' in prefix_in:
+                cs_high = 3.464e3
+                cs_low = 2.887e3
+                mu_sed = 6.8e9
+                sed_xlim = 35
+                sed_ylim = 5
+            else:
+                mu0 = cs0**2*rho0
+            Vinit = 1.0e-9
+            f0 = 0.6
+            V0 = 1.0e-6
+            Dc = 5e-3
+            Dc_asperity = 1e-2
+            Vp = 1e-9
+            dtmin,dtmax=0.5,5
+            others = [dtmin,dtmax,Vp,rho0,V0,f0]
+
+            sigma0 = sigma_vs*np.ones(z.shape)
+            if 'linear_base' in prefix_in or 'linearsn' in prefix_in:
+                sigma0[z < H] = sigma_asperity*np.ones(z[z < H].shape)
+                sigma0[z < h] = sigma_asperity + (sigma_asperity-sigma_shallow)*(z[z < h]-h)/h
+            else:
+                sigma0[z < H] = sigma_asperity*np.ones(z[z < H].shape)
+                sigma0[z < h] = sigma_shallow*np.ones(z[z < h].shape)
+
+            L = Dc*np.ones(z.shape)
+            if 'lindc' in prefix_in or 'linear_base' in prefix_in:
+                L[z < H2] = Dc + (Dc-Dc_asperity)*(z[z < H2]-H2)/(H2-H)
+                L[z < H] = Dc_asperity*np.ones(z[z < H].shape)
+                L[z < h] = Dc_asperity + (Dc_asperity-Dc)*(z[z < h]-h)/h
+            else:
+                L[z < H] = Dc_asperity*np.ones(z[z < H].shape)
+                L[z < h] = Dc*np.ones(z[z < h].shape)
+            
+            if 'gradmu' in prefix_in:
+                print('gradmu')
+                mu = np.sqrt(z*60)+2.5
+            elif 'patchmu' in prefix_in:
+                print('patchmu')
+                mu_high = cs_high**2*rho0
+                mu_low = cs_low**2*rho0
+                mu = mu_high*np.ones(z.shape)
+                idx = np.where(x >= -z/np.tan(np.pi-dip))
+                mu[idx] = mu_low*np.ones(mu[idx].shape)
+                mu[idx][np.where(np.logical_and(x <= sed_xlim, y<= sed_ylim))] = \
+                    mu_sed*np.ones(mu[idx][np.where(np.logical_and(x <= sed_xlim, y<= sed_ylim))].shape)
+            else:
+                mu = mu0*np.ones(z.shape)
+            others.append(mu)
+            eta = np.sqrt(mu * rho0) / 2.0
+            Vi = Vinit*np.ones(z.shape)
+            # tau0 = f0*sigma0
+            e = np.exp((f0 + b * np.log(V0 / Vi)) / avs)
+            tau0 = -(sigma0 * avs * np.arcsinh((Vi / (2.0 * V0)) * e) + eta * Vi)
+            # tau0 = -(sigma0 * f0 + np.log(Vp/np.cos(dip)/V0))
+            # tau0[z < h] = -sigma0[z < h] * f0
+            
             return y,Hs,a,b,a_b,tau0,sigma0,L,others
 
         else:
@@ -295,13 +428,13 @@ class setups:
                 params['mu'] = float(var)
                 here = False
 
-            if 'BP1.' in line:
+            if 'mtmod.' in line:
                 var = line.split('BP1.')[-1].split(' = ')
                 if len(var[1].split('--')) > 1:
                     params[var[0]] = float(var[1].split('--')[0])            
                 else:
                     params[var[0]] = float(var[1])
-            elif 'BP1:mu' in line and 'DZ' not in prefix:
+            elif 'mtmod:mu' in line and 'DZ' not in prefix:
                 here = True
         fid.close()
 

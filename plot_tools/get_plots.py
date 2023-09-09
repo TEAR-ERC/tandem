@@ -2,14 +2,13 @@
 '''
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
-Update note: implement new faultout image plots
-Last modification: 2023.07.24.
+Update note: added Gutenberg-Richter relation plot
+Last modification: 2023.09.05.
 '''
-import numpy as np
 import argparse
-import setup_shortcut
 
-sc = setup_shortcut.setups()
+yr2sec = 365*24*60*60
+wk2sec = 7*24*60*60
 
 # Set input parameters -------------------------------------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
@@ -48,7 +47,8 @@ parser.add_argument("-dd","--depth_dist", action="store_true", help=": Plot cums
 parser.add_argument("-abio","--ab_inout", action="store_true", help=": Plot cumslip plot with a-b profile",default=False)
 parser.add_argument("-stio","--stress_inout", action="store_true", help=": Plot cumslip plot with stress profile",default=False)
 parser.add_argument("-dcio","--dc_inout", action="store_true", help=": Plot cumslip plot with Dc profile",default=False)
-parser.add_argument("-spup","--spin_up", type=float, help=": Plot with spin-up after given slip amount",default=0)
+# parser.add_argument("-spup","--spin_up", type=float, help=": Plot with spin-up after given slip amount",default=0)
+parser.add_argument("-spup","--spin_up", nargs=2, type=str, help=": Plot with spin-up after given amount of quantity",default=[])
 parser.add_argument("-rths","--rths", type=float, help=": Rupture length threshold to define system wide event [m]",default=10)
 parser.add_argument("-ct","--cuttime", type=float, help=": Show result up until to the given time to save computation time [yr]", default=0)
 parser.add_argument("-mg","--mingap", type=float, help=": Minimum seperation time between two different events [s]", default=60)
@@ -58,11 +58,15 @@ parser.add_argument("-evan","--ev_anal", action="store_true", help=": ON/OFF eve
 parser.add_argument("-stf","--STF", action="store_true", help=": ON/OFF STF plot")
 parser.add_argument("-M0","--M0", type=str.lower, choices=['1d','approx2d'], help=": Produce M0 plot of your choice ['1d','approx2d']")
 parser.add_argument("-Mw","--Mw", action="store_true", help="When used with --M0, plots output in Mw scale")
+parser.add_argument("-gr","--GR", nargs='+', type=float, help="Returns Gutenberg-Richter relation. Cutoff magnitude and number of points are required")
+
+# Whether this figure is for publishing
+parser.add_argument("-pub","--Publish", action="store_true", help="Generate figure for publishing purpose (without version names)",default=False)
 
 args = parser.parse_args()
 
 # --- Check dependencies
-if args.cumslip or args.ev_anal or args.STF or args.image or args.M0:        # When args.cumslip are true
+if args.cumslip or args.ev_anal or args.STF or args.image or args.M0 or args.GR:        # When args.cumslip are true
     if not args.dt_creep:
         parser.error('Required field \'dt_creep\' is not defined - check again')
     if not args.dt_coseismic:
@@ -73,10 +77,10 @@ if args.cumslip or args.ev_anal or args.STF or args.image or args.M0:        # W
     if args.SRvar is None:
         print('Field \'SRvar\' not defined - using default value 0.15')
         args.SRvar = 0.15
-    dt_creep = args.dt_creep*sc.yr2sec
+    dt_creep = args.dt_creep*yr2sec
     dt_coseismic = args.dt_coseismic
     if args.dt_interm:
-        dt_interm = args.dt_interm*sc.wk2sec
+        dt_interm = args.dt_interm*wk2sec
         if not args.Vlb:
             print('Required field \'Vlb\' not defined - using default value 1e-8 m/s')
             args.Vlb = 1e-8
@@ -87,15 +91,15 @@ if args.cumslip or args.ev_anal or args.STF or args.image or args.M0:        # W
 save_dir = args.save_dir
 if 'models' in save_dir: # local
     prefix = save_dir.split('models/')[-1]
-    # setup_dir = '/Users/j4yun/Dropbox/Codes/Ridgecrest_CSC/jeena-tandem/setup_files'
 elif 'di75weg' in save_dir: # supermuc
     prefix = save_dir.split('di75weg/')[-1]
-    # setup_dir = '/hppfs/work/pn49ha/di75weg/jeena-tandem/setup_files/supermuc'
 elif 'jyun' in save_dir: # LMU server
     prefix = save_dir.split('jyun/')[-1]
-    # setup_dir = '/home/jyun/Tandem'
 
-cuttime = args.cuttime*sc.yr2sec
+cuttime = args.cuttime*yr2sec
+
+if args.Publish:
+    print('Figure version: publish')
 
 # Extract data ---------------------------------------------------------------------------------------------------------------------------
 from read_outputs import *
@@ -120,18 +124,18 @@ if args.cumslip:
     cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
 
     # --- Plot the result
-    if args.spin_up > 0:
-        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)
-        spup_where(save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,args.Vths,dt_coseismic,args.rths)
+    if len(args.spin_up) > 0:
+        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up,args.rths)
+        spup_where(save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,args.Vths,dt_coseismic,args.rths,args.Publish)
     else:
         spup_cumslip_outputs = None
 
     if sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 0:
-        only_cumslip(save_dir,prefix,cumslip_outputs,args.Vths,dt_coseismic,args.rths,spup_cumslip_outputs)
+        only_cumslip(save_dir,prefix,cumslip_outputs,args.Vths,dt_coseismic,args.rths,spup_cumslip_outputs,args.Publish)
     elif sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 1:
-        two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)
+        two_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs,args.Publish)
     elif sum([args.ab_inout,args.stress_inout,args.dc_inout,args.depth_dist]) == 2:
-        three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs)
+        three_set(save_dir,prefix,outputs,dep,cumslip_outputs,args.Vths,dt_coseismic,args.depth_dist,args.ab_inout,args.stress_inout,args.dc_inout,args.rths,spup_cumslip_outputs,args.Publish)
 
 # Fault output image ---------------------------------------------------------------------------------------------------------------------
 if args.image:
@@ -139,8 +143,8 @@ if args.image:
     if not args.vmin:                       # No vmin defined
         if args.image == 'sliprate':
             vmin = 1e-12
-        elif args.image == 'shearT':
-            vmin = -5
+        # elif args.image == 'shearT':
+        #     vmin = -5
         else:
             vmin = None
     else:
@@ -148,8 +152,8 @@ if args.image:
     if not args.vmax:                       # No vmax defined
         if args.image == 'sliprate':
             vmax = 1e1
-        elif args.image == 'shearT':
-            vmax = 5
+        # elif args.image == 'shearT':
+        #     vmax = 5
         else:
             vmax = None
     else:
@@ -157,7 +161,7 @@ if args.image:
     if not 'cumslip_outputs' in locals():   # No event outputs computed
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
-    fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec)
+    fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec,args.Publish)
 
 # Miscellaneous --------------------------------------------------------------------------------------------------------------------------
 if args.ev_anal:
@@ -165,7 +169,7 @@ if args.ev_anal:
     if not 'cumslip_outputs' in locals():
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
-    plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths)
+    plot_event_analyze(save_dir,prefix,cumslip_outputs,args.rths,args.Publish)
 
 if args.STF:
     from misc_plots import plot_STF
@@ -173,9 +177,9 @@ if args.STF:
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
 
-    if args.spin_up > 0:
+    if len(args.spin_up) > 0:
         if not 'spin_up_idx' in locals():
-            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up,args.rths)[-1]
     else:
         spin_up_idx = 0
     plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,args.rths)
@@ -186,13 +190,31 @@ if args.M0:
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
 
-    if args.spin_up > 0:
+    if len(args.spin_up) > 0:
         if not 'spin_up_idx' in locals():
-            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up)[-1]
+            spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,args.spin_up,args.rths)[-1]
     else:
         spin_up_idx = 0
     plot_M0(save_dir,cumslip_outputs,spin_up_idx,args.rths,args.M0,args.Mw)
 
+if args.GR:
+    cutoff_Mw = args.GR[0]
+    if len(args.GR) == 1:
+        print('Field npts not defined - using default value 50')
+        npts = 50
+    else:
+        npts = args.GR[1]
+    from misc_plots import plot_GR
+    if not 'cumslip_outputs' in locals():
+        from cumslip_compute import *
+        cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
+
+    if len(args.spin_up) > 0:
+        if not 'spin_up_idx' in locals():
+            spin_up_idx = compute_spinup(outputs,dep,cuttime,args.rths,cumslip_outputs,args.spin_up,args.rths)[-1]
+    else:
+        spin_up_idx = 0
+    plot_GR(save_dir,prefix,cumslip_outputs,spin_up_idx,args.rths,cutoff_Mw,npts,args.Publish)
 
 # Input variable profile -----------------------------------------------------------------------------------------------------------------
 if args.stressprof:

@@ -88,10 +88,10 @@ def scaling(ax,D,G,col,lab=None,s=4,marker='o',ec=None,lw=1.5,zord=1,alpha=None,
     if len(col) == len(D):
         cmap = mpl.colormaps['magma_r']
         col = cmap(col.flatten())
-    if len(ec) == len(D):
-        cmap = mpl.colormaps['magma_r']
-        ec = cmap(ec.flatten())
     if ec is not None:
+        if len(ec) == len(D):
+            cmap = mpl.colormaps['magma_r']
+            ec = cmap(ec.flatten())
         psc = ax.scatter(D,G,s=s,marker=marker,fc=col,label=lab,zorder=zord,ec=ec,lw=lw,alpha=alpha)
     else:
         psc = ax.scatter(D,G,s=s,marker=marker,fc=col,label=lab,zorder=zord,alpha=alpha)
@@ -113,7 +113,7 @@ def scaling(ax,D,G,col,lab=None,s=4,marker='o',ec=None,lw=1.5,zord=1,alpha=None,
     return psc
 
 def plot_Coccos(ax,follow_color=False,legend_on=True):
-    cocco_outputs = np.load('outputs/Cocco/outputs.npy',allow_pickle=True)
+    cocco_outputs = np.load('/Users/j4yun/Dropbox/Coursework/2023-S_Advanced_Seismology_2/Final_project/outputs/Cocco/outputs.npy',allow_pickle=True)
     Gcc = cocco_outputs.item().get('G')
     Dcc = cocco_outputs.item().get('D')
     Lcc = cocco_outputs.item().get('L')

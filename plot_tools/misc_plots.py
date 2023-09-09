@@ -1,7 +1,7 @@
 '''
 Miscellaneous plotting scripts
 By Jeena Yun
-Last modification: 2023.07.24.
+Last modification: 2023.09.01.
 '''
 import numpy as np
 import matplotlib.pylab as plt
@@ -64,7 +64,7 @@ def plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,rths=10,save_on=Tr
     if save_on:
         plt.savefig('%s/STF.png'%(save_dir),dpi=300)
 
-def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
+def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,publish=False,save_on=True):
     from cumslip_compute import analyze_events
     print('Rupture length criterion:',rths,'m')
     rupture_length,av_slip,system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[0:4]
@@ -86,11 +86,9 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
 
     # ------ Ax0: Rupture length
     markers, stemlines, baseline = ax0.stem(np.arange(1,len(rupture_length)+1),rupture_length)
-    # plt.setp(stemlines, color='k', linewidth=2.5)
-    # plt.setp(markers, color='k')
-    plt.setp(stemlines, color='0.62', linewidth=2.5)
-    plt.setp(markers, color='0.62')
-    plt.setp(baseline, color='0.62')
+    plt.setp(stemlines, color='0.7', linewidth=2.5)
+    plt.setp(markers, color='0.7')
+    plt.setp(baseline, color='0.7')
     if len(system_wide) > 0:
         for i in range(len(system_wide)):
             markers, stemlines, baseline = ax0.stem(system_wide[i]+1,rupture_length[system_wide[i]])
@@ -106,11 +104,9 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     # ------ Ax1: Hypocenter depth
     evdep = cumslip_outputs[1][1]
     markers, stemlines, baseline = ax1.stem(np.arange(1,len(evdep)+1),evdep)
-    # plt.setp(stemlines, color='k', linewidth=2.5)
-    # plt.setp(markers, color='k')
-    plt.setp(stemlines, color='0.62', linewidth=2.5)
-    plt.setp(markers, color='0.62')
-    plt.setp(baseline, color='0.62')
+    plt.setp(stemlines, color='0.7', linewidth=2.5)
+    plt.setp(markers, color='0.7')
+    plt.setp(baseline, color='0.7')
     if len(system_wide) > 0:
         for i in range(len(system_wide)):
             markers, stemlines, baseline = ax1.stem(system_wide[i]+1,evdep[system_wide[i]])
@@ -126,12 +122,12 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     # ------ Ax2: Slip along fault for each event
     fault_z = np.array(cumslip_outputs[3][1]).T[0]
     if len(partial_rupture) > 0:
-        ax2.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[0]].T,fault_z,lw=2.5,color='0.62',label='Partial rupture events')
+        ax2.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[0]].T,fault_z,lw=2.5,color='0.7',label='Partial rupture events')
         if len(partial_rupture) > 1:
-            ax2.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[1:]].T,np.array([fault_z for i in range(len(partial_rupture[1:]))]).T,lw=2.5,color='0.62')
+            ax2.plot(np.array(cumslip_outputs[1][2]).T[partial_rupture[1:]].T,np.array([fault_z for i in range(len(partial_rupture[1:]))]).T,lw=2.5,color='0.7')
     if len(system_wide) > 0:       
         ax2.set_prop_cycle('color',[cmap(i) for i in np.linspace(0.5,0.9,len(system_wide))]) 
-        ax2.plot(np.array(cumslip_outputs[1][2]).T[system_wide].T,np.array([fault_z for i in range(len(system_wide))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i+1,av_slip[i]) for i in system_wide])
+        ax2.plot(np.array(cumslip_outputs[1][2]).T[system_wide].T,np.array([fault_z for i in range(len(system_wide))]).T,lw=3,label=[r'Event %d ($\bar{D}$ = %2.2f m)'%(i,av_slip[i]) for i in system_wide])
         hyp_dep = cumslip_outputs[1][1][system_wide]
         hyp_slip = [np.array(cumslip_outputs[1][2]).T[system_wide][i][np.where(fault_z==hyp_dep[i])[0][0]] for i in range(len(system_wide))]
         ax2.scatter(hyp_slip,hyp_dep,marker='*',s=300,facecolor=mydarkviolet,edgecolors='k',lw=1,zorder=3,label='Hypocenter')
@@ -151,29 +147,31 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,save_on=True):
     ax2.invert_yaxis()
     ax2.grid(True,alpha=0.4)
 
-    if len(ver_info) > 0:
+    if len(ver_info) > 0 and not publish:
         plt.suptitle(ver_info,fontsize=25,fontweight='bold')
     plt.tight_layout()
     if save_on:
-        plt.savefig('%s/analyze_events.png'%(save_dir),dpi=300)
+        if publish:
+            plt.savefig('%s/publish_analyze_events.png'%(save_dir),dpi=300)
+        else:
+            plt.savefig('%s/analyze_events.png'%(save_dir),dpi=300)
 
-def compute_M0(save_dir,cumslip_outputs,mode,Mw):
-    from scipy import integrate
+def compute_M0(save_dir,rupture_length,av_slip,mode,Mw):
+    # from scipy import integrate
     params = np.load('%s/const_params.npy'%(save_dir),allow_pickle=True)
     if 'DZ' in save_dir:
         mu = params.item().get('mu_damage')*1e9
     else:
         mu = params.item().get('mu')*1e9
     
-    # M0 = mu*D*A where A is area (3D) -> M0_1D = mu*D*L where L is length (2D)
-    fault_slip = np.array(cumslip_outputs[1][2]).T
-    fault_z = np.array(cumslip_outputs[3][1]).T[0]*1e3  # convert to meters
+    rupture_length *= 1e3
     if mode == '1d':
         print('1D: Moment per length')
-        M0 = np.array([mu * integrate.simpson(fault_slip[iev],fault_z) for iev in range(fault_slip.shape[0])])
+        M0 = np.array([mu * rupture_length[iev] * av_slip[iev] for iev in range(len(av_slip))])
     elif mode == 'approx2d':
         print('Approximated 2D: Moment assuming a square fault patch')
-        M0 = np.array([mu * integrate.simpson(fault_slip[iev],np.square(fault_z)) for iev in range(fault_slip.shape[0])])
+        # M0 = np.array([mu * np.pi * ((rupture_length[iev]/2)**2) * av_slip[iev] for iev in range(len(av_slip))])
+        M0 = np.array([mu * (rupture_length[iev]**2) * av_slip[iev] for iev in range(len(av_slip))])
     if Mw:
         print('Output in moment magnitude (Mw) instead of moment (M0)')
         return 2/3*(np.log10(M0)-9.1)
@@ -186,8 +184,8 @@ def plot_M0(save_dir,cumslip_outputs,spin_up_idx,rths,mode='1d',Mw=False,save_on
         plot_in_log = False
     else:
         plot_in_log = True
-    M0_1D = compute_M0(save_dir,cumslip_outputs,mode,Mw)
-    system_wide,partial_rupture,event_cluster,lead_fs = analyze_events(cumslip_outputs,rths)[2:6]
+    rupture_length,av_slip,system_wide,partial_rupture,event_cluster,lead_fs = analyze_events(cumslip_outputs,rths)[:6]
+    M0_1D = compute_M0(save_dir,rupture_length,av_slip,mode,Mw)
     if spin_up_idx > 0:
         print('Spin-up: shows only after %d'%(spin_up_idx))
         system_wide = system_wide[system_wide>=spin_up_idx]
@@ -203,17 +201,21 @@ def plot_M0(save_dir,cumslip_outputs,spin_up_idx,rths,mode='1d',Mw=False,save_on
             maxM0 /= 10
             order += 1
         scale = 10**(order)
-        plt.scatter(system_wide,M0_1D[system_wide]/scale,s=121,color=mydarkviolet,edgecolors='k',lw=0.5,marker='*',label='System-wide events')
+        plt.scatter(system_wide,M0_1D[system_wide]/scale,s=121,color=mydarkviolet,edgecolors='k',lw=0.5,marker='*',label='System-wide events',zorder=3)
         if len(lead_fs) > 0:
-            plt.scatter(lead_fs,M0_1D[lead_fs]/scale,s=36,color=mydarkviolet,edgecolors='k',lw=0.5,marker='d',label='Leading foreshocks')
+            plt.scatter(lead_fs,M0_1D[lead_fs]/scale,s=36,color=mydarkviolet,edgecolors='k',lw=0.5,marker='d',label='Leading foreshocks',zorder=3)
         if len(partial_rupture) > 0:
             plt.scatter(partial_rupture,M0_1D[partial_rupture]/scale,s=36,color=mylightblue,edgecolors='k',lw=0.5,marker='d',label='Partial rupture events')
         if mode == '1d':
             ylab = 'Moment per Length [$10^{%d}$N]'%(order)
         elif mode == 'approx2d':
             ylab = 'Moment [$10^{%d}$Nm]'%(order)
+        yl = plt.gca().get_ylim()
+        plt.ylim(yl[0]-(yl[1]-yl[0])*0.2,yl[1])
     else:
-        plt.scatter(system_wide,M0_1D[system_wide],s=121,color=mydarkviolet,edgecolors='k',lw=0.5,marker='*',label='System-wide events')
+        plt.scatter(system_wide,M0_1D[system_wide],s=121,color=mydarkviolet,edgecolors='k',lw=0.5,marker='*',label='System-wide events',zorder=3)
+        if len(lead_fs) > 0:
+            plt.scatter(lead_fs,M0_1D[lead_fs],s=36,color=mydarkviolet,edgecolors='k',lw=0.5,marker='d',label='Leading foreshocks',zorder=3)
         if len(partial_rupture) > 0:
             plt.scatter(partial_rupture,M0_1D[partial_rupture],s=36,color=mylightblue,edgecolors='k',lw=0.5,marker='d',label='Partial rupture events')
         if mode == '1d':
@@ -235,3 +237,64 @@ def plot_M0(save_dir,cumslip_outputs,spin_up_idx,rths,mode='1d',Mw=False,save_on
             plt.savefig('%s/Moments_%s_inMw.png'%(save_dir,mode),dpi=300)
         else:
             plt.savefig('%s/Moments_%s.png'%(save_dir,mode),dpi=300)
+
+def estimate_coef(x, y):
+    # number of observations/points
+    n = np.size(x)
+ 
+    # mean of x and y vector
+    m_x = np.mean(x)
+    m_y = np.mean(y)
+ 
+    # calculating cross-deviation and deviation about x
+    SS_xy = np.sum(y*x) - n*m_y*m_x
+    SS_xx = np.sum(x*x) - n*m_x*m_x
+ 
+    # calculating regression coefficients
+    b = SS_xy / SS_xx
+    a = m_y - b*m_x
+ 
+    return (a, b)
+
+def compute_GR(save_dir,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,npts):
+    from cumslip_compute import analyze_events
+    rupture_length,av_slip = analyze_events(cumslip_outputs,rths)[:2]
+    Mw = compute_M0(save_dir,rupture_length,av_slip,mode='approx2d',Mw=True)
+    Mw = Mw[spin_up_idx:]
+    # baseval = np.linspace(min(Mw),max(Mw),npts)[:-1]
+    # N = np.array([sum(Mw > mag) for mag in baseval])
+    baseval = np.linspace(min(Mw),max(Mw),npts)
+    # baseval = np.sort(Mw)
+    N = np.array([sum(Mw >= mag) for mag in baseval])
+    if cutoff_Mw == 0:
+        x = baseval; y = np.log10(N)
+    else:
+        # ii = np.where(baseval>=cutoff_Mw)[0]; x = baseval[ii]; y = np.log10(N[ii])
+        ii = np.where(baseval<=cutoff_Mw)[0]; x = baseval[ii]; y = np.log10(N[ii])
+    a,b = estimate_coef(x,y)
+    yN = np.power(10,a + b*x)
+    return baseval,N,b,x,yN,a
+
+def plot_GR(save_dir,prefix,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,npts=50,publish=False,save_on=True):
+    baseval,N,b,x,yN,a = compute_GR(save_dir,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,int(npts))
+    plt.rcParams['font.size'] = '15'
+    plt.figure(figsize=(8,6))
+    ver_info = ch.version_info(prefix)
+    plt.plot(x,yN,color=myburgundy,lw=2)
+    plt.scatter(baseval,N,s=50,color='k',edgecolors='k',lw=0.5)
+    plt.text(min(baseval),min(N),'b = %2.3f'%(-b),ha='left',va='bottom',fontsize=17,fontweight='bold',color=myburgundy)
+    if not publish:
+        plt.title(ver_info,fontsize=20,fontweight='bold')
+    plt.xlabel('Moment Magnitude (Mw)',fontsize=17)
+    plt.ylabel('N (events > Mw)',fontsize=17)
+    plt.yscale('log')
+    if publish:
+        decor = 'publish_'
+    else:
+        decor = ''
+    plt.tight_layout()
+    if save_on:
+        if spin_up_idx == 0:
+            plt.savefig('%s/%sGRrelation.png'%(save_dir,decor),dpi=300)
+        else:
+            plt.savefig('%s/%sGRrelation_spup.png'%(save_dir,decor),dpi=300)

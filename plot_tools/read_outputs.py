@@ -2,15 +2,16 @@
 '''
 Functions related to reading tandem outputs: domain/fault/fault_probe
 By Jeena Yun
-Last modification: 2023.07.18.
+Last modification: 2023.09.08.
 '''
 import numpy as np
-from vtk import vtkXMLUnstructuredGridReader
 from glob import glob
-from csv import reader
 import os
+import time
 import change_params
+import setup_shortcut
 
+sc = setup_shortcut.setups()
 ch = change_params.variate()
 
 def read_pvd(fname):
@@ -41,6 +42,13 @@ def extract_from_lua(save_dir,prefix,save_on=True):
         for k in range(1,len(strr)):
             tails += '_%s'%(strr[k])
         fname = prefix.split('/')[0] + '/' + fname + tails +'.lua'
+    elif 'mtmod' in prefix:
+        fname = prefix.split('/')[0] + '/' + fname + '.lua'
+    elif 'BP1' in prefix:
+        if 'delsn' in prefix.split('/')[-1]:
+            fname = prefix.split('/')[0] + '/' + 'bp1_deltasn.lua'
+        else:
+            fname = prefix.split('/')[0] + '/' + 'bp1.lua'
     else:
         fname = prefix.split('/')[0] + '/' + fname + '_'+prefix.split('/')[-1]+'.lua'
     fname = ch.get_setup_dir() + '/' + fname
@@ -58,16 +66,32 @@ def extract_from_lua(save_dir,prefix,save_on=True):
     for line in lines:
         if here:
             var = line.split('return ')[-1]
-            params['mu'] = float(var)
+            params['mu'] = params['cs']**2 * params['rho0']
             here = False
-        if 'BP1.' in line:
-            var = line.split('BP1.')[-1].split(' = ')
+        if 'mtmod.' in line and 'index' not in line and 'new' not in line:
+            var = line.split('mtmod.')[1].split(' = ')
+            if len(var[1].split('--')) > 1:
+                if var[0] == 'dip':
+                    params[var[0]] = float(var[1].split('--')[0].split('*')[0])
+                elif var[0].lower() == 'h' or var[0].lower() == 'h2':
+                    params[var[0]] = float(var[1].split('--')[0].split('*')[0]) * np.sin(params['dip'])
+                else:
+                    params[var[0]] = float(var[1].split('--')[0])            
+            else:
+                if var[0] == 'dip':
+                    params[var[0]] = float(var[1].split('*')[0])
+                elif var[0].lower() == 'h' or var[0].lower() == 'h2':
+                    params[var[0]] = float(var[1].split('*')[0]) * np.sin(params['dip'])
+                else:
+                    params[var[0]] = float(var[1])
+        elif 'mtmod:mu' in line and 'DZ' not in prefix:
+            here = True
+        elif 'BP1.' in line:
+            var = line.split('BP1.')[1].split(' = ')
             if len(var[1].split('--')) > 1:
                 params[var[0]] = float(var[1].split('--')[0])            
             else:
                 params[var[0]] = float(var[1])
-        elif 'BP1:mu' in line and 'DZ' not in prefix:
-            here = True
     fid.close()
     if save_on:
         print('Save data...',end=' ')
@@ -76,22 +100,22 @@ def extract_from_lua(save_dir,prefix,save_on=True):
     return np.array(params)
     
 def read_fault_probe_outputs(save_dir,save_on=True):
-    fnames = glob('%s/outputs/*.csv'%(save_dir))
+    import pandas as pd
+    fnames = glob('%s/outputs/faultp_*.csv'%(save_dir))
     if len(fnames) == 0:
-        raise NameError('No such file found - check the input')
-    outputs = ()
-    dep = []
-    for fn in fnames:
-        with open(fn, 'r') as csvfile:
-            csvreader = reader(csvfile)
-            stloc = next(csvreader)
-            r_z = float(stloc[1].split(']')[0])
-            dep.append(r_z)
-            next(csvreader)
-            dat = []
-            for row in csvreader:
-                dat.append(np.asarray(row).astype(float))
-        outputs = outputs + (dat,)
+        print('Cannot find faultp_*.csv - try finding receiver_*.csv')
+        fnames = glob('%s/outputs/receiver_*.csv'%(save_dir))
+    if len(fnames) == 0:
+        raise NameError('No fault probe output found - check the input')
+    outputs,dep=[],[]
+    print('Start computing output... ',end='')
+    ti = time.time()
+    for k,fname in enumerate(np.sort(fnames)):
+        dat = pd.read_csv(fname,delimiter=',',skiprows=2)
+        stloc = pd.read_csv(fname,nrows=1,header=None)
+        dep.append(float(stloc.values[0][-1].split(']')[0]))
+        outputs.append(dat.values)
+    print('Done! (%2.4f s)'%(time.time()-ti))
     outputs = np.array(outputs)
     dep = np.array(dep)
     if save_on:
@@ -102,6 +126,7 @@ def read_fault_probe_outputs(save_dir,save_on=True):
     return outputs,dep
 
 def read_fault_outputs(save_dir,save_on=True):
+    from vtk import vtkXMLUnstructuredGridReader
     # --- Read time info from pvd file
     time = read_pvd('%s/outputs/fault.pvd'%(save_dir))
 

@@ -12,20 +12,21 @@ sc = setup_shortcut.setups()
 mp = myplots.Figpref()
 ch = change_params.variate()
 
-compute_and_save = 1
+compute_and_save = 0
 plot_G_prof_all = 0
 plot_G_prof_spinup = 0
 plot_avG_event = 0
 plot_Wb_Wr = 0
 plot_scaling_relation = 0
 plot_scaling_relation_no_av = 0
-plot_linear_prop_onlyspup = 0
+plot_linear_prop_onlyspup = 1
 
+# 'Thakur20_various_fractal_profiles/v6_ab2_Dc1_long',
 prefix_list = ['BP1',
-               'Thakur20_hetero_stress/n8',
+               'Thakur20_hetero_stress/n8_v6',
                'Thakur20_various_fractal_profiles/ab2',
                'Thakur20_various_fractal_profiles/Dc1',
-               'Thakur20_various_fractal_profiles/v6_ab2_Dc1_long',
+               'Thakur20_various_fractal_profiles/v6_ab2_Dc2',
                'Thakur20_various_fractal_profiles/v6_Dc1_long',
                'Thakur20_various_fractal_profiles/v6_ab2',
                'Thakur20_various_fractal_profiles/ab2_Dc1']
@@ -60,17 +61,21 @@ for uu,prefix in enumerate(prefix_list):
     cumslip = np.array([outputs[i][:,2] for i in np.argsort(abs(dep))])
     shearT = abs(np.array([outputs[i][:,3] for i in np.argsort(abs(dep))]))
 
-    Vths = 1e-2
+    if 'v6_ab2_Dc2' in prefix:
+        Vths = 1e-1
+        intv = 0.15
+    else:
+        Vths = 1e-2
+        intv = 0.
     Vlb = 0
     dt_interm = 0
     cuttime = 0
-    mingap = 60
     rths = 10
     dt_creep = 2*ch.yr2sec
     dt_coseismic = 0.5
 
-    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,mingap)
-    rupture_length,avD,system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)
+    cumslip_outputs = compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,intv)
+    rupture_length,avD,system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[0:4]
     tstart,tend = cumslip_outputs[0][0],cumslip_outputs[0][1]
     spin_up_idx = compute_spinup(outputs,dep,cuttime,cumslip_outputs,2.5)[-1]
 
