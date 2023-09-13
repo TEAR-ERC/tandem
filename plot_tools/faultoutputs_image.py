@@ -2,13 +2,13 @@
 '''
 Functions related to plotting spatio-temporal evolution of variables as an image
 By Jeena Yun
-Last modification: 2023.09.06.
+Last modification: 2023.09.09.
 '''
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import cmcrameri.cm as cram
-from cumslip_compute import analyze_events
+from event_analyze import analyze_events
 import change_params
 import warnings
 

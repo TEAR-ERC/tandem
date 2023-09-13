@@ -1,11 +1,12 @@
 '''
 Miscellaneous plotting scripts
 By Jeena Yun
-Last modification: 2023.09.01.
+Last modification: 2023.09.09.
 '''
 import numpy as np
 import matplotlib.pylab as plt
 import matplotlib as mpl
+from event_analyze import *
 import change_params
 ch = change_params.variate()
 
@@ -16,28 +17,7 @@ mynavy = (17/255,34/255,133/255)
 mylightblue = (218/255,230/255,240/255)
 mydarkviolet = (145/255,80/255,180/255)
 
-def compute_STF(save_dir,outputs,dep,cumslip_outputs):
-    from scipy import integrate
-    from scipy import interpolate
-    tstart, tend = cumslip_outputs[0]
-    params = np.load('%s/const_params.npy'%(save_dir),allow_pickle=True)
-    time = np.array([outputs[i][:,0] for i in np.argsort(abs(dep))])
-    sr = abs(np.array([outputs[i][:,4] for i in np.argsort(abs(dep))]))
-    z = np.sort(abs(dep))*1e3
-    if 'DZ' in save_dir:
-        mu = params.item().get('mu_damage')*1e9
-    else:
-        mu = params.item().get('mu')*1e9
-
-    npoints = 500
-    f = np.array([mu * integrate.simpson(sr[:,t],z) for t in range(sr.shape[1])])
-    stf = interpolate.interp1d(time[0],f)
-    Fdot=np.array([stf(np.linspace(tstart[iev],tend[iev],npoints)) for iev in range(len(tstart))])
-    t = np.array([np.linspace(tstart[iev],tend[iev],npoints)-tstart[iev] for iev in range(len(tstart))])
-    return t,Fdot
-
 def plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,rths=10,save_on=True):
-    from cumslip_compute import analyze_events
     print('Rupture length criterion:',rths,'m')
     system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[2:4]
     t,Fdot = compute_STF(save_dir,outputs,dep,cumslip_outputs)
@@ -65,7 +45,6 @@ def plot_STF(save_dir,outputs,dep,cumslip_outputs,spin_up_idx,rths=10,save_on=Tr
         plt.savefig('%s/STF.png'%(save_dir),dpi=300)
 
 def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,publish=False,save_on=True):
-    from cumslip_compute import analyze_events
     print('Rupture length criterion:',rths,'m')
     rupture_length,av_slip,system_wide,partial_rupture = analyze_events(cumslip_outputs,rths)[0:4]
     
@@ -156,30 +135,7 @@ def plot_event_analyze(save_dir,prefix,cumslip_outputs,rths=10,publish=False,sav
         else:
             plt.savefig('%s/analyze_events.png'%(save_dir),dpi=300)
 
-def compute_M0(save_dir,rupture_length,av_slip,mode,Mw):
-    # from scipy import integrate
-    params = np.load('%s/const_params.npy'%(save_dir),allow_pickle=True)
-    if 'DZ' in save_dir:
-        mu = params.item().get('mu_damage')*1e9
-    else:
-        mu = params.item().get('mu')*1e9
-    
-    rupture_length *= 1e3
-    if mode == '1d':
-        print('1D: Moment per length')
-        M0 = np.array([mu * rupture_length[iev] * av_slip[iev] for iev in range(len(av_slip))])
-    elif mode == 'approx2d':
-        print('Approximated 2D: Moment assuming a square fault patch')
-        # M0 = np.array([mu * np.pi * ((rupture_length[iev]/2)**2) * av_slip[iev] for iev in range(len(av_slip))])
-        M0 = np.array([mu * (rupture_length[iev]**2) * av_slip[iev] for iev in range(len(av_slip))])
-    if Mw:
-        print('Output in moment magnitude (Mw) instead of moment (M0)')
-        return 2/3*(np.log10(M0)-9.1)
-    else:
-        return M0
-
 def plot_M0(save_dir,cumslip_outputs,spin_up_idx,rths,mode='1d',Mw=False,save_on=True):
-    from cumslip_compute import analyze_events
     if Mw:
         plot_in_log = False
     else:
@@ -238,43 +194,6 @@ def plot_M0(save_dir,cumslip_outputs,spin_up_idx,rths,mode='1d',Mw=False,save_on
         else:
             plt.savefig('%s/Moments_%s.png'%(save_dir,mode),dpi=300)
 
-def estimate_coef(x, y):
-    # number of observations/points
-    n = np.size(x)
- 
-    # mean of x and y vector
-    m_x = np.mean(x)
-    m_y = np.mean(y)
- 
-    # calculating cross-deviation and deviation about x
-    SS_xy = np.sum(y*x) - n*m_y*m_x
-    SS_xx = np.sum(x*x) - n*m_x*m_x
- 
-    # calculating regression coefficients
-    b = SS_xy / SS_xx
-    a = m_y - b*m_x
- 
-    return (a, b)
-
-def compute_GR(save_dir,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,npts):
-    from cumslip_compute import analyze_events
-    rupture_length,av_slip = analyze_events(cumslip_outputs,rths)[:2]
-    Mw = compute_M0(save_dir,rupture_length,av_slip,mode='approx2d',Mw=True)
-    Mw = Mw[spin_up_idx:]
-    # baseval = np.linspace(min(Mw),max(Mw),npts)[:-1]
-    # N = np.array([sum(Mw > mag) for mag in baseval])
-    baseval = np.linspace(min(Mw),max(Mw),npts)
-    # baseval = np.sort(Mw)
-    N = np.array([sum(Mw >= mag) for mag in baseval])
-    if cutoff_Mw == 0:
-        x = baseval; y = np.log10(N)
-    else:
-        # ii = np.where(baseval>=cutoff_Mw)[0]; x = baseval[ii]; y = np.log10(N[ii])
-        ii = np.where(baseval<=cutoff_Mw)[0]; x = baseval[ii]; y = np.log10(N[ii])
-    a,b = estimate_coef(x,y)
-    yN = np.power(10,a + b*x)
-    return baseval,N,b,x,yN,a
-
 def plot_GR(save_dir,prefix,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,npts=50,publish=False,save_on=True):
     baseval,N,b,x,yN,a = compute_GR(save_dir,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,int(npts))
     plt.rcParams['font.size'] = '15'
@@ -298,3 +217,20 @@ def plot_GR(save_dir,prefix,cumslip_outputs,spin_up_idx,rths,cutoff_Mw,npts=50,p
             plt.savefig('%s/%sGRrelation.png'%(save_dir,decor),dpi=300)
         else:
             plt.savefig('%s/%sGRrelation_spup.png'%(save_dir,decor),dpi=300)
+
+def mainshock_analyze(save_dir,cumslip_outputs,rths,spin_up_idx,save_on=True):
+    rupture_length,av_slip,system_wide = analyze_events(cumslip_outputs,rths)[0:3]
+    Mw = compute_M0(save_dir,rupture_length,av_slip,mode='approx2d',Mw=True)
+    evdep = cumslip_outputs[1][1]
+
+    plt.rcParams['font.size'] = '15'
+    plt.figure(figsize=(10,6))
+    plt.scatter(Mw[system_wide[system_wide>=spin_up_idx]],evdep[system_wide[system_wide>=spin_up_idx]],49,c=np.arange(sum(system_wide>=spin_up_idx)),zorder=3)
+    plt.colorbar().set_label('Event Index',fontsize=15,rotation=270,labelpad=20)
+    plt.xlabel('Magnitude [Mw]',fontsize=17)
+    plt.ylabel('Depth [km]',fontsize=17)
+    plt.gca().invert_yaxis()
+    plt.grid(True,alpha=0.5)
+    plt.tight_layout()
+    if save_on:
+        plt.savefig('%s/sw_dep_Mw.png'%(save_dir),dpi=300)

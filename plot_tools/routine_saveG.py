@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from cumslip_compute import *
+from event_analyze import analyze_events
 from fcomputeG import *
 from fplotsG import *
 import myplots

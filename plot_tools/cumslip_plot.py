@@ -2,13 +2,13 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.09.05.
+Last modification: 2023.09.09.
 '''
 import numpy as np
 import matplotlib.pylab as plt
 import matplotlib as mpl
 import change_params
-from cumslip_compute import analyze_events
+from event_analyze import analyze_events
 
 ch = change_params.variate()
 
