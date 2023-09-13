@@ -2,10 +2,11 @@
 '''
 Functions related to plotting cumulative slip vs. depth plot
 By Jeena Yun
-Last modification: 2023.09.06.
+Last modification: 2023.09.09.
 '''
 import numpy as np
 from scipy import interpolate
+from event_analyze import analyze_events
 
 yr2sec = 365*24*60*60
 wk2sec = 7*24*60*60
@@ -31,7 +32,7 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on=True):
     psr = np.max(sliprate,axis=0)
     pd = np.argmax(sliprate,axis=0)
 
-    # Define events by peak sliprate
+    # ----- Define events by peak sliprate
     if Vlb > 0:
         events = np.where(np.logical_and(psr < Vths,psr > Vlb))[0]
     else:
@@ -44,12 +45,14 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on=True):
         tmp_tend = time[events][np.hstack((jumps-1,len(events)-1))]
         tmp_evdep = pd[events][np.hstack(([0],jumps))]
 
+        # ----- Remove events with too short duration
         ii = np.where(tmp_tend-tmp_tstart>=dt_coseismic)[0]
         tstart = tmp_tstart[ii]
         tend = tmp_tend[ii]
         amax = tmp_evdep[ii]
         evdep = z[tmp_evdep[ii]]
 
+        # ----- Adjust start time to be closer to the peak
         its_all = np.array([np.argmin(abs(time-t)) for t in tstart])
         ite_all = np.array([np.argmin(abs(time-t)) for t in tend])
         diffcrit = np.quantile(abs(np.diff(np.log10(psr[events]))),0.98)
@@ -63,7 +66,8 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on=True):
         evdep = z[pd[new_its_all]]
         tstart = time[new_its_all]
 
-        varsr = np.array([np.log10(psr[its_all[k]:ite_all[k]+1]).max()-np.log10(psr[its_all[k]:ite_all[k]+1]).min() for k in range(len(tstart))])
+        # ----- Remove events whose maximum peak slip rate is lower than certain criterion
+        varsr = np.array([np.log10(psr[new_its_all[k]:ite_all[k]+1]).max()-np.log10(psr[new_its_all[k]:ite_all[k]+1]).min() for k in range(len(tstart))])
         ii = np.where(varsr/abs(np.log10(Vths))>=0.1)[0]
         if len(ii) < len(tstart):
             print('Negligible events with SR variation < 0.1Vths:',np.where(varsr/abs(np.log10(Vths))<0.1)[0])
@@ -72,6 +76,17 @@ def event_times(dep,outputs,Vlb,Vths,cuttime,dt_coseismic,intv,print_on=True):
             evdep = evdep[ii]
         else:
             print('All safe from the SR variation criterion')
+
+        # ----- Remove events if it is only activated at specific depth: likely to be unphysical
+        num_active_dep = np.array([np.sum(np.sum(sliprate[:,new_its_all[k]:ite_all[k]]>Vths,axis=1)>0) for k in range(len(tstart))])
+        if len(num_active_dep>1) > 0:
+            print('Remove single-depth activated event:',np.where(num_active_dep==1)[0])
+            tstart = tstart[num_active_dep>1]
+            tend = tend[num_active_dep>1]
+            evdep = evdep[num_active_dep>1]
+        else:
+            print('All events activate more than one depth')
+
     else:
         tstart, tend, evdep = [],[],[]
     return tstart, tend, evdep
@@ -225,71 +240,3 @@ def compute_spinup(outputs,dep,cuttime,cumslip_outputs,spin_up,rths,print_on=Tru
         return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spup_csinterm, spin_up_idx]
     else:
         return [new_inits, spup_evslip, spup_cscreep, spup_cscoseis, spin_up_idx]
-    
-def cluster_events(cumslip_outputs):
-    tstart = cumslip_outputs[0][0]
-    event_gap = np.diff(tstart)/yr2sec
-    event_cluster = [[0,0]]
-    ci = 0
-    for k,eg in enumerate(event_gap):
-        if eg > 1:
-            event_cluster.append([k+1,k+1])
-            ci += 1
-        else:
-            event_cluster[ci][1] = k+1
-    return np.array(event_cluster)
-
-def analyze_events(cumslip_outputs,rths):
-    from scipy import integrate,interpolate
-    rupture_length = []
-    av_slip = []
-    if len(cumslip_outputs[3][1]) > 0:
-        fault_z = np.array(cumslip_outputs[3][1]).T[0]
-        fault_slip = np.array(cumslip_outputs[1][2]).T
-        event_cluster = cluster_events(cumslip_outputs)
-
-        for ti in range(fault_slip.shape[0]):
-            fs = fault_slip[ti]
-            try:
-                Sths = 1e-2
-                ii = np.where(fs>Sths)[0]
-                if min(ii) > 0:
-                    ii = np.hstack(([min(ii)-1],ii))
-                if max(ii) < len(fs)-1:
-                    ii = np.hstack((ii,[max(ii)+1]))
-            except ValueError:
-                Sths = 1e-3
-                ii = np.where(fs>Sths)[0]
-                if min(ii) > 0:
-                    ii = np.hstack(([min(ii)-1],ii))
-                if max(ii) < len(fs)-1:
-                    ii = np.hstack((ii,[max(ii)+1]))
-            rl = max(fault_z[ii])-min(fault_z[ii])
-            f = interpolate.interp1d(fault_z,fs)
-            npts = 1000
-            newz = np.linspace(min(fault_z),max(fault_z),npts)
-            Dbar = integrate.simpson(f(newz),newz)/rl
-            rupture_length.append(rl)
-            av_slip.append(Dbar)
-
-        rupture_length = np.array(rupture_length)
-        partial_rupture = np.where(rupture_length<rths)[0]
-        system_wide = np.where(rupture_length>=rths)[0]
-
-        lead_fs,major_pr,minor_pr = [],[],[]
-        for k,ec in enumerate(event_cluster):
-            if sum([np.logical_and(sw>=ec[0],sw<=ec[1]) for sw in system_wide]) >= 1:
-                if ec[0] not in system_wide:
-                    lead_fs.append(ec[0])
-            elif ec[1]-ec[0]<=4:
-                minor_pr.append(k)
-            else:
-                major_pr.append(k)
-        lead_fs = np.array(lead_fs)
-        major_pr = np.array(major_pr)
-        minor_pr = np.array(minor_pr)
-    else:
-        print('No events')
-        rupture_length,av_slip,system_wide,partial_rupture,event_cluster,lead_fs,major_pr,minor_pr = \
-                [],[],[],[],[],[],[],[]
-    return rupture_length,av_slip,system_wide,partial_rupture,event_cluster,lead_fs,major_pr,minor_pr
