@@ -12,6 +12,7 @@ extern "C" {
 namespace tndm {
 
 PetscErrorCode register_PCs() {
+    PetscFunctionBegin;
 #ifdef HAVE_LAPACK
     CHKERRQ(PCRegister("eigdeflate", PCCreate_eigdeflate));
 #endif
@@ -19,6 +20,7 @@ PetscErrorCode register_PCs() {
 }
 
 PetscErrorCode register_KSPs() {
+    PetscFunctionBegin;
     // CHKERRQ(KSPRegister("lspoly", KSPCreate_LSPoly));
     PetscFunctionReturn(0);
 }

@@ -26,6 +26,7 @@ PetscErrorCode PCApply_eigdeflate(PC pc, Vec x, Vec y) {
     PetscScalar *r_local_, *rc_;
     PetscInt m, k, bs;
 
+    PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
     A = pc->pmat;
 
@@ -80,6 +81,7 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
     Mat A;
     const char* prefix;
 
+    PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
     A = pc->pmat;
 
@@ -145,6 +147,7 @@ PetscErrorCode PCSetUp_eigdeflate(PC pc) {
 PetscErrorCode PCReset_eigdeflate(PC pc) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
+    PetscFunctionBegin;
     CHKERRQ(KSPReset(ctx->reig));
     CHKERRQ(MatDestroy(&ctx->Q));
     CHKERRQ(VecDestroy(&ctx->r));
@@ -155,6 +158,7 @@ PetscErrorCode PCReset_eigdeflate(PC pc) {
 PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
+    PetscFunctionBegin;
     PCReset_eigdeflate(pc);
 
     CHKERRQ(KSPDestroy(&ctx->reig));
@@ -174,6 +178,7 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
     PetscInt M;
     PetscBool flg;
 
+    PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
 
     PetscOptionsHead(PetscOptionsObject, "Eigdeflate options");
@@ -197,6 +202,7 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
 PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
+    PetscFunctionBegin;
     PetscViewerASCIIPrintf(viewer, "num. eigenvectors: %D\n", ctx->nev);
     PetscViewerASCIIPrintf(viewer, "emin: %+1.4e\n", ctx->e_min);
     PetscViewerASCIIPrintf(viewer, "emax: %+1.4e\n", ctx->e_max);
@@ -221,6 +227,7 @@ PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
 PetscErrorCode PCCreate_eigdeflate(PC pc) {
     PC_eigdeflate* edef;
 
+    PetscFunctionBegin;
     CHKERRQ(PetscNewLog(pc, &edef));
     pc->data = (void*)edef;
 
