@@ -112,7 +112,8 @@ template <typename seas_t> struct operator_specifics;
 template <typename T> struct qd_operator_specifics {
     using monitor_t = seas::MonitorQD;
 
-    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
+    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                     seas::ContextBase& ctx) {
         auto seasop = std::make_shared<T>(std::move(ctx.dg()), std::move(ctx.adapter()),
                                           std::move(ctx.friction()), cfg.matrix_free,
                                           MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
@@ -137,25 +138,29 @@ template <typename T> struct qd_operator_specifics {
 };
 
 template <>
-struct operator_specifics<SeasQDOperator>
-  : public qd_operator_specifics<SeasQDOperator> {};
+struct operator_specifics<SeasQDOperator> : public qd_operator_specifics<SeasQDOperator> {};
 
-template <> struct operator_specifics<SeasQDDiscreteGreenOperator> : public qd_operator_specifics<SeasQDDiscreteGreenOperator> {
+template <>
+struct operator_specifics<SeasQDDiscreteGreenOperator>
+    : public qd_operator_specifics<SeasQDDiscreteGreenOperator> {
 
-  static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
-    auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(std::move(ctx.dg()), std::move(ctx.adapter()),
-                                      std::move(ctx.friction()), mesh, cfg.gf_checkpoint_prefix, cfg.gf_checkpoint_every_nmins, cfg.matrix_free,
-                                      MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
-    ctx.setup_seasop(*seasop);
-    seasop->warmup();
-    return seasop;
-  }
+    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                     seas::ContextBase& ctx) {
+        auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
+            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh,
+            cfg.gf_checkpoint_prefix, cfg.gf_checkpoint_every_nmins, cfg.matrix_free,
+            MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+        ctx.setup_seasop(*seasop);
+        seasop->warmup();
+        return seasop;
+    }
 };
 
 template <> struct operator_specifics<SeasFDOperator> {
     using monitor_t = seas::MonitorFD;
 
-    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
+    static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                     seas::ContextBase& ctx) {
         auto seasop = std::make_shared<SeasFDOperator>(
             std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()));
         ctx.setup_seasop(*seasop);
