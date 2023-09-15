@@ -3,12 +3,12 @@
 
 #include "common/MGConfig.h"
 #include "common/MeshConfig.h"
+#include "common/Type.h"
 #include "config.h"
 #include "io/CSVWriter.h"
 #include "io/Probe.h"
 #include "io/TecplotWriter.h"
 #include "tandem/AdaptiveOutputStrategy.h"
-#include "tandem/SeasType.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
@@ -64,7 +64,7 @@ struct Config {
     double cfl;
 
     SeasMode mode;
-    SeasType type;
+    LocalOpType type;
     std::string lib;
     std::string scenario;
     std::array<double, DomainDimension> up;

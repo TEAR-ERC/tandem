@@ -55,9 +55,9 @@ public:
 
     void initial_condition(BlockVector& state);
     void rhs(double time, BlockVector const& state, BlockVector& result);
-    void update_internal_state(double time, BlockVector const& state,
-                               bool state_changed_since_last_rhs, bool require_traction,
-                               bool require_displacement);
+    virtual void update_internal_state(double time, BlockVector const& state,
+                                       bool state_changed_since_last_rhs, bool require_traction,
+                                       bool require_displacement);
 
     inline auto displacement(std::vector<std::size_t> const& subset) const {
         return dgop_->solution(linear_solver_.x(), subset);

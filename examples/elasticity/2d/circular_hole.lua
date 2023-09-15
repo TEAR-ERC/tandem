@@ -3,15 +3,24 @@ local a = 0.2
 local mu0 = 1.0
 local nu = 0.25
 
-function mu(x, y)
+local CircularHole = {}
+
+function CircularHole:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function CircularHole:mu(x, y)
     return mu0
 end
 
-function lam(x, y)
+function CircularHole:lam(x, y)
     return 2 * mu0 * nu / (1 - 2*nu)
 end
 
-function force(x, y)
+function CircularHole:force(x, y)
     return 0, 0
 end
 
@@ -27,13 +36,13 @@ function u_polar(r, t)
     return ur, ut 
 end
 
-function solution(x, y)
+function CircularHole:solution(x, y)
     local r, t = polar(x, y)
     local ur, ut = u_polar(r, t)
     return ur * math.cos(t) - ut * math.sin(t), ur * math.sin(t) + ut * math.cos(t)
 end
 
-function solution_jacobian(x, y)
+function CircularHole:solution_jacobian(x, y)
     local r, t = polar(x, y)
     local c = math.cos(t)
     local s = math.sin(t)
@@ -58,4 +67,10 @@ function solution_jacobian(x, y)
 
     return ux_x, ux_y, uy_x, uy_y
 end
+
+function CircularHole:boundary(x, y)
+    return self:solution(x, y)
+end
+
+circular_hole = CircularHole:new()
 

@@ -1,11 +1,7 @@
 resolution = 0.125
-
-[elasticity]
+type = "elasticity"
 lib = "beam.lua"
-force = "gravity"
-boundary = "left_boundary"
-lam = "lam"
-mu = "mu"
+scenario = "beam"
 
 [generate_mesh]
 intercepts = [

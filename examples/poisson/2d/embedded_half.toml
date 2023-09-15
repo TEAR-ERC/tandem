@@ -1,11 +1,7 @@
 resolution = 0.125
-
-[poisson]
+type = "poisson"
 lib = "embedded_half.lua"
-force = "force"
-boundary = "solution"
-slip = "slip"
-solution = "solution"
+scenario = "embedded_half"
 ref_normal = [1, 0]
 
 [generate_mesh]

@@ -1,3 +1,12 @@
+Embedded = {}
+
+function Embedded:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
 function smoothstep(x)
     return -20 * x^7 + 70 * x^6 - 84 * x^5 + 35 * x^4
 end
@@ -18,7 +27,7 @@ function sign(x)
     end
 end
 
-function force(x, y)
+function Embedded:force(x, y)
     if -1 < y and y < 1 then
         return 0, 2 * sign(x) * dsmoothstep_dx2(math.abs(y))
     else
@@ -26,11 +35,11 @@ function force(x, y)
     end
 end
 
-function slip(x, y)
+function Embedded:slip(x, y)
     return 0.0, 2 * (1-smoothstep(math.abs(y)))
 end
 
-function solution(x, y)
+function Embedded:solution(x, y)
     if -1 < y and y < 1 then
         return 0, sign(x) * (1-smoothstep(math.abs(y)))
     else
@@ -38,7 +47,7 @@ function solution(x, y)
     end
 end
 
-function solution_jacobian(x, y)
+function Embedded:solution_jacobian(x, y)
     if -1 < y and y < 1 then
         return 0, 0,
                0, -sign(x) * dsmoothstep_dx(math.abs(y)) * (y / math.abs(y))
@@ -48,6 +57,12 @@ function solution_jacobian(x, y)
     end
 end
 
-function lam(x, y)
+function Embedded:boundary(x, y)
+    return self:solution(x, y)
+end
+
+function Embedded:lam(x, y)
     return 0
 end
+
+embedded = Embedded:new()

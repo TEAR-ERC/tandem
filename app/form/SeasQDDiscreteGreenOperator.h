@@ -48,7 +48,7 @@ public:
 
     void update_internal_state(double time, BlockVector const& state,
                                bool state_changed_since_last_rhs, bool require_traction,
-                               bool require_displacement);
+                               bool require_displacement) override;
 
 protected:
     std::string gf_operator_filename_ = "gf_mat.bin";
