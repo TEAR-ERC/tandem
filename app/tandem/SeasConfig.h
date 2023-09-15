@@ -76,6 +76,7 @@ struct Config {
     unsigned mg_coarse_level;
 
     std::optional<std::string> gf_checkpoint_prefix;
+    double gf_checkpoint_every_nmins;
 
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;

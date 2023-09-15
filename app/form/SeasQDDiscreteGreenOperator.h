@@ -25,7 +25,9 @@ public:
     SeasQDDiscreteGreenOperator(std::unique_ptr<typename base::dg_t> dgop,
                                 std::unique_ptr<AbstractAdapterOperator> adapter,
                                 std::unique_ptr<AbstractFrictionOperator> friction,
-LocalSimplexMesh<DomainDimension> const& mesh, std::optional<std::string> prefix, 
+                                LocalSimplexMesh<DomainDimension> const& mesh, 
+                                std::optional<std::string> prefix, 
+                                double gf_checkpoint_every_nmins,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig());
     ~SeasQDDiscreteGreenOperator();
 
@@ -54,7 +56,7 @@ protected:
     std::string gf_operator_filename_ = "gf_mat.bin";
     std::string gf_traction_filename_ = "gf_vec.bin";
     std::string gf_facet_filename_ = "gf_facet_labels.bin";
-    double checkpoint_every_nmins_ = 30.0;
+    double checkpoint_every_nmins_;
 
     void update_traction(double time, BlockVector const& state);
 

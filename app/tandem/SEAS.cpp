@@ -144,7 +144,7 @@ template <> struct operator_specifics<SeasQDDiscreteGreenOperator> : public qd_o
 
   static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg, seas::ContextBase& ctx) {
     auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(std::move(ctx.dg()), std::move(ctx.adapter()),
-                                      std::move(ctx.friction()), mesh, cfg.gf_checkpoint_prefix, cfg.matrix_free,
+                                      std::move(ctx.friction()), mesh, cfg.gf_checkpoint_prefix, cfg.gf_checkpoint_every_nmins, cfg.matrix_free,
                                       MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     ctx.setup_seasop(*seasop);
     seasop->warmup();

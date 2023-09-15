@@ -16,6 +16,7 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<AbstractFrictionOperator> friction,
     LocalSimplexMesh<DomainDimension> const& mesh,
     std::optional<std::string> prefix,
+    double gf_checkpoint_every_nmins,
     bool matrix_free, MGConfig const& mg_config)
     : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
 
@@ -23,6 +24,9 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
 
     MPI_Comm_rank(base::comm(),&rank);
     // if prefix is not empty, set filenames and mark checkpoint_enabled_ = true
+
+    checkpoint_every_nmins_ = gf_checkpoint_every_nmins;
+
     if (prefix.has_value()) {
         std::string sprefix = prefix.value_or("");
         if (rank == 0) { std::cout << "Using GF checkpoint path: " << sprefix << std::endl; }
