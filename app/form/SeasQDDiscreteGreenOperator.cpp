@@ -603,6 +603,8 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
         /* checkpoint */
         MPI_Bcast(&solve_time, 1, MPI_DOUBLE, 0, comm);
         if (solve_time / 60.0 > checkpoint_every_nmins_) {
+            CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
+            CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
             write_discrete_greens_operator(mesh, current_gf, n_gf);
             solve_time = 0.0;
         }
