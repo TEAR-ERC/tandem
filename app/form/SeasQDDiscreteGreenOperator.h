@@ -25,8 +25,10 @@ public:
     SeasQDDiscreteGreenOperator(std::unique_ptr<typename base::dg_t> dgop,
                                 std::unique_ptr<AbstractAdapterOperator> adapter,
                                 std::unique_ptr<AbstractFrictionOperator> friction,
-LocalSimplexMesh<DomainDimension> const& mesh,
-                                bool matrix_free = false, MGConfig const& mg_config = MGConfig(), std::string prefix = "");
+                                LocalSimplexMesh<DomainDimension> const& mesh, 
+                                std::optional<std::string> prefix, 
+                                double gf_checkpoint_every_nmins,
+                                bool matrix_free = false, MGConfig const& mg_config = MGConfig());
     ~SeasQDDiscreteGreenOperator();
 
     void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
@@ -49,27 +51,22 @@ LocalSimplexMesh<DomainDimension> const& mesh,
                                bool state_changed_since_last_rhs, bool require_traction,
                                bool require_displacement);
 
-    std::tuple<std::string, std::string> get_checkpoint_filenames(void);
-    double get_checkpoint_time_interval(void);
-    void set_checkpoint_filenames(std::string, std::string);
-    void set_checkpoint_time_interval(double);
-    void prepend_checkpoint_path(std::string);
 
 protected:
     std::string gf_operator_filename_ = "gf_mat.bin";
     std::string gf_traction_filename_ = "gf_vec.bin";
     std::string gf_facet_filename_ = "gf_facet_labels.bin";
-    double checkpoint_every_nmins_ = 30.0;
+    double checkpoint_every_nmins_;
 
     void update_traction(double time, BlockVector const& state);
 
 private:
     void compute_discrete_greens_function();
     void compute_boundary_traction();
-    void create_discrete_greens_function();
-    void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
-    void write_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh);
-    void load_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh);
+    PetscInt create_discrete_greens_function();
+    void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf_, PetscInt n_gf_);
+    void write_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf_, PetscInt n_gf_);
+    PetscInt load_discrete_greens_operator(LocalSimplexMesh<DomainDimension> const& mesh, PetscInt n_gf_);
     // all logic associated with matix craetion, loading / partial assembly is done here
     void get_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
     void write_discrete_greens_traction();
@@ -82,8 +79,6 @@ private:
     std::tuple<Mat, Mat> create_row_col_permutation_matrices(bool create_row, bool create_col);
   
     bool checkpoint_enabled_ = false;
-    PetscInt current_gf_ = 0;
-    PetscInt n_gf_ = 0;
     Mat G_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;
