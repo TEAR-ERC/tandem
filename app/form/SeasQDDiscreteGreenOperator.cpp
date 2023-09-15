@@ -303,6 +303,7 @@ void SeasQDDiscreteGreenOperator :: write_facet_labels_IS(LocalSimplexMesh<Domai
 
   CHKERRTHROW(PetscTime(&t0));
   CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),gf_facet_filename_.c_str(),FILE_MODE_WRITE,&v));
+  CHKERRTHROW(ISView(is, v));
   CHKERRTHROW(PetscViewerDestroy(&v));
   CHKERRTHROW(PetscTime(&t1));
   CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"write_discrete_greens_operator():facets %1.2e (sec)\n",(double)(t1 - t0)));
@@ -420,12 +421,12 @@ std::tuple<Mat, Mat> SeasQDDiscreteGreenOperator :: create_row_col_permutation_m
   // Rperm is the transpose of Cperm just with a different block size
 
   auto create_permutation_matrix = [this,&comm, mb_offset,&fault_map_index](PetscInt m, PetscInt M, PetscInt block_size, bool swap) {
-    Mat perm = NULL, Rperm = NULL;
+    Mat perm = NULL;
     CHKERRTHROW(MatCreate(comm,&perm));
     CHKERRTHROW(MatSetSizes(perm,m,m,M,M));
     CHKERRTHROW(MatSetType(perm,MATAIJ));
-    CHKERRTHROW(MatSeqAIJSetPreallocation(Rperm,block_size,NULL));
-    CHKERRTHROW(MatMPIAIJSetPreallocation(Rperm,block_size,NULL,block_size,NULL));
+    CHKERRTHROW(MatSeqAIJSetPreallocation(perm,block_size,NULL));
+    CHKERRTHROW(MatMPIAIJSetPreallocation(perm,block_size,NULL,block_size,NULL));
 
     for (std::size_t bndNo = 0; bndNo < this->adapter().fault_map().local_size(); ++bndNo) {
       PetscInt from = mb_offset + bndNo;
@@ -598,7 +599,7 @@ void SeasQDDiscreteGreenOperator::get_discrete_greens_function(LocalSimplexMesh<
 
   // Write out the operator whenever the fully assembled operator was not loaded from file
   if (n_gfloaded != n_gf) {
-    write_discrete_greens_operator(mesh, n_gfloaded, n_gf);
+    write_discrete_greens_operator(mesh, n_gf, n_gf);
   }
 }
 
