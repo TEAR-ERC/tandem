@@ -18,7 +18,7 @@ Steps to reproduce the behavior:
 1. Which version do you use? Provide branch and commit id.
 2. Which build settings do you use? Which compiler version do you use? 
 3. On which machine does your problem occur? If on a cluster: Which modules are loaded?
-4. Provide parameter/material files.
+4. Provide your .toml, .lua files and the PETSc options you used.
 
 **Screenshots/Console output**
 If you suspect a problem in the numerics/physics add a screenshot of your output.
