@@ -1,0 +1,1 @@
+mpiexec -n 1 ./custom_ex51 -ts_monitor -options_file $PATH_TO_TANDEM/examples/options/lu_mumps.cfg -options_file $PATH_TO_TANDEM/examples/options/rk45.cfg
