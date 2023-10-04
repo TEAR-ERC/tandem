@@ -10,10 +10,23 @@ static char help[] = "Small ODE to test TS accuracy.\n";
   is used to test the accuracy of TS schemes.
 */
 
-#include "tandem_PetscUtil.h"
 #include <petscts.h>
 #include <petsc.h>
 #include <petsc/private/tsimpl.h>
+
+#define max(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b;       \
+})
+
+#define min(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b;       \
+})
 
 /*
      Defines the ODE passed to the ODE solver in explicit form: U_t = F(U)
@@ -372,11 +385,11 @@ int main(int argc,char **argv)
   PetscMPIInt    size;
   PetscInt       n = 2;
   PetscScalar    *u;
-  PetscReal      t, final_time = 10.0;
+  PetscReal      t, final_time = 20.0;
   // PetscReal      t, final_time = 1.0, dt = 0.25;
   PetscReal      error;
   TSAdapt        adapt;
-  const char ts_filename_ = "ts_checkpoint.bin";
+  const char * ts_filename_ = "ts_checkpoint.bin";
   PetscInt checkpoint_every_nsteps_ = 10;
   PetscInt ns0,ns = checkpoint_every_nsteps_;
   TSConvergedReason reason;
@@ -416,53 +429,25 @@ int main(int argc,char **argv)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set solver options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  // ierr = TSSetSaveTrajectory(ts);CHKERRQ(ierr);
-  // ierr = TSSetMaxTime(ts,final_time);CHKERRQ(ierr);
-  // ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
-  // ierr = TSSetTimeStep(ts,dt);CHKERRQ(ierr);
-  // /* The adapative time step controller is forced to take constant time steps. */
-  // ierr = TSGetAdapt(ts,&adapt);CHKERRQ(ierr);
-  // ierr = TSAdaptSetType(adapt,TSADAPTNONE);CHKERRQ(ierr);
-  // ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetSaveTrajectory(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,final_time);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
+  ierr = TSGetAdapt(ts,&adapt);CHKERRQ(ierr);
+  ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
 
   // Load an existing checkpoint if it exists
-  CHKERRTHROW(tandem_TSLoad(ts,ts_filename_));
-  CHKERRTHROW(TSSetMaxTime(ts,final_time));
-  CHKERRTHROW(TSGetMaxSteps(ts,&ns0));
-  CHKERRTHROW(TSGetStepNumber(ts,&curr));
-  CHKERRTHROW(TSSetMaxSteps(ts,min(curr + ns,ns0)));
-
-  reason = TS_CONVERGED_ITERATING;
-  while (reason != TS_CONVERGED_TIME) {
-    CHKERRTHROW(TSGetStepNumber(ts,&curr));
-    CHKERRTHROW(TSGetMaxSteps(ts,&span));
-    printf("[checkpoint phase] executing steps %d to %d\n",(int)curr,(int)span);
-
-    CHKERRTHROW(TSSolve(ts, U));
-    CHKERRTHROW(TSGetConvergedReason(ts,&reason));
-
-    CHKERRTHROW(TSGetStepNumber(ts,&curr));
-    if (curr == ns0) {
-      // Checkpoint final trajectory
-      CHKERRTHROW(tandem_TSView(ts,ts_filename_));
-      break;
-    }
-
-    if (reason != TS_CONVERGED_TIME) {
-      // Checkpoint
-      CHKERRTHROW(tandem_TSView(ts,ts_filename_));
-      // Change configuration for next checkpoint cycle
-      CHKERRTHROW(TSSetMaxSteps(ts,min(curr + ns,ns0)));
-    } else {
-      // Checkpoint final trajectory
-      CHKERRTHROW(tandem_TSView(ts,ts_filename_));
-    }
-  }
+  ierr = tandem_TSLoad(ts,ts_filename_);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,final_time);CHKERRQ(ierr);
+  ierr = TSGetMaxSteps(ts,&ns0);CHKERRQ(ierr);
+  ierr = TSGetStepNumber(ts,&curr);CHKERRQ(ierr);
+  ierr = TSSetMaxSteps(ts,min(curr + ns,ns0));CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Run timestepping solver and compute error
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  // ierr = TSSolve(ts,U);CHKERRQ(ierr);
+  ierr = TSSolve(ts,U);CHKERRQ(ierr);
+  printf("Checkpoint final trajectory\n");
+  ierr = tandem_TSView(ts,ts_filename_);CHKERRQ(ierr);
   ierr = TSGetTime(ts,&t);CHKERRQ(ierr);
 
   if (PetscAbsReal(t-final_time)>100*PETSC_MACHINE_EPSILON) {
