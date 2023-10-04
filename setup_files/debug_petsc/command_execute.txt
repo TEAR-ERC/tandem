@@ -1,4 +1,4 @@
 # Ex51 with rk45, with checkpointing
-mpiexec -n 1 ./custom_ex51 -ts_monitor -options_file $PATH_TO_TANDEM/examples/options/lu_mumps.cfg -options_file $PATH_TO_TANDEM/examples/options/rk45.cfg > ON_checkpoint.msg
+mpiexec -n 1 ./custom_ex51 -ts_monitor -options_file lu_mumps.cfg -options_file rk45.cfg > ON_checkpoint.msg
 # Ex51 with rk45, without checkpointing
-mpiexec -n 1 ./rk_ex51 -ts_monitor -options_file $PATH_TO_TANDEM/examples/options/lu_mumps.cfg -options_file $PATH_TO_TANDEM/examples/options/rk45.cfg > OFF_checkpoint.msg
+mpiexec -n 1 ./rk_ex51 -ts_monitor -options_file lu_mumps.cfg -options_file rk45.cfg > OFF_checkpoint.msg
