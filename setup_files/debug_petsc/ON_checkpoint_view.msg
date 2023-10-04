@@ -1,0 +1,42 @@
+0 TS dt 0.1 time 0.
+1 TS dt 0.22288 time 0.1
+2 TS dt 0.232468 time 0.32288
+3 TS dt 0.35973 time 0.555348
+4 TS dt 0.248624 time 0.792593
+5 TS dt 0.240771 time 1.04122
+6 TS dt 0.36173 time 1.28199
+7 TS dt 0.214287 time 1.49307
+8 TS dt 0.192885 time 1.70736
+9 TS dt 0.185092 time 1.90024
+10 TS dt 0.183238 time 2.08533
+11 TS dt 0.184207 time 2.26857
+12 TS dt 0.18697 time 2.45278
+13 TS dt 0.191052 time 2.63975
+14 TS dt 0.196197 time 2.8308
+15 TS dt 0.202269 time 3.027
+16 TS dt 0.209193 time 3.22927
+17 TS dt 0.216945 time 3.43846
+18 TS dt 0.225533 time 3.6554
+19 TS dt 0.234993 time 3.88094
+20 TS dt 0.245388 time 4.11593
+21 TS dt 0.256806 time 4.36132
+22 TS dt 0.269361 time 4.61812
+23 TS dt 0.283199 time 4.88749
+24 TS dt 0.298502 time 5.17068
+25 TS dt 0.31549 time 5.46919
+26 TS dt 0.33444 time 5.78468
+27 TS dt 0.355104 time 6.11912
+28 TS dt 0.351998 time 6.47422
+29 TS dt 0.357794 time 6.82622
+30 TS dt 0.375095 time 7.18401
+31 TS dt 0.416424 time 7.55911
+32 TS dt 0.504048 time 7.97553
+33 TS dt 0.430694 time 8.3962
+34 TS dt 0.378598 time 8.77236
+35 TS dt 0.358586 time 9.15096
+36 TS dt 0.352043 time 9.50955
+37 TS dt 0.355041 time 9.86159
+38 TS dt 0.368287 time 10.2166
+Checkpoint final trajectory
+Note: There is a difference of -0.216633 between the prescribed final time 10. and the actual final time.
+Error at final time: 2.37E-08
