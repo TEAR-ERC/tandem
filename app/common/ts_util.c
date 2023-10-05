@@ -654,14 +654,14 @@ PetscErrorCode ts_checkpoint(TS ts)
   ierr = PetscObjectQuery((PetscObject)ts,"_TSCheckPoint",(PetscObject*)&container);CHKERRQ(ierr);
   if (!container) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_ORDER,"Must call ts_checkpoint_configure() first");
   PetscContainerGetPointer(container,(void**)&tsc);
-  ts_checkpoint_test(ts,tsc,&generate);
+  ierr = ts_checkpoint_test(ts,tsc,&generate);CHKERRQ(ierr);
   if (generate) {
     /* create directory checkpoint_prefix/stepXXXX/ */
     TSGetStepNumber(ts,&step);
-    ts_checkpoint_create_path(ts,tsc,step);
+    ierr = ts_checkpoint_create_path(ts,tsc,step);CHKERRQ(ierr);
     
     /* write files ts.bin, state.vec, ts_impl.bin */
-    ts_checkpoint_write(ts,tsc);
+    ierr = ts_checkpoint_write(ts,tsc);CHKERRQ(ierr);
   }
   tsc->path_step[0] = '\0';
   PetscFunctionReturn(0);
