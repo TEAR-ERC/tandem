@@ -3,7 +3,9 @@
 
 #include <petscts.h>
 
-PetscErrorCode tandem_TSView(TS,const char*);
-PetscErrorCode tandem_TSLoad(TS,const char*);
+
+PetscErrorCode ts_checkpoint_configure(TS ts);
+PetscErrorCode ts_checkpoint(TS ts);
+PetscErrorCode ts_checkpoint_restart(TS ts);
 
 #endif // TS_UTIL_20211202_H

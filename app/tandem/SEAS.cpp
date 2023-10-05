@@ -234,11 +234,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     Stopwatch sw;
     sw.start();
-    if (!cfg.ts_checkpoint_prefix) {
-      ts.solve(cfg.final_time);
-    } else {
-      ts.solve_with_checkpoints(cfg.final_time);
-    }
+    ts.solve(cfg.final_time);
+
     double solve_time = sw.stop();
 
     std::optional<double> L2_error_domain = std::nullopt;
