@@ -720,6 +720,7 @@ PetscErrorCode ts_checkpoint_restart(TS ts)
 {
   PetscBool found = PETSC_FALSE;
   char      load_path_prefix[PETSC_MAX_PATH_LEN];
+  PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
   load_path_prefix[0] = '\0';
@@ -727,8 +728,8 @@ PetscErrorCode ts_checkpoint_restart(TS ts)
   if (found) {
     PetscPrintf(PetscObjectComm((PetscObject)ts),"TS -ts_checkpoint_load %s\n",load_path_prefix);
     
-    ts_checkpoint_load(ts,load_path_prefix);
-    TSSetFromOptions(ts);
+    ierr = ts_checkpoint_load(ts,load_path_prefix);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
