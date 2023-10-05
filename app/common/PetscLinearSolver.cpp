@@ -239,7 +239,7 @@ void PetscLinearSolver::setup_mg_default_mf(AbstractDGOperator<DomainDimension>&
     }
 
     for (int k=nlevels-1; k>=0; k--) {
-        if (interp_cat[k]) {
+        if (interp_cat[k] && (interp_cat[k] != interp[k])) {
             char pname[PETSC_MAX_PATH_LEN];
 
             PetscSNPrintf(pname,PETSC_MAX_PATH_LEN-1,"interp_c_%d%d",nlevels-1,k-1);
