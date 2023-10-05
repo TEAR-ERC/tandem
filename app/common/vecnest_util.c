@@ -38,7 +38,7 @@ static PetscErrorCode _VecView_Nest(Vec x,PetscViewer viewer)
     }
     ierr = PetscViewerASCIIPopTab(viewer);CHKERRQ(ierr);                /* pop0 */
   } else if (isbinary) {
-    for (i=0; i<nb; i++) {
+    for (i=0; i<nb; i++) {PetscInt NR;
       ierr = VecView(v[i],viewer);CHKERRQ(ierr);
     }
   }
@@ -64,7 +64,11 @@ static PetscErrorCode _VecLoad_Nest(Vec x,PetscViewer viewer)
 
 PetscErrorCode VecNestUpgradeOperations(Vec x)
 {
-  x->ops->view = _VecView_Nest;
-  x->ops->load = _VecLoad_Nest;
+  PetscBool isnest;
+  PetscObjectTypeCompare((PetscObject)x,VECNEST,&isnest);
+  if (isnest) {
+    x->ops->view = _VecView_Nest;
+    x->ops->load = _VecLoad_Nest;
+  }
   PetscFunctionReturn(0);
 }
