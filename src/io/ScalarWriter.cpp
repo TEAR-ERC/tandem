@@ -2,6 +2,8 @@
 
 #include <iomanip>
 #include <ios>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 namespace tndm {
 
@@ -19,7 +21,17 @@ void ScalarWriter::write(double time, mneme::span<double> scalars) const {
         out_->open(file_name_, false);
         write_header();
     } else {
-        out_->open(file_name_, true);
+        fs::path pckp(file_name_);
+        bool exists = fs::exists(pckp);
+        if (exists) {
+            // open existing file
+            out_->open(file_name_, true);
+        } else { // below is needed to support checkpointing
+            // open new file
+            out_->open(file_name_, false);
+            // write header
+            write_header();
+        }
     }
 
     *out_ << time;

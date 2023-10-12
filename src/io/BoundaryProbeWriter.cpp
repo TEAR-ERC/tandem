@@ -8,6 +8,8 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 namespace tndm {
 
@@ -83,7 +85,17 @@ void BoundaryProbeWriter<D>::write(double time,
             out_->open(probe.file_name, false);
             write_header(probe, functions);
         } else {
-            out_->open(probe.file_name, true);
+            fs::path pckp(probe.file_name);
+            bool exists = fs::exists(pckp);
+            if (exists) {
+                // open existing file
+                out_->open(probe.file_name, true);
+            } else { // below is needed to support checkpointing
+                // open new file
+                out_->open(probe.file_name, false);
+                // write header
+                write_header(probe, functions);
+            }
         }
 
         *out_ << time;
