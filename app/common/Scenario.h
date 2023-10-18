@@ -16,35 +16,6 @@
 
 namespace tndm {
 
-struct ScenarioConfig {
-    std::string lib;
-    std::optional<std::string> warp;
-    std::optional<std::string> force;
-    std::optional<std::string> boundary;
-    std::optional<std::string> slip;
-    std::optional<std::string> solution;
-    std::optional<std::string> solution_jacobian;
-    std::optional<std::array<double, DomainDimension>> ref_normal;
-
-    template <typename Derived, typename PathConverter>
-    static void setSchema(TableSchema<Derived>& schema, PathConverter path_converter) {
-        auto cast = [](auto ptr) {
-            using type = std::remove_reference_t<decltype(std::declval<ScenarioConfig>().*ptr)>;
-            return static_cast<type Derived::*>(ptr);
-        };
-        schema.add_value("lib", cast(&Derived::lib))
-            .converter(path_converter)
-            .validator(PathExists());
-        schema.add_value("warp", cast(&Derived::warp));
-        schema.add_value("force", cast(&Derived::force));
-        schema.add_value("boundary", cast(&Derived::boundary));
-        schema.add_value("slip", cast(&Derived::slip));
-        schema.add_value("solution", cast(&Derived::solution));
-        schema.add_value("solution_jacobian", cast(&Derived::solution_jacobian));
-        schema.add_array("ref_normal", cast(&Derived::ref_normal)).of_values();
-    }
-};
-
 template <class LocalOperator> class Scenario {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
@@ -54,24 +25,34 @@ public:
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
 
-    Scenario(ScenarioConfig const& problem) : ref_normal_(problem.ref_normal) {
-        lib_.loadFile(problem.lib);
+    constexpr static char Warp[] = "warp";
+    constexpr static char Force[] = "force";
+    constexpr static char Boundary[] = "boundary";
+    constexpr static char Slip[] = "slip";
+    constexpr static char Solution[] = "solution";
+    constexpr static char SolutionJacobian[] = "solution_jacobian";
 
-        if (problem.warp) {
-            warp_ = lib_.getFunction<DomainDimension, DomainDimension>(*problem.warp);
+    Scenario(std::string const& lib, std::string const& scenario,
+             std::array<double, DomainDimension> const& ref_normal)
+        : ref_normal_(ref_normal) {
+        lib_.loadFile(lib);
+
+        if (lib_.hasMember(scenario, Warp)) {
+            warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
 
-        auto functional = [](LuaLib& lib, std::optional<std::string> const& opt,
-                             std::optional<functional_t<NumQuantities>>& target) {
-            if (opt) {
-                target = std::make_optional(lib.getFunction<DomainDimension, NumQuantities>(*opt));
+        auto functional = [&](char const opt[],
+                              std::optional<functional_t<NumQuantities>>& target) {
+            if (lib_.hasMember(scenario, opt)) {
+                target = std::make_optional(
+                    lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, opt));
             }
         };
-        functional(lib_, problem.force, force_);
-        functional(lib_, problem.boundary, boundary_);
-        functional(lib_, problem.slip, slip_);
-        if (problem.solution) {
-            auto myF = lib_.getFunction<DomainDimension, NumQuantities>(*problem.solution);
+        functional(Force, force_);
+        functional(Boundary, boundary_);
+        functional(Slip, slip_);
+        if (lib_.hasMember(scenario, Solution)) {
+            auto myF = lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, Solution);
             solution_ = [myF](Vector<double> const& v) -> std::array<double, NumQuantities> {
                 std::array<double, DomainDimension> x;
                 for (std::size_t i = 0; i < DomainDimension; ++i) {
@@ -80,9 +61,9 @@ public:
                 return myF(x);
             };
         }
-        if (problem.solution_jacobian) {
-            auto myF = lib_.getFunction<DomainDimension, NumQuantities * DomainDimension>(
-                *problem.solution_jacobian);
+        if (lib_.hasMember(scenario, SolutionJacobian)) {
+            auto myF = lib_.getMemberFunction<DomainDimension, NumQuantities * DomainDimension>(
+                scenario, SolutionJacobian);
             solution_jacobian_ = [myF](Vector<double> const& v)
                 -> std::array<double, NumQuantities * DomainDimension> {
                 std::array<double, DomainDimension> x;
@@ -116,18 +97,16 @@ public:
         if (force_) {
             lop.set_force(*force_);
         }
-        if (boundary_ && ref_normal_) {
-            lop.set_dirichlet(*boundary_, *ref_normal_);
-        } else if (boundary_) {
-            lop.set_dirichlet(*boundary_);
+        if (boundary_) {
+            lop.set_dirichlet(*boundary_, ref_normal_);
         }
-        if (slip_ && ref_normal_) {
-            lop.set_slip(*slip_, *ref_normal_);
+        if (slip_) {
+            lop.set_slip(*slip_, ref_normal_);
         }
     }
 
 protected:
-    std::optional<std::array<double, DomainDimension>> ref_normal_;
+    std::array<double, DomainDimension> ref_normal_;
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     std::optional<functional_t<NumQuantities>> force_ = std::nullopt;

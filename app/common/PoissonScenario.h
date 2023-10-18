@@ -6,30 +6,21 @@
 #include "form/DGCurvilinearCommon.h"
 #include "localoperator/Poisson.h"
 
-#include "util/Schema.h"
-
 #include <memory>
 #include <optional>
 #include <string>
 
 namespace tndm {
 
-struct PoissonScenarioConfig : ScenarioConfig {
-    std::optional<std::string> coefficient;
-
-    template <typename PathConverter>
-    static void setSchema(TableSchema<PoissonScenarioConfig>& schema,
-                          PathConverter path_converter) {
-        ScenarioConfig::setSchema(schema, std::move(path_converter));
-        schema.add_value("coefficient", &PoissonScenarioConfig::coefficient);
-    }
-};
-
 class PoissonScenario : public Scenario<Poisson> {
 public:
-    PoissonScenario(PoissonScenarioConfig const& problem) : Scenario(problem) {
-        if (problem.coefficient) {
-            coefficient_ = lib_.getFunction<DomainDimension, 1>(*problem.coefficient);
+    constexpr static char Mu[] = "mu";
+
+    PoissonScenario(std::string const& lib, std::string const& scenario,
+                    std::array<double, DomainDimension> const& ref_normal)
+        : Scenario(lib, scenario, ref_normal) {
+        if (lib_.hasMember(scenario, Mu)) {
+            coefficient_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
         }
     }
 

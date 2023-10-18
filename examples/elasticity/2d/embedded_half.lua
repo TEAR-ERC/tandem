@@ -1,3 +1,12 @@
+EmbeddedHalf = {}
+
+function EmbeddedHalf:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
 function smoothstep(x)
     return -20 * x^7 + 70 * x^6 - 84 * x^5 + 35 * x^4
 end
@@ -18,7 +27,7 @@ function sign(x)
     end
 end
 
-function force(x, y)
+function EmbeddedHalf:force(x, y)
     if y > 0.0 then
         return 0, -2 * sign(x) * dsmoothstep_dx2(y)
     else
@@ -26,7 +35,7 @@ function force(x, y)
     end
 end
 
-function slip(x, y)
+function EmbeddedHalf:slip(x, y)
     if y > 0.0 then
         return 0, 2 * smoothstep(y)
     else
@@ -34,7 +43,7 @@ function slip(x, y)
     end
 end
 
-function solution(x, y)
+function EmbeddedHalf:solution(x, y)
     if y > 0.0 then
         return 0, sign(x) * smoothstep(y)
     else
@@ -42,7 +51,7 @@ function solution(x, y)
     end
 end
 
-function solution_jacobian(x, y)
+function EmbeddedHalf:solution_jacobian(x, y)
     if y > 0.0 then
         return 0, 0,
                0, sign(x) * dsmoothstep_dx(y)
@@ -52,6 +61,12 @@ function solution_jacobian(x, y)
     end
 end
 
-function lam(x, y)
+function EmbeddedHalf:boundary(x, y)
+    return self:solution(x, y)
+end
+
+function EmbeddedHalf:lam(x, y)
     return 0
 end
+
+embedded_half = EmbeddedHalf:new()

@@ -67,6 +67,12 @@ include(../cmake/doctest.cmake)
 
 find_package(PETSc REQUIRED)
 
+if(PETSC_MEMALIGN LESS ALIGNMENT)
+    message(SEND_ERROR "The memory alignment of PETSc is ${PETSC_MEMALIGN} bytes but an alignment of "
+                       "at least ${ALIGNMENT} bytes is required for ARCH=${ARCH}. "
+                       "Please compile PETSc with --with-memalign=${ALIGNMENT}.")
+endif()
+
 add_library(global-flop-counter kernels/flop_counter.cpp)
 
 function(generate_code APP)
@@ -76,9 +82,9 @@ function(generate_code APP)
     if("${YATETO_ARCH}" MATCHES "skl|naples|rome")
         set(YATETO_ARCH "hsw")
     endif()
-    set(WITH_LIBXSMM "")
+    set(WITH_LIBXSMM "\'\'")
     if(${LibxsmmGenerator_FOUND})
-        set(WITH_LIBXSMM ${LibxsmmGeneratorExecutable})
+        set(WITH_LIBXSMM "\'${LibxsmmGeneratorExecutable}\'")
     endif()
     add_custom_command(
         COMMAND

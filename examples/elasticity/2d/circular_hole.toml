@@ -1,10 +1,4 @@
 mesh_file = "circular_hole.msh"
-
-[elasticity]
+type = "elasticity"
 lib = "circular_hole.lua"
-force = "force"
-boundary = "solution"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
-mu = "mu"
-lam = "lam"
+scenario = "circular_hole"

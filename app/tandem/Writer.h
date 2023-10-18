@@ -132,7 +132,7 @@ public:
 
         auto writer = VTUWriter<D - 1u>(degree_, true, comm_);
         writer.addFieldData("time", &time, 1);
-        auto piece = writer.addPiece(adapter_);
+        auto& piece = writer.addPiece(adapter_);
         for (auto const& fun : data) {
             piece.addPointData(fun);
         }
@@ -146,7 +146,7 @@ public:
 
     void write_static(mneme::span<FiniteElementFunction<D - 1u>> data) override {
         auto writer = VTUWriter<D - 1u>(degree_, true, comm_);
-        auto piece = writer.addPiece(adapter_);
+        auto& piece = writer.addPiece(adapter_);
         for (auto const& fun : data) {
             piece.addPointData(fun);
         }
@@ -197,7 +197,7 @@ public:
 
         auto writer = VTUWriter<D>(degree_, true, comm_);
         writer.addFieldData("time", &time, 1);
-        auto piece = writer.addPiece(adapter_);
+        auto& piece = writer.addPiece(adapter_);
         for (auto const& fun : data) {
             piece.addPointData(fun);
             if (jacobian_) {
@@ -214,7 +214,7 @@ public:
 
     void write_static(mneme::span<FiniteElementFunction<D>> data) override {
         auto writer = VTUWriter<D>(degree_, true, comm_);
-        auto piece = writer.addPiece(adapter_);
+        auto& piece = writer.addPiece(adapter_);
         for (auto const& fun : data) {
             piece.addPointData(fun);
         }

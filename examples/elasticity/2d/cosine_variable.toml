@@ -1,14 +1,7 @@
 resolution = 0.125
-
-[elasticity]
+type = "elasticity"
 lib = "cosine_variable.lua"
-force = "force"
-boundary = "solution"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
-warp = "warp"
-mu = "mu"
-lam = "lam"
+scenario = "cosine_variable"
 
 [generate_mesh]
 intercepts = [
