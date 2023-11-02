@@ -139,14 +139,6 @@ void setConfigSchema(TableSchema<Config>& schema,
         .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; })
         .help("MG level selection strategy (TwoLevel|Logarithmic|Full)");
 
-    schema.add_value("ts_checkpoint_prefix", &Config::ts_checkpoint_prefix)
-        .help("Path where time integrator history will be checkpointed");
-    schema.add_value("ts_checkpoint_frequency", &Config::ts_checkpoint_freq)
-        .default_value(20)
-        .validator([](auto&& x) { return x > 0; })
-        .help("Interval when time integrator will be checkpointed");
-
-
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
