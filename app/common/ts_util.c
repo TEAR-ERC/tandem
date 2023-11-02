@@ -521,6 +521,10 @@ PetscErrorCode _TSImplLoad_RK(TS ts, PetscViewer viewer)
   PetscFunctionReturn(0);
 }
 
+typedef enum { TSCP_STORAGE_NONE=0, TSCP_STORAGE_UNLIMITED, TSCP_STORAGE_LIMITED } TSCheckPointStorageType;
+
+const char *TSCheckPointStorageTypes[] = { "none", "unlimited", "limited", "TSCheckPointStorageType", "TSCP_STORAGE_", NULL };
+
 struct _TSCheckPoint {
   char      path_prefix[PETSC_MAX_PATH_LEN];
   char      path_step[PETSC_MAX_PATH_LEN];
@@ -529,6 +533,8 @@ struct _TSCheckPoint {
   PetscReal checkpoint_frequency_time_physical;
   PetscInt  n, step_last;
   PetscReal cputime_last,time_last;
+  TSCheckPointStorageType mode;
+  PetscInt limited_size;
 };
 typedef struct _TSCheckPoint *TSCheckPoint;
 
@@ -536,16 +542,22 @@ typedef struct _TSCheckPoint *TSCheckPoint;
 static PetscErrorCode ts_checkpoint_create_path(TS ts, TSCheckPoint cp, PetscInt step)
 {
   size_t L;
-  
+  const char *basenames[] = { "none", "step", "chkpnt", 0 };
+  char *base = NULL;
+  PetscInt fileindex;
+
   PetscFunctionBeginUser;
+  if (cp->mode == TSCP_STORAGE_UNLIMITED) { fileindex = step; }
+  if (cp->mode == TSCP_STORAGE_LIMITED) { fileindex = cp->n % cp->limited_size; }
+  base = (char*)basenames[(int)cp->mode];
   PetscStrlen(cp->path_prefix,&L);
   if (L == 0) {
-    PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"step%d",(int)step);
+    PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"%s%d",base,(int)fileindex);
   } else {
     if (cp->path_prefix[L-1] == '/') {
-      PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"%sstep%d",cp->path_prefix,(int)step);
+      PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"%s%s%d",cp->path_prefix,base,(int)fileindex);
     } else {
-      PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"%s/step%d",cp->path_prefix,(int)step);
+      PetscSNPrintf(cp->path_step,PETSC_MAX_PATH_LEN-1,"%s/%s%d",cp->path_prefix,base,(int)fileindex);
     }
   }
   MPICreateDirectory(PetscObjectComm((PetscObject)ts),cp->path_step);
@@ -684,6 +696,11 @@ PetscErrorCode ts_checkpoint_configure(TS ts)
   PetscOptionsGetInt(NULL,NULL,"-ts_checkpoint_freq_step",&tsc->checkpoint_frequency_step,NULL);
   PetscOptionsGetReal(NULL,NULL,"-ts_checkpoint_freq_cputime",&tsc->checkpoint_frequency_cputime_minutes,NULL);
   PetscOptionsGetReal(NULL,NULL,"-ts_checkpoint_freq_physical_time",&tsc->checkpoint_frequency_time_physical,NULL);
+  tsc->mode = TSCP_STORAGE_LIMITED;
+  tsc->limited_size = 1;
+  PetscOptionsGetEnum(NULL,NULL,"-ts_checkpoint_storage_type",TSCheckPointStorageTypes,(PetscEnum*)&tsc->mode,NULL);
+  PetscOptionsGetInt(NULL,NULL,"-ts_checkpoint_storage_limited_size",&tsc->limited_size,NULL);
+
 
   tsc->path_prefix[0] = '\0';
   PetscSNPrintf(tsc->path_prefix,PETSC_MAX_PATH_LEN-1,"checkpoint");
@@ -691,28 +708,41 @@ PetscErrorCode ts_checkpoint_configure(TS ts)
   PetscOptionsGetString(NULL,NULL,"-ts_checkpoint_path",tsc->path_prefix,PETSC_MAX_PATH_LEN-1,&found);
   tsc->path_step[0] = '\0';
 
-  PetscPrintf(comm,"TS -ts_checkpoint_path %s\n",tsc->path_prefix);
-  PetscPrintf(comm,"TS -ts_checkpoint_freq_step %d\n",tsc->checkpoint_frequency_step);
-  PetscPrintf(comm,"TS -ts_checkpoint_freq_cputime %1.4e\n",tsc->checkpoint_frequency_cputime_minutes);
-  PetscPrintf(comm,"TS -ts_checkpoint_freq_physical_time %1.4e\n",tsc->checkpoint_frequency_time_physical);
+  PetscPrintf(comm,"TS -ts_checkpoint_storage_type %s\n",TSCheckPointStorageTypes[(PetscInt)tsc->mode]);
+  if (tsc->mode != TSCP_STORAGE_NONE) {
+    PetscPrintf(comm,"TS -ts_checkpoint_path %s\n",tsc->path_prefix);
+    PetscPrintf(comm,"TS -ts_checkpoint_freq_step %d\n",tsc->checkpoint_frequency_step);
+    PetscPrintf(comm,"TS -ts_checkpoint_freq_cputime %1.4e\n",tsc->checkpoint_frequency_cputime_minutes);
+    PetscPrintf(comm,"TS -ts_checkpoint_freq_physical_time %1.4e\n",tsc->checkpoint_frequency_time_physical);
+  }
+  if (tsc->mode == TSCP_STORAGE_LIMITED) {
+    PetscPrintf(comm,"TS -ts_checkpoint_storage_limited_size %d\n",tsc->limited_size);
+  }
 
   PetscTime(&tsc->cputime_last);
-  {
+  if (tsc->mode != TSCP_STORAGE_NONE) {
     size_t len;
+
     PetscStrlen(tsc->path_prefix,&len);
     if (len != 0) {
       MPICreateDirectory(comm,tsc->path_prefix);
     }
   }
 
-  /* Push checkpoint object into PetscContainer. Attach container to TS */
-  PetscContainerCreate(PetscObjectComm((PetscObject)ts),&container);
-  PetscContainerSetPointer(container,tsc);
-  PetscObjectCompose((PetscObject)ts,"_TSCheckPoint",(PetscObject)container);
-  
-  /* Set function to be called after each TS time step */
-  TSSetPostStep(ts,ts_checkpoint);
-  
+  if (tsc->mode != TSCP_STORAGE_NONE) {
+    /* Push checkpoint object into PetscContainer. Attach container to TS */
+    PetscContainerCreate(PetscObjectComm((PetscObject)ts),&container);
+    PetscContainerSetPointer(container,tsc);
+    PetscContainerSetUserDestroy(container,PetscContainerUserDestroyDefault);
+    PetscObjectCompose((PetscObject)ts,"_TSCheckPoint",(PetscObject)container);
+    PetscObjectDereference((PetscObject)container); /* Let ts free container */
+
+    /* Set function to be called after each TS time step */
+    TSSetPostStep(ts,ts_checkpoint);
+  } else {
+    PetscFree(tsc);
+  }
+
   PetscFunctionReturn(0);
 }
 
