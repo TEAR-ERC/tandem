@@ -48,20 +48,4 @@ void PetscTimeSolverBase::set_max_time_step(double dt) {
     CHKERRTHROW(TSSetTimeStep(ts_, dt));
 }
 
-std::string PetscTimeSolverBase::get_checkpoint_filename(void) {
-    return ts_filename_;
-}
-
-void PetscTimeSolverBase::set_checkpoint_filename(std::string fname) {
-    ts_filename_ = fname;
-}
-
-PetscInt PetscTimeSolverBase::get_checkpoint_frequency(void) {
-    return checkpoint_every_nsteps_;
-}
-
-void PetscTimeSolverBase::set_checkpoint_frequency(PetscInt nt) {
-    checkpoint_every_nsteps_ = nt;
-}
-
 } // namespace tndm

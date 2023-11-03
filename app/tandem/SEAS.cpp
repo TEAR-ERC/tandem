@@ -218,20 +218,6 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         }
     }
 
-    if (cfg.ts_checkpoint_prefix) {
-      fs::path pckp(*(cfg.ts_checkpoint_prefix));
-      std::cout << "Using TS checkpoint path: " << *(cfg.ts_checkpoint_prefix) << std::endl;
-      bool exists = fs::exists(pckp);
-      if (!exists) {
-        bool ret = fs::create_directories(pckp);
-        if (!ret) std::cout << "--> Failed to create directory!" << std::endl;
-      }
-
-      pckp /= ts.get_checkpoint_filename();
-      ts.set_checkpoint_filename(pckp);
-      ts.set_checkpoint_frequency((PetscInt)cfg.ts_checkpoint_freq);
-    }
-
     Stopwatch sw;
     sw.start();
     ts.solve(cfg.final_time);
