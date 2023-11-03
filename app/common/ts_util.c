@@ -274,9 +274,6 @@ static PetscErrorCode _TSView(TS ts,PetscViewer viewer)
   /*ierr = DMGetDMTS(ts->dm,&sdm);CHKERRQ(ierr);*/
   /*ierr = DMTSView(sdm,viewer);CHKERRQ(ierr);*/
 
-  ierr = PetscViewerASCIIPushTab(viewer);CHKERRQ(ierr);
-  ierr = PetscObjectTypeCompare((PetscObject)ts,TSSUNDIALS,&isundials);CHKERRQ(ierr);
-  ierr = PetscViewerASCIIPopTab(viewer);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
