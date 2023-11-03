@@ -451,7 +451,7 @@ static PetscErrorCode _TSLoad(TS ts, PetscViewer viewer)
   /* PETSC BUG FIX START */
   if (!ts->adapt) {
     /*
-       The reason why we create/load here is because _TSView() is gaurnteed to write out a TSAdapt object.
+       The reason why we create/load here is because _TSView() is guaranteed to write out a TSAdapt object.
        However, depending on the TSType TSAdapt may not be created by default.
        Also, some implementations of TS will actually create / load TSAdapt _within_ ts->ops->load().
        Hence if we create the TSAdapt (because it didn't exist), we must also load it.
@@ -460,7 +460,10 @@ static PetscErrorCode _TSLoad(TS ts, PetscViewer viewer)
     ierr = TSAdaptCreate(PetscObjectComm((PetscObject)ts),&ts->adapt);CHKERRQ(ierr);
     ierr = TSAdaptLoad(ts->adapt,viewer);CHKERRQ(ierr);
   }
-  
+  if (!ts->ops->load) { /* If load() is null, there was no possibility to load TSAdapt */
+    ierr = TSAdaptLoad(ts->adapt,viewer);CHKERRQ(ierr);
+  }
+
   /* PETSC BUG FIX END */
   ierr = DMCreate(PetscObjectComm((PetscObject)ts),&dm);CHKERRQ(ierr);
   ierr = DMLoad(dm,viewer);CHKERRQ(ierr);
