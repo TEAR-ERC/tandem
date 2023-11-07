@@ -40,7 +40,7 @@ public:
     PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state,
                     Config const& cfg)
         : PetscTimeSolverBase(timeop.comm(), cfg), state_(std::move(state)),
-          ts_checkpoint_load_directory(cfg.ts_checkpoint_config.load_directory) {
+          ts_checkpoint_load_directory(std::move(cfg.ts_checkpoint_load_directory)) {
 
         Vec x[NumStateVecs];
         for (std::size_t n = 0; n < NumStateVecs; ++n) {

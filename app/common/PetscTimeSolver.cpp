@@ -8,17 +8,13 @@ PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm, Config const& cfg) {
     CHKERRTHROW(TSSetExactFinalTime(ts_, TS_EXACTFINALTIME_MATCHSTEP));
     CHKERRTHROW(TSSetFromOptions(ts_));
 
-    // Extract individual members from the C++ struct
-    auto const& tsCheckpointConfig = cfg.ts_checkpoint_config;
-    const char* saveDirectory = tsCheckpointConfig.save_directory.c_str();
-    // tsCheckpointStorageType storageType  = static_cast<enum
-    // tndm::tsCheckpointStorageType>(tsCheckpointConfig.storage_type);
-    int storageType = static_cast<int>(tsCheckpointConfig.storage_type);
+    const char* saveDirectory = cfg.ts_checkpoint_save_directory.c_str();
+    int storageType = static_cast<int>(cfg.ts_checkpoint_storage_type);
 
-    CHKERRTHROW(ts_checkpoint_configure(ts_, saveDirectory, tsCheckpointConfig.frequency_step,
-                                        tsCheckpointConfig.frequency_cputime_minutes,
-                                        tsCheckpointConfig.frequency_time_physical, storageType,
-                                        tsCheckpointConfig.storage_limited_size));
+    CHKERRTHROW(ts_checkpoint_configure(ts_, saveDirectory, cfg.ts_checkpoint_frequency_step,
+                                        cfg.ts_checkpoint_frequency_cputime_minutes,
+                                        cfg.ts_checkpoint_frequency_time_physical, storageType,
+                                        cfg.ts_checkpoint_storage_limited_size));
 
     TSType time_scheme;
     CHKERRTHROW(TSGetType(ts_, &time_scheme));
