@@ -600,12 +600,15 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool *gene
 static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp)
 {
   PetscInt       step;
+  PetscReal      time, dt;
   char           filename[PETSC_MAX_PATH_LEN];
   PetscViewer    viewer;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
   ierr = TSGetStepNumber(ts,&step);CHKERRQ(ierr);
+  ierr = TSGetTime(ts,&time);CHKERRQ(ierr);
+  ierr = TSGetTimeStep(ts,&dt);CHKERRQ(ierr);
  
   PetscPrintf(PetscObjectComm((PetscObject)ts),"[TSCheckpoint]   writing checkpoint data for step %d -> path %s\n",(int)step,cp->path_step);
   PetscSNPrintf(filename,PETSC_MAX_PATH_LEN-1,"%s/ts.bin",cp->path_step);
