@@ -716,7 +716,11 @@ PetscErrorCode ts_checkpoint(TS ts)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode ts_checkpoint_configure(TS ts)
+PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirectory,
+                                       int tsCheckpointFrequencyStep,
+                                       double tsCheckpointFrequencyCputimeMinutes,
+                                       double tsCheckpointFrequencyPhysical, int storageType,
+                                       int tsCheckpointStorageLimitedSize)
 {
   PetscContainer container = NULL;
   TSCheckPoint   tsc = NULL;
@@ -727,33 +731,25 @@ PetscErrorCode ts_checkpoint_configure(TS ts)
   comm = PetscObjectComm((PetscObject)ts);
   /* Create checkpoint helper object, initialize values */
   PetscCalloc1(1,&tsc);
-  tsc->checkpoint_frequency_step = 1000.0;
-  tsc->checkpoint_frequency_cputime_minutes = 30.0;
-  tsc->checkpoint_frequency_time_physical = 1.0e10;
-  PetscOptionsGetInt(NULL,NULL,"-ts_checkpoint_freq_step",&tsc->checkpoint_frequency_step,NULL);
-  PetscOptionsGetReal(NULL,NULL,"-ts_checkpoint_freq_cputime",&tsc->checkpoint_frequency_cputime_minutes,NULL);
-  PetscOptionsGetReal(NULL,NULL,"-ts_checkpoint_freq_physical_time",&tsc->checkpoint_frequency_time_physical,NULL);
-  tsc->mode = TSCP_STORAGE_LIMITED;
-  tsc->limited_size = 1;
-  PetscOptionsGetEnum(NULL,NULL,"-ts_checkpoint_storage_type",TSCheckPointStorageTypes,(PetscEnum*)&tsc->mode,NULL);
-  PetscOptionsGetInt(NULL,NULL,"-ts_checkpoint_storage_limited_size",&tsc->limited_size,NULL);
-
+  tsc->checkpoint_frequency_step = tsCheckpointFrequencyStep;
+  tsc->checkpoint_frequency_cputime_minutes = tsCheckpointFrequencyCputimeMinutes;
+  tsc->checkpoint_frequency_time_physical = tsCheckpointFrequencyPhysical;
+  tsc->mode = (TSCheckPointStorageType)storageType;
+  tsc->limited_size = tsCheckpointStorageLimitedSize;
 
   tsc->path_prefix[0] = '\0';
-  PetscSNPrintf(tsc->path_prefix,PETSC_MAX_PATH_LEN-1,"checkpoint");
-  found = PETSC_FALSE;
-  PetscOptionsGetString(NULL,NULL,"-ts_checkpoint_path",tsc->path_prefix,PETSC_MAX_PATH_LEN-1,&found);
+  PetscSNPrintf(tsc->path_prefix, PETSC_MAX_PATH_LEN, "%s", tsCheckpointSaveDirectory);
   tsc->path_step[0] = '\0';
 
-  PetscPrintf(comm,"TS -ts_checkpoint_storage_type %s\n",TSCheckPointStorageTypes[(PetscInt)tsc->mode]);
+  PetscPrintf(comm,"TS ts_checkpoint:storage_type %s\n",TSCheckPointStorageTypes[(PetscInt)tsc->mode]);
   if (tsc->mode != TSCP_STORAGE_NONE) {
-    PetscPrintf(comm,"TS -ts_checkpoint_path %s\n",tsc->path_prefix);
-    PetscPrintf(comm,"TS -ts_checkpoint_freq_step %d\n",(int)tsc->checkpoint_frequency_step);
-    PetscPrintf(comm,"TS -ts_checkpoint_freq_cputime %1.4e\n",(double)tsc->checkpoint_frequency_cputime_minutes);
-    PetscPrintf(comm,"TS -ts_checkpoint_freq_physical_time %1.4e\n",(double)tsc->checkpoint_frequency_time_physical);
+    PetscPrintf(comm,"TS ts_checkpoint:path %s\n",tsc->path_prefix);
+    PetscPrintf(comm,"TS ts_checkpoint:freq_step %d\n",(int)tsc->checkpoint_frequency_step);
+    PetscPrintf(comm,"TS ts_checkpoint:freq_cputime %1.4e\n",(double)tsc->checkpoint_frequency_cputime_minutes);
+    PetscPrintf(comm,"TS ts_checkpoint:freq_physical_time %1.4e\n",(double)tsc->checkpoint_frequency_time_physical);
   }
   if (tsc->mode == TSCP_STORAGE_LIMITED) {
-    PetscPrintf(comm,"TS -ts_checkpoint_storage_limited_size %d\n",(int)tsc->limited_size);
+    PetscPrintf(comm,"TS ts_checkpoint:storage_limited_size %d\n",(int)tsc->limited_size);
   }
 
   PetscTime(&tsc->cputime_last);
@@ -783,21 +779,17 @@ PetscErrorCode ts_checkpoint_configure(TS ts)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode ts_checkpoint_restart(TS ts)
+PetscErrorCode ts_checkpoint_restart(TS ts, const char* tsCheckpointLoadDirectory)
 {
   PetscBool found = PETSC_FALSE;
   char      load_path_prefix[PETSC_MAX_PATH_LEN];
   PetscErrorCode ierr;
 
-  PetscFunctionBeginUser;
+  PetscFunctionBeginUser;   
   load_path_prefix[0] = '\0';
-  PetscOptionsGetString(NULL,NULL,"-ts_checkpoint_load",load_path_prefix,PETSC_MAX_PATH_LEN-1,&found);
-  if (found) {
-    PetscPrintf(PetscObjectComm((PetscObject)ts),"TS -ts_checkpoint_load %s\n",load_path_prefix);
-    
-    ierr = ts_checkpoint_load(ts,load_path_prefix);CHKERRQ(ierr);
-    ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
-  }
+  PetscSNPrintf(load_path_prefix, PETSC_MAX_PATH_LEN, "%s", tsCheckpointLoadDirectory);
+  ierr = ts_checkpoint_load(ts,load_path_prefix);CHKERRQ(ierr);
+  ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 

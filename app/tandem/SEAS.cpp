@@ -179,7 +179,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
     auto ts =
         PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
-                                                 seasop->num_local_elements(), seasop->comm()));
+                                                 seasop->num_local_elements(), seasop->comm()), cfg);
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
     if (cfl_time_step) {
