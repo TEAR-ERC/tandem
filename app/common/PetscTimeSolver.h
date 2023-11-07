@@ -3,9 +3,10 @@
 
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
+#include "tandem/SeasConfig.h"
 extern "C" {
-  #include "ts_util.h"
-  #include "vecnest_util.h"
+#include "ts_util.h"
+#include "vecnest_util.h"
 }
 #include <petscsystypes.h>
 #include <petscts.h>
@@ -20,7 +21,7 @@ namespace tndm {
 
 class PetscTimeSolverBase {
 public:
-    PetscTimeSolverBase(MPI_Comm comm);
+    PetscTimeSolverBase(MPI_Comm comm, Config const& cfg);
     ~PetscTimeSolverBase();
 
     std::size_t get_step_number() const;
@@ -36,8 +37,10 @@ protected:
 template <std::size_t NumStateVecs> class PetscTimeSolver : public PetscTimeSolverBase {
 public:
     template <typename TimeOp>
-    PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state)
-        : PetscTimeSolverBase(timeop.comm()), state_(std::move(state)) {
+    PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state,
+                    Config const& cfg)
+        : PetscTimeSolverBase(timeop.comm(), cfg), state_(std::move(state)),
+          ts_checkpoint_load_directory(cfg.ts_checkpoint_config.load_directory) {
 
         Vec x[NumStateVecs];
         for (std::size_t n = 0; n < NumStateVecs; ++n) {
@@ -56,7 +59,10 @@ public:
 
     void solve(double upcoming_time) {
         CHKERRTHROW(TSSetUp(ts_));
-        CHKERRTHROW(ts_checkpoint_restart(ts_));
+        if (ts_checkpoint_load_directory.has_value()) {
+            const char* loadDirectory = ts_checkpoint_load_directory.value().c_str();
+            CHKERRTHROW(ts_checkpoint_restart(ts_, loadDirectory));
+        }
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
     }
@@ -112,9 +118,9 @@ private:
         return 0;
     }
 
-
     std::array<std::unique_ptr<PetscVector>, NumStateVecs> state_;
     Vec ts_state_ = nullptr;
+    std::optional<std::string> ts_checkpoint_load_directory;
 };
 
 } // namespace tndm
