@@ -1,11 +1,7 @@
 resolution = 0.125
-
-[poisson]
+type = "poisson"
 lib = "singular.lua"
-boundary = "solution"
-coefficient = "coefficient"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
+scenario = "singular"
 
 [generate_mesh]
 intercepts = [

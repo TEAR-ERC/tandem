@@ -1,11 +1,7 @@
 resolution = 0.125
-
-[poisson]
+type = "poisson"
 lib = "cosine.lua"
-warp = "warp"
-force = "force"
-boundary = "solution"
-solution = "solution"
+scenario = "cosine"
 
 [generate_mesh]
 intercepts = [

@@ -99,14 +99,14 @@ void setConfigSchema(TableSchema<Config>& schema,
     schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
             if (iEquals(value, "poisson")) {
-                return SeasType::Poisson;
+                return LocalOpType::Poisson;
             } else if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
-                return SeasType::Elasticity;
+                return LocalOpType::Elasticity;
             } else {
-                return SeasType::Unknown;
+                return LocalOpType::Unknown;
             }
         })
-        .validator([](SeasType const& type) { return type != SeasType::Unknown; });
+        .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; });
     schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists());
     schema.add_value("scenario", &Config::scenario);
     auto default_up = std::array<double, DomainDimension>{};
@@ -116,6 +116,13 @@ void setConfigSchema(TableSchema<Config>& schema,
     schema.add_value("boundary_linear", &Config::boundary_linear)
         .default_value(false)
         .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
+
+    schema.add_value("gf_checkpoint_prefix", &Config::gf_checkpoint_prefix)
+        .help("Path where Green's function operator and RHS will be checkpointed");
+    schema.add_value("gf_checkpoint_every_nmins", &Config::gf_checkpoint_every_nmins)
+        .default_value(30.0)
+        .help("time interval, in minutes, at which the Green's function operator data is saved to "
+              "disk");
 
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)

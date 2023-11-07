@@ -3,12 +3,12 @@
 
 #include "common/MGConfig.h"
 #include "common/MeshConfig.h"
+#include "common/Type.h"
 #include "config.h"
 #include "io/CSVWriter.h"
 #include "io/Probe.h"
 #include "io/TecplotWriter.h"
 #include "tandem/AdaptiveOutputStrategy.h"
-#include "tandem/SeasType.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
@@ -64,7 +64,7 @@ struct Config {
     double cfl;
 
     SeasMode mode;
-    SeasType type;
+    LocalOpType type;
     std::string lib;
     std::string scenario;
     std::array<double, DomainDimension> up;
@@ -74,6 +74,9 @@ struct Config {
     bool matrix_free;
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
+
+    std::optional<std::string> gf_checkpoint_prefix;
+    double gf_checkpoint_every_nmins;
 
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;

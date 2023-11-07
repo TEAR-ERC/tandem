@@ -1,13 +1,7 @@
 resolution = 0.125
-
-[elasticity]
+type = "elasticity"
 lib = "cosine_oscillatory.lua"
-force = "force"
-boundary = "solution"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
-mu = "mu"
-lam = "lam"
+scenario = "cosine_oscillatory"
 
 [generate_mesh]
 intercepts = [

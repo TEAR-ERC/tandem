@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-
 <svg
    xmlns:dc="http://purl.org/dc/elements/1.1/"
    xmlns:cc="http://creativecommons.org/ns#"
@@ -14,7 +12,7 @@
    viewBox="0 0 140.98512 58.649319"
    version="1.1"
    id="svg8"
-   inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
+   inkscape:version="1.0.2 (e86c870879, 2021-01-15)"
    sodipodi:docname="wedge.svg"
    inkscape:export-filename="/home/uphoff/projects/tandem/notebooks/wedge.png"
    inkscape:export-xdpi="150.07399"
@@ -28,21 +26,22 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.98994949"
-     inkscape:cx="300.81664"
-     inkscape:cy="214.89252"
+     inkscape:zoom="1.4"
+     inkscape:cx="285.66934"
+     inkscape:cy="108.00081"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="text106"
      showgrid="false"
      fit-margin-top="0"
      fit-margin-left="0"
      fit-margin-right="0"
      fit-margin-bottom="0"
-     inkscape:window-width="986"
-     inkscape:window-height="744"
-     inkscape:window-x="665"
-     inkscape:window-y="62"
-     inkscape:window-maximized="0" />
+     inkscape:window-width="1920"
+     inkscape:window-height="1043"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:document-rotation="0" />
   <metadata
      id="metadata5">
     <rdf:RDF>
@@ -51,7 +50,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -360,6 +359,15 @@
        aria-label="⟦ur⟧ = Srλ/(2µ)"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:6.7530179px;line-height:1.25;font-family:Symbola;-inkscape-font-specification:Symbola;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.16882543"
        id="text4677">
+      <g
+         aria-label="γ"
+         id="text106"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.7793px;line-height:1.25;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';letter-spacing:0px;word-spacing:0px;stroke-width:0.0159511">
+        <path
+           d="m 142.48438,111.29858 c -0.0113,-0.0378 -0.0567,-0.0378 -0.0567,-0.0378 -0.0113,0 -0.034,0 -0.0378,0.0264 -0.10582,0.35903 -0.16251,0.73696 -0.2192,1.11867 -0.034,-0.11715 -0.1096,-0.40438 -0.3477,-0.77097 -0.14739,-0.23054 -0.34391,-0.41573 -0.60469,-0.41573 -0.47241,0 -0.59335,0.57446 -0.56689,0.69162 0.0113,0.0378 0.0453,0.0378 0.0831,0.0378 l 0.0113,-0.0189 c 0.0378,-0.43462 0.44974,-0.4384 0.49131,-0.4384 0.57067,0 0.77476,0.66138 0.85034,0.95994 0.0567,0.23054 0.0567,0.29479 0.0491,0.37038 -0.0151,0.27589 -0.0189,0.71428 0.004,0.81255 0.0113,0.0416 0.0378,0.068 0.068,0.068 0.0491,0 0.0567,-0.0831 0.0642,-0.22675 0.008,-0.31747 -0.0113,-0.53289 -0.0227,-0.65004 -0.004,-0.0491 -0.0113,-0.0983 -0.008,-0.1474 0.0265,-0.37415 0.1285,-0.93726 0.20409,-1.23583 0.0151,-0.0453 0.0416,-0.12849 0.0378,-0.14361 z"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';stroke-width:0.0159511"
+           id="path108" />
+      </g>
       <path
          d="m 120.942,117.05937 c 0,-0.0594 -0.0486,-0.10805 -0.10805,-0.10805 h -0.4592 v -4.97022 h 0.4592 c 0.0594,0 0.10805,-0.0486 0.10805,-0.10805 0,-0.0594 -0.0486,-0.10805 -0.10805,-0.10805 h -1.3506 v 5.40241 h 1.3506 c 0.0594,0 0.10805,-0.0486 0.10805,-0.10804 z m -0.78335,-5.07827 v 4.97022 h -0.45921 v -4.97022 z"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.40241385px;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';stroke-width:0.16882543"
@@ -388,10 +396,6 @@
          d="m 140.42405,113.75849 c 0,-0.17288 -0.16747,-0.32955 -0.39978,-0.32955 -0.39437,0 -0.58886,0.36197 -0.66449,0.59427 v -0.59427 l -0.75094,0.0594 v 0.16748 c 0.37817,0 0.42139,0.0378 0.42139,0.30253 v 1.44785 c 0,0.24311 -0.0594,0.24311 -0.42139,0.24311 v 0.16747 l 0.61588,-0.0162 c 0.21609,0 0.47001,0 0.6861,0.0162 v -0.16747 h -0.11345 c -0.39978,0 -0.41058,-0.0594 -0.41058,-0.25392 v -0.83197 c 0,-0.53484 0.2269,-1.01565 0.63748,-1.01565 0.0378,0 0.0486,0 0.0594,0.005 -0.0162,0.005 -0.12425,0.0702 -0.12425,0.21069 0,0.15127 0.11345,0.23231 0.2323,0.23231 0.0972,0 0.2323,-0.0648 0.2323,-0.23771 z"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.40241385px;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';stroke-width:0.16882543"
          id="path5159" />
-      <path
-         d="m 142.55546,113.65936 c 0,-0.0105 -0.0105,-0.0176 -0.0246,-0.0316 -0.0456,-0.0386 -0.0773,-0.0913 -0.1194,-0.16153 l -1.21851,-1.99808 c -0.1229,-0.20367 -0.32306,-0.24932 -0.48811,-0.24932 -0.0176,0 -0.0632,0 -0.0562,0.0386 0.007,0.0281 0.0421,0.0351 0.0421,0.0351 0.11939,0.0211 0.15099,0.0421 0.29848,0.28092 l 0.57941,0.95515 -0.73041,0.96217 c -0.0316,0.0421 -0.0456,0.0632 -0.0351,0.10886 0.014,0.0597 0.0737,0.10184 0.12992,0.10184 0.0562,0 0.0808,-0.0386 0.0983,-0.0737 l 0.59696,-0.99728 c 0.23528,0.36871 0.54079,0.90598 0.61453,0.98675 0.0772,0.0772 0.11237,0.0772 0.20718,0.0772 h 0.0773 c 0.0316,-0.004 0.0316,-0.0246 0.0281,-0.0351 z"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:64.99999762%;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';baseline-shift:super"
-         id="path5161" />
       <path
          d="m 144.86861,111.87305 c 0,-0.0594 -0.0486,-0.10805 -0.10804,-0.10805 -0.0486,0 -0.0864,0.027 -0.10265,0.0702 l -1.88544,5.18632 c -0.005,0.0108 -0.005,0.027 -0.005,0.0378 0,0.0594 0.0486,0.10804 0.10804,0.10804 0.0486,0 0.0864,-0.027 0.10265,-0.0702 l 1.88544,-5.18631 c 0.005,-0.0108 0.005,-0.027 0.005,-0.0378 z"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.40241385px;font-family:'Latin Modern Math';-inkscape-font-specification:'Latin Modern Math';stroke-width:0.16882543"

@@ -1,11 +1,5 @@
 mesh_file = "dip.msh"
-
-[elasticity]
+type = "elasticity"
 lib = "dip.lua"
-boundary = "solution"
-slip = "slip"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
-mu = "mat_mu"
-lam = "mat_lam"
+scenario = "dip_60"
 ref_normal = [1, 0]

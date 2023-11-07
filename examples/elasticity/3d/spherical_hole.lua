@@ -3,15 +3,24 @@ local a = 0.5
 local mu0 = 1.0
 local nu = 0.25
 
-function mu(x, y, z)
+local SphericalHole = {}
+
+function SphericalHole:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function SphericalHole:mu(x, y, z)
     return mu0
 end
 
-function lam(x, y, z)
+function SphericalHole:lam(x, y, z)
     return 2.0 * mu0 * nu / (1-2*nu)
 end
 
-function force(x, y, z)
+function SphericalHole:force(x, y, z)
     return 0, 0, 0
 end
 
@@ -37,7 +46,7 @@ function u_spherical(R, theta, beta)
     return uR, ub
 end
 
-function solution(x, y, z)
+function SphericalHole:solution(x, y, z)
     R, theta, beta = spherical(x, y, z)
     local uR, ub = u_spherical(R, theta, beta)
 
@@ -50,7 +59,7 @@ function solution(x, y, z)
            uR * cb      - ub * sb
 end
 
-function solution_jacobian(x, y, z)
+function SphericalHole:solution_jacobian(x, y, z)
     R, theta, beta = spherical(x, y, z)
     local uR, ub = u_spherical(R, theta, beta)
 
@@ -109,3 +118,8 @@ function solution_jacobian(x, y, z)
     return ux_x, ux_y, ux_z, uy_x, uy_y, uy_z, uz_x, uz_y, uz_z
 end
 
+function SphericalHole:boundary(x, y, z)
+    return self:solution(x, y, z)
+end
+
+spherical_hole = SphericalHole:new()

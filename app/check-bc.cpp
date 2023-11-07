@@ -84,7 +84,7 @@ void write_bcs(LocalSimplexMesh<D> const& mesh, unsigned N, std::vector<std::siz
     auto adapter = CurvilinearBoundaryVTUAdapter(mesh, cl, fctNos);
     auto writer = VTUWriter<D - 1u>(N, true, MPI_COMM_WORLD);
 
-    auto piece = writer.addPiece(adapter);
+    auto& piece = writer.addPiece(adapter);
     piece.addCellData("bc", bcs.data(), bcs.size());
     writer.write(prefix);
 }

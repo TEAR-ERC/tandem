@@ -1,13 +1,7 @@
 resolution = 0.125
-
-[elasticity]
+type = "elasticity"
 lib = "embedded_half.lua"
-force = "force"
-boundary = "solution"
-slip = "slip"
-solution = "solution"
-solution_jacobian = "solution_jacobian"
-lam = "lam"
+scenario = "embedded_half"
 ref_normal = [1, 0]
 
 [generate_mesh]
