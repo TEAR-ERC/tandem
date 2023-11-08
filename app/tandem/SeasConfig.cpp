@@ -31,6 +31,63 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         .help("Maximum time difference between samples");
 }
 
+template <typename Derived>
+void setTsCheckpointConfigSchema(TableSchema<Derived>& tsCheckpointSchema) {
+
+    tsCheckpointSchema.add_value("load_directory", up_cast<Derived>(&Derived::load_directory))
+        .validator(PathExists())
+        .help("directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to "
+              "let tandem retrieve the name of the last checkpoint file");
+
+    tsCheckpointSchema.add_value("save_directory", up_cast<Derived>(&Derived::save_directory))
+        .default_value("checkpoint")
+        .validator(ParentPathExists())
+        .help("directory from which a checkpoint is saved");
+
+    tsCheckpointSchema.add_value("freq_step", up_cast<Derived>(&Derived::frequency_step))
+        .default_value(1000)
+        .validator([](auto&& x) { return x > 0; })
+        .help("time step frequency between checkpoints");
+
+    tsCheckpointSchema
+        .add_value("freq_cputime", up_cast<Derived>(&Derived::frequency_cputime_minutes))
+        .default_value(30)
+        .validator([](auto&& x) { return x > 0; })
+        .help("CPU time (minutes) frequency between checkpoints");
+
+    tsCheckpointSchema
+        .add_value("freq_physical_time", up_cast<Derived>(&Derived::frequency_time_physical))
+        .default_value(1.0e10)
+        .validator([](auto&& x) { return x > 0; })
+        .help("physical time frequency between checkpoints");
+
+    tsCheckpointSchema.add_value("storage_type", up_cast<Derived>(&Derived::storage_type))
+        .converter([](std::string_view value) {
+            if (iEquals(value, "none")) {
+                return tsCheckpointStorageType::NONE;
+            } else if (iEquals(value, "limited")) {
+                return tsCheckpointStorageType::LIMITED;
+            } else if (iEquals(value, "unlimited")) {
+                return tsCheckpointStorageType::UNLIMITED;
+            } else {
+                return tsCheckpointStorageType::UNKNOWN;
+            }
+        })
+        .default_value(tsCheckpointStorageType::LIMITED)
+        .validator([](tsCheckpointStorageType const& type) {
+            return type != tsCheckpointStorageType::UNKNOWN;
+        })
+        .help("type of storage for checkpoints. limited will store a finite number of unique "
+              "checkpoints on disk. unlimited stores all checkpoints. Use none to completely "
+              "deactivate checkpointing.");
+
+    tsCheckpointSchema
+        .add_value("storage_limited_size", up_cast<Derived>(&Derived::storage_limited_size))
+        .default_value(2)
+        .validator([](auto&& x) { return x > 0; })
+        .help("number of unique checkpoints stored on disk (with storage_type=limited)");
+}
+
 template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
     setOutputConfigSchema(outputSchema);
 
@@ -156,59 +213,7 @@ void setConfigSchema(TableSchema<Config>& schema,
         schema.add_table("domain_probe_output", &Config::domain_probe_output);
     detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
 
-    schema.add_value("ts_checkpoint_load_directory", &Config::ts_checkpoint_load_directory)
-        .validator(PathExists())
-        .help("directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to "
-              "let tandem retrieve the name of the last checkpoint file");
-
-    schema.add_value("ts_checkpoint_save_directory", &Config::ts_checkpoint_save_directory)
-        .default_value("checkpoint")
-        .validator(ParentPathExists())
-        .help("directory from which a checkpoint is saved");
-
-    schema.add_value("ts_checkpoint_freq_step", &Config::ts_checkpoint_frequency_step)
-        .default_value(1000)
-        .validator([](auto&& x) { return x > 0; })
-        .help("time step frequency between checkpoints");
-
-    schema.add_value("ts_checkpoint_freq_cputime", &Config::ts_checkpoint_frequency_cputime_minutes)
-        .default_value(30)
-        .validator([](auto&& x) { return x > 0; })
-        .help("CPU time (minutes) frequency between checkpoints");
-
-    schema
-        .add_value("ts_checkpoint_freq_physical_time",
-                   &Config::ts_checkpoint_frequency_time_physical)
-        .default_value(1.0e10)
-        .validator([](auto&& x) { return x > 0; })
-        .help("physical time frequency between checkpoints");
-
-    schema.add_value("ts_checkpoint_storage_type", &Config::ts_checkpoint_storage_type)
-        .converter([](std::string_view value) {
-            if (iEquals(value, "none")) {
-                return tsCheckpointStorageType::NONE;
-            } else if (iEquals(value, "limited")) {
-                return tsCheckpointStorageType::LIMITED;
-            } else if (iEquals(value, "unlimited")) {
-                return tsCheckpointStorageType::UNLIMITED;
-            } else {
-                return tsCheckpointStorageType::UNKNOWN;
-            }
-        })
-        .default_value(tsCheckpointStorageType::LIMITED)
-        .validator([](tsCheckpointStorageType const& type) {
-            return type != tsCheckpointStorageType::UNKNOWN;
-        })
-        .help("type of storage for checkpoints. limited will store a finite number of unique "
-              "checkpoints on disk. unlimited stores all checkpoints. Use none to completely "
-              "deactivate checkpointing.");
-
-    schema
-        .add_value("ts_checkpoint_storage_limited_size",
-                   &Config::ts_checkpoint_storage_limited_size)
-        .default_value(2)
-        .validator([](auto&& x) { return x > 0; })
-        .help("number of unique checkpoints stored on disk (with storage_type=limited)");
+    auto& tsCheckpointSchema = schema.add_table("ts_checkpoint", &Config::ts_checkpoint_config);
+    detail::setTsCheckpointConfigSchema(tsCheckpointSchema);
 }
-
 } // namespace tndm
