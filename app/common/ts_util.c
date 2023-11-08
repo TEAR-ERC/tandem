@@ -639,22 +639,22 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp)
       PetscViewerASCIIPrintf(viewer,"%1.18e,%1.18e,%ld,%d,%s\n",(double)time,(double)dt,(long int)step,(int)cp->n,cp->path_step);
       ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
 
-      /* Write a helper PETSc options file that enables restating from the last checkpoint written */
-      PetscSNPrintf(infoname,PETSC_MAX_PATH_LEN-1,"%s/load_last_checkpoint.opts",cp->path_prefix);
+      /* Write a helper file that enables restating from the last checkpoint written */
+      PetscSNPrintf(infoname,PETSC_MAX_PATH_LEN-1,"%s/last_checkpoint.txt",cp->path_prefix);
       ierr = PetscViewerASCIIOpen(PETSC_COMM_SELF,infoname,&viewer);CHKERRQ(ierr);
-      PetscViewerASCIIPrintf(viewer,"# PETSc options to load the last written checkpoint file\n");
+      PetscViewerASCIIPrintf(viewer,"%s\n",cp->path_step);
+      PetscViewerASCIIPrintf(viewer,"# is the last written checkpoint file\n");
       PetscViewerASCIIPrintf(viewer,"# time, time_step, step_number, checkpoint_number, path\n");
       PetscViewerASCIIPrintf(viewer,"# %1.18e,%1.18e,%ld,%d,%s\n",(double)time,(double)dt,(long int)step,(int)cp->n,cp->path_step);
-      PetscViewerASCIIPrintf(viewer,"\n-ts_checkpoint_load_directory %s\n",cp->path_step);
 
       PetscViewerASCIIPrintf(viewer,"\n# Previously used checkpoint options\n");
-      PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_save_directory %s\n",cp->path_prefix);
-      PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_freq_step %d\n",(int)cp->checkpoint_frequency_step);
-      PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_freq_cputime %1.4e\n",(double)cp->checkpoint_frequency_cputime_minutes);
-      PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_freq_physical_time %1.4e\n",(double)cp->checkpoint_frequency_time_physical);
-      PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_storage_type %s\n",TSCheckPointStorageTypes[(PetscInt)cp->mode]);
+      PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_save_directory %s\n",cp->path_prefix);
+      PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_freq_step %d\n",(int)cp->checkpoint_frequency_step);
+      PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_freq_cputime %1.4e\n",(double)cp->checkpoint_frequency_cputime_minutes);
+      PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_freq_physical_time %1.4e\n",(double)cp->checkpoint_frequency_time_physical);
+      PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_storage_type %s\n",TSCheckPointStorageTypes[(PetscInt)cp->mode]);
       if (cp->mode == TSCP_STORAGE_LIMITED) {
-        PetscViewerASCIIPrintf(viewer,"#-ts_checkpoint_storage_limited_size %d\n",(int)cp->limited_size);
+        PetscViewerASCIIPrintf(viewer,"#ts_checkpoint_storage_limited_size %d\n",(int)cp->limited_size);
       }
       ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
     }

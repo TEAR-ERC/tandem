@@ -158,7 +158,8 @@ void setConfigSchema(TableSchema<Config>& schema,
 
     schema.add_value("ts_checkpoint_load_directory", &Config::ts_checkpoint_load_directory)
         .validator(PathExists())
-        .help("directory from which a checkpoint is loaded");
+        .help("directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to "
+              "let tandem retrieve the name of the last checkpoint file");
 
     schema.add_value("ts_checkpoint_save_directory", &Config::ts_checkpoint_save_directory)
         .default_value("checkpoint")
