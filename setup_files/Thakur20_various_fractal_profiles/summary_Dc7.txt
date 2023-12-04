@@ -1,0 +1,20 @@
+392432 TS dt 727211. time 2.20722e+10
+392433 TS dt 758588. time 2.20729e+10
+392434 TS dt 719589. time 2.20737e+10
+392435 TS dt 392333. time 2.20744e+10
+392436 TS dt 392333. time 2.20748e+10
+392437 TS dt 978408. time 2.20752e+10
+
+
+========= Summary =========
+date_time=Wed Jun 21 05:11:25 2023
+code_version=v1.0-13-gbcdda11
+solve_time=22448.3
+time_steps=392437
+step_rejections=43581
+min_time_step=0.000118256
+max_time_step=1.03557e+06
+dofs_domain=385840
+dofs_fault=16016
+mesh_size=63.5474
+===========================
