@@ -1,0 +1,20 @@
+7227976 TS dt 1.64436 time 1.16288e+11
+7227977 TS dt 1.74231 time 1.16288e+11
+7227978 TS dt 1.91367 time 1.16288e+11
+7227979 TS dt 1.93809 time 1.16288e+11
+7227980 TS dt 1.76058 time 1.16288e+11
+7227981 TS dt 1.59564 time 1.16288e+11
+
+
+========= Summary =========
+date_time=Mon Nov 27 21:51:08 2023
+code_version=v1.0-133-g8d5f341
+solve_time=2727.97
+time_steps=7227981
+step_rejections=3198
+min_time_step=0.00012207
+max_time_step=477.116
+dofs_domain=525756
+dofs_fault=13440
+mesh_size=55.9832
+===========================

@@ -3,7 +3,7 @@
 '''
 A script to match the time of nearest checkpoint to be the nearest foreshock point
 By Jeena Yun
-Last modification: 2023.11.21.
+Last modification: 2023.12.01.
 '''
 import argparse
 import os
@@ -33,7 +33,10 @@ else:
 
 # ---------------------- 
 # Path and file names
-run_branch_n = 'match%d'%(args.target_sys_evID)
+if args.time_diff_in_sec == 58320:
+    run_branch_n = 'match%d'%(args.target_sys_evID)
+else:
+    run_branch_n = 'match%d_%dh'%(args.target_sys_evID,args.time_diff_in_sec/3600)
 output_save_dir = '/export/dump/jyun/%s/%s'%(args.model_n,args.output_branch_n)
 fname_toml = '/home/jyun/Tandem/%s/parameters_match_time.toml'%(args.model_n)
 fname_shell = '/home/jyun/Tandem/match_time_run_tandem.sh'
@@ -70,12 +73,12 @@ ckp_idx = np.where(ckp_dat[:,1]>=T_foreshock)[0][0]-1
 stepnum = int(ckp_dat[ckp_idx][0])
 init_time = ckp_dat[ckp_idx][1]
 print('Event %d; System-size Event Index %d; Hypocenter Depth: %1.2f [km]'%(idx,args.target_sys_evID,evdep[idx]))
-print('Difference in time between real foreshock and the checkpoint: %1.4f s'%(T_foreshock - init_time))
+print('Difference in time between the given perturbation time and the checkpoint: %1.4f s'%(T_foreshock - init_time))
 
 print('Spinned-up system-size events index: %d / Event index: %d'%(args.target_sys_evID,idx))
 print('Nearest checkpoint #: %d'%(stepnum))
 print('Nearest checkpoint time: %1.18f'%(init_time))
-print('Foreshock start time: %1.18f'%(T_foreshock))
+print('Perturbation start time: %1.18f'%(T_foreshock))
 
 if args.write_on:
     # 3. Generate parameter file
@@ -89,7 +92,7 @@ if args.write_on:
     fpar.write('ref_normal = [-1, 0]\n')
     fpar.write('boundary_linear = true\n\n')
 
-    fpar.write('gf_checkpoint_prefix = "/home/jyun/Tandem/perturb_stress/greensfun/hf25"\n\n')
+    fpar.write('gf_checkpoint_prefix = "/export/dump/jyun/GreensFunctions/ridgecrest_hf25"\n\n')
 
     fpar.write('[fault_probe_output]\n')
     fpar.write('prefix = "faultp_"\n')
@@ -131,7 +134,6 @@ if args.write_on:
 
     # 4.2. Process the perturation period output
     fshell.write('# Process the output, change the directory name, and generate checkpoint time info\n')
-    fshell.write('conda activate ridgecrest\n')
     fshell.write('process_output_full $model_n $branch_n\n')
     fshell.write('read_time_full $model_n $branch_n\n\n')
     fshell.close()

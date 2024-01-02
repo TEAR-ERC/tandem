@@ -1,0 +1,20 @@
+3143906 TS dt 0.000568567 time 5.57437e+10
+3143907 TS dt 0.000505322 time 5.57437e+10
+3143908 TS dt 0.000541942 time 5.57437e+10
+3143909 TS dt 0.000567265 time 5.57437e+10
+3143910 TS dt 0.00056007 time 5.57437e+10
+3143911 TS dt 0.000524909 time 5.57437e+10
+
+
+========= Summary =========
+date_time=Sat Dec  2 00:38:51 2023
+code_version=v1.0-133-g8d5f341
+solve_time=2176.44
+time_steps=3143911
+step_rejections=2031
+min_time_step=0.000389099
+max_time_step=100
+dofs_domain=525756
+dofs_fault=13440
+mesh_size=55.9832
+===========================

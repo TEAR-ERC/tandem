@@ -1,0 +1,20 @@
+2107264 TS dt 0.00093884 time 3.72197e+10
+2107265 TS dt 0.00103539 time 3.72197e+10
+2107266 TS dt 0.00108888 time 3.72197e+10
+2107267 TS dt 0.0010269 time 3.72197e+10
+2107268 TS dt 0.000929051 time 3.72197e+10
+2107269 TS dt 0.000912281 time 3.72197e+10
+
+
+========= Summary =========
+date_time=Wed Nov 22 07:08:03 2023
+code_version=v1.0-133-g8d5f341
+solve_time=2218.39
+time_steps=2107269
+step_rejections=2549
+min_time_step=0.000144958
+max_time_step=1398.12
+dofs_domain=525756
+dofs_fault=13440
+mesh_size=55.9832
+===========================

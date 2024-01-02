@@ -1,0 +1,20 @@
+[TSCheckpoint]   writing checkpoint data for step 3093500 -> path checkpoint/step3093500
+3093500 TS dt 0.01 time 5.57436e+10
+[TSCheckpoint] Triggered by: "step"
+[checkpoint] directory exists
+[checkpoint/step3093501] directory created
+[TSCheckpoint]   writing checkpoint data for step 3093501 -> path checkpoint/step3093501
+3093501 TS dt 0.01 time 5.57436e+10
+[TSCheckpoint] Triggered by: "step"
+[checkpoint] directory exists
+[checkpoint/step3093502] directory created
+[TSCheckpoint]   writing checkpoint data for step 3093502 -> path checkpoint/step3093502
+3093502 TS dt 0.01 time 5.57436e+10
+[TSCheckpoint] Triggered by: "step"
+[checkpoint] directory exists
+[checkpoint/step3093503] directory created
+[TSCheckpoint]   writing checkpoint data for step 3093503 -> path checkpoint/step3093503
+3093503 TS dt 0.01 time 5.57436e+10
+[TSCheckpoint] Triggered by: "step"
+[checkpoint] directory exists
+3093504 TS dt 0.01 time 5.57436e+10

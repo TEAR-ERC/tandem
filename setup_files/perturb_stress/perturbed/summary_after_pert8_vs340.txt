@@ -1,0 +1,20 @@
+[TSCheckpoint]   writing checkpoint data for step 1566950 -> path checkpoint/step1566950
+1566950 TS dt 0.000578454 time 2.7121e+10
+1566951 TS dt 0.00056428 time 2.7121e+10
+1566952 TS dt 0.000581262 time 2.7121e+10
+1566953 TS dt 0.000611154 time 2.7121e+10
+1566954 TS dt 0.00061803 time 2.7121e+10
+
+
+========= Summary =========
+date_time=Sat Nov 18 02:58:45 2023
+code_version=v1.0-133-g8d5f341
+solve_time=4020.69
+time_steps=1566954
+step_rejections=2029
+min_time_step=0.00038147
+max_time_step=100
+dofs_domain=525756
+dofs_fault=13440
+mesh_size=55.9832
+===========================

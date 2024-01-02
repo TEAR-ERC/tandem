@@ -10,7 +10,7 @@ import myplots
 mp = myplots.Figpref()
 ch = change_params.variate()
 
-want_spinup = False
+want_spinup = True
 if want_spinup:
     print('spin up')
 else:
@@ -93,7 +93,8 @@ def save_csl(ii,save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,cumslip_out
         else:
             plt.savefig('%s/adjusted_spinup_cumslip_%d_%d_short_%d.png'%(save_dir,int(Vths*100),int(dt_coseismic*10),ii),dpi=300)
 
-fnames = glob.glob('%s/short_outputs_*.npy'%(save_dir))
+# fnames = glob.glob('%s/short_outputs_*.npy'%(save_dir))
+fnames = ['%s/short_outputs_0.npy'%(save_dir)]
 for fn in fnames:
     print(fn)
     outputs = np.load(fn)
@@ -103,14 +104,14 @@ for fn in fnames:
     #     continue
     cumslip_outputs_events = compute_cumslip(outputs,dep,cuttime,Vlb,Vths,dt_creep,dt_coseismic,dt_interm,intv)
     if want_spinup:
-        spup_cumslip_outputs_events = compute_spinup(outputs,dep,cuttime,cumslip_outputs_events,['yrs',200])
+        spup_cumslip_outputs_events = compute_spinup(outputs,dep,cuttime,cumslip_outputs_events,['yrs',200],rths)
     else:
         spup_cumslip_outputs_events = None
     system_wide,partial_rupture,event_cluster,lead_fs,major_pr,minor_pr = analyze_events(cumslip_outputs_events,rths)[2:]
 
     cumslip_outputs = compute_cumslip(outputs,dep,cuttime,Vlb,1e-2,dt_creep,dt_coseismic,dt_interm,intv)
     if want_spinup:
-        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,cumslip_outputs,['yrs',200])
+        spup_cumslip_outputs = compute_spinup(outputs,dep,cuttime,cumslip_outputs,['yrs',200],rths)
     else:
         spup_cumslip_outputs = None
     save_csl(ii,save_dir,prefix,cumslip_outputs,spup_cumslip_outputs,cumslip_outputs_events,spup_cumslip_outputs_events,system_wide,partial_rupture,lead_fs,Vths,dt_coseismic,save_on=True)

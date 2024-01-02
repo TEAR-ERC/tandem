@@ -1,0 +1,20 @@
+
+
+Using GF checkpoint path: /home/jyun/Tandem/perturb_stress/greensfun/hf25
+create_discrete_greens_function()
+Green's function operator size: 13440 x 6720
+GF loaded was created with commsize = 60. Current commsize = 40. Repartitioning required.
+load_discrete_greens_operator() 1.07e+00 (sec)
+  status: loaded 6720 / pending 0
+load_discrete_greens_operator():facets 2.46e-03 (sec)
+load_discrete_greens_operator() 7.40e-02 (sec)
+TS -ts_checkpoint_path checkpoint
+TS -ts_checkpoint_freq_step 50
+TS -ts_checkpoint_freq_cputime 6.0000e+01
+TS -ts_checkpoint_freq_physical_time 1.0000e+09
+[checkpoint] directory created
+DOFs (domain): 525756
+DOFs (fault): 13440
+Mesh size: 55.9832
+TS -ts_checkpoint_load ../pert8_vsX30_340/outputs/checkpoint/step1516954
+[TSCheckpoint]   loading checkpoint data <- path ../pert8_vsX30_340/outputs/checkpoint/step1516954

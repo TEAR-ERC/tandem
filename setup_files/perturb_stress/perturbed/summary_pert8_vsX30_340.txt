@@ -1,0 +1,20 @@
+[TSCheckpoint]   writing checkpoint data for step 1515698 -> path checkpoint/step1515698
+1515698 TS dt 0.01 time 2.71209e+10
+[TSCheckpoint] Triggered by: "step"
+[checkpoint] directory exists
+[checkpoint/step1515699] directory created
+[TSCheckpoint]   writing checkpoint data for step 1515699 -> path checkpoint/step1515699
+sigma_n = 26.6438
+|tau| = 6021.5
+psi = -2.08122
+L = 0
+U = 1648.03
+F(L) = 6021.5
+F(U) = 3.97578e-13
+sigma_n = 30.1752
+|tau| = 7416.13
+psi = -1.45756
+L = 0
+U = 2029.72
+F(L) = 7416.13
+F(U) = 1.7637e-13

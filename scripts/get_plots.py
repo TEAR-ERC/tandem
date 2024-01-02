@@ -3,7 +3,7 @@
 An executable plotting script for Tandem to save figures directly from a remote server
 By Jeena Yun
 Update note: added color bar off feature
-Last modification: 2023.11.29.
+Last modification: 2023.12.04.
 '''
 import argparse
 
@@ -171,7 +171,7 @@ if args.image:
     if not 'cumslip_outputs' in locals():   # No event outputs computed
         from cumslip_compute import *
         cumslip_outputs = compute_cumslip(outputs,dep,cuttime,args.Vlb,args.Vths,dt_creep,dt_coseismic,dt_interm,args.SRvar)
-    fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec,args.cboff,args.publish)
+    fout_image(args.image,outputs,dep,params,cumslip_outputs,save_dir,prefix,args.rths,vmin,vmax,args.Vths,args.zoom_frame,args.plot_in_timestep,args.plot_in_sec,args.colorbar_off,args.publish)
 
 # Miscellaneous --------------------------------------------------------------------------------------------------------------------------
 if args.ev_anal:
@@ -251,17 +251,26 @@ if args.dcprof:
 
 # Fault output vs. time at certain depth -------------------------------------------------------------------------------------------------
 if abs(args.sliprate)>0:
-    from faultoutputs_vs_time import sliprate_time
-    sliprate_time(save_dir,outputs,dep,args.sliprate,args.plot_in_sec)
+    from faultoutputs_vs_time import fout_time
+    # from faultoutputs_vs_time import sliprate_time
+    # sliprate_time(save_dir,outputs,dep,args.sliprate,args.plot_in_sec)
+    fout_time(save_dir,outputs,dep,target_depth=args.sliprate,target_var='sliprate',plot_in_sec=args.plot_in_sec)
     
 if abs(args.slip)>0:
-    from faultoutputs_vs_time import slip_time
-    slip_time(save_dir,outputs,dep,args.slip,args.plot_in_sec)
+    from faultoutputs_vs_time import fout_time
+    # from faultoutputs_vs_time import slip_time
+    # slip_time(save_dir,outputs,dep,args.slip,args.plot_in_sec)
+    fout_time(save_dir,outputs,dep,target_depth=args.slip,target_var='slip',plot_in_sec=args.plot_in_sec)
     
 if abs(args.stress)>0:
-    from faultoutputs_vs_time import stress_time
-    stress_time(save_dir,outputs,dep,args.stress,args.plot_in_sec)
+    from faultoutputs_vs_time import fout_time
+    # from faultoutputs_vs_time import stress_time
+    # stress_time(save_dir,outputs,dep,args.stress,args.plot_in_sec)
+    fout_time(save_dir,outputs,dep,target_depth=args.stress,target_var='shearT',plot_in_sec=args.plot_in_sec)
+    fout_time(save_dir,outputs,dep,target_depth=args.stress,target_var='normalT',plot_in_sec=args.plot_in_sec)
 
 if abs(args.state_var)>0:
-    from faultoutputs_vs_time import state_time
-    state_time(save_dir,outputs,dep,args.state_var,args.plot_in_sec)
+    from faultoutputs_vs_time import fout_time
+    # from faultoutputs_vs_time import state_time
+    # state_time(save_dir,outputs,dep,args.state_var,args.plot_in_sec)
+    fout_time(save_dir,outputs,dep,target_depth=args.state_var,target_var='state',plot_in_sec=args.plot_in_sec)
