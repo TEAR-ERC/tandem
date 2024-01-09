@@ -97,3 +97,10 @@ E.g.
 .. code:: console
 
    $ gmsh -2 tutorial.geo -setnumber res_f 0.5
+
+We can also generate the mesh with curvilinear elements by adding :code:`-order 2` to the line, which prevents numerical artifacts in strain and traction as demonstrated by Uphoff et al. (2023).
+E.g.
+
+.. code:: console
+
+   $ gmsh -2 tutorial.geo -setnumber res_f 0.5 -order 2
