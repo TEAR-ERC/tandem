@@ -1,23 +1,23 @@
 Parameter file
 ==============
 
-Tandem simulation parameters are written in toml script. Here's key parameters and their descriptions:
+Tandem simulation parameters are written in the toml script. Here are the key parameters and their descriptions:
 
 - **final_time**: Final simulation time in seconds.
 - **mesh_file**: Mesh file.
 - **lib**: Lua file containing material&frictional paramters.
-- **scenario**: Name of the specific scenario defined in the lua library.
-- **type**: Type of problems. Available options: [poisson | elastic/elasticity].
-- **mode**: Mode of SEAS simulation. Available options: [QuasiDynamic/QD | QuasiDynamicDiscreteGreen/QDGreen | FullyDynamic/FD]
+- **scenario**: Name of the specific scenario defined in the Lua library.
+- **type**: Type of problem. Available options: [poisson | elastic/elasticity].
+- **mode**: Mode of SEAS simulation. Available options: [QuasiDynamic/QD | QuasiDynamicDiscreteGreen/QDGreen | FullyDynamic/FD].
 - **ref_normal**: Define reference normal vector.
 - **up**: Define up direction vector.
-- **boundary_linear**: Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t). Default = false
+- **boundary_linear**: Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t). Default = false.
 - **matrix_free**: Use matrix-free operators. Default = false.
-- **cfl**: CFL tuning parameter (typically >= 1.0). Default = 1.0.
+- **cfl**: CFL tuning parameter (typically <= 1.0). Default = 1.0.
 - **mg_coarse_level**: Polynomial degree of coarsest MG level. Default = 1.
-- **mg_strategy**: MG level selection strategy. Available options: [TwoLevel | Logarithmic | Full]. Default = TwoLevel
+- **mg_strategy**: MG level selection strategy. Available options: [TwoLevel | Logarithmic | Full]. Default = TwoLevel.
 
-When using :code:`mode=QDGreen`, you can use Green's function checkpointing feature by defining following parameters:
+When using :code:`mode=QDGreen`, you can use Green's function checkpointing feature by defining the following parameters:
 
 - **gf_checkpoint_prefix**: Path where Green's function operator and RHS will be checkpointed.
 - **gf_checkpoint_every_nmins**: Time interval, in minutes, at which the Green's function operator data is saved to disk. Default = 30.0.
@@ -25,7 +25,7 @@ When using :code:`mode=QDGreen`, you can use Green's function checkpointing feat
         
 Output configurations
 ---------------------
-Five types of outputs are available: **fault output**, **fault probe output**, **fault scalar output**, **domain output**, and **domain proble output**. 
+Five types of outputs are available: **fault output**, **fault probe output**, **fault scalar output**, **domain output**, and **domain probe output**. 
 
 Common options:
 
@@ -41,8 +41,8 @@ For domain output:
 
 For probe outputs:
 
-- **type**: Define probe output format. Available options: [Tecplot | CSV]. Default = CSV.
-- **probes**: Define names and locations of the probes.
+- **type**: Define the probe output format. Available options: [Tecplot | CSV]. Default = CSV.
+- **probes**: Define the names and locations of the probes.
    - **name**: Station name added to the :code:`prefix` to give the complete output file name.
    - **x**: Location of the probe. Units are consistent with your mesh [km].
 
@@ -56,9 +56,9 @@ Commented parameter file:
    mesh_file = "tutorial.msh"    # Mesh file.
    lib = "tutorial.lua"          # Lua file containing material&frictional paramters.
    scenario = "normal"           # Name of the specific scenario defined in the lua library.
-   type = "elasticity"           # Type of problems: poisson, elastic/elasticity.
+   type = "elasticity"           # Type of problem: [poisson | elastic/elasticity].
    ref_normal = [1, 0]           # Reference normal vector.
-   boundary_linear = true        # Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t). Default = False
+   boundary_linear = true        # Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t). Default = False.
 
    # On-fault probe outputs
    [fault_probe_output]

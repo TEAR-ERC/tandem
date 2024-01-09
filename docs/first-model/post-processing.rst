@@ -12,7 +12,7 @@ Outputs
 +--------------------+------------------------------------------------------------------------+------+
 | **state**          | State variable :math:`\phi = f_0 + b \ln{\left(V_0 \theta / L\right)}` |      |
 +--------------------+------------------------------------------------------------------------+------+
-| **slip0**          | Slip on the fault                                                      | m    |
+| **slip0**          | Fault slip                                                             | m    |
 +--------------------+------------------------------------------------------------------------+------+
 | **traction0**      | Shear traction on the fault                                            | MPa  |
 +--------------------+------------------------------------------------------------------------+------+
@@ -33,4 +33,4 @@ Outputs
 
 Post-processing tools
 ---------------------
-Tools related to the post-processing of the tandem output can be found in `TEAR-ERC/tandem-tools <https://github.com/TEAR-ERC/tandem-tools.git>`_ repository.
+Tools related to the post-processing of the tandem output can be found in the `TEAR-ERC/tandem-tools <https://github.com/TEAR-ERC/tandem-tools.git>`_ repository.
