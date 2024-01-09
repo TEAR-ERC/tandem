@@ -1,7 +1,7 @@
 Lua scripting
 =============
 
-Material and frictional parameters used in Tandem simulation are written in Lua script. Here's key parameters and their descriptions:
+Material and frictional parameters used in Tandem simulation are written in Lua script. Here are the key parameters and their descriptions:
 
 +--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
 | Name               | Format                    | Description                                                     | Unit    | Default |
@@ -43,7 +43,7 @@ Material and frictional parameters used in Tandem simulation are written in Lua 
 |                    |                           | analytic solutions or manufactured solutions.                   |         |         |
 +--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
 
-For more descriptions about units and scaling, please check out :doc:`Equation scaling section <../reference/scaling>`.
+For more descriptions about units and scaling, please check out the :doc:`Equation scaling section <../reference/scaling>`.
 
 
 Commented lua script:
@@ -60,7 +60,7 @@ Commented lua script:
    Tutorial.f0 = 0.6        -- Reference friction coefficient
 
    -- internal parameters
-   Tutorial.rho = 2.670     -- Density
+   Tutorial.rho = 2.670     -- Density [g/cm3]
    Tutorial.cs = 3.464      -- Shear velocity [km/s]
    Tutorial.nu = 0.25       -- Poisson ratio
 
@@ -92,7 +92,7 @@ Commented lua script:
    end
 
    function Tutorial:eta(x, y)
-       -- Half the shear-wave impedance for radius damping [MPa s/m]
+       -- Half the shear-wave impedance for radiation damping [MPa s/m]
        return self.cs * self.rho / 2.0
    end
 
