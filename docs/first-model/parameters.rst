@@ -83,7 +83,7 @@ Commented parameter file:
    prefix = "output/fault"
    rtol = 0.1
 
-   # Domain probe outputs
+   # Domain outputs
    [domain_output]
    prefix = "output/domain"
    rtol = 0.1
