@@ -569,30 +569,33 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool *gene
   PetscInt       step;
   PetscLogDouble cputime;
   PetscReal      time_physical;
+  MPI_Comm       comm;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser; 
   *generate = PETSC_FALSE;
+  comm = PetscObjectComm((PetscObject)ts);
   
   PetscTime(&cputime);
+  MPI_Bcast(&cputime,1,MPIU_PETSCLOGDOUBLE,0,comm);
   if (cputime - cp->cputime_last >= cp->checkpoint_frequency_cputime_minutes*60.0) {
     cp->cputime_last = cputime;
     *generate = PETSC_TRUE;
-    PetscPrintf(PetscObjectComm((PetscObject)ts),"[TSCheckpoint] Triggered by: \"cputime\"\n");
+    PetscPrintf(comm,"[TSCheckpoint] Triggered by: \"cputime\"\n");
   }
   
   ierr = TSGetStepNumber(ts, &step);CHKERRQ(ierr);
   if (step%cp->checkpoint_frequency_step == 0) {
     cp->step_last = step;
     *generate = PETSC_TRUE;
-    PetscPrintf(PetscObjectComm((PetscObject)ts),"[TSCheckpoint] Triggered by: \"step\"\n");
+    PetscPrintf(comm,"[TSCheckpoint] Triggered by: \"step\"\n");
   }
   
   TSGetTime(ts,&time_physical);
   if (time_physical - cp->time_last >= cp->checkpoint_frequency_time_physical) {
     cp->time_last = time_physical;
     *generate = PETSC_TRUE;
-    PetscPrintf(PetscObjectComm((PetscObject)ts),"[TSCheckpoint] Triggered by: \"physical_time\"\n");
+    PetscPrintf(comm,"[TSCheckpoint] Triggered by: \"physical_time\"\n");
   }
   PetscFunctionReturn(0);
 }
