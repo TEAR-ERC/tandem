@@ -153,7 +153,7 @@ public:
         }
     }
 
-private:
+protected:
     double F(std::size_t index, double snAbs, double V, double psi) const {
         auto a = p_[index].get<A>();
         double e = exp(psi / a);
