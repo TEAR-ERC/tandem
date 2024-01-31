@@ -8,6 +8,7 @@
 #include "form/FrictionOperator.h"
 #include "form/SeasQDOperator.h"
 #include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -48,12 +49,16 @@ template <typename Type> class Context : public ContextBase {
 public:
     using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
-    using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
+    #if AGING_LAW
+        using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
+    #elif SLIP_LAW
+        using friction_lop_t = RateAndState<DieterichRuinaSlip>;
+    #endif
     using friction_t = FrictionOperator<friction_lop_t>;
 
     Context(LocalSimplexMesh<DomainDimension> const& mesh,
             std::unique_ptr<SeasScenario<Type>> seas_sc,
-            std::unique_ptr<DieterichRuinaAgeingScenario> friction_sc,
+            std::unique_ptr<DieterichRuinaScenario> friction_sc,
             std::array<double, DomainDimension> up, std::array<double, DomainDimension> ref_normal)
         : ContextBase(mesh, seas_sc->transform()), scenario(std::move(seas_sc)),
           friction_scenario(std::move(friction_sc)),
@@ -113,7 +118,7 @@ public:
     }
 
     std::unique_ptr<SeasScenario<Type>> scenario;
-    std::unique_ptr<DieterichRuinaAgeingScenario> friction_scenario;
+    std::unique_ptr<DieterichRuinaScenario> friction_scenario;
     std::shared_ptr<Type> dg_lop;
 
 private:

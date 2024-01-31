@@ -51,6 +51,18 @@ add_custom_command(
         ${OPTIONS_FILE_NAME}
 )
 
+# Define options for state evolution law
+set(FRICION_LAW "aging" CACHE STRING "Define the state variable evolution law")
+if (FRICION_LAW STREQUAL "aging")
+    add_definitions(-DAGING_LAW)
+    message(STATUS "State evolution law: Aging")
+elseif (FRICION_LAW STREQUAL "slip")
+    add_definitions(-DSLIP_LAW)
+    message(STATUS "State evolution law: Slip")
+else()
+    message(FATAL_ERROR "Cannot recognize the given option. Your option should be either aging or slip.")
+endif()
+
 # Generate kernels
 
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
