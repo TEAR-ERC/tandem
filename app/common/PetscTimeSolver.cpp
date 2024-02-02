@@ -7,6 +7,7 @@ PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm) {
     CHKERRTHROW(TSSetProblemType(ts_, TS_NONLINEAR));
     CHKERRTHROW(TSSetExactFinalTime(ts_, TS_EXACTFINALTIME_MATCHSTEP));
     CHKERRTHROW(TSSetFromOptions(ts_));
+    CHKERRTHROW(ts_checkpoint_configure(ts_));
 
     TSType time_scheme;
     CHKERRTHROW(TSGetType(ts_, &time_scheme));

@@ -46,6 +46,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 namespace tndm::detail {
 
@@ -235,6 +237,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     Stopwatch sw;
     sw.start();
     ts.solve(cfg.final_time);
+
     double solve_time = sw.stop();
 
     std::optional<double> L2_error_domain = std::nullopt;
