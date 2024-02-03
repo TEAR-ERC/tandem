@@ -570,6 +570,7 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool *gene
   PetscLogDouble cputime;
   PetscReal      time_physical;
   MPI_Comm       comm;
+  int            bi;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser; 
@@ -597,6 +598,12 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool *gene
     *generate = PETSC_TRUE;
     PetscPrintf(comm,"[TSCheckpoint] Triggered by: \"physical_time\"\n");
   }
+  
+  bi = (int)(*generate);
+  MPI_Bcast(&bi,1,MPI_INT,0,comm);
+  if (bi == 0) {  *generate = PETSC_FALSE;
+  } else {        *generate = PETSC_TRUE; }
+  
   PetscFunctionReturn(0);
 }
 
