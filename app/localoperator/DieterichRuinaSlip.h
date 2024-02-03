@@ -6,7 +6,7 @@
 #include "geometry/Vector.h"
 #include "tensor/Tensor.h"
 #include "util/Zero.h"
-#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaAging.h"
 
 #include "mneme/storage.hpp"
 
@@ -18,7 +18,7 @@
 
 namespace tndm {
 
-class DieterichRuinaSlip : public DieterichRuinaAgeing {
+class DieterichRuinaSlip : public DieterichRuinaAging {
 public:
     double state_rhs(std::size_t index, double V, double psi) const {
         double myL = p_[index].get<L>();
