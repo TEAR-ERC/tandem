@@ -52,15 +52,15 @@ add_custom_command(
 )
 
 # Define options for state evolution law
-set(FRICION_LAW "aging" CACHE STRING "Define the state variable evolution law")
-if (FRICION_LAW STREQUAL "aging")
-    add_definitions(-DAGING_LAW)
-    message(STATUS "State evolution law: Aging")
-elseif (FRICION_LAW STREQUAL "slip")
-    add_definitions(-DSLIP_LAW)
-    message(STATUS "State evolution law: Slip")
+set(FRICTION_LAW "dieterich_ruina_aging" CACHE STRING "Define the state variable evolution law")
+if (FRICTION_LAW STREQUAL "dieterich_ruina_aging")
+    add_definitions(-DDR_AGING_LAW)
+    message(STATUS "State evolution law: Dieterich-Ruina Aging Law")
+elseif (FRICTION_LAW STREQUAL "dieterich_ruina_slip")
+    add_definitions(-DDR_SLIP_LAW)
+    message(STATUS "State evolution law: Dieterich-Ruina Slip Law")
 else()
-    message(FATAL_ERROR "Cannot recognize the given option. Your option should be either aging or slip.")
+    message(FATAL_ERROR "Cannot recognize the given option. Your option should be either [dieterich_ruina_aging] or [dieterich_ruina_slip].")
 endif()
 
 # Generate kernels

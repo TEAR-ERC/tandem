@@ -12,7 +12,7 @@
 #include "form/SeasQDOperator.h"
 #include "form/VolumeFunctionalFactory.h"
 #include "localoperator/Adapter.h"
-#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaAging.h"
 #include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"

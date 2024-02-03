@@ -2,7 +2,7 @@
 #define FRICTIONCONFIG_20201027_H
 
 #include "config.h"
-#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaAging.h"
 #include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/RateAndStateBase.h"
 #include "tandem/SeasSolution.h"
@@ -97,11 +97,7 @@ public:
     auto const& constant_params() const { return cp_; }
     auto param_fun() const {
         return [this](std::array<double, DomainDimension> const& x) {
-            #if AGING_LAW
-                DieterichRuinaAgeing::Params p;
-            #elif SLIP_LAW
-                DieterichRuinaSlip::Params p;
-            #endif
+            DieterichRuinaAging::Params p;
             p.a = this->a_(x)[0];
             p.eta = this->eta_(x)[0];
             p.L = this->L_(x)[0];
@@ -125,11 +121,7 @@ public:
     }
 
 protected:
-    #if AGING_LAW
-        DieterichRuinaAgeing::ConstantParams cp_;
-    #elif SLIP_LAW
-        DieterichRuinaSlip::ConstantParams cp_;
-    #endif
+    DieterichRuinaAging::ConstantParams cp_;
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;
     functional_t<DomainDimension> sn_pre_ =
