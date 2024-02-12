@@ -1,5 +1,5 @@
-#ifndef DIETERICHRUINAAGEING_20201027_H
-#define DIETERICHRUINAAGEING_20201027_H
+#ifndef DIETERICHRUINAAGING_20201027_H
+#define DIETERICHRUINAAGING_20201027_H
 
 #include "config.h"
 
@@ -17,7 +17,7 @@
 
 namespace tndm {
 
-class DieterichRuinaAgeing {
+class DieterichRuinaAging {
 public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
 
@@ -199,4 +199,4 @@ protected:
 
 } // namespace tndm
 
-#endif // DIETERICHRUINAAGEING_20201027_H
+#endif // DIETERICHRUINAAGING_20201027_H
