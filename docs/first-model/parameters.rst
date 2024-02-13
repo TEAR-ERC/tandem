@@ -5,7 +5,7 @@ Tandem simulation parameters are written in the toml script. Here are the key pa
 
 - **final_time**: Final simulation time in seconds.
 - **mesh_file**: Mesh file.
-- **lib**: Lua file containing material&frictional paramters.
+- **lib**: Lua file containing material & frictional paramters.
 - **scenario**: Name of the specific scenario defined in the Lua library.
 - **type**: Type of problem. Available options: [poisson | elastic/elasticity].
 - **mode**: Mode of SEAS simulation. Available options: [QuasiDynamic/QD | QuasiDynamicDiscreteGreen/QDGreen | FullyDynamic/FD].
