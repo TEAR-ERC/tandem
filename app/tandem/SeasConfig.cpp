@@ -12,23 +12,23 @@ template <typename T, typename P> auto up_cast(P ptr) {
 template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& outputSchema) {
     outputSchema.add_value("prefix", up_cast<Derived>(&Derived::prefix))
         .validator(ParentPathExists())
-        .help("Output file name prefix");
+        .help("Output file name prefix.");
     outputSchema.add_value("atol", up_cast<Derived>(&Derived::atol))
         .validator([](auto&& x) { return x >= 0; })
         .default_value(1e-50)
-        .help("Absolute tolerance for VMax");
+        .help("Absolute tolerance for VMax.");
     outputSchema.add_value("rtol", up_cast<Derived>(&Derived::rtol))
         .validator([](auto&& x) { return x >= 0; })
         .default_value(0.01)
-        .help("Relative tolerance for VMax");
+        .help("Relative tolerance for VMax.");
     outputSchema.add_value("t_min", up_cast<Derived>(&Derived::t_min))
         .validator([](auto&& x) { return x >= 0; })
         .default_value(0.0)
-        .help("Minimum time difference between samples");
+        .help("Minimum time difference between samples.");
     outputSchema.add_value("t_max", up_cast<Derived>(&Derived::t_max))
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
-        .help("Maximum time difference between samples");
+        .help("Maximum time difference between samples.");
 }
 
 template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
@@ -36,7 +36,7 @@ template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived
 
     outputSchema.add_value("jacobian", up_cast<Derived>(&Derived::jacobian))
         .default_value(false)
-        .help("Output Jacobian");
+        .help("Output Jacobian.");
 };
 
 template <typename Derived> void setTabularOutputConfigSchema(TableSchema<Derived>& outputSchema) {
@@ -71,17 +71,18 @@ void setConfigSchema(TableSchema<Config>& schema,
                      MakePathRelativeToOtherPath const& path_converter) {
     schema.add_value("resolution", &Config::resolution)
         .validator([](auto&& x) { return x > 0; })
-        .help("Non-negative resolution parameter");
+        .help("Non-negative resolution parameter.");
     schema.add_value("final_time", &Config::final_time)
         .validator([](auto&& x) { return x >= 0; })
-        .help("Non-negative final time of simulation");
+        .help("Non-negative final time of simulation.");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(path_converter)
         .validator(PathExists());
+        .help("Mesh file.");
     schema.add_value("cfl", &Config::cfl)
         .validator([](auto&& x) { return x > 0.0; })
         .default_value(1.0)
-        .help("CFL tuning parameter (typically <= 1.0)");
+        .help("CFL tuning parameter (typically <= 1.0).");
 
     schema.add_value("mode", &Config::mode)
         .converter([](std::string_view value) {
@@ -96,6 +97,7 @@ void setConfigSchema(TableSchema<Config>& schema,
             }
         })
         .validator([](SeasMode const& mode) { return mode != SeasMode::Unknown; });
+        .help("Mode of SEAS simulation (QuasiDynamic/QD|QuasiDynamicDiscreteGreen/QDGreen|FullyDynamic/FD).");
     schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
             if (iEquals(value, "poisson")) {
@@ -107,29 +109,34 @@ void setConfigSchema(TableSchema<Config>& schema,
             }
         })
         .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; });
+        .help("Type of problem (poisson|elastic/elasticity).");
     schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists());
+        .help("Lua file containing material & frictional paramters.");
     schema.add_value("scenario", &Config::scenario);
+        .help("Name of the specific scenario defined in the Lua library.");
     auto default_up = std::array<double, DomainDimension>{};
     default_up.back() = 1.0;
     schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values();
+        .help("Define up direction vector.");
     schema.add_array("ref_normal", &Config::ref_normal).of_values();
+        .help("Define reference normal vector.");
     schema.add_value("boundary_linear", &Config::boundary_linear)
         .default_value(false)
         .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
 
     schema.add_value("gf_checkpoint_prefix", &Config::gf_checkpoint_prefix)
-        .help("Path where Green's function operator and RHS will be checkpointed");
+        .help("Path where Green's function operator and RHS will be checkpointed.");
     schema.add_value("gf_checkpoint_every_nmins", &Config::gf_checkpoint_every_nmins)
         .default_value(30.0)
         .help("time interval, in minutes, at which the Green's function operator data is saved to "
-              "disk");
+              "disk.");
 
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
-        .help("Use matrix-free operators");
+        .help("Use matrix-free operators.");
     schema.add_value("mg_coarse_level", &Config::mg_coarse_level)
         .default_value(1)
-        .help("Polynomial degree of coarsest MG level");
+        .help("Polynomial degree of coarsest MG level.");
     schema.add_value("mg_strategy", &Config::mg_strategy)
         .converter([](std::string_view value) {
             if (iEquals(value, "TwoLevel")) {
@@ -144,7 +151,7 @@ void setConfigSchema(TableSchema<Config>& schema,
         })
         .default_value(MGStrategy::TwoLevel)
         .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; })
-        .help("MG level selection strategy (TwoLevel|Logarithmic|Full)");
+        .help("MG level selection strategy (TwoLevel|Logarithmic|Full).");
 
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
