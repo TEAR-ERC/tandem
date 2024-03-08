@@ -99,6 +99,37 @@ tandem can be then installed, e.g. with:
 
 The procedure to create an environment module is the same as detailed above.
 
+Installing various branches using Spack
+--------------------------------------
+
+Spack installs the main branch by default. 
+Compiling tandem from other branches using Spack can be done by modifying the file :code:`package.py` under directory :code:`spack/var/spack/repos/builtin/packages/tandem` or :code:`seissol-spack-aid/spack/packages/tandem` in SuperMUC.
+The lines one may want to alter include:
+
+.. code-block:: python
+
+    git = "https://github.com/TEAR-ERC/tandem.git"
+    version("main", branch="main", submodules=True)
+
+If one aims to install other branches in tandem repository, one may change the version information, e.g.: 
+
+.. code-block:: python
+
+    version("TSckp", branch="dmay/seas-checkpoint", submodules=True)
+
+The installation can be done by, e.g.:
+
+.. code-block:: bash
+
+    spack install tandem@TSckp polynomial_degree=3 domain_dimension=2 target=skylake_avx512
+
+If one aims to install their own fork of tandem, one may alter the git address, e.g.:
+
+.. code-block:: python
+
+    git = "https://github.com/USER_REPO/fork_of_tandem.git"
+
+
 Manual installation
 -------------------
 
@@ -128,7 +159,7 @@ Consult your package manager's documentation for other operating systems.
 
 .. code:: console
    
-   # apt-get install -y gcc g++ gfortran libgomp1 \
+   $ apt-get install -y gcc g++ gfortran libgomp1 \
          make cmake libopenblas-dev libopenblas-base \
          libopenmpi-dev libopenmpi3 git libeigen3-dev \
          python3 python3-distutils python3-numpy \
@@ -139,47 +170,50 @@ Install METIS and ParMETIS
 
 .. code:: console
 
-    # wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-    # wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
-    # tar -xvf metis-5.1.0.tar.gz
-    # tar -xvf parmetis-4.0.3.tar.gz
-    # cd metis-5.1.0
-    # make config && make && make install
-    # cd ../parmetis-4.0.3
-    # make config && make && make install
-    # cd ..
+    $ wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+    $ wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
+    $ tar -xvf metis-5.1.0.tar.gz
+    $ tar -xvf parmetis-4.0.3.tar.gz
+    $ cd metis-5.1.0
+    $ make config && make && make install
+    $ cd ../parmetis-4.0.3
+    $ make config && make && make install
+    $ cd ..
 
 Install PETSc
 -------------
 
 .. code:: console
 
-    # wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.6.tar.gz
-    # tar -xvf petsc-lite-3.14.6.tar.gz
-    # cd petsc-3.14.6
-    # ./configure --with-fortran-bindings=0 --with-debugging=0 \
+    $ wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.6.tar.gz
+    $ tar -xvf petsc-lite-3.14.6.tar.gz
+    $ cd petsc-3.14.6
+    $ ./configure --with-fortran-bindings=0 --with-debugging=0 \
          --with-memalign=32 --with-64-bit-indices \
          CC=mpicc CXX=mpicxx FC=mpif90 --prefix=/usr/local/ \
          --download-mumps --download-scalapack \
          COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3"
-    # make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j
-    # make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
-    # cd ..
+    $ make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j
+    $ make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
+    $ cd ..
 
 (Optional) Install libxsmm
 --------------------------
 
 .. code:: console
 
-    # wget https://github.com/hfp/libxsmm/archive/refs/tags/1.16.1.tar.gz
-    # tar -xvf 1.16.1.tar.gz
-    # cd libxsmm-1.16.1
-    # make -j generator
-    # cp bin/libxsmm_gemm_generator /usr/local/bin/
-    # cd ..
+    $ wget https://github.com/hfp/libxsmm/archive/refs/tags/1.16.1.tar.gz
+    $ tar -xvf 1.16.1.tar.gz
+    $ cd libxsmm-1.16.1
+    $ make -j generator
+    $ cp bin/libxsmm_gemm_generator /usr/local/bin/
+    $ cd ..
 
 Compile tandem
 --------------
+
+You can provide polynomical degree and domain dimension during the compilation stage using :code:`-DPOLYNOMIAL_DEGREE` and :code:`-DDOMAIN_DIMENSION`, respectively. 
+If not provided, both polynomical degree and domain dimension are set to 2 by default.
 
 .. code:: console
 

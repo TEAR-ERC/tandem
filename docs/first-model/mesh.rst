@@ -89,7 +89,7 @@ format to version 2.2.
    Mesh.MshFileVersion = 2.2;
 
 The argument of :code:`Physical Curve` must be set to 1, 3, or 5.
-A 1 stands for free surface, 3 for fault, and 5 for Dirichlet boundary condition.
+A 1 stands for free surface, 3 for fault, and 5 for Dirichlet boundary condition. 
 
 We can now generate the mesh and adjust the resolution and dip angle from the command line.
 E.g.
@@ -97,3 +97,27 @@ E.g.
 .. code:: console
 
    $ gmsh -2 tutorial.geo -setnumber res_f 0.5
+
+We can also generate the mesh with curvilinear elements by adding :code:`-order 2` to the line, which prevents numerical artifacts in strain and traction as demonstrated by Uphoff et al. (2023).
+E.g.
+
+.. code:: console
+
+   $ gmsh -2 tutorial.geo -setnumber res_f 0.5 -order 2
+
+Now, you have your first mesh. Before proceeding to next steps, it is recommended to check the boundary condition using :code:`check-bc` app. The app can be compiled by running
+
+.. code:: console
+
+   $ make -j check-bc
+
+at your build directory. Once :code:`check-bc` is built, you can run it with a syntax of :code:`check-bc SPATIAL_DIMENSION MESH_FILE OUTPUT_PREFIX`. 
+E.g.
+
+.. code:: console
+
+   $ ./app/check-bc 2 tutorial.msh tutorial_bc
+
+which will produce :code:`tutorial_bc.pvtu` and :code:`tutorial_bc_0.vtu`. 
+Then you can check the boundary conditions by loading the pvtu file using paraview, which will show either 1, 3, or 5 for each boundary.
+Note that :code:`Physical Curve` with values other than 1, 3, or 5 will not appear in the pvtu output.
