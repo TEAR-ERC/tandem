@@ -46,6 +46,9 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <filesystem>
+namespace fs = std::filesystem;
+
 
 namespace tndm::detail {
 
@@ -70,6 +73,21 @@ auto make_state_vecs(std::array<std::size_t, N> const& block_sizes,
 auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
+    int rank;
+
+    MPI_Comm_rank(comm,&rank);
+    if ((rank == 0) && cfg.output_path.has_value()) {
+        std::string sprefix = cfg.output_path.value_or("");
+        auto pckp = fs::path(sprefix);
+        bool exists = fs::exists(pckp);
+        if (!exists) {
+            bool ret = fs::create_directories(pckp);
+	    std::cout << "Created output path " << sprefix << std::endl;
+	    if (!ret) 
+	        throw std::runtime_error("Failed to create output_path directory");
+        }
+    }
+
     if (cfg.fault_output && cfg.domain_output) {
         if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
             throw std::runtime_error(
@@ -78,31 +96,71 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
     }
     if (cfg.fault_probe_output) {
         auto const& oc = *cfg.fault_probe_output;
+
+	std::string opath_prefix = oc.prefix;
+        if (cfg.output_path.has_value()) {
+	    auto op = fs::path(cfg.output_path.value_or(""));
+	    op /= oc.prefix;
+	    opath_prefix = op;
+	}
+
         monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            opath_prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
             fault_map, comm));
     }
     if (cfg.domain_probe_output) {
         auto const& oc = *cfg.domain_probe_output;
-        monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+
+	std::string opath_prefix = oc.prefix;
+        if (cfg.output_path.has_value()) {
+	    auto op = fs::path(cfg.output_path.value_or(""));
+	    op /= oc.prefix;
+	    opath_prefix = op;
+	}
+
+	monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+            opath_prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
             comm));
     }
     if (cfg.fault_output) {
         auto const& oc = *cfg.fault_output;
-        monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
-            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+
+	std::string opath_prefix = oc.prefix;
+        if (cfg.output_path.has_value()) {
+	    auto op = fs::path(cfg.output_path.value_or(""));
+	    op /= oc.prefix;
+	    opath_prefix = op;
+	}
+
+	monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
+            opath_prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
             comm));
     }
     if (cfg.fault_scalar_output) {
         auto const& oc = *cfg.fault_scalar_output;
-        monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
-            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm));
+
+	std::string opath_prefix = oc.prefix;
+        if (cfg.output_path.has_value()) {
+	    auto op = fs::path(cfg.output_path.value_or(""));
+	    op /= oc.prefix;
+	    opath_prefix = op;
+	}
+
+	monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
+            opath_prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm));
     }
     if (cfg.domain_output) {
         auto const& oc = *cfg.domain_output;
-        monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
-            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
+
+	std::string opath_prefix = oc.prefix;
+        if (cfg.output_path.has_value()) {
+	    auto op = fs::path(cfg.output_path.value_or(""));
+	    op /= oc.prefix;
+	    opath_prefix = op;
+	}
+
+	monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
+            opath_prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
             comm));
     }
 }

@@ -62,6 +62,7 @@ struct Config {
     double final_time;
     std::optional<std::string> mesh_file;
     double cfl;
+    std::optional<std::string> output_path;
 
     SeasMode mode;
     LocalOpType type;
