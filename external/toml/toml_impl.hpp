@@ -493,8 +493,15 @@ is no longer necessary.
 		#if (TOML_ARM && TOML_GCC) || TOML_CLANG
 			#define TOML_FP16 __fp16
 		#endif
-		#if TOML_ARM && (TOML_GCC || TOML_CLANG)
-			#define TOML_FLOAT16 _Float16
+		#if TOML_ARM
+			#if TOML_GNU
+				#if __GNUC__ >= 12
+					#define TOML_FLOAT16 _Float16
+				#endif
+			#endif
+			#if TOML_CLANG
+				#define TOML_FLOAT16 _Float16
+			#endif
 		#endif
 	#endif
 #endif
