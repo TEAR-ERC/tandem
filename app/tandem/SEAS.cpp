@@ -46,8 +46,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-#include <filesystem>
-namespace fs = std::filesystem;
 
 namespace tndm::detail {
 
@@ -193,9 +191,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                         seas::ContextBase& ctx) {
     auto seasop = operator_specifics<seas_t>::make(mesh, cfg, ctx);
 
-    auto ts =
-        PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
-                                                 seasop->num_local_elements(), seasop->comm()));
+    auto ts = PetscTimeSolver(
+        *seasop,
+        make_state_vecs(seasop->block_sizes(), seasop->num_local_elements(), seasop->comm()), cfg);
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
     if (cfl_time_step) {
