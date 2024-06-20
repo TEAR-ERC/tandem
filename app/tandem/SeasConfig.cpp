@@ -77,7 +77,7 @@ void setConfigSchema(TableSchema<Config>& schema,
         .help("Non-negative final time of simulation.");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(path_converter)
-        .validator(PathExists());
+        .validator(PathExists())
         .help("Mesh file.");
     schema.add_value("cfl", &Config::cfl)
         .validator([](auto&& x) { return x > 0.0; })
@@ -96,7 +96,7 @@ void setConfigSchema(TableSchema<Config>& schema,
                 return SeasMode::Unknown;
             }
         })
-        .validator([](SeasMode const& mode) { return mode != SeasMode::Unknown; });
+        .validator([](SeasMode const& mode) { return mode != SeasMode::Unknown; })
         .help("Mode of SEAS simulation (QuasiDynamic/QD|QuasiDynamicDiscreteGreen/QDGreen|FullyDynamic/FD).");
     schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
@@ -108,17 +108,17 @@ void setConfigSchema(TableSchema<Config>& schema,
                 return LocalOpType::Unknown;
             }
         })
-        .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; });
+        .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; })
         .help("Type of problem (poisson|elastic/elasticity).");
-    schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists());
+    schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists())
         .help("Lua file containing material & frictional paramters.");
-    schema.add_value("scenario", &Config::scenario);
+    schema.add_value("scenario", &Config::scenario)
         .help("Name of the specific scenario defined in the Lua library.");
     auto default_up = std::array<double, DomainDimension>{};
     default_up.back() = 1.0;
-    schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values();
+    schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values()
         .help("Define up direction vector.");
-    schema.add_array("ref_normal", &Config::ref_normal).of_values();
+    schema.add_array("ref_normal", &Config::ref_normal).of_values()
         .help("Define reference normal vector.");
     schema.add_value("boundary_linear", &Config::boundary_linear)
         .default_value(false)
