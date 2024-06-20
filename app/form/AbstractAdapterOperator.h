@@ -20,8 +20,8 @@ public:
     virtual std::size_t traction_block_size() const = 0;
     virtual MPI_Comm comm() const = 0;
 
-    virtual auto slip_bc(BlockView const& state)
-        -> std::function<void(std::size_t, Matrix<double>&, bool)> = 0;
+    virtual auto
+    slip_bc(BlockView const& state) -> std::function<void(std::size_t, Matrix<double>&, bool)> = 0;
     virtual void traction(BlockView const& displacement, BlockVector& result) = 0;
 };
 

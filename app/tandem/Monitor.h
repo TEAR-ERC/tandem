@@ -89,8 +89,8 @@ private:
             return seasop_->friction().params();
         }
     }
-    inline auto volume_data(std::vector<std::size_t> const* subset)
-        -> FiniteElementFunction<DomainDimension> {
+    inline auto
+    volume_data(std::vector<std::size_t> const* subset) -> FiniteElementFunction<DomainDimension> {
         if (subset) {
             return seasop_->displacement(*subset);
         } else {
