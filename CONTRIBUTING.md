@@ -64,7 +64,7 @@ Note that code formatting is enforced in src test and app.
 If you change files in these folders, you can enforce a suitable formatting by running:
 
 ```
-.ci/format.sh $(which clang-format-11) .
+.ci/format.sh $(which clang-format) .
 ```
 
 Push it to your remote repository
