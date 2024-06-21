@@ -68,6 +68,7 @@ Then we add `spack.yaml` in the folder:
                 polynomial_degree=5: p5
                 polynomial_degree=6: p6
                 cuda: cuda
+                rocm: rocm
                 debug: debug
             core_compilers:
             - gcc@=12.2.0

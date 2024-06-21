@@ -48,6 +48,7 @@ You may want to update ``~/.spack/modules.yaml``, to specify the path where the 
               polynomial_degree=5: 'p5'
               polynomial_degree=6: 'p6'
               cuda: cuda
+              rocm: rocm
               debug: debug
 
 Note that a custom install directory for spack packages can also be set, by changing ``~/.spack/config.yaml``:
@@ -107,6 +108,17 @@ LUMI-C installation
 
 The procedure to install tandem on LUMI-C is described in :doc:`installation_lumic`.
 
+Installing Lua modules
+----------------------
+
+Additionnal Lua modules can be installed through luarocks. E.g. for the Ridgecrest setup of Uphoff et al. (2023):
+
+.. code-block:: bash
+
+    luarocks install csv 
+    luarocks install luaposix    
+
+
 Installing various branches using Spack
 ---------------------------------------
 
@@ -137,6 +149,11 @@ If one aims to install their own fork of tandem, one may alter the git address, 
 
     git = "https://github.com/USER_REPO/fork_of_tandem.git"
 
+
+Tandem with GPUs
+----------------
+
+The installation and usage of tandem with GPUs is described in :doc:`gpus`.
 
 Manual installation
 -------------------
