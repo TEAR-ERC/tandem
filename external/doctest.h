@@ -4016,6 +4016,10 @@ namespace {
 
 #else // DOCTEST_PLATFORM_WINDOWS
 
+    // glibc 2.34+ fix
+    #undef SIGSTKSZ
+    #define SIGSTKSZ 32768
+
     struct SignalDefs
     {
         int         id;
