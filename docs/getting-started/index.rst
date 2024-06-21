@@ -6,6 +6,7 @@ Getting started
 
    quick-start
    installation
+   installation_lumic
    examples
 
 Welcome to tandem!

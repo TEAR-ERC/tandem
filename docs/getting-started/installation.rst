@@ -47,6 +47,8 @@ You may want to update ``~/.spack/modules.yaml``, to specify the path where the 
               polynomial_degree=4: 'p4'
               polynomial_degree=5: 'p5'
               polynomial_degree=6: 'p6'
+              cuda: cuda
+              debug: debug
 
 Note that a custom install directory for spack packages can also be set, by changing ``~/.spack/config.yaml``:
 
@@ -59,7 +61,7 @@ We can then generate a tandem module file with:
 
 .. code-block:: bash
 
-    spack module tcl refresh tandem
+    spack module tcl refresh --upstream-modules $(spack find -d --format "{name}{/hash:5}" tandem) 
 
 to access the module at start up, add to your ``~/.bashrc``:
 
@@ -99,8 +101,14 @@ tandem can be then installed, e.g. with:
 
 The procedure to create an environment module is the same as detailed above.
 
+
+LUMI-C installation
+-------------------
+
+The procedure to install tandem on LUMI-C is described in :doc:`installation_lumic`.
+
 Installing various branches using Spack
---------------------------------------
+---------------------------------------
 
 Spack installs the main branch by default. 
 Compiling tandem from other branches using Spack can be done by modifying the file :code:`package.py` under directory :code:`spack/var/spack/repos/builtin/packages/tandem` or :code:`seissol-spack-aid/spack/packages/tandem` in SuperMUC.
