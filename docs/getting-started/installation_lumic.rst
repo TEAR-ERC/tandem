@@ -17,7 +17,7 @@ Therefore we add to ~/.bashrc:
     export WORK=/project/project_${PROJECT_ID}
     export SCRATCH=/scratch/project_${PROJECT_ID}
     export SPACK_USER_PREFIX=/project/project_${PROJECT_ID}/spack_tandem
-    module load spack/spack/23.03-2
+    module load spack/spack/23.09
     # eval $(spack env activate --sh $SPACK_USER_PREFIX)
 
 Note that spack_tandem could be changed to another name.
@@ -115,11 +115,12 @@ Once you have installed tandem with spack, you can use modules instead of spack 
     export WORK=/project/project_${PROJECT_ID}
     export SCRATCH=/scratch/project_${PROJECT_ID}
     export SPACK_USER_PREFIX=/project/project_${PROJECT_ID}/spack_tandem
-    #module load spack/23.03-2
+    #module load spack/23.09
     #eval $(spack env activate --sh $SPACK_USER_PREFIX)
     export MODULEPATH=$SPACK_USER_PREFIX/spack-modules:$MODULEPATH
     module load gcc tandem
 
+Note that this may not work with spack/23.09 because the module folder of the preinstalled modules is currently not accessible for reading.
 
 Running tandem
 --------------
