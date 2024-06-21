@@ -85,8 +85,21 @@ void PetscLinearSolver::setup_mg(AbstractDGOperator<DomainDimension>& dgop, PC p
         i_op->assemble(to_degree, from_degree, I);
         CHKERRTHROW(PCMGSetInterpolation(pc, l + 1, I.mat()));
 
-        Mat A_l;
-        CHKERRTHROW(MatPtAP(A_lp1, I.mat(), MAT_INITIAL_MATRIX, PETSC_DEFAULT, &A_l));
+        // Construct coarse level operator via A_c = Pt A P
+        //Mat A_l;
+        //CHKERRTHROW(MatPtAP(A_lp1, I.mat(), MAT_INITIAL_MATRIX, PETSC_DEFAULT, &A_l));
+
+        // PETSc manpage for MatPtAP() states that For matrix types without a
+        // special implementation of PtAP, MatPtAP() fallbacks back to
+        // using MatMatMult() followed by MatTransposeMatMult().
+        // The following fall back will always work
+        Mat A_l, AP, Pt;
+        CHKERRTHROW(MatMatMult(A_lp1, I.mat(), MAT_INITIAL_MATRIX, 1, &AP));
+        CHKERRTHROW(MatTranspose(I.mat(), MAT_INITIAL_MATRIX, &Pt));
+        CHKERRTHROW(MatMatMult(Pt, AP, MAT_INITIAL_MATRIX, 1, &A_l));
+        CHKERRTHROW(MatDestroy(&Pt));
+        CHKERRTHROW(MatDestroy(&AP));
+
         CHKERRTHROW(PCMGGetSmoother(pc, l, &smooth));
         CHKERRTHROW(KSPSetOperators(smooth, A_l, A_l));
         mat_cleanup.push_back(A_l);
