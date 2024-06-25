@@ -1,0 +1,36 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Tandem
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file, or cite
+  Uphoff, C., May, D. A., & Gabriel, A. A. (2023).
+  A discontinuous Galerkin method for sequences of earthquakes
+  and aseismic slip on multiple faults using unstructured
+  curvilinear grids. Geophysical Journal International, 233(1), 586-626.
+  https://doi.org/10.1093/gji/ggac467
+type: software
+authors:
+  - given-names: Carsten
+    family-names: Uphoff
+  - given-names: Dave
+    family-names: May
+  - given-names: Alice-Agnes
+    family-names: Gabriel
+  - given-names: Jeena
+    family-names: Yun
+  - given-names: Thomas
+    family-names: Ulrich
+  - given-names: Nico
+    family-names: Schliwa
+  - given-names: Casper
+    family-names: Pranger
+repository-code: 'https://github.com/TEAR-ERC/tandem/'
+url: 'https://tandem.readthedocs.io/en/latest/'
+abstract: >-
+  Tandem is a scalable discontinuous Galerkin code on
+  unstructured curvilinear grids for linear elasticity
+  problems and sequences of earthquakes and aseismic slip.
+license: BSD-3-Clause
