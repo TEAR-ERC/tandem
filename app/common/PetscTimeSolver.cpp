@@ -2,11 +2,18 @@
 
 namespace tndm {
 
-PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm) {
+PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm, Config const& cfg) {
     CHKERRTHROW(TSCreate(comm, &ts_));
     CHKERRTHROW(TSSetProblemType(ts_, TS_NONLINEAR));
     CHKERRTHROW(TSSetExactFinalTime(ts_, TS_EXACTFINALTIME_MATCHSTEP));
     CHKERRTHROW(TSSetFromOptions(ts_));
+
+    auto const& cfgcp = cfg.ts_checkpoint_config;
+
+    CHKERRTHROW(
+        ts_checkpoint_configure(ts_, cfgcp.save_directory.c_str(), cfgcp.frequency_step,
+                                cfgcp.frequency_cputime_minutes, cfgcp.frequency_time_physical,
+                                static_cast<int>(cfgcp.storage_type), cfgcp.storage_limited_size));
 
     TSType time_scheme;
     CHKERRTHROW(TSGetType(ts_, &time_scheme));
