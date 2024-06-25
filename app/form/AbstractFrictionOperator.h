@@ -33,8 +33,8 @@ public:
     virtual auto state(double time, BlockVector const& traction, BlockVector const& state,
                        std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
-    virtual auto raw_state(BlockVector const& state)
-        -> FiniteElementFunction<DomainDimension - 1u> = 0;
+    virtual auto
+    raw_state(BlockVector const& state) -> FiniteElementFunction<DomainDimension - 1u> = 0;
     virtual auto params(std::vector<std::size_t> const& subset)
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
     virtual auto params(std::optional<Range<std::size_t>> range = std::nullopt)

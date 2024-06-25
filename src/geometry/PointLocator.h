@@ -30,8 +30,8 @@ public:
                  double bbox_factor = 1.5, double max_its = 100);
 
     template <typename Iterator>
-    auto locate(point_t const& point, Iterator first, Iterator last) const
-        -> PointLocatorResult<D> {
+    auto locate(point_t const& point, Iterator first,
+                Iterator last) const -> PointLocatorResult<D> {
         auto r = PointLocatorResult<D>{
             std::numeric_limits<std::size_t>::max(), std::numeric_limits<double>::max(), {}, {}};
 

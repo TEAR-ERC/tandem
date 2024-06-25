@@ -85,8 +85,8 @@ public:
         };
     }
     template <std::size_t Q>
-    auto make_facet_functional(functional_t<Q> fun, std::array<double, D> const& refNormal) const
-        -> facet_functional_t {
+    auto make_facet_functional(functional_t<Q> fun,
+                               std::array<double, D> const& refNormal) const -> facet_functional_t {
         return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
