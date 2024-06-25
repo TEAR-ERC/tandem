@@ -12,7 +12,8 @@
 #include "form/SeasQDOperator.h"
 #include "form/VolumeFunctionalFactory.h"
 #include "localoperator/Adapter.h"
-#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaAging.h"
+#include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -53,7 +54,7 @@ template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     return std::make_unique<seas::Context<Type>>(
         mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
-        std::make_unique<DieterichRuinaAgeingScenario>(cfg.lib, cfg.scenario), cfg.up,
+        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up,
         cfg.ref_normal);
 }
 
