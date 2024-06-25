@@ -64,18 +64,18 @@ void setTsCheckpointConfigSchema(TableSchema<Derived>& tsCheckpointSchema) {
     tsCheckpointSchema.add_value("storage_type", up_cast<Derived>(&Derived::storage_type))
         .converter([](std::string_view value) {
             if (iEquals(value, "none")) {
-                return tsCheckpointStorageType::NONE;
+                return TsCheckpointStorageType::NONE;
             } else if (iEquals(value, "limited")) {
-                return tsCheckpointStorageType::LIMITED;
+                return TsCheckpointStorageType::LIMITED;
             } else if (iEquals(value, "unlimited")) {
-                return tsCheckpointStorageType::UNLIMITED;
+                return TsCheckpointStorageType::UNLIMITED;
             } else {
-                return tsCheckpointStorageType::UNKNOWN;
+                return TsCheckpointStorageType::UNKNOWN;
             }
         })
-        .default_value(tsCheckpointStorageType::LIMITED)
-        .validator([](tsCheckpointStorageType const& type) {
-            return type != tsCheckpointStorageType::UNKNOWN;
+        .default_value(TsCheckpointStorageType::LIMITED)
+        .validator([](TsCheckpointStorageType const& type) {
+            return type != TsCheckpointStorageType::UNKNOWN;
         })
         .help("type of storage for checkpoints. limited will store a finite number of unique "
               "checkpoints on disk. unlimited stores all checkpoints. Use none to completely "
@@ -88,6 +88,16 @@ void setTsCheckpointConfigSchema(TableSchema<Derived>& tsCheckpointSchema) {
         .help("number of unique checkpoints stored on disk (with storage_type=limited)");
 }
 
+template <typename Derived>
+void setGfCheckpointConfigSchema(TableSchema<Derived>& gfCheckpointSchema) {
+    gfCheckpointSchema.add_value("prefix", up_cast<Derived>(&Derived::prefix))
+        .default_value("gf_checkpoint")
+        .help("Path where Green's function operator and RHS will be checkpointed.");
+    gfCheckpointSchema.add_value("freq_cputime", up_cast<Derived>(&Derived::frequency_cputime_minutes))
+        .default_value(30.0)
+        .help("CPU time (minutes) frequency between Green's function operator checkpoints");
+}
+ 
 template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
     setOutputConfigSchema(outputSchema);
 
@@ -181,13 +191,6 @@ void setConfigSchema(TableSchema<Config>& schema,
         .default_value(false)
         .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
 
-    schema.add_value("gf_checkpoint_prefix", &Config::gf_checkpoint_prefix)
-        .help("Path where Green's function operator and RHS will be checkpointed.");
-    schema.add_value("gf_checkpoint_every_nmins", &Config::gf_checkpoint_every_nmins)
-        .default_value(30.0)
-        .help("time interval, in minutes, at which the Green's function operator data is saved to "
-              "disk.");
-
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
         .help("Use matrix-free operators.");
@@ -226,6 +229,9 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto& domainProbeOutputSchema =
         schema.add_table("domain_probe_output", &Config::domain_probe_output);
     detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
+
+    auto& gfCheckpointSchema = schema.add_table("gf_checkpoint", &Config::gf_checkpoint_config);
+    detail::setGfCheckpointConfigSchema(gfCheckpointSchema);
 
     auto& tsCheckpointSchema = schema.add_table("ts_checkpoint", &Config::ts_checkpoint_config);
     detail::setTsCheckpointConfigSchema(tsCheckpointSchema);
