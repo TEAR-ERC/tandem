@@ -6,6 +6,8 @@ Getting started
 
    quick-start
    installation
+   installation_lumic
+   gpus
    examples
 
 Welcome to tandem!
