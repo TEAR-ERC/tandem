@@ -1,5 +1,5 @@
-Installation on LUMI-C
-======================
+LUMI-C
+======
 
 Installation on LUMI-C leverages the preinstalled spack software stack there.
 It requires setting up a spack environment and installing tandem there.
