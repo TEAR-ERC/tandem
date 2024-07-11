@@ -44,12 +44,25 @@ template <std::size_t D> inline bool is_lower_dimensional_gmsh_simplex_v(long ty
 
 template <std::size_t D> class GlobalSimplexMeshBuilder : public GMSHMeshBuilder {
 private:
+
+    struct  PhysicalNames{
+    std::string name;
+    long id;
+
+    PhysicalNames(const std::string& name, long id) : name(name), id(id) {}
+
+    };
+
+    std::vector<BoundaryTagManager> boundaryManagers;
+
+
     constexpr static std::size_t NumVerts = D + 1u;
 
     std::vector<std::array<double, D>> vertices;
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
     std::vector<BC> bcs;
+    std::vector<PhysicalNames> userInputPhysicalNames;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
 
@@ -57,10 +70,19 @@ private:
     std::size_t unknownBC = 0;
     std::size_t type_ = 0;
 
+    
+    std::string returnLowercaseFirstSixChar (std::string name) {
+        std::string prefix = name.substr(0, 6);
+        std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+
+        return prefix;
+    }
     void preparePermutationTable(std::size_t numNodes);
 
 public:
     inline void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
+    inline void addPhysicalName (std::string name, long id) { userInputPhysicalNames.emplace_back(name,id); }
+
     inline void setVertex(long id, std::array<double, 3> const& x) {
         for (std::size_t i = 0; i < D; ++i) {
             vertices[id][i] = x[i];
@@ -73,9 +95,47 @@ public:
     }
     void addElement(long type, long tag, long* node, std::size_t numNodes);
 
+
     inline auto getUnknownBC() const { return unknownBC; }
     std::unique_ptr<GlobalSimplexMesh<D>> create(MPI_Comm comm);
 };
+
+class boundaryTagManager {
+private:
+    long tagID;
+    std::string tagLabel;
+    std::vector<long> elementTagIds; 
+
+public:
+    BoundaryTagManager(const std::string& label, const long& tagID)
+        : tagLabel(label), tagID(tagID) { }
+
+    void addTagId(long id) {
+        elementTagIds.push_back(id);
+    }
+
+    const std::string& getTagLabel() const {
+        return tagLabel;
+    }
+
+    const long& getTagID() const {
+        return tagID;
+    }
+
+    long getTagIdByIndex(size_t index) const {
+        if (index < elementTagIds.size() ) {
+            return elementTagIds[index];
+        else{
+            throw std::out_of_range("Index out of range");
+        }
+        
+    }
+
+    size_t getNumberOfIds() const {
+        return elementTagIds.size();
+    }
+};
+
 
 } // namespace tndm
 

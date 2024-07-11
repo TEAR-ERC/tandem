@@ -22,6 +22,7 @@ public:
     virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
     virtual void setNumElements(std::size_t numElements) = 0;
     virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
+    virtual void addPhysicalName (std::string name, long id) = 0;
 };
 
 class GMSHParser {
@@ -37,6 +38,7 @@ private:
         return curTok = lexer.getToken();
     }
 
+    
     template <typename T> T logError(std::string_view msg);
     template <typename T> T logErrorAnnotated(std::string_view msg);
     std::optional<double> getNumber();
@@ -44,6 +46,9 @@ private:
     bool parseNodes();
     bool parseElements();
     bool parse_();
+    bool parsePhysicalNames();
+    bool validateString(const std::string& inputString);
+    
 
 public:
     static constexpr std::size_t NumNodes[] = {

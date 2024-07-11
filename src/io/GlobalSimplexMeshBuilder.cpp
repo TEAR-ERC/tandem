@@ -77,22 +77,54 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
         BC bc = BC::None;
-        switch (tag) {
-        case static_cast<long>(BC::None):
-            bc = BC::None;
-            break;
-        case static_cast<long>(BC::Dirichlet):
-            bc = BC::Dirichlet;
-            break;
-        case static_cast<long>(BC::Fault):
-            bc = BC::Fault;
-            break;
-        case static_cast<long>(BC::Natural):
-            bc = BC::Natural;
-            break;
-        default:
-            ++unknownBC;
-            break;
+        
+        bool useSwitch = true;
+
+        if (userInputPhysicalNames.size()>0 ){
+            for (const auto&  entry :userInputPhysicalNames ) {
+                if ( (entry.id == tag ) && (entry.name.size() > 5)) {
+    
+                        std::string prefix=returnLowercaseFirstSixChar(entry.name);
+
+                        if (prefix == "diric_") {
+                            bc = BC::Dirichlet;
+                            useSwitch=false;
+                            break;                        
+                        }
+                        //else if (name=="field_"){
+                            
+                        //}
+                        //else if (name=="normal_"){
+
+                        //}
+                        else if (prefix=="fault_"){
+                            bc = BC::Dirichlet;
+                            useSwitch=false;
+                            break;                        
+
+                        } 
+                    }
+                }
+        }
+
+        if (useSwitch){
+            switch (tag) {
+            case static_cast<long>(BC::None):
+                bc = BC::None;
+                break;
+            case static_cast<long>(BC::Dirichlet):
+                bc = BC::Dirichlet;
+                break;
+            case static_cast<long>(BC::Fault):
+                bc = BC::Fault;
+                break;
+            case static_cast<long>(BC::Natural):
+                bc = BC::Natural;
+                break;
+            default:
+                ++unknownBC;
+                break;
+            }
         }
         bcs.push_back(bc);
     } else {
