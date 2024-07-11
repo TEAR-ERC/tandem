@@ -77,7 +77,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
         BC bc = BC::None;
-        
+
         bool useSwitch = true;
 
         if (userInputPhysicalNames.size()>0 ){
@@ -89,6 +89,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
                         if (prefix == "diric_") {
                             bc = BC::Dirichlet;
                             useSwitch=false;
+                            dieterichs.addTagIdToBoundaryManager(entry.name,entry.id, *node);
                             break;                        
                         }
                         //else if (name=="field_"){
@@ -100,6 +101,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
                         else if (prefix=="fault_"){
                             bc = BC::Dirichlet;
                             useSwitch=false;
+                            faults.addTagIdToBoundaryManager(entry.name,entry.id,*node);
                             break;                        
 
                         } 

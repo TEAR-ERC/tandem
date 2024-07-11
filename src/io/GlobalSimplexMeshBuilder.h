@@ -12,6 +12,83 @@
 
 namespace tndm {
 
+class BoundaryTagManager {
+private:
+    long tagID;
+    std::string tagLabel;
+    std::vector<long> elementTagIds; 
+
+public:
+    BoundaryTagManager(const std::string& label, long tagID)
+        : tagLabel(label), tagID(tagID) { }
+
+    void addElementTagID(long elementID) {
+        elementTagIds.push_back(elementID);
+    }
+
+    const std::string& getTagLabel() const {
+        return tagLabel;
+    }
+
+    long getTagID() const {
+        return tagID;
+    }
+
+    long getTagIdByIndex(size_t index) const {
+        if (index < elementTagIds.size()) {
+            return elementTagIds[index];
+        } else {
+            throw std::out_of_range("Index out of range");
+        }
+    }
+
+    size_t getNumberOfIds() const {
+        return elementTagIds.size();
+    }
+};
+
+class BoundaryCEO {
+private:
+    std::vector<BoundaryTagManager> boundaryManagers;
+
+    void addElementIDToLastBoundaryManager(long elementID) {
+        boundaryManagers.back().addElementTagID(elementID);
+    }
+
+    void addBoundaryManager(long id, const std::string& label) {
+        boundaryManagers.emplace_back(label, id);  // Parameter order corrected
+    }
+
+public:
+
+
+    void addTagIdToBoundaryManager(const std::string& boundaryName, long tagID, long elementID) {
+        for (auto& manager : boundaryManagers) {
+            if (manager.getTagID() == tagID) {
+                manager.addElementTagID(elementID);  // Corrected function name
+                return;
+            }
+        }
+        // If BoundaryTagManager with the given tagID does not exist, create a new one
+        addBoundaryManager(tagID, boundaryName);
+        addElementIDToLastBoundaryManager(elementID);
+    }
+
+    const BoundaryTagManager& getBoundaryManager(size_t index) const {
+        if (index < boundaryManagers.size()) {
+            return boundaryManagers[index];
+        } else {
+            throw std::out_of_range("Index out of range");
+        }
+    }
+
+    size_t getNumberOfBoundaryManagers() const {
+        return boundaryManagers.size();
+    }
+};
+
+
+
 template <std::size_t D> struct GMSHSimplexType {};
 template <> struct GMSHSimplexType<0u> { static constexpr std::array<long, 1> types = {15}; };
 template <> struct GMSHSimplexType<1u> {
@@ -51,9 +128,12 @@ private:
 
     PhysicalNames(const std::string& name, long id) : name(name), id(id) {}
 
+
+
     };
 
-    std::vector<BoundaryTagManager> boundaryManagers;
+    BoundaryCEO faults;
+    BoundaryCEO dieterichs;
 
 
     constexpr static std::size_t NumVerts = D + 1u;
@@ -100,41 +180,6 @@ public:
     std::unique_ptr<GlobalSimplexMesh<D>> create(MPI_Comm comm);
 };
 
-class boundaryTagManager {
-private:
-    long tagID;
-    std::string tagLabel;
-    std::vector<long> elementTagIds; 
-
-public:
-    BoundaryTagManager(const std::string& label, const long& tagID)
-        : tagLabel(label), tagID(tagID) { }
-
-    void addTagId(long id) {
-        elementTagIds.push_back(id);
-    }
-
-    const std::string& getTagLabel() const {
-        return tagLabel;
-    }
-
-    const long& getTagID() const {
-        return tagID;
-    }
-
-    long getTagIdByIndex(size_t index) const {
-        if (index < elementTagIds.size() ) {
-            return elementTagIds[index];
-        else{
-            throw std::out_of_range("Index out of range");
-        }
-        
-    }
-
-    size_t getNumberOfIds() const {
-        return elementTagIds.size();
-    }
-};
 
 
 } // namespace tndm
