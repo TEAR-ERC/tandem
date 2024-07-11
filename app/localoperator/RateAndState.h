@@ -8,12 +8,15 @@
 #include "tensor/Reshape.h"
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
+#include "../tandem/FrictionConfig.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdio>
 #include <functional>
 #include <optional>
+#include <iostream>
+#include <string>
 
 namespace tndm {
 
@@ -34,13 +37,26 @@ public:
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
     }
+
+
+
     void set_params(param_fun_t pfun) {
+        std::string newfile="newfault.lua";
+        std::string newscanerio="fault1";
+        
+        DieterichRuinaAgeingScenario readnewfault(newfile, newscanerio);
+
         auto num_nodes = fault_.storage().size();
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
             auto params = pfun(fault_.storage()[index].template get<Coords>());
             law_.set_params(index, params);
         }
+
+        auto param_generator = readnewfault.param_fun();
+        auto params1= param_generator(fault_.storage()[0].template get<Coords>());
+        law_.set_params(0, params1);
+
     }
 
     void set_source_fun(source_fun_t source) { source_ = std::make_optional(std::move(source)); }

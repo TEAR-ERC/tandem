@@ -55,6 +55,17 @@ bool GMSHParser::parseFile(std::string const& fileName) {
     return parse_();
 }
 
+// function that make sure the phsyical string only has strings digis and - or _  --- Bar july 2024
+bool GMSHParser::validateString(const std::string& inputString) {
+    for (char c : inputString) {
+        if (!(std::isalpha(c) || std::isdigit(c) || c == '-' || c == '_')) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool GMSHParser::parse_() {
     errorMsg.clear();
     getNextToken();
@@ -68,6 +79,7 @@ bool GMSHParser::parse_() {
 
     bool hasNodes = false;
     bool hasElements = false;
+    bool hasPhysicalNames = false;
 
     while (curTok != GMSHToken::eof) {
         switch (curTok) {
@@ -79,6 +91,10 @@ bool GMSHParser::parse_() {
             parseElements();
             hasElements = true;
             break;
+        case GMSHToken::physical_names:
+            parsePhysicalNames();
+            hasPhysicalNames=true;
+            break;       
         default:
             getNextToken();
             break;
@@ -109,6 +125,8 @@ double GMSHParser::parseMeshFormat() {
     getNextToken();
     return *version;
 }
+
+
 
 bool GMSHParser::parseNodes() {
     getNextToken();
@@ -145,6 +163,66 @@ bool GMSHParser::parseNodes() {
     }
     getNextToken();
     return true;
+}
+
+// function that parase the phsyical names that the usere gave the mesh
+bool GMSHParser::parsePhysicalNames() {
+    getNextToken();
+    if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
+        return logErrorAnnotated<bool>("Expected non-zero integer");
+    }
+    std::size_t numPhysicalEntites = lexer.getInteger();
+
+    for (std::size_t i = 0; i < numPhysicalEntites; ++i) {
+    getNextToken();   
+    if (curTok != GMSHToken::integer || lexer.getInteger() < 1 ||
+        lexer.getInteger() > numPhysicalEntites) {
+        char buf[128];
+        sprintf(buf, "Expected physical-tag with 1 <= node-tag <= %zu", numPhysicalEntites);
+        return logErrorAnnotated<bool>(buf);
+        }
+    std::size_t PhysicalEntity_id = lexer.getInteger() - 1;
+    getNextToken(); 
+
+    if (curTok != GMSHToken::integer || lexer.getInteger() < 1) {
+        char buf[128];
+        sprintf(buf, "Expected physical-id tag with >1 ");
+        return logErrorAnnotated<bool>(buf);
+        }
+
+
+    std::size_t PhysicalEntity_tag = lexer.getInteger();
+
+    getNextToken(); 
+    if (curTok !=  GMSHToken::string ) {
+        char buf[128];
+        sprintf(buf, "Expected string to describe physical names ");
+        return logErrorAnnotated<bool>(buf);
+        }
+
+    std::string PhysicalEntity_tag_string = lexer.getString();
+
+    // clean the last two chars of the string if they backslash or quotes -- Bar July 2024
+    for (int i = PhysicalEntity_tag_string.size() - 1; i >= PhysicalEntity_tag_string.size() - 2 && i >= 0; --i) {
+    if (PhysicalEntity_tag_string[i] == '"' || PhysicalEntity_tag_string[i] == '\\') {
+        PhysicalEntity_tag_string.erase(i, 1);
+    }
+    }
+    
+    
+    bool validated=validateString(PhysicalEntity_tag_string);
+
+  
+    if (!validated) {  // Correct syntax for checking if validated is false
+        return logErrorAnnotated<bool>("Expected only digits/letters/_/-      .Change tag name to resolve the issue");
+    }
+
+    builder->addPhysicalName(PhysicalEntity_tag_string,PhysicalEntity_tag);
+    
+    }
+    
+getNextToken();
+return true;
 }
 
 bool GMSHParser::parseElements() {
@@ -212,5 +290,8 @@ bool GMSHParser::parseElements() {
 
     return true;
 }
+
+
+
 
 } // namespace tndm
