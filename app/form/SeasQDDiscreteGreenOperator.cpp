@@ -254,6 +254,33 @@ PetscInt SeasQDDiscreteGreenOperator::create_discrete_greens_function() {
     return n_gf;
 }
 
+void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
+    int rank;
+    MPI_Comm_rank(base::comm(), &rank);
+    std::string new_filename = file_to_backup + ".tmp";
+    std::string bu_filename = file_to_backup + ".bu";
+    if (rank == 0) {
+        if (fs::exists(file_to_backup)) {
+            try {
+                if (fs::exists(bu_filename)) {
+                    fs::remove(bu_filename);
+                }
+                fs::rename(file_to_backup, bu_filename);
+            } catch (fs::filesystem_error& e) {
+                std::cerr << "Error moving file: " << e.what() << std::endl;
+            }
+        }
+    }
+    MPI_Barrier(base::comm());
+    if (rank == 0) {
+        try {
+            fs::rename(new_filename, file_to_backup);
+        } catch (fs::filesystem_error& e) {
+            std::cerr << "Error moving file: " << e.what() << std::endl;
+        }
+    }
+}
+
 void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf, PetscInt n_gf) {
     PetscViewer v;
@@ -263,8 +290,9 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     MPI_Comm_size(base::comm(), &commsize);
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
-                                      gf_operator_filename_.c_str(), FILE_MODE_WRITE, &v));
+    std::string new_filename = gf_operator_filename_ + ".tmp";
+    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
+                                      FILE_MODE_WRITE, &v));
     CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
@@ -276,7 +304,11 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     CHKERRTHROW(MatView(G_, v));
 
     CHKERRTHROW(PetscViewerDestroy(&v));
+
+    back_up_file(gf_operator_filename_);
+
     CHKERRTHROW(PetscTime(&t1));
+
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "write_discrete_greens_operator():matrix %1.2e (sec)\n",
                             (double)(t1 - t0)));
@@ -313,11 +345,13 @@ void SeasQDDiscreteGreenOperator ::write_facet_labels_IS(
                                 (const PetscInt*)idx_, PETSC_USE_POINTER, &is));
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), gf_facet_filename_.c_str(),
+    std::string new_filename = gf_facet_filename_ + ".tmp";
+    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
     CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     CHKERRTHROW(ISView(is, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
+    back_up_file(gf_facet_filename_);
     CHKERRTHROW(PetscTime(&t1));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "write_discrete_greens_operator():facets %1.2e (sec)\n",
