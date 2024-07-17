@@ -265,7 +265,7 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_WRITE, &v));
-
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
@@ -315,6 +315,7 @@ void SeasQDDiscreteGreenOperator ::write_facet_labels_IS(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), gf_facet_filename_.c_str(),
                                       FILE_MODE_WRITE, &v));
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     CHKERRTHROW(ISView(is, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
     CHKERRTHROW(PetscTime(&t1));
@@ -338,6 +339,7 @@ IS SeasQDDiscreteGreenOperator ::load_facet_labels_seq_IS(void) {
         CHKERRTHROW(PetscTime(&t0));
         CHKERRTHROW(
             PetscViewerBinaryOpen(PETSC_COMM_SELF, gf_facet_filename_.c_str(), FILE_MODE_READ, &v));
+        CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
         CHKERRTHROW(ISLoad(is, v));
         CHKERRTHROW(PetscViewerDestroy(&v));
         CHKERRTHROW(PetscTime(&t1));
@@ -492,6 +494,7 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_READ, &v));
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
 
     CHKERRTHROW(PetscViewerBinaryRead(v, &commsize_checkpoint, 1, NULL, PETSC_INT));
     MPI_Comm_size(comm, &commsize);
