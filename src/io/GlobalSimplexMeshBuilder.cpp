@@ -42,16 +42,15 @@ void GlobalSimplexMeshBuilder<D>::addBoundaryTag( std::string tagLabel, long tag
     bool addData=false;
     BC bc=BC::None;
     if (tagLabel.size()>6 ){
-        std::string prefix=returnLowercaseFirstSixChar(tagLabel);
-        if (prefix == "diric_") {bc = BC::Dirichlet;addData=true; }
-        else if (prefix=="norma_") {bc = BC::Natural;addData=true; }
-        else if (prefix=="fault_") {bc = BC::Fault;addData=true; }
+        
+        if (returnFirstNChars(tagLabel,10) == "dirichlet_") {bc = BC::Dirichlet;addData=true; }
+        else if (returnFirstNChars(tagLabel,13)=="free_surface_") {bc = BC::Natural;addData=true; }
+        else if (returnFirstNChars(tagLabel,6)=="fault_") {bc = BC::Fault;addData=true; }
     }
 
     if (addData){boundaryTags.emplace_back(tagLabel, tagID, dimension, bc);}
     else{
-        std::cerr << "Warning: tag name is neither diric_*/norma_*/fault_* or may contain characters that are not supported." 
-        <<" Please rename "<< tagLabel << " if you would like to include it" << std::endl;
+   throw std::runtime_error("Warning: tag name is neither dirichlet_*/free_surface_*/fault_* (case sensetive) or may contain characters that are not y digits/letters/-/_. Please rename " + tagLabel + " to continue.");
     }
 }
 

@@ -66,9 +66,9 @@ private:
     std::size_t type_ = 0;
 
     
-    std::string returnLowercaseFirstSixChar (std::string name) {
-        std::string prefix = name.substr(0, 6);
-        std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
+    std::string returnFirstNChars (std::string name,int N) {
+        std::string prefix = name.substr(0, N);
+        //std::transform(prefix.begin(), prefix.end(), prefix.begin(), ::tolower);
 
         return prefix;
     }
