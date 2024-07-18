@@ -8,7 +8,7 @@
 #include "tandem/SEAS.h"
 #include "tandem/SeasConfig.h"
 #include "tandem/SeasScenario.h"
-
+#include "form/BC.h"
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
 #include "mesh/GenMesh.h"
@@ -16,7 +16,8 @@
 #include "parallel/Affinity.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
-#include "mesh/MultiplyBoundaryTags.h"
+#include "mesh/GlobalSimplexMesh.h"
+#include "mesh/Simplex.h"
 #include <argparse.hpp>
 #include <mpi.h>
 #include <petscsys.h>
@@ -33,6 +34,59 @@
 #include <vector>
 
 using namespace tndm;
+
+void generateGlobalMesh(std::unique_ptr<GlobalSimplexMesh<DomainDimension>>& globalMesh,const Config& cfg, int rank, int procs) {
+    
+    if (cfg.mesh_file) {
+        bool ok = false;
+        
+       
+
+        GlobalSimplexMeshBuilder<DomainDimension> builder;
+        
+        if (rank == 0) {
+            GMSHParser parser(&builder);
+            ok = parser.parseFile(*cfg.mesh_file);
+            if (!ok) {
+                std::cerr << *cfg.mesh_file << std::endl << parser.getErrorMessage();
+            }
+        }
+        MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
+        if (ok) {
+            globalMesh = builder.create(PETSC_COMM_WORLD);
+        }
+        if (procs > 1) {
+            // ensure initial element distribution for metis
+            globalMesh->repartitionByHash();
+        }
+
+    } else if (cfg.generate_mesh && cfg.resolution) {
+        auto meshGen = cfg.generate_mesh->create(*cfg.resolution, PETSC_COMM_WORLD);
+
+        globalMesh = meshGen.uniformMesh();
+    }
+
+    if (!globalMesh) {
+        PetscFinalize();
+        throw std::runtime_error("You must either provide a valid mesh file or provide the mesh generation config (including the resolution parameter).");
+        
+
+    } 
+    //std::cout << "im here 1" << std::endl;
+}
+/*
+void printSimplexBaseVectorWithRank(std::vector<LocalFaces<1>> vector, int rank) {
+    std::cout << "MPI Rank " << rank << ": SimplexBase Vector:" << std::endl;
+    for (std::size_t i = 0; i < vector.size(); ++i) {
+        std::cout << i << ": ";
+        for (const auto& _M_elems : vector[i]) {
+            std::cout << element << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+*/
 
 std::string BCToString(BC bc) {
     switch (bc) {
@@ -94,45 +148,18 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         Banner::standard(std::cout, affinity);
     }
-    std::vector<boundaryTag> faultTagBoundaries;
+
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
-
-    if (cfg->mesh_file) {
-        bool ok = false;
-        GlobalSimplexMeshBuilder<DomainDimension> builder;
-        if (rank == 0) {
-            GMSHParser parser(&builder);
-            ok = parser.parseFile(*cfg->mesh_file);
-            faultTagBoundaries=builder.returnFaultTypeBoundaries();
-            
-            if (!ok) {
-                std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
-            }
-        }
-        MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
-        if (ok) {
-            globalMesh = builder.create(PETSC_COMM_WORLD);
-        }
-        if (procs > 1) {
-            // ensure initial element distribution for metis
-            globalMesh->repartitionByHash();
-        }
-
-    } else if (cfg->generate_mesh && cfg->resolution) {
-        auto meshGen = cfg->generate_mesh->create(*cfg->resolution, PETSC_COMM_WORLD);
-        globalMesh = meshGen.uniformMesh();
-    }
-    if (!globalMesh) {
-        std::cerr
-            << "You must either provide a valid mesh file or provide the mesh generation config "
-               "(including the resolution parameter)."
-            << std::endl;
-        PetscFinalize();
-        return -1;
-    }
+    generateGlobalMesh( globalMesh,*cfg,  rank, procs);
+    //std::cout <<rank << "im here 2" << std::endl;
     globalMesh->repartition();
-    auto mesh = globalMesh->getLocalMesh(faultTagBoundaries,1);
     
+    auto mesh = globalMesh->getLocalMesh(1);
+    //std::cout <<rank <<"im here 3" << std::endl;
+    //auto const& facets = mesh.facets();
+    //auto boundaryData = dynamic_cast<BoundaryData const*>(facets.data());
+    //auto aa=boundaryData->getBoundaryConditions()[0];
+    //std::cout <<rank << "im here 4" << std::endl;
     auto aa=mesh.get();
     const auto& facets = aa->facets();
     const auto& face=facets.faces();
@@ -145,8 +172,29 @@ int main(int argc, char** argv) {
         std::cout <<"rank:"<<rank<<"-"<< i << ": " << BCToString(aaa[i]) << std::endl;
     }
 
-    
+    auto bcMapping=globalMesh->returnBCMapping();
 
+
+    
+   
+    for (const auto& row : bcMapping) {
+        std::cout << "bcMapping for rank " << rank << " is: ";
+        for (const auto& value : row) {
+            std::cout << value << " ";
+        }
+        std::cout << std::endl;
+    }
+       
+   
+
+
+/*
+    for (const auto& simplex : vertices) {
+        simplex.print(rank);
+    }
+
+    */
+    std::cout << std::endl;
     solveSEASProblem(*mesh, *cfg);
 
     PetscErrorCode ierr = PetscFinalize();

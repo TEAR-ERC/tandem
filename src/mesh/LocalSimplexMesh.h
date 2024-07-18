@@ -5,7 +5,7 @@
 #include "MeshData.h"
 #include "Simplex.h"
 #include "util/Utility.h"
-
+#include "mesh/MultiplyBoundaryTags.h"
 #include <array>
 #include <cstddef>
 #include <tuple>
@@ -65,6 +65,14 @@ public:
         return upward<Dfrom>(faces<Dfrom>().g2l()[face]);
     }
 
+    void setFaultTags(std::vector<boundaryTag> faultTags) {
+        this->faultTags = std::move(faultTags);
+    }
+
+    auto getFaultTags() const {
+        return faultTags;
+    }
+
 private:
     using upward_map_t = std::vector<std::vector<std::size_t>>;
 
@@ -87,6 +95,8 @@ private:
 
     storage_t lfs;
     std::array<upward_map_t, D> upwardMaps;
+    std::vector<boundaryTag> faultTags;
+
 };
 
 } // namespace tndm
