@@ -181,7 +181,7 @@ bool GMSHParser::parsePhysicalNames() {
         sprintf(buf, "Expected physical-tag with 1 <= node-tag <= %zu", numPhysicalEntites);
         return logErrorAnnotated<bool>(buf);
         }
-    std::size_t PhysicalEntity_id = lexer.getInteger() - 1;
+    int PhysicalEntity_dimension = lexer.getInteger();
     getNextToken(); 
 
     if (curTok != GMSHToken::integer || lexer.getInteger() < 1) {
@@ -190,8 +190,8 @@ bool GMSHParser::parsePhysicalNames() {
         return logErrorAnnotated<bool>(buf);
         }
 
-
-    std::size_t PhysicalEntity_tag = lexer.getInteger();
+    long PhysicalEntity_id = lexer.getInteger();
+    
 
     getNextToken(); 
     if (curTok !=  GMSHToken::string ) {
@@ -217,7 +217,7 @@ bool GMSHParser::parsePhysicalNames() {
         return logErrorAnnotated<bool>("Expected only digits/letters/_/-      .Change tag name to resolve the issue");
     }
 
-    builder->addPhysicalName(PhysicalEntity_tag_string,PhysicalEntity_tag);
+    builder->addBoundaryTag(PhysicalEntity_tag_string,PhysicalEntity_id,PhysicalEntity_dimension);
     
     }
     
@@ -235,6 +235,7 @@ bool GMSHParser::parseElements() {
     constexpr std::size_t MaxElementType = sizeof(NumNodes) / sizeof(std::size_t);
     constexpr std::size_t MaxNodes = *std::max_element(NumNodes, NumNodes + MaxElementType);
     long tag = -1;
+    long elementID;
     std::array<long, MaxNodes> nodes;
 
     builder->setNumElements(numElements);
@@ -244,6 +245,8 @@ bool GMSHParser::parseElements() {
         if (curTok != GMSHToken::integer) {
             return logErrorAnnotated<bool>("Expected element-tag");
         }
+        elementID = lexer.getInteger();
+
 
         getNextToken();
         if (curTok != GMSHToken::integer || lexer.getInteger() < 1 ||
@@ -280,7 +283,7 @@ bool GMSHParser::parseElements() {
             nodes[i] = lexer.getInteger() - 1;
         }
 
-        builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
+        builder->addElement(type, tag, nodes.data(), NumNodes[type - 1], elementID);
     }
     getNextToken();
     if (curTok != GMSHToken::end_elements) {

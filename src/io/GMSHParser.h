@@ -2,7 +2,6 @@
 #define GMSHPARSER_20200901_H
 
 #include "GMSHLexer.h"
-
 #include <array>
 #include <optional>
 #include <streambuf>
@@ -21,8 +20,8 @@ public:
     virtual void setNumVertices(std::size_t numVertices) = 0;
     virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
     virtual void setNumElements(std::size_t numElements) = 0;
-    virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
-    virtual void addPhysicalName (std::string name, long id) = 0;
+    virtual void addElement(long type, long tag, long* node, std::size_t numNodes,long elementID) = 0;
+    virtual void addBoundaryTag( std::string tagLabel, long tagID, int dimension) = 0;
 };
 
 class GMSHParser {

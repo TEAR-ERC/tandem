@@ -43,7 +43,7 @@ public:
     constexpr static char DeltaSn[] = "delta_sn";
     constexpr static char FaultSolution[] = "fault_solution";
 
-    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
+    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario):fileToLoad(lib) {
         lib_.loadFile(lib);
 
         a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
@@ -119,7 +119,10 @@ public:
         return nullptr;
     }
 
+    std::string returnFileLoaded (){return fileToLoad;}
+
 protected:
+    std::string fileToLoad;
     DieterichRuinaAgeing::ConstantParams cp_;
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;

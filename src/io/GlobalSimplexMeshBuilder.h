@@ -4,6 +4,7 @@
 #include "io/GMSHParser.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/Simplex.h"
+#include "mesh/MultiplyBoundaryTags.h"
 
 #include <mpi.h>
 
@@ -11,82 +12,6 @@
 #include <vector>
 
 namespace tndm {
-
-class BoundaryTagManager {
-private:
-    long tagID;
-    std::string tagLabel;
-    std::vector<long> elementTagIds; 
-
-public:
-    BoundaryTagManager(const std::string& label, long tagID)
-        : tagLabel(label), tagID(tagID) { }
-
-    void addElementTagID(long elementID) {
-        elementTagIds.push_back(elementID);
-    }
-
-    const std::string& getTagLabel() const {
-        return tagLabel;
-    }
-
-    long getTagID() const {
-        return tagID;
-    }
-
-    long getTagIdByIndex(size_t index) const {
-        if (index < elementTagIds.size()) {
-            return elementTagIds[index];
-        } else {
-            throw std::out_of_range("Index out of range");
-        }
-    }
-
-    size_t getNumberOfIds() const {
-        return elementTagIds.size();
-    }
-};
-
-class BoundaryCEO {
-private:
-    std::vector<BoundaryTagManager> boundaryManagers;
-
-    void addElementIDToLastBoundaryManager(long elementID) {
-        boundaryManagers.back().addElementTagID(elementID);
-    }
-
-    void addBoundaryManager(long id, const std::string& label) {
-        boundaryManagers.emplace_back(label, id);  // Parameter order corrected
-    }
-
-public:
-
-
-    void addTagIdToBoundaryManager(const std::string& boundaryName, long tagID, long elementID) {
-        for (auto& manager : boundaryManagers) {
-            if (manager.getTagID() == tagID) {
-                manager.addElementTagID(elementID);  // Corrected function name
-                return;
-            }
-        }
-        // If BoundaryTagManager with the given tagID does not exist, create a new one
-        addBoundaryManager(tagID, boundaryName);
-        addElementIDToLastBoundaryManager(elementID);
-    }
-
-    const BoundaryTagManager& getBoundaryManager(size_t index) const {
-        if (index < boundaryManagers.size()) {
-            return boundaryManagers[index];
-        } else {
-            throw std::out_of_range("Index out of range");
-        }
-    }
-
-    size_t getNumberOfBoundaryManagers() const {
-        return boundaryManagers.size();
-    }
-};
-
 
 
 template <std::size_t D> struct GMSHSimplexType {};
@@ -122,18 +47,8 @@ template <std::size_t D> inline bool is_lower_dimensional_gmsh_simplex_v(long ty
 template <std::size_t D> class GlobalSimplexMeshBuilder : public GMSHMeshBuilder {
 private:
 
-    struct  PhysicalNames{
-    std::string name;
-    long id;
-
-    PhysicalNames(const std::string& name, long id) : name(name), id(id) {}
-
-
-
-    };
-
-    BoundaryCEO faults;
-    BoundaryCEO dieterichs;
+    
+    long boundaryCounter;
 
 
     constexpr static std::size_t NumVerts = D + 1u;
@@ -142,9 +57,9 @@ private:
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
     std::vector<BC> bcs;
-    std::vector<PhysicalNames> userInputPhysicalNames;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
+    std::vector<boundaryTag> boundaryTags;
 
     std::size_t ignoredElems = 0;
     std::size_t unknownBC = 0;
@@ -160,8 +75,26 @@ private:
     void preparePermutationTable(std::size_t numNodes);
 
 public:
+ GlobalSimplexMeshBuilder() : boundaryCounter(0) {} 
+
+
+    std::vector<boundaryTag> ReturnBoundariesOfType(BC bcType) {
+        std::vector<boundaryTag> result;
+        for (const auto& tag : boundaryTags) {
+            if (tag.getBoundaryType() == bcType) {
+                result.push_back(tag);
+            }
+        }
+    return result;
+    }
+
+    std::vector<boundaryTag> returnFaultTypeBoundaries() {return ReturnBoundariesOfType(BC::Fault);}
+
+
     inline void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
-    inline void addPhysicalName (std::string name, long id) { userInputPhysicalNames.emplace_back(name,id); }
+    void addBoundaryTag( std::string tagLabel, long tagID, int dimension); 
+    
+
 
     inline void setVertex(long id, std::array<double, 3> const& x) {
         for (std::size_t i = 0; i < D; ++i) {
@@ -173,7 +106,7 @@ public:
         facets.reserve(numElements);
         type_ = 0;
     }
-    void addElement(long type, long tag, long* node, std::size_t numNodes);
+    void addElement(long type, long tag, long* node, std::size_t numNodes, long elementID);
 
 
     inline auto getUnknownBC() const { return unknownBC; }

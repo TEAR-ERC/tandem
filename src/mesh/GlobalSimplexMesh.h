@@ -5,7 +5,7 @@
 #include "LocalSimplexMesh.h"
 #include "MeshData.h"
 #include "Simplex.h"
-
+#include "mesh/MultiplyBoundaryTags.h"
 #include "parallel/CommPattern.h"
 #include "parallel/DistributedCSR.h"
 #include "parallel/MPITraits.h"
@@ -124,11 +124,20 @@ public:
      *
      * @return
      */
-    std::unique_ptr<LocalSimplexMesh<D>> getLocalMesh(unsigned overlap = 0) const {
-        auto localFaces = getAllLocalFaces(overlap, std::make_index_sequence<D>{});
+    std::unique_ptr<LocalSimplexMesh<D>> getLocalMesh(std::vector<boundaryTag> faultTags,unsigned overlap = 0) const {
 
-        return std::make_unique<LocalSimplexMesh<D>>(std::move(localFaces));
+        auto localFaces = getAllLocalFaces(overlap, std::make_index_sequence<D>{});
+        auto localMesh=std::make_unique<LocalSimplexMesh<D>>(std::move(localFaces));
+        computeMappingForBoundaries(faultTags , bcMapping);
+        localMesh->setFaultTags(faultTags);
+
+
+        return localMesh;
     }
+
+
+   //std::vector<std::vector<std::size_t>> returnBCMapping() { return bcMapping;}
+
 
 private:
     template <std::size_t DD> friend class GlobalSimplexMesh;
@@ -143,6 +152,8 @@ private:
         }
         return map;
     }
+
+
 
     void doPartition(std::vector<idx_t> const& partition);
 
@@ -208,10 +219,11 @@ private:
     template <std::size_t DD>
     auto getFaces(std::vector<Simplex<D>> const& elems, std::size_t elemsLocalSize) const {
         auto plex2rank = getPlex2Rank<DD>();
-
+        std::vector<std::size_t> returnedNewOriginalIndices;
         int rank, procs;
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &procs);
+        bool applyPermuationOnBCmapping=false;
 
         std::vector<std::set<Simplex<DD>>> requiredFaces(procs);
         std::unordered_map<Simplex<DD>, std::size_t, SimplexHash<DD>> faceOrder;
@@ -282,9 +294,15 @@ private:
                     } else {
                         lids.emplace_back(it->second);
                     }
-                }
-                auto meshData = boundaryMesh->elementData->redistributed(lids, a2a);
+                } 
+
+                std::unique_ptr<MeshData> meshData;
+                
+                //std::vector<std::size_t> returnedNewOriginalIndices;
+                std::tie(meshData,returnedNewOriginalIndices) = boundaryMesh->elementData->redistributedWithMapping(lids, a2a);
+                //bcMapping=std::move(returnedBcMapping);
                 lf.setMeshData(std::move(meshData));
+                applyPermuationOnBCmapping=true;
             }
         }
 
@@ -298,8 +316,14 @@ private:
                   [&lf, &faceOrder](std::size_t a, std::size_t b) {
                       return faceOrder[lf.faces()[a]] < faceOrder[lf.faces()[b]];
                   });
+        //lf.permute(bcMapping)
         lf.permute(permutation);
+        if (applyPermuationOnBCmapping){
+            apply_permutation(returnedNewOriginalIndices,permutation);
+            bcMapping=generateMappingMatrix(returnedNewOriginalIndices);
+        }
 
+        
         return lf;
     }
 
@@ -408,6 +432,9 @@ private:
     bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;
     ntuple_t<global_mesh_ptr, D> boundaryMeshes;
+    //mutable std::vector<std::vector<std::size_t>> bcMapping; //becuase getFaces is annoying and woudn't let me store this. There's a probably a better way to do it
+    //mutable std::vector<std::size_t> bcMapping;
+    mutable std::vector<std::vector<std::size_t>> bcMapping;
 };
 } // namespace tndm
 

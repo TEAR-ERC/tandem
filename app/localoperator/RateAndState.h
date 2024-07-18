@@ -9,7 +9,7 @@
 #include "tensor/Tensor.h"
 #include "util/LinearAllocator.h"
 #include "../tandem/FrictionConfig.h"
-
+#include "../../src/mesh/MultiplyBoundaryTags.h"
 #include <array>
 #include <cstddef>
 #include <cstdio>
@@ -37,24 +37,41 @@ public:
         law_.set_constant_params(cps);
     }
 
-
+    void save_fault_tags(std::vector<boundaryTag> faultTagsSent){
+        faultTags=faultTagsSent;
+    }
 
     void set_params(param_fun_t pfun) {
-        std::string newfile="newfault.lua";
-        std::string newscanerio="fault1";
+       // std::string newfile="newfault.lua";
+       // std::string newscanerio="fault1";
         
-        DieterichRuinaAgeingScenario readnewfault(newfile, newscanerio);
+        //DieterichRuinaAgeingScenario readnewfault(newfile, newscanerio);
+
+         
 
         auto num_nodes = fault_.storage().size();
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
+            //auto aa=fault_.storage()[index].template get<Coords>();
             auto params = pfun(fault_.storage()[index].template get<Coords>());
             law_.set_params(index, params);
         }
 
-        auto param_generator = readnewfault.param_fun();
-        auto params1= param_generator(fault_.storage()[0].template get<Coords>());
-        law_.set_params(0, params1);
+        for ( auto faultTag_i : faultTags){
+            DieterichRuinaAgeingScenario frictionOfFaultTag_i(fileWithFrictionData, faultTag_i.getLabel());
+            auto param_generator_for_fault_tagging = frictionOfFaultTag_i.param_fun();
+
+            for (const auto& faceinLocalBoundaryMap_i : faultTag_i.returnfacesInLocalBoundaryMap()) {
+                auto params_from_fault_tagging = param_generator_for_fault_tagging(fault_.storage()[faceinLocalBoundaryMap_i].template get<Coords>());
+                law_.set_params(faceinLocalBoundaryMap_i, params_from_fault_tagging);
+
+            }
+
+        }
+
+        //auto param_generator = readnewfault.param_fun();
+        //auto params1= param_generator(fault_.storage()[0].template get<Coords>());
+        //law_.set_params(0, params1);
 
     }
 
@@ -78,6 +95,7 @@ public:
                Vector<double const>& state, Matrix<double>& result, LinearAllocator<double>&) const;
     auto params_prototype(std::size_t numLocalElements) const;
     void params(std::size_t faultNo, Matrix<double>& result, LinearAllocator<double>&) const;
+    void set_file_with_friction(std::string filename){fileWithFrictionData=filename;}
 
 private:
     template <typename T> auto state_mat(Vector<T>& state) const {
@@ -114,11 +132,14 @@ private:
         return (*delta_sn_)(xt)[0];
     }
 
+    
 
+    std::string fileWithFrictionData; 
     Law law_;
     std::optional<source_fun_t> source_;
     std::optional<delta_tau_fun_t> delta_tau_;
     std::optional<delta_sn_fun_t> delta_sn_;
+    std::vector<boundaryTag> faultTags; 
 };
 
 template <class Law>
