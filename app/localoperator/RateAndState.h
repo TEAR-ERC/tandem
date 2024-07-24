@@ -37,9 +37,9 @@ public:
         law_.set_constant_params(cps);
     }
 
-    void save_fault_tags(std::vector<boundaryTag> faultTagsSent){
-        faultTags=faultTagsSent;
-    }
+  //  void save_fault_tags(std::vector<boundaryTag<D>> faultTagsSent){
+  //      faultTags=faultTagsSent;
+  //  }
 
     void set_params(param_fun_t pfun) {
        // std::string newfile="newfault.lua";
@@ -56,7 +56,7 @@ public:
             auto params = pfun(fault_.storage()[index].template get<Coords>());
             law_.set_params(index, params);
         }
-
+/*
         for ( auto faultTag_i : faultTags){
             DieterichRuinaAgeingScenario frictionOfFaultTag_i(fileWithFrictionData, faultTag_i.getLabel());
             auto param_generator_for_fault_tagging = frictionOfFaultTag_i.param_fun();
@@ -68,7 +68,7 @@ public:
             }
 
         }
-
+*/
         //auto param_generator = readnewfault.param_fun();
         //auto params1= param_generator(fault_.storage()[0].template get<Coords>());
         //law_.set_params(0, params1);
@@ -139,7 +139,7 @@ private:
     std::optional<source_fun_t> source_;
     std::optional<delta_tau_fun_t> delta_tau_;
     std::optional<delta_sn_fun_t> delta_sn_;
-    std::vector<boundaryTag> faultTags; 
+    // std::vector<boundaryTag<D>> faultTags; 
 };
 
 template <class Law>

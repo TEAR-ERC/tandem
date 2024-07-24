@@ -51,6 +51,7 @@ std::string BCToString(BC bc) {
 int main(int argc, char** argv) {
     auto affinity = Affinity();
 
+
     int pArgc = 0;
     char** pArgv = nullptr;
     for (int i = 0; i < argc; ++i) {
@@ -61,6 +62,7 @@ int main(int argc, char** argv) {
             break;
         }
     }
+
 
     argparse::ArgumentParser program("tandem");
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
@@ -93,8 +95,13 @@ int main(int argc, char** argv) {
 
     if (rank == 0) {
         Banner::standard(std::cout, affinity);
+
+        int i = 0;
+        std::cout << "Paused. Go?\n";
+        std::cin >> i;
     }
-    std::vector<boundaryTag> faultTagBoundaries;
+
+    //std::vector<boundaryTag<D>> faultTagBoundaries;
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
 
     if (cfg->mesh_file) {
@@ -103,7 +110,7 @@ int main(int argc, char** argv) {
         if (rank == 0) {
             GMSHParser parser(&builder);
             ok = parser.parseFile(*cfg->mesh_file);
-            faultTagBoundaries=builder.returnFaultTypeBoundaries();
+            //faultTagBoundaries=builder.returnFaultTypeBoundaries();
             
             if (!ok) {
                 std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
@@ -112,6 +119,7 @@ int main(int argc, char** argv) {
         MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
         if (ok) {
             globalMesh = builder.create(PETSC_COMM_WORLD);
+            globalMesh->AllGatherBoundaryTags();
         }
         if (procs > 1) {
             // ensure initial element distribution for metis
@@ -131,12 +139,25 @@ int main(int argc, char** argv) {
         return -1;
     }
     globalMesh->repartition();
-    auto mesh = globalMesh->getLocalMesh(faultTagBoundaries,1);
+    auto mesh = globalMesh->getLocalMesh(1);
     
+
     auto aa=mesh.get();
     const auto& facets = aa->facets();
+    Simplex<1> simplexToFind1 = {3-1, 10-1};
+    auto bb1=facets.getLocalIndex(simplexToFind1);
+    Simplex<1> simplexToFind2 = {10-1, 4-1};
+    auto bb2=facets.getLocalIndex(simplexToFind2);
+    Simplex<1> simplexToFind3 = {4-1, 11-1};
+    auto bb3=facets.getLocalIndex(simplexToFind3);
+    Simplex<1> simplexToFind4 = {11-1, 1-1};
+    auto bb4=facets.getLocalIndex(simplexToFind4);
     const auto& face=facets.faces();
     const auto& vertices =aa->vertices();
+
+    //facets.printLocalFaces();
+   // vertices.printG2L();
+
     auto boundaryData = dynamic_cast<BoundaryData const*>(facets.data());
     auto aaa=boundaryData->getBoundaryConditions();
     //printSimplexBaseVectorWithRank(facets,rank);
