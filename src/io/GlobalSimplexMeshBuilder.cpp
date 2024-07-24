@@ -93,6 +93,9 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
+
+        std::array<uint64_t, D>& elemtsForTagging = elem;
+        
         
         BC bc = BC::None;
         bool foundEntry=false;
@@ -105,7 +108,8 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
 
             if (entry.getTagID()==tag){
 
-                entry.addFaceInGlobalMesh(boundaryCounter);
+               
+                entry.addElements(Simplex<D - 1u>(elemtsForTagging));
                 bc=entry.getBoundaryType();
                 foundEntry=true;
                 break;
@@ -196,6 +200,8 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
                                                       std::move(elementData), comm);
+
+
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
@@ -207,6 +213,7 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
                                                                     std::move(boundaryData), comm);
 
     mesh->setBoundaryMesh(std::move(boundaryMesh));
+    mesh->setBoundaryTags(boundaryTags);
 
 
     return mesh;

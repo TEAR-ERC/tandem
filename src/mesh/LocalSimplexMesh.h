@@ -5,13 +5,14 @@
 #include "MeshData.h"
 #include "Simplex.h"
 #include "util/Utility.h"
-#include "mesh/MultiplyBoundaryTags.h"
+
 #include <array>
 #include <cstddef>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "mesh/MultiplyBoundaryTags.h"
 
 namespace tndm {
 
@@ -40,6 +41,14 @@ public:
     auto const& elements() const { return faces<D>(); }
     std::size_t numElements() const { return size<D>(); }
 
+    void saveFaultTags(std::vector<localBoundaryTag> localfaultTagsRecivied) {
+        this->localFaultTags = std::move(localfaultTagsRecivied);
+    }
+
+    auto getFaultTags() const {
+        return localFaultTags;
+    }
+
     template <std::size_t Dto, std::size_t Dfrom> auto downward(std::size_t lid) const {
         return downward<Dto, Dfrom>(faces<Dfrom>()[lid]);
     }
@@ -65,14 +74,6 @@ public:
         return upward<Dfrom>(faces<Dfrom>().g2l()[face]);
     }
 
-    void setFaultTags(std::vector<boundaryTag> faultTags) {
-        this->faultTags = std::move(faultTags);
-    }
-
-    auto getFaultTags() const {
-        return faultTags;
-    }
-
 private:
     using upward_map_t = std::vector<std::vector<std::size_t>>;
 
@@ -95,8 +96,7 @@ private:
 
     storage_t lfs;
     std::array<upward_map_t, D> upwardMaps;
-    std::vector<boundaryTag> faultTags;
-
+    std::vector<localBoundaryTag> localFaultTags;
 };
 
 } // namespace tndm

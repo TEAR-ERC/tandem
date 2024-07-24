@@ -28,6 +28,10 @@ template <std::size_t D> void GlobalSimplexMesh<D>::repartitionByHash() {
     isPartitionedByHash = true;
 }
 
+
+
+
+
 template <std::size_t D>
 void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     int procs, rank;
@@ -44,6 +48,7 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     std::vector<int> sendcounts(procs, 0);
     std::vector<simplex_t> elemsToSend;
     elemsToSend.reserve(numElements());
+    std::vector<globalBoundaryTag<D>> boundaryTagsToSend;
     auto eIt = enumeration.begin();
     for (int p = 0; p < procs; ++p) {
         while (eIt != enumeration.end() && partition[*eIt] <= p) {
@@ -61,6 +66,8 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     if (elementData) {
         elementData = elementData->redistributed(enumeration, a2a);
     }
+
+
 }
 
 template <std::size_t D>

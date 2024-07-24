@@ -59,7 +59,7 @@ private:
     std::vector<BC> bcs;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
-    std::vector<boundaryTag> boundaryTags;
+    std::vector<globalBoundaryTag<D>> boundaryTags;
 
     std::size_t ignoredElems = 0;
     std::size_t unknownBC = 0;
@@ -78,17 +78,7 @@ public:
  GlobalSimplexMeshBuilder() : boundaryCounter(0) {} 
 
 
-    std::vector<boundaryTag> ReturnBoundariesOfType(BC bcType) {
-        std::vector<boundaryTag> result;
-        for (const auto& tag : boundaryTags) {
-            if (tag.getBoundaryType() == bcType) {
-                result.push_back(tag);
-            }
-        }
-    return result;
-    }
 
-    std::vector<boundaryTag> returnFaultTypeBoundaries() {return ReturnBoundariesOfType(BC::Fault);}
 
 
     inline void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
