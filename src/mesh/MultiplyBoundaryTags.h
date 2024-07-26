@@ -39,10 +39,16 @@ public:
     const std::vector<std::size_t>& returnfacesInLocalMesh() const { return facesInLocalMesh; }
     void setFacesInLocalBoundaryMap(std::vector<std::size_t> facesInBoundaryMap) { facesInLocalBoundaryMap = facesInBoundaryMap; }
     std::vector<std::size_t> getFacesInLocalBoundaryMap() const { return facesInLocalBoundaryMap; }
-    void resizeFacesInLocalBoundaryMap() { facesInLocalBoundaryMap.resize(facesInLocalMesh.size()); }
+    void resizeFacesInLocalBoundaryMap() { facesInLocalBoundaryMap.resize(facesInLocalMesh.size(), std::numeric_limits<std::size_t>::max()); }
     void setfacesInLocalBoundaryMap(std::size_t index, std::size_t value) { facesInLocalBoundaryMap[index] = value; }
     std::vector<std::size_t> returnfacesInLocalBoundaryMap() const { return facesInLocalBoundaryMap; }
-
+    
+    std::vector<std::size_t> returnNonNullFacesInLocalBoundaryMap() const {
+        std::vector<std::size_t> nonNullFaces;
+        std::copy_if(facesInLocalBoundaryMap.begin(), facesInLocalBoundaryMap.end(), std::back_inserter(nonNullFaces),
+                    [](std::size_t value) { return value != std::numeric_limits<std::size_t>::max(); });
+        return nonNullFaces;
+    }
     void addFacesInLocalMesh(const std::vector<std::size_t>& boundaryFacesInLocalMesh) {
         facesInLocalMesh = boundaryFacesInLocalMesh;
     }
@@ -114,14 +120,36 @@ std::vector<globalBoundaryTag<D>> returnFaultTypeBoundaries(const std::vector<gl
 }
 
 
-/*
-template <std::size_t D> 
-inline void setSizeForFacesInLocalBoundaryMap(std::vector<boundaryTag<D>>& boundaryTags){
+inline std::vector<std::vector<size_t>> create2DMatrixFromBoundaryTags(const std::vector<localBoundaryTag>& localBoundaryTag) {
+    std::vector<std::vector<size_t>> matrix;
+
+    for (size_t i = 0; i < localBoundaryTag.size(); ++i) {
+        const auto& facesInLocalMesh = localBoundaryTag[i].getFacesInLocalMesh();
+
+        for (size_t j = 0; j < facesInLocalMesh.size(); ++j) {
+            matrix.push_back({ i, j, facesInLocalMesh[j] });
+        }
+    }
+
+// this generate a matrix with 3 columns index
+// i j faceInLocalMesh
+// where i is the localBoundayTag , j is element index within the boundaryTag
+// and the last one is element in localMesh
+// for example for fault_1 & fault_2 with one face for each it'd look like this
+// 0, 0 , 10 --- index for fault_1 , index for face within fault_1, 10 is element number in localMesh
+// 1,  0 , 12 
+    return matrix;
+}
+
+
+
+
+inline void setSizeForFacesInLocalBoundaryMap(std::vector<localBoundaryTag>& boundaryTags){
     for (auto& boundaryTag_i :boundaryTags ){
         boundaryTag_i.resizeFacesInLocalBoundaryMap();
     }
 }
-
+/*
 
 
 
@@ -133,19 +161,7 @@ inline void computeMappingForBoundaries(std::vector<boundaryTag<D>>& boundaryTag
 }
 
 template <std::size_t D> 
-inline std::vector<std::vector<size_t>> create2DMatrixFromBoundaryTags(const std::vector<boundaryTag<D>>& boundaryTags) {
-    std::vector<std::vector<size_t>> matrix;
 
-    for (size_t i = 0; i < boundaryTags.size(); ++i) {
-        const auto& facesInLocalMesh = boundaryTags[i].getFacesInLocalMesh();
-
-        for (size_t j = 0; j < facesInLocalMesh.size(); ++j) {
-            matrix.push_back({ i, j, facesInLocalMesh[j] });
-        }
-    }
-
-    return matrix;
-}
 
 */
 } //end tndm namespace

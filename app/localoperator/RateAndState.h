@@ -37,41 +37,58 @@ public:
         law_.set_constant_params(cps);
     }
 
-  //  void save_fault_tags(std::vector<boundaryTag<D>> faultTagsSent){
-  //      faultTags=faultTagsSent;
-  //  }
+    void setFaultTags(std::vector<localBoundaryTag> faultTagsSent){
+        faultTags=faultTagsSent;
+    }
 
     void set_params(param_fun_t pfun) {
-       // std::string newfile="newfault.lua";
-       // std::string newscanerio="fault1";
-        
-        //DieterichRuinaAgeingScenario readnewfault(newfile, newscanerio);
-
-         
-
         auto num_nodes = fault_.storage().size();
+        if (num_nodes == 0 || faultSize == 0) {
+            return;
+        }
+        
+        
+        if (num_nodes %faultSize   != 0) {
+            throw std::runtime_error("something went wrong nq needs to be an integer. ");
+        }
+        auto nq=num_nodes/faultSize;
         law_.set_num_nodes(num_nodes);
+        
+        /*
         for (std::size_t index = 0; index < num_nodes; ++index) {
-            //auto aa=fault_.storage()[index].template get<Coords>();
+            
             auto params = pfun(fault_.storage()[index].template get<Coords>());
             law_.set_params(index, params);
-        }
-/*
+       }
+       */
+
+       
+        int verficationCounter=0;
         for ( auto faultTag_i : faultTags){
-            DieterichRuinaAgeingScenario frictionOfFaultTag_i(fileWithFrictionData, faultTag_i.getLabel());
-            auto param_generator_for_fault_tagging = frictionOfFaultTag_i.param_fun();
 
-            for (const auto& faceinLocalBoundaryMap_i : faultTag_i.returnfacesInLocalBoundaryMap()) {
-                auto params_from_fault_tagging = param_generator_for_fault_tagging(fault_.storage()[faceinLocalBoundaryMap_i].template get<Coords>());
-                law_.set_params(faceinLocalBoundaryMap_i, params_from_fault_tagging);
+            auto facesInLocalBoundaryMap=faultTag_i.returnNonNullFacesInLocalBoundaryMap();
+            if (facesInLocalBoundaryMap.size()>0){
 
+
+                DieterichRuinaAgeingScenario frictionOfFaultTag_i(fileWithFrictionData, faultTag_i.getLabel());
+                auto param_generator_for_fault_tagging = frictionOfFaultTag_i.param_fun();
+
+                for (const auto& faceinLocalBoundaryMap_i : facesInLocalBoundaryMap ) {
+                    for (std::size_t j = 0; j < nq; ++j) {
+                        size_t storage_index=nq*faceinLocalBoundaryMap_i+j;
+                        auto params_from_fault_tagging = param_generator_for_fault_tagging(fault_.storage()[storage_index].template get<Coords>());
+                        law_.set_params(storage_index, params_from_fault_tagging);
+                        verficationCounter=verficationCounter+1;
+                       
+
+                    }
+                }
             }
-
         }
-*/
-        //auto param_generator = readnewfault.param_fun();
-        //auto params1= param_generator(fault_.storage()[0].template get<Coords>());
-        //law_.set_params(0, params1);
+
+        if (verficationCounter =! num_nodes){
+            throw std::runtime_error("fault tagging did not call all expected fault faces ");
+        }
 
     }
 
@@ -96,7 +113,8 @@ public:
     auto params_prototype(std::size_t numLocalElements) const;
     void params(std::size_t faultNo, Matrix<double>& result, LinearAllocator<double>&) const;
     void set_file_with_friction(std::string filename){fileWithFrictionData=filename;}
-
+    void setEtaScanerio(std::string etaScanerioRecivied){etaScanerio=etaScanerioRecivied;}
+    void setFaultSize(std::size_t faultSizeRecivied){faultSize=faultSizeRecivied;}
 private:
     template <typename T> auto state_mat(Vector<T>& state) const {
         std::size_t nbf = space_.numBasisFunctions();
@@ -134,12 +152,14 @@ private:
 
     
 
-    std::string fileWithFrictionData; 
+    std::string fileWithFrictionData;
+    std::string etaScanerio; 
     Law law_;
     std::optional<source_fun_t> source_;
     std::optional<delta_tau_fun_t> delta_tau_;
     std::optional<delta_sn_fun_t> delta_sn_;
-    // std::vector<boundaryTag<D>> faultTags; 
+    std::vector<localBoundaryTag> faultTags; 
+    std::size_t faultSize;
 };
 
 template <class Law>
