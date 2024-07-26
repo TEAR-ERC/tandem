@@ -50,7 +50,7 @@ void GlobalSimplexMeshBuilder<D>::addBoundaryTag( std::string tagLabel, long tag
 
     if (addData){boundaryTags.emplace_back(tagLabel, tagID, dimension, bc);}
     else{
-   throw std::runtime_error("Warning: tag name is neither dirichlet_*/free_surface_*/fault_* (case sensetive) or may contain characters that are not y digits/letters/-/_. Please rename " + tagLabel + " to continue.");
+   throw std::runtime_error("Warning: tag name is neither dirichlet_*/free_surface_*/fault_* (case sensetive) . Please rename " + tagLabel + " to continue.");
     }
 }
 

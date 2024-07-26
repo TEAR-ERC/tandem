@@ -63,10 +63,12 @@ public:
     }
     auto friction() -> std::unique_ptr<AbstractFrictionOperator> override {
 
-        /*
+        
         auto faultTags=mesh.getFaultTags();
         auto matrixWithBoundaryTagsDetails=create2DMatrixFromBoundaryTags(faultTags);
         setSizeForFacesInLocalBoundaryMap(faultTags);
+
+        auto intialSizeOfMatrixWithBoundaryTags=matrixWithBoundaryTagsDetails.size();
 
         for (std::size_t i = 0; i < fault_map->local_size(); ++i) {
             const auto faceInLocalMeshObtainedFromFaultMap=fault_map->fctNo(i);
@@ -85,21 +87,27 @@ public:
             }
 
         }
-    
-    
+        auto facesAssinged=intialSizeOfMatrixWithBoundaryTags-matrixWithBoundaryTagsDetails.size();
+
+        if (fault_map->local_size()  != facesAssinged ){
+            std::runtime_error("Couldn't figure out all fault tags faces");
+        }
+
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
         
-        // very ugly, needs to change 
+        // this part of the new code 
         auto filename=friction_scenario->returnFileLoaded();
         fric->lop().set_file_with_friction(filename);
+        fric->lop().setFaultTags(faultTags);
+        fric->lop().setEtaScanerio(friction_scenario->returnScanerioLoaded());
+        fric->lop().setFaultSize(fault_map->local_size());
 
-        */
-
-       auto fric =
-            std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
+      // auto fric =
+        //    std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
         
-        //fric->lop().save_fault_tags(faultTags);
+        
+
         fric->lop().set_constant_params(friction_scenario->constant_params());
         fric->lop().set_params(friction_scenario->param_fun());
         if (friction_scenario->source_fun()) {

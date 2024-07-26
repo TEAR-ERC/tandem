@@ -96,9 +96,9 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         Banner::standard(std::cout, affinity);
 
-        int i = 0;
-        std::cout << "Paused. Go?\n";
-        std::cin >> i;
+        //int i = 0;
+        //std::cout << "Paused. Go?\n";
+        //std::cin >> i;
     }
 
     //std::vector<boundaryTag<D>> faultTagBoundaries;
@@ -144,6 +144,7 @@ int main(int argc, char** argv) {
 
     auto aa=mesh.get();
     const auto& facets = aa->facets();
+    /*
     Simplex<1> simplexToFind1 = {3-1, 10-1};
     auto bb1=facets.getLocalIndex(simplexToFind1);
     Simplex<1> simplexToFind2 = {10-1, 4-1};
@@ -152,6 +153,7 @@ int main(int argc, char** argv) {
     auto bb3=facets.getLocalIndex(simplexToFind3);
     Simplex<1> simplexToFind4 = {11-1, 1-1};
     auto bb4=facets.getLocalIndex(simplexToFind4);
+    */
     const auto& face=facets.faces();
     const auto& vertices =aa->vertices();
 
@@ -161,10 +163,10 @@ int main(int argc, char** argv) {
     auto boundaryData = dynamic_cast<BoundaryData const*>(facets.data());
     auto aaa=boundaryData->getBoundaryConditions();
     //printSimplexBaseVectorWithRank(facets,rank);
-    std::cout << "MPI Rank " << rank << ": BC Vector: ";
-    for (std::size_t i = 0; i < aaa.size(); ++i) {
-        std::cout <<"rank:"<<rank<<"-"<< i << ": " << BCToString(aaa[i]) << std::endl;
-    }
+   // std::cout << "MPI Rank " << rank << ": BC Vector: ";
+    //for (std::size_t i = 0; i < aaa.size(); ++i) {
+    //    std::cout <<"rank:"<<rank<<"-"<< i << ": " << BCToString(aaa[i]) << std::endl;
+    //}
 
     
 
