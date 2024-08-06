@@ -128,7 +128,10 @@ double RateAndState<Law>::init(double time, std::size_t faultNo,
     auto t_mat = traction_mat(traction);
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
+    auto coords = fault_[faultNo].template get<Coords>();
+    int ierr;
     for (std::size_t node = 0; node < nbf; ++node) {
+        auto const& x = coords[node];
         auto sn = t_mat(node, 0);
         if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
@@ -138,7 +141,7 @@ double RateAndState<Law>::init(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
         auto psi = law_.psi_init(index + node, sn, tau);
-        double V = norm(law_.slip_rate(index + node, sn, tau, psi));
+        double V = norm(law_.slip_rate(index + node, sn, tau, psi, x, &ierr));
         VMax = std::max(VMax, V);
         s_mat(node, PsiIndex) = psi;
     }
@@ -155,8 +158,13 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto s_mat = state_mat(state);
     auto r_mat = state_mat(result);
     auto t_mat = traction_mat(traction);
+    auto coords = fault_[faultNo].template get<Coords>();
+    int ierr;
+    int all_passed = 1;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto sn = t_mat(node, 0);
+        auto const& x = coords[node];
+
+	auto sn = t_mat(node, 0);
 	if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
 	}
@@ -165,8 +173,13 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
         }
-        auto Vi = law_.slip_rate(index + node, sn, tau, psi);
-        double V = norm(Vi);
+
+	auto Vi = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
+        if (ierr != 0) {
+	  all_passed = 0;
+	}
+
+	double V = norm(Vi);
         VMax = std::max(VMax, V);
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             r_mat(node, t) = Vi[t];
@@ -174,7 +187,6 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
         r_mat(node, PsiIndex) = law_.state_rhs(index + node, V, psi);
     }
     if (source_) {
-        auto coords = fault_[faultNo].template get<Coords>();
         std::array<double, DomainDimension + 1> xt;
         for (std::size_t node = 0; node < nbf; ++node) {
             auto const& x = coords[node];
@@ -182,6 +194,10 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
             xt.back() = time;
             r_mat(node, PsiIndex) += (*source_)(xt)[0];
         }
+    }
+    if (all_passed == 0) {
+        std::cout << "One or more fault basis failed to compute a valid slip-rate (V)" << std::endl;
+	throw;
     }
     return VMax;
 }
@@ -216,8 +232,11 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
     auto t_mat = traction_mat(traction);
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
+    auto coords = fault_[faultNo].template get<Coords>();
+    int ierr;
     for (std::size_t node = 0; node < nbf; ++node) {
-        auto sn = t_mat(node, 0);
+	auto const& x = coords[node];
+	auto sn = t_mat(node, 0);
 	if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
 	}
@@ -226,7 +245,7 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
         auto psi = s_mat(node, PsiIndex);
-        auto V = law_.slip_rate(index + node, sn, tau, psi);
+        auto V = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
         auto tau_hat = law_.tau_hat(index + node, tau, V);
         std::size_t out = 0;
         result(node, out++) = psi;
