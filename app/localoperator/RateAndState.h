@@ -53,10 +53,11 @@ public:
 
     void pre_init(std::size_t faultNo, Vector<double>& state, LinearAllocator<double>&) const;
     double init(double time, std::size_t faultNo, Vector<double const> const& traction,
-                Vector<double>& state, LinearAllocator<double>&) const;
+                Vector<double>& state, LinearAllocator<double>&, int* ierr) const;
 
     double rhs(double time, std::size_t faultNo, Vector<double const> const& traction,
-               Vector<double const>& state, Vector<double>& result, LinearAllocator<double>&) const;
+               Vector<double const>& state, Vector<double>& result, LinearAllocator<double>&,
+               int* ierr) const;
 
     auto state_prototype(std::size_t numLocalElements) const;
     void state(double time, std::size_t faultNo, Vector<double const> const& traction,
@@ -122,14 +123,14 @@ void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
 template <class Law>
 double RateAndState<Law>::init(double time, std::size_t faultNo,
                                Vector<double const> const& traction, Vector<double>& state,
-                               LinearAllocator<double>&) const {
+                               LinearAllocator<double>&, int* _ierr) const {
     double VMax = 0.0;
     auto s_mat = state_mat(state);
     auto t_mat = traction_mat(traction);
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
     auto coords = fault_[faultNo].template get<Coords>();
-    int ierr;
+    int ierr = 0, ierr_max = 0;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];
         auto sn = t_mat(node, 0);
@@ -141,17 +142,21 @@ double RateAndState<Law>::init(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
         auto psi = law_.psi_init(index + node, sn, tau);
-        double V = norm(law_.slip_rate(index + node, sn, tau, psi, x, &ierr));
+        double V = norm(law_.slip_rate(index + node, faultNo, sn, tau, psi, x, &ierr));
+        if (ierr > ierr_max) {
+            ierr_max = ierr;
+        }
         VMax = std::max(VMax, V);
         s_mat(node, PsiIndex) = psi;
     }
+    *_ierr = ierr_max;
     return VMax;
 }
 
 template <class Law>
 double RateAndState<Law>::rhs(double time, std::size_t faultNo,
                               Vector<double const> const& traction, Vector<double const>& state,
-                              Vector<double>& result, LinearAllocator<double>&) const {
+                              Vector<double>& result, LinearAllocator<double>&, int* _ierr) const {
     double VMax = 0.0;
     std::size_t nbf = space_.numBasisFunctions();
     std::size_t index = faultNo * nbf;
@@ -159,8 +164,7 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto r_mat = state_mat(result);
     auto t_mat = traction_mat(traction);
     auto coords = fault_[faultNo].template get<Coords>();
-    int ierr;
-    int all_passed = 1;
+    int ierr = 0, ierr_max = 0;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];
 
@@ -174,9 +178,9 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
 
-        auto Vi = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
-        if (ierr != 0) {
-            all_passed = 0;
+        auto Vi = law_.slip_rate(index + node, faultNo, sn, tau, psi, x, &ierr);
+        if (ierr > ierr_max) {
+            ierr_max = ierr;
         }
 
         double V = norm(Vi);
@@ -195,10 +199,7 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
             r_mat(node, PsiIndex) += (*source_)(xt)[0];
         }
     }
-    if (all_passed == 0) {
-        std::cout << "One or more fault basis failed to compute a valid slip-rate (V)" << std::endl;
-        throw;
-    }
+    *_ierr = ierr_max;
     return VMax;
 }
 
@@ -245,7 +246,7 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
         auto psi = s_mat(node, PsiIndex);
-        auto V = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
+        auto V = law_.slip_rate(index + node, faultNo, sn, tau, psi, x, &ierr);
         auto tau_hat = law_.tau_hat(index + node, tau, V);
         std::size_t out = 0;
         result(node, out++) = psi;

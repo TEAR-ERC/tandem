@@ -78,7 +78,7 @@ public:
     }
     auto S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
-    auto slip_rate(std::size_t index, double sn,
+    auto slip_rate(std::size_t index, std::size_t fault_index, double sn,
                    std::array<double, TangentialComponents> const& tau, double psi,
                    std::array<double, DomainDimension> const& x, int* _ierr) const
         -> std::array<double, TangentialComponents> {
@@ -120,7 +120,8 @@ public:
                     auto _SnPre = p_[index].get<SnPre>();
                     auto const& tau_pre = p_[index].get<TauPre>();
 
-                    std::cout << "fault_index[" << index << "]" << std::endl;
+                    std::cout << "fault_basis_index [" << index << "], fault_index [" << fault_index
+                              << "]" << std::endl;
                     std::cout << "  ierr = " << ierr << std::endl;
                     std::cout << "  f0 = " << cp_.f0 << " (const)" << std::endl;
                     std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
