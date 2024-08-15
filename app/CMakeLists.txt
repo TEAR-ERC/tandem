@@ -168,6 +168,7 @@ endif()
 
 ## Common
 set(APP_COMMON_SRCS
+    common/plogger.cpp
     common/Banner.cpp
     common/MeshConfig.cpp
     common/MGConfig.cpp

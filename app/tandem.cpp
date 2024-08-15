@@ -1,3 +1,4 @@
+#include "common/TandemLogfile.h"
 #include "common/Banner.h"
 #include "common/CmdLine.h"
 #include "common/MeshConfig.h"
@@ -32,7 +33,10 @@
 #include <string_view>
 #include <vector>
 
+
 using namespace tndm;
+
+ParallelLogBase* tndm::g_log_;
 
 int main(int argc, char** argv) {
     auto affinity = Affinity();
@@ -77,6 +81,24 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
+    // Create logger, assign pointer to global variable
+    // Log mode 1 - no rank is permitted to open a file (ever)
+    //tndm::ParallelLogBase *g_log = new tndm::ParallelLogBase(PETSC_COMM_WORLD);
+    //tndm::g_log_ = g_log;
+
+    // Log mode 2 - all ranks are permitted to open and write to a file
+    tndm::ParallelLog *g_log = new tndm::ParallelLog(PETSC_COMM_WORLD);
+    tndm::g_log_ = g_log;
+
+    // Log mode 3 - only rank 0 is ever permitted to open and write to a file
+    //if (rank == 0) {
+    //    tndm::ParallelLog *g_log = new tndm::ParallelLog(PETSC_COMM_WORLD);
+    //    tndm::g_log_ = g_log;
+    //} else {
+    //    tndm::ParallelLogBase *g_log = new tndm::ParallelLogBase(PETSC_COMM_WORLD);
+    //    tndm::g_log_ = g_log;
+    //}
+
     if (rank == 0) {
         Banner::standard(std::cout, affinity);
     }
@@ -116,6 +138,8 @@ int main(int argc, char** argv) {
     auto mesh = globalMesh->getLocalMesh(1);
 
     solveSEASProblem(*mesh, *cfg);
+
+    delete tndm::g_log_;
 
     PetscErrorCode ierr = PetscFinalize();
 
