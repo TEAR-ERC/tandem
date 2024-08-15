@@ -80,7 +80,7 @@ public:
 
     auto slip_rate(std::size_t index, double sn,
                    std::array<double, TangentialComponents> const& tau, double psi,
-		    std::array<double, DomainDimension> const& x, int *_ierr) const
+                   std::array<double, DomainDimension> const& x, int* _ierr) const
         -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
@@ -89,14 +89,14 @@ public:
         double V = 0.0;
         int ierr = 0;
 
-	if (eta == 0.0) {
+        if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
-	} else {
+        } else {
             if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
-		ierr = 1;
+                ierr = 1;
             } else {
                 double Va = 0.0;
                 double Vb = tauAbs / eta;
@@ -109,45 +109,47 @@ public:
                 try {
                     V = zeroIn(Va, Vb, fF);
                 } catch (std::exception const&) {
-		    V = NAN;
-		    ierr = 2;
+                    V = NAN;
+                    ierr = 2;
                 }
-	        
-	        if (ierr != 0) {
+
+                if (ierr != 0) {
                     auto _A = p_[index].get<A>();
                     auto _Eta = p_[index].get<Eta>();
                     auto _L = p_[index].get<L>();
                     auto _SnPre = p_[index].get<SnPre>();
                     auto const& tau_pre = p_[index].get<TauPre>();
 
-		    std::cout << "fault_index[" << index << "]" << std::endl;
-		    std::cout << "  ierr = " << ierr << std::endl;
+                    std::cout << "fault_index[" << index << "]" << std::endl;
+                    std::cout << "  ierr = " << ierr << std::endl;
                     std::cout << "  f0 = " << cp_.f0 << " (const)" << std::endl;
-		    std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
-		    std::cout << "  b  = " << cp_.b << " (const)" << std::endl;
+                    std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
+                    std::cout << "  b  = " << cp_.b << " (const)" << std::endl;
                     std::cout << "  a(x)   = " << _A << std::endl;
-		    std::cout << "  eta(x) = " << _Eta << std::endl;
-		    std::cout << "  L(x)   = " << _L << std::endl;
-		    std::cout << "  sigma_n_pre(x) = " << _SnPre << std::endl;
-		    std::cout << "  tau_pre(x)     = { ";
-                    for (std::size_t t=0; t<DomainDimension-2; t++) {
+                    std::cout << "  eta(x) = " << _Eta << std::endl;
+                    std::cout << "  L(x)   = " << _L << std::endl;
+                    std::cout << "  sigma_n_pre(x) = " << _SnPre << std::endl;
+                    std::cout << "  tau_pre(x)     = { ";
+                    for (std::size_t t = 0; t < DomainDimension - 2; t++) {
                         std::cout << tau_pre[t] << ", ";
-                    } std::cout << tau_pre[DomainDimension-2] << " }" << std::endl;
-		    std::cout << "  sigma_n = " << snAbs << std::endl;
-	            std::cout << "  |tau|   = " << tauAbs << std::endl;
-		    std::cout << "  psi     = " << psi << std::endl;
-	            std::cout << "  V_lower = " << Va << std::endl;
+                    }
+                    std::cout << tau_pre[DomainDimension - 2] << " }" << std::endl;
+                    std::cout << "  sigma_n = " << snAbs << std::endl;
+                    std::cout << "  |tau|   = " << tauAbs << std::endl;
+                    std::cout << "  psi     = " << psi << std::endl;
+                    std::cout << "  V_lower = " << Va << std::endl;
                     std::cout << "  V_upper = " << Vb << std::endl;
-		    std::cout << "  R(V_lower) = " << fF(Va) << std::endl;
-		    std::cout << "  R(V_upper) = " << fF(Vb) << std::endl;
+                    std::cout << "  R(V_lower) = " << fF(Va) << std::endl;
+                    std::cout << "  R(V_upper) = " << fF(Vb) << std::endl;
                     std::cout << "  x = { ";
-                    for (std::size_t t=0; t<DomainDimension-1; t++) {
+                    for (std::size_t t = 0; t < DomainDimension - 1; t++) {
                         std::cout << x[t] << ", ";
-                    } std::cout << x[DomainDimension-1] << " }" << std::endl;
-	        }
-	    }
+                    }
+                    std::cout << x[DomainDimension - 1] << " }" << std::endl;
+                }
+            }
         }
-	*_ierr = ierr;
+        *_ierr = ierr;
         return -(V / tauAbs) * tauAbsVec;
     }
 

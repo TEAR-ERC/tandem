@@ -28,7 +28,8 @@ public:
         std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
     using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
         std::array<double, DomainDimension + 1> const&)>;
-    using delta_sn_fun_t = std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
+    using delta_sn_fun_t =
+        std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -98,7 +99,6 @@ private:
         return (*delta_sn_)(xt)[0];
     }
 
-
     Law law_;
     std::optional<source_fun_t> source_;
     std::optional<delta_tau_fun_t> delta_tau_;
@@ -164,22 +164,22 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];
 
-	auto sn = t_mat(node, 0);
-	if (delta_sn_) {
+        auto sn = t_mat(node, 0);
+        if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
-	}
+        }
         auto psi = s_mat(node, PsiIndex);
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
         }
 
-	auto Vi = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
+        auto Vi = law_.slip_rate(index + node, sn, tau, psi, x, &ierr);
         if (ierr != 0) {
-	  all_passed = 0;
-	}
+            all_passed = 0;
+        }
 
-	double V = norm(Vi);
+        double V = norm(Vi);
         VMax = std::max(VMax, V);
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             r_mat(node, t) = Vi[t];
@@ -197,7 +197,7 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     }
     if (all_passed == 0) {
         std::cout << "One or more fault basis failed to compute a valid slip-rate (V)" << std::endl;
-	throw;
+        throw;
     }
     return VMax;
 }
@@ -235,11 +235,11 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
     auto coords = fault_[faultNo].template get<Coords>();
     int ierr;
     for (std::size_t node = 0; node < nbf; ++node) {
-	auto const& x = coords[node];
-	auto sn = t_mat(node, 0);
-	if (delta_sn_) {
+        auto const& x = coords[node];
+        auto sn = t_mat(node, 0);
+        if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
-	}
+        }
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
