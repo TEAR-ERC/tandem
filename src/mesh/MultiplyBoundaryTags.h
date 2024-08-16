@@ -82,6 +82,8 @@ public:
 
         return boundaryTagInLocalMesh;
     }
+    std::vector<Simplex<D - 1>> getElementBoundary() const {return elementBoundary;}
+
 
 
 

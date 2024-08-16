@@ -141,6 +141,11 @@ void setConfigSchema(TableSchema<Config>& schema,
         .default_value(1.0)
         .help("CFL tuning parameter (typically <= 1.0).");
 
+    schema.add_value("partitionFaultWeight", &Config::partitionFaultWeight)
+        .validator([](auto&& x) { return x > 0.0; })
+        .default_value(1.0)
+        .help("Weights given to elements containing faults.Needs to be >0 ");
+
     schema.add_value("mode", &Config::mode)
         .converter([](std::string_view value) {
             if (iEquals(value, "QuasiDynamic") || iEquals(value, "QD")) {

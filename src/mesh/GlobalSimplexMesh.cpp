@@ -5,9 +5,19 @@
 
 namespace tndm {
 
-template <std::size_t D> void GlobalSimplexMesh<D>::repartition() {
-    auto distCSR = distributedCSR<idx_t>();
-    auto partition = MetisPartitioner::partition(distCSR, D, 1.05, comm);
+template <std::size_t D> void GlobalSimplexMesh<D>::repartition(long faultPartitionElementWeight) {
+    auto numElems = numElements();
+    DistributedCSR<idx_t> distCSR;
+    std::vector<idx_t> elementWeights(numElems, 1);
+    
+    if (faultPartitionElementWeight==1){
+        distCSR = distributedCSR<idx_t>();
+    }else{
+        distCSR = distributedCSR<idx_t>(elementWeights,faultPartitionElementWeight);
+    }
+    
+    
+    auto partition = MetisPartitioner::partition(distCSR, D,elementWeights, 1.05, comm);
 
     doPartition(partition);
     isPartitionedByHash = false;

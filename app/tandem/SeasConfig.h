@@ -87,6 +87,7 @@ struct Config {
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
 
+
     std::optional<std::string> gf_checkpoint_prefix;
     double gf_checkpoint_every_nmins;
 
@@ -98,6 +99,8 @@ struct Config {
     std::optional<ProbeOutputConfig> domain_probe_output;
 
     tsCheckpointConfig ts_checkpoint_config;
+
+    double partitionFaultWeight;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,
