@@ -31,10 +31,19 @@ public:
         std::copy(other.begin(), other.end(), this->begin());
         return *this;
     }
-
+/*
+    void print(int rank) const {
+        std::cout << "MPI Rank " << rank << ": SimplexBase elements: ";
+        for (const auto& elem : *this) {
+            std::cout << elem << " ";
+        }
+        std::cout << std::endl;
+    }
+*/
 private:
     void sort() { std::sort(base_t::begin(), base_t::end()); }
 };
+
 
 template <std::size_t DD, std::size_t D> struct Downward;
 

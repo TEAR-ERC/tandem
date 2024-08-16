@@ -22,9 +22,11 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
     std::size_t numLocalFacets = mesh.facets().localSize();
     std::vector<std::pair<int, std::size_t>> theFctNos;
     theFctNos.reserve(numLocalFacets);
-
+    auto aa=boundaryData->getBoundaryConditions();
     for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
+       
         if (boundaryData->getBoundaryConditions()[fctNo] == bc) {
+            
             auto elNos = mesh.template upward<D - 1u>(fctNo);
             assert(elNos.size() >= 1u && elNos.size() <= 2u);
             int other_rank = -1;
@@ -76,6 +78,10 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
 
     scatter_plan_ = std::make_shared<ScatterPlan>(send_map, recv_map);
 }
+
+
+
+
 
 template BoundaryMap::BoundaryMap(LocalSimplexMesh<1> const&, BC, MPI_Comm);
 template BoundaryMap::BoundaryMap(LocalSimplexMesh<2> const&, BC, MPI_Comm);

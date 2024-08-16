@@ -14,7 +14,6 @@
 #include "tandem/ContextBase.h"
 #include "tandem/FrictionConfig.h"
 #include "tandem/SeasScenario.h"
-
 #include "form/AbstractDGOperator.h"
 #include "form/DGOperator.h"
 
@@ -63,8 +62,52 @@ public:
         return std::make_unique<dg_t>(topo, dg_lop);
     }
     auto friction() -> std::unique_ptr<AbstractFrictionOperator> override {
+
+        
+        auto faultTags=mesh.getFaultTags();
+        auto matrixWithBoundaryTagsDetails=create2DMatrixFromBoundaryTags(faultTags);
+        setSizeForFacesInLocalBoundaryMap(faultTags);
+
+        auto intialSizeOfMatrixWithBoundaryTags=matrixWithBoundaryTagsDetails.size();
+
+        for (std::size_t i = 0; i < fault_map->local_size(); ++i) {
+            const auto faceInLocalMeshObtainedFromFaultMap=fault_map->fctNo(i);
+            for (std::size_t j = 0; j < matrixWithBoundaryTagsDetails.size(); ++j) {
+                auto faceInLocalMeshObtainedFromBoundaryTag=matrixWithBoundaryTagsDetails[j][2];
+                if (faceInLocalMeshObtainedFromBoundaryTag==faceInLocalMeshObtainedFromFaultMap){
+                    auto faultTagElement=matrixWithBoundaryTagsDetails[j][0];
+                    auto loaclMeshInFaultTagIndex=matrixWithBoundaryTagsDetails[j][1];
+                    matrixWithBoundaryTagsDetails.erase(matrixWithBoundaryTagsDetails.begin() + j);
+                    faultTags[faultTagElement].setfacesInLocalBoundaryMap(loaclMeshInFaultTagIndex,i);
+                    break;
+
+                    //
+                }
+
+            }
+
+        }
+        auto facesAssinged=intialSizeOfMatrixWithBoundaryTags-matrixWithBoundaryTagsDetails.size();
+
+        if (fault_map->local_size()  != facesAssinged ){
+            std::runtime_error("Couldn't figure out all fault tags faces");
+        }
+
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
+        
+        // this part of the new code 
+        auto filename=friction_scenario->returnFileLoaded();
+        fric->lop().set_file_with_friction(filename);
+        fric->lop().setFaultTags(faultTags);
+        fric->lop().setEtaScanerio(friction_scenario->returnScanerioLoaded());
+        fric->lop().setFaultSize(fault_map->local_size());
+
+      // auto fric =
+        //    std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
+        
+        
+
         fric->lop().set_constant_params(friction_scenario->constant_params());
         fric->lop().set_params(friction_scenario->param_fun());
         if (friction_scenario->source_fun()) {
@@ -76,6 +119,8 @@ public:
         if (friction_scenario->delta_sn_fun()) {
             fric->lop().set_delta_sn_fun(*friction_scenario->delta_sn_fun());
         }
+      
+
         return fric;
     }
     auto adapter() -> std::unique_ptr<AbstractAdapterOperator> override {
@@ -116,7 +161,10 @@ public:
     std::unique_ptr<DieterichRuinaAgeingScenario> friction_scenario;
     std::shared_ptr<Type> dg_lop;
 
+    
+
 private:
+    
     std::array<double, DomainDimension> up;
     std::array<double, DomainDimension> ref_normal;
 };

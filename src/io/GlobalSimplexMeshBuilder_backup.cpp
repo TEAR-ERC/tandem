@@ -42,21 +42,22 @@ void GlobalSimplexMeshBuilder<D>::addBoundaryTag( std::string tagLabel, long tag
     bool addData=false;
     BC bc=BC::None;
     if (tagLabel.size()>6 ){
-        
-        if (returnFirstNChars(tagLabel,10) == "dirichlet_") {bc = BC::Dirichlet;addData=true; }
-        else if (returnFirstNChars(tagLabel,13)=="free_surface_") {bc = BC::Natural;addData=true; }
-        else if (returnFirstNChars(tagLabel,6)=="fault_") {bc = BC::Fault;addData=true; }
+        std::string prefix=returnLowercaseFirstSixChar(tagLabel);
+        if (prefix == "diric_") {BC bc = BC::Dirichlet;addData=true; }
+        else if (prefix=="norma_") {BC bc = BC::Natural;addData=true; }
+        else if (prefix=="fault_") {BC bc = BC::Fault;addData=true; }
     }
 
     if (addData){boundaryTags.emplace_back(tagLabel, tagID, dimension, bc);}
     else{
-   throw std::runtime_error("Warning: tag name is neither dirichlet_*/free_surface_*/fault_* (case sensetive) . Please rename " + tagLabel + " to continue.");
+        std::cerr << "Warning: tag name is neither diric_/norma_/fault_ or may contain characters that are not supported. Please change "
+        << tagLabel << std::endl;
     }
 }
 
 template <std::size_t D>
 void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
-                                             std::size_t numNodes, long elementID) {
+                                             std::size_t numNodes) {
     if (is_gmsh_simplex<D>(type)) {
         if (type_ == 0) {
             type_ = type;
@@ -93,36 +94,78 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
-
-        std::array<uint64_t, D>& elemtsForTagging = elem;
-        
-        
         BC bc = BC::None;
-        bool foundEntry=false;
-        
-        if (boundaryTags.size()<1){
-            throw std::runtime_error("Couldn't find  boundary conditions in the mesh :( ");
+
+        bool useSwitch = true;
+        //std::cout << "Im here-10" << std::endl;
+        if (userInputPhysicalNames.size()>0 ){
+            for (const auto&  entry :userInputPhysicalNames ) {
+                if ( (entry.id == tag ) && (entry.name.size() > 5)) {
+    
+                        std::string prefix=returnLowercaseFirstSixChar(entry.name);
+
+                        if (prefix == "diric_") {
+                            bc = BC::Dirichlet;
+                            useSwitch=false;
+                            boundariesTags->addNewEntry(bc,entry.name,entry.id,*node,boundaryCounter);
+                            break;
+                          
+                                           
+                        }
+                        //else if (prefix=="field_"){
+                        //    useSwitch=true;
+                        //    regionBoundaryTags->addTagIdToBoundaryManager(entry.name,entry.id, *node);
+                        //}
+                        else if (prefix=="norma_"){
+                            bc = BC::Natural;
+                            useSwitch=false;
+                            boundariesTags->addNewEntry(bc,entry.name,entry.id,*node,boundaryCounter);
+                            break;
+                          
+                            
+                        }
+                        if (prefix=="fault_"){
+                            bc = BC::Fault;
+                            useSwitch=false;
+                            boundariesTags->addNewEntry(bc,entry.name,entry.id,*node,boundaryCounter);
+                            break;
+                          //  faultsTags->addTagIdToBoundaryManager(entry.name,entry.id,*node);
+                                                  
+
+                        }
+
+
+
+                    }
+                }
+                
         }
 
-        for ( auto&  entry :boundaryTags ){
-
-            if (entry.getTagID()==tag){
-
-               
-                entry.addElements(Simplex<D - 1u>(elemtsForTagging));
-                bc=entry.getBoundaryType();
-                foundEntry=true;
+        if (useSwitch){
+            switch (tag) {
+            case static_cast<long>(BC::None):
+                bc = BC::None;
+                boundariesTags->addTagID(tag);
+                break;
+            case static_cast<long>(BC::Dirichlet):
+                bc = BC::Dirichlet;
+                break;
+            case static_cast<long>(BC::Fault):
+                bc = BC::Fault;
+                break;
+            case static_cast<long>(BC::Natural):
+                bc = BC::Natural;
+                break;
+            default:
+                ++unknownBC;
+                boundariesTags->addTagID(tag);
                 break;
             }
         }
-        if (foundEntry==false){
-                ++unknownBC;
-        }
         bcs.push_back(bc);
         boundaryCounter=boundaryCounter+1;
-    }
-      
-     else {
+       
+    } else {
         if (is_lower_dimensional_gmsh_simplex_v<D - 1u>(type)) {
             ++ignoredElems;
         } else {
@@ -132,6 +175,9 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
             throw std::runtime_error(s.str());
         }
     }
+   //std::cout << "Im here-11" << std::endl;
+    //bcs[0]=BC::Dirichlet;
+    //std::cout << "Im here-12" << std::endl;
 
 }
 
@@ -200,22 +246,27 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
                                                       std::move(elementData), comm);
-
-
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
                                                       nullptr, comm);
     }
 
+    // boundary mesh
+   // if ( bcs.size() != static_cast<std::size_t>(boundaryCounter)) {
+   //      throw std::runtime_error("bcs length and tagging list is not the same, Need to exit to be careful. Please correct");
+   // }
+    //std::cout << "Im here 0" << std::endl;
+    //bcs.back()=BC::None;
+    //bcs[0]=BC::None;
+    //std::cout << "Im here -1" << std::endl;
     auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs));
     auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets), nullptr,
                                                                     std::move(boundaryData), comm);
-
+    boundariesTags->generateBoolVector(BC::Fault);
     mesh->setBoundaryMesh(std::move(boundaryMesh));
-    mesh->setBoundaryTags(boundaryTags);
 
-
+    //std::cout << "Size of MyClass object: " << sizeof(mesh) << " bytes" << std::endl;
     return mesh;
 }
 

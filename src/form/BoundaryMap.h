@@ -29,6 +29,7 @@ public:
     std::size_t local_size() const { return local_size_; }
     std::shared_ptr<ScatterPlan> scatter_plan() const { return scatter_plan_; }
 
+
 private:
     std::vector<std::size_t> fctNos_;
     std::vector<std::size_t> bndNos_;

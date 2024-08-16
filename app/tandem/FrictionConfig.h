@@ -43,11 +43,19 @@ public:
     constexpr static char DeltaSn[] = "delta_sn";
     constexpr static char FaultSolution[] = "fault_solution";
 
-    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
+    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario,std::optional<std::string> etaScenario = std::nullopt)
+    :fileToLoad(lib),scenarioToLoad(scenario),etaScenario(etaScenario)
+     {
         lib_.loadFile(lib);
+        std::string scenarioSpecificForEta;
 
         a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
-        eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Eta);
+        if (etaScenario.has_value()){
+            scenarioSpecificForEta=etaScenario.value();;
+        }else{
+            scenarioSpecificForEta=scenario;
+        }
+            eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenarioSpecificForEta, Eta);
         L_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, L);
         if (lib_.hasMember(scenario, SnPre)) {
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
@@ -119,7 +127,14 @@ public:
         return nullptr;
     }
 
+    std::string returnFileLoaded (){return fileToLoad;}
+    std::string returnScanerioLoaded (){return scenarioToLoad;}
+
+
 protected:
+    std::string fileToLoad;
+    std::string scenarioToLoad;
+    std::optional<std::string> etaScenario;
     DieterichRuinaAgeing::ConstantParams cp_;
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;
