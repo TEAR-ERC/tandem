@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
         PetscFinalize();
         return -1;
     }
-    globalMesh->repartition();
+    globalMesh->repartition(cfg->partitionFaultWeight);
     auto mesh = globalMesh->getLocalMesh(1);
     
 

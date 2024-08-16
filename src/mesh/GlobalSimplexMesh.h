@@ -86,19 +86,22 @@ public:
      *
      * @return Returns mesh in distributed CSR format as required by ParMETIS.
      */
+
     template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR() const {
         DistributedCSR<OutIntT> csr;
 
         auto elmdist = makeSortedDistribution(numElements(), comm);
         csr.dist.resize(elmdist.size());
         std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
-
+        
         auto numElems = numElements();
         csr.rowPtr.resize(numElems + 1);
         csr.colInd.resize(numElems * (D + 1));
-
+        //std::vector<idx_t> elementWeights(numElems, 1);
+        
         OutIntT ind = 0;
         OutIntT ptr = 0;
+        std::size_t elementIndex=0;
         for (auto& e : elems_) {
             csr.rowPtr[ptr++] = ind;
             for (auto& p : e) {
@@ -110,10 +113,60 @@ public:
         return csr;
     }
 
+    template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR(std::vector<idx_t>& elementWeights,long faultWeight) const {
+        DistributedCSR<OutIntT> csr;
+
+        auto elmdist = makeSortedDistribution(numElements(), comm);
+        csr.dist.resize(elmdist.size());
+        std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
+        
+        auto numElems = numElements();
+        csr.rowPtr.resize(numElems + 1);
+        csr.colInd.resize(numElems * (D + 1));
+        //std::vector<idx_t> elementWeights(numElems, 1);
+        
+        OutIntT ind = 0;
+        OutIntT ptr = 0;
+        std::size_t elementIndex=0;
+        for (auto& e : elems_) {
+            csr.rowPtr[ptr++] = ind;
+            for (auto& p : e) {
+                csr.colInd[ind++] = p;
+            }
+
+            for (const auto& boundaryTag_i : boundaryTags){
+                if (boundaryTag_i.getBoundaryType() == BC::Fault ){
+                
+                    bool match_found = false;
+                    auto faultFaces=boundaryTag_i.getElementBoundary(); 
+                    auto elementFaces=e.downward();
+
+                    for (const auto& elementFace_i : elementFaces) {
+                        for (const auto& faultFace_i : faultFaces) {
+                    
+                            if (std::equal(elementFace_i.begin(), elementFace_i.end(), faultFace_i.begin())){
+                                elementWeights[elementIndex]=faultWeight;
+                                match_found = true;
+                                break;
+                            } 
+                        }
+                        if (match_found) {
+                            break; // Exit outer loop if a match is found
+                        }
+                    }
+                }
+            }
+            elementIndex=elementIndex+1;
+        }    
+        csr.rowPtr.back() = ind;
+
+        return csr;
+    }
+
     /**
      * @brief Use ParMETIS to optimise mesh partitioning.
      */
-    void repartition();
+    void repartition(long faultPartitionElementWeight=1);
 
     /**
      * @brief Partition elements by their hash value (SimplexHash).
