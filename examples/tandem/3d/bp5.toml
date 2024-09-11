@@ -6,8 +6,9 @@ mode = "QD"
 type = "elasticity"
 ref_normal = [0, -1, 0]
 boundary_linear = true
+# comment mg_strategy for QDGreen
 mg_strategy = "logarithmic"
-matrix_free = true
+matrix_free = false
 
 [fault_probe_output]
 prefix = "fltst_"
@@ -23,4 +24,27 @@ probes = [
     { name = "strk+00dp+10", x = [  0, 0, -10] },
     { name = "strk+16dp+10", x = [ 16, 0, -10] },
     { name = "strk+00dp+22", x = [  0, 0, -22] }
+]
+
+[fault_output]
+prefix = "fault_output/bp5-fault"
+rtol = 0.1
+
+[domain_output]
+prefix = "domain_output/bp5-domain"
+rtol = 0.1
+
+[domain_probe_output]
+prefix = "blkst_"
+t_max = 9460800
+probes = [
+    { name = "strk-16fn+08dp+00", x = [-16,  8,   0] },
+    { name = "strk+00fn+08dp+00", x = [  0,  8,   0] },
+    { name = "strk+16fn+08dp+00", x = [ 16,  8,   0] },
+    { name = "strk+00fn+16dp+00", x = [  0, 16,   0] },
+    { name = "strk+00fn+32dp+00", x = [  0, 32,   0] },
+    { name = "strk+00fn+48dp+00", x = [  0, 48,   0] },
+    { name = "strk+00fn+08dp+10", x = [  0,  8, -10] },
+    { name = "strk+00fn+16dp+10", x = [  0, 16, -10] },
+    { name = "strk+00fn+32dp+10", x = [  0, 32, -10] }
 ]

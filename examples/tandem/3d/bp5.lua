@@ -26,11 +26,6 @@ end
 
 function BP5:boundary(x, y, z, t)
     local Vh = self.Vp * t
-    if y > 1 then
-        Vh = Vh / 2.0
-    elseif y < -1 then
-        Vh = -Vh / 2.0
-    end
     return Vh, 0, 0
 end
 
