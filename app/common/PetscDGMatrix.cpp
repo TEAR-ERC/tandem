@@ -55,6 +55,12 @@ PetscDGMatrix::PetscDGMatrix(std::size_t blockSize, DGOperatorTopo const& topo)
     case HASH_DEF(MATIS):
         preallocate_IS(topo);
         break;
+    case HASH_DEF(MATSEQAIJCUSPARSE):
+        preallocate_SeqAIJ(topo);
+        break;
+    case HASH_DEF(MATMPIAIJCUSPARSE):
+        preallocate_MPIAIJ(topo);
+        break;
     default:
         break;
     }
