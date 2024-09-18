@@ -1,7 +1,7 @@
-LUMI-C
-======
+LUMI
+====
 
-Installation on LUMI-C leverages the preinstalled spack software stack there.
+Installation on LUMI leverages the preinstalled spack software stack there.
 It requires setting up a spack environment and installing tandem there.
 
 Preparing spack for installation
@@ -88,15 +88,55 @@ We then add the seissol-spack-aid repository which contains the latest version o
     git clone --branch NG https://github.com/SeisSol/seissol-spack-aid
     spack repo add seissol-spack-aid/spack/
 
+Next step is to discover the more recent compilers (e.g. gcc-13)
 
-Installation of tandem
-----------------------
+.. code-block:: bash
+
+    spack compiler find
+
+After that we load find python and cmake, to avoid rebuilding them:
+
+.. code-block:: bash
+
+    module load cray-python/3.11.7
+    spack external find python cmake
+
+We tag this added packages as non buildable in spack_tandem/spack.yaml, with `add buildable: false`. That is the files now looks like:
+
+.. code-block:: yaml
+
+  packages:
+    cmake:
+      externals:
+      - spec: cmake@3.20.4
+        prefix: /usr
+        buildable: false
+    python:
+      externals:
+      - spec: python@3.11.7+bz2+crypt+ctypes+dbm+lzma+nis+pyexpat+pythoncmd+readline+sqlite3+ssl~tkinter+uuid+zlib
+        prefix: /opt/cray/pe/python/3.11.7
+        buildable: false
+
+
+Installation of tandem on LUMI-C
+--------------------------------
 
 We can now install tandem, e.g. with:
 
 .. code-block:: yaml
 
     spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@12.2.0
+
+
+
+Installation of tandem on LUMI-G
+--------------------------------
+
+We can install the GPU version of tandem, with:
+
+.. code-block:: yaml
+
+    spack install -j 20 --add tandem@gpu polynomial_degree=2 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
 
 
 Using modules
