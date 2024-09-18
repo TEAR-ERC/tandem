@@ -6,7 +6,7 @@ Installation
 
    spack_installation
    installation_supermucNG
-   installation_lumic
+   installation_lumi
    gpus
    manual_installation
    installing_lua_modules

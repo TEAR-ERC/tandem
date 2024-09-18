@@ -166,7 +166,7 @@ Note that this may not work with spack/23.09 because the module folder of the pr
 Running tandem
 --------------
 
-Here is an example of slurm job file for running static on LUMI:
+Here is an example of slurm job file for running static on LUMI-C:
 
 .. code-block:: bash
 
