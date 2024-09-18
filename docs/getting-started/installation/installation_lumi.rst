@@ -70,8 +70,6 @@ Then we add `spack.yaml` in the folder:
                 cuda: cuda
                 rocm: rocm
                 debug: debug
-            core_compilers:
-            - gcc@=12.2.0
 
 We then source the environment with:
 
@@ -125,7 +123,7 @@ We can now install tandem, e.g. with:
 
 .. code-block:: yaml
 
-    spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@12.2.0
+    spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@13
 
 
 
@@ -136,7 +134,7 @@ We can install the GPU version of tandem, with:
 
 .. code-block:: yaml
 
-    spack install -j 20 --add tandem@gpu polynomial_degree=2 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
+    spack install -j 20 --add tandem@gpu polynomial_degree=4 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
 
 
 Using modules

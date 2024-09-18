@@ -14,7 +14,6 @@ Installing the GPU version tandem is (in theory) as simple as adding the GPU var
 Using a GPU version
 -------------------
 
-
 To ensure that tandem utilizes GPUs for computation, the following PETSc arguments are required when running the application:
 
 .. code-block:: bash
