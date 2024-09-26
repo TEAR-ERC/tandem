@@ -1,6 +1,7 @@
 #include "PetscDGShell.h"
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
+#include <petsc/private/matimpl.h>
 
 namespace tndm {
 
@@ -16,6 +17,34 @@ PetscDGShell::PetscDGShell(AbstractDGOperator<DomainDimension>& dgop) {
 
     CHKERRTHROW(MatShellSetContext(A_, static_cast<void*>(&dgop)));
     CHKERRTHROW(MatShellSetOperation(A_, MATOP_MULT, (void (*)(void))apply));
+    CHKERRTHROW(PetscStrallocpy(VECSTANDARD, &A_->defaultvectype)); // seq or mpi
+    {
+        char val[PETSC_MAX_PATH_LEN];
+        PetscBool found = PETSC_FALSE;
+        CHKERRTHROW(PetscOptionsGetString(NULL, NULL, "-vec_type", val, sizeof(val), &found));
+        if (found) {
+            PetscBool isstd, iskok, iscuda, iship;
+
+            CHKERRTHROW(PetscStrcmpAny(val, &isstd, VECSTANDARD, VECSEQ, VECMPI, ""));
+            if (isstd) {
+                CHKERRTHROW(PetscStrallocpy(VECSTANDARD, &A_->defaultvectype));
+            }
+            CHKERRTHROW(PetscStrcmpAny(val, &iskok, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
+            if (iskok) {
+                CHKERRTHROW(PetscStrallocpy(VECKOKKOS, &A_->defaultvectype));
+            }
+
+            CHKERRTHROW(PetscStrcmpAny(val, &iscuda, VECCUDA, VECSEQCUDA, VECMPICUDA, ""));
+            if (iscuda) {
+                CHKERRTHROW(PetscStrallocpy(VECCUDA, &A_->defaultvectype));
+            }
+
+            CHKERRTHROW(PetscStrcmpAny(val, &iship, VECHIP, VECSEQHIP, VECMPIHIP, ""));
+            if (iship) {
+                CHKERRTHROW(PetscStrallocpy(VECHIP, &A_->defaultvectype));
+            }
+        }
+    }
 }
 
 PetscDGShell::~PetscDGShell() { MatDestroy(&A_); }
