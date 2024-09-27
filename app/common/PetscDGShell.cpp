@@ -17,31 +17,26 @@ PetscDGShell::PetscDGShell(AbstractDGOperator<DomainDimension>& dgop) {
 
     CHKERRTHROW(MatShellSetContext(A_, static_cast<void*>(&dgop)));
     CHKERRTHROW(MatShellSetOperation(A_, MATOP_MULT, (void (*)(void))apply));
-    CHKERRTHROW(PetscStrallocpy(VECSTANDARD, &A_->defaultvectype)); // seq or mpi
     {
         char val[PETSC_MAX_PATH_LEN];
         PetscBool found = PETSC_FALSE;
         CHKERRTHROW(PetscOptionsGetString(NULL, NULL, "-vec_type", val, sizeof(val), &found));
-        if (found) {
-            PetscBool isstd, iskok, iscuda, iship;
 
-            CHKERRTHROW(PetscStrcmpAny(val, &isstd, VECSTANDARD, VECSEQ, VECMPI, ""));
-            if (isstd) {
-                CHKERRTHROW(PetscStrallocpy(VECSTANDARD, &A_->defaultvectype));
-            }
-            CHKERRTHROW(PetscStrcmpAny(val, &iskok, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
-            if (iskok) {
-                CHKERRTHROW(PetscStrallocpy(VECKOKKOS, &A_->defaultvectype));
-            }
+        if (!found) {
+            CHKERRTHROW(PetscStrallocpy(VECSTANDARD, &A_->defaultvectype)); // seq or mpi
+        } else {
+            const char *vecTypes[] = {VECSTANDARD, VECKOKKOS, VECCUDA, VECHIP};
+            const char *vecSeqTypes[] = {VECSEQ, VECSEQKOKKOS, VECSEQCUDA, VECSEQHIP};
+            const char *vecMPItypes[] = {VECMPI, VECMPIKOKKOS, VECMPICUDA, VECMPIHIP};
+            PetscBool match;
 
-            CHKERRTHROW(PetscStrcmpAny(val, &iscuda, VECCUDA, VECSEQCUDA, VECMPICUDA, ""));
-            if (iscuda) {
-                CHKERRTHROW(PetscStrallocpy(VECCUDA, &A_->defaultvectype));
-            }
-
-            CHKERRTHROW(PetscStrcmpAny(val, &iship, VECHIP, VECSEQHIP, VECMPIHIP, ""));
-            if (iship) {
-                CHKERRTHROW(PetscStrallocpy(VECHIP, &A_->defaultvectype));
+            // Check for Kokkos, CUDA, or HIP vector types only
+            for (int i = 0; i < 4; ++i) {
+                CHKERRTHROW(PetscStrcmpAny(val, &match, vecTypes[i], vecSeqTypes[i], vecMPItypes[i], ""));
+                if (match) {
+                    CHKERRTHROW(PetscStrallocpy(vecTypes[i], &A_->defaultvectype));
+                    break;
+                }
             }
         }
     }
