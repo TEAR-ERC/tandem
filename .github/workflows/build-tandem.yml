@@ -35,12 +35,17 @@ jobs:
               libeigen3-dev python3-numpy \
               libopenblas0 libopenblas-dev \
               liblua5.3-0 liblua5.3-dev \
-              libomp-dev libgomp1
+              libomp-dev libgomp1 \
+              libglu1-mesa
             # libxsmm
             git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git gitbuild && \
             mkdir -p gitbuild && cd gitbuild && \
             make generator -j $(nproc) && sudo cp bin/libxsmm_gemm_generator /usr/bin && \
             cd .. && rm -rf gitbuild
+            # gmsh for code verification
+            wget -q https://gmsh.info/bin/Linux/gmsh-4.13.1-Linux64.tgz
+            tar -xzf gmsh-4.13.1-Linux64.tgz
+            echo "$PWD/gmsh-4.13.1-Linux64/bin" >> $GITHUB_PATH
 
       - name: Get Ubuntu and PETSc Version
         id: get_version
@@ -82,10 +87,16 @@ jobs:
           mkdir build && cd build
           cmake .. \
                 -DCMAKE_PREFIX_PATH=${{ env.PETSC_CACHE_FOLDER }} \
-                -DDOMAIN_DIMENSION=3 \
+                -DDOMAIN_DIMENSION=2 \
                 -DPOLYNOMIAL_DEGREE=2 \
                 -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} \
                 -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} 
      
           make -j$(nproc)
           make test
+
+      - name: verify static
+        run: |
+          cd examples/elasticity/2d
+          gmsh -2 circular_hole.geo 
+          ../../../build/app/static circular_hole.toml --resolution 0.8  --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1  --petsc -options_file ../../options/mg_cheby.cfg
