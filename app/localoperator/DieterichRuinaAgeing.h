@@ -79,8 +79,8 @@ public:
     auto S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     auto slip_rate(std::size_t index, double sn,
-                   std::array<double, TangentialComponents> const& tau, double psi) const
-        -> std::array<double, TangentialComponents> {
+                   std::array<double, TangentialComponents> const& tau,
+                   double psi) const -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
@@ -90,7 +90,7 @@ public:
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
             if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
             } else {

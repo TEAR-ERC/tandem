@@ -113,8 +113,8 @@ public:
         return soln;
     }
 
-    auto raw_state(BlockVector const& vector)
-        -> FiniteElementFunction<DomainDimension - 1u> override {
+    auto
+    raw_state(BlockVector const& vector) -> FiniteElementFunction<DomainDimension - 1u> override {
         auto range = Range<std::size_t>(0, num_local_elements());
         return raw_state(vector, range.begin(), range.end());
     }

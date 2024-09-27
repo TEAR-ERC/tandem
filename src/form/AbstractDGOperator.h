@@ -37,14 +37,14 @@ public:
     virtual void project(volume_functional_t x, BlockVector& y) = 0;
     virtual double local_cfl_time_step() const = 0;
 
-    virtual auto solution(BlockVector const& vector, std::vector<std::size_t> const& subset)
-        -> FiniteElementFunction<D> = 0;
+    virtual auto solution(BlockVector const& vector,
+                          std::vector<std::size_t> const& subset) -> FiniteElementFunction<D> = 0;
     virtual auto solution(BlockVector const& vector,
                           std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<D> = 0;
     virtual auto params(std::vector<std::size_t> const& subset) -> FiniteElementFunction<D> = 0;
-    virtual auto params(std::optional<Range<std::size_t>> range = std::nullopt)
-        -> FiniteElementFunction<D> = 0;
+    virtual auto
+    params(std::optional<Range<std::size_t>> range = std::nullopt) -> FiniteElementFunction<D> = 0;
 
     virtual void set_force(volume_functional_t fun) = 0;
     virtual void set_slip(facet_functional_t fun) = 0;
