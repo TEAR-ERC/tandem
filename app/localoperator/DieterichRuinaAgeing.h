@@ -99,19 +99,20 @@ public:
                 if (a > b) {
                     std::swap(a, b);
                 }
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
-                    return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
+                    return tauAbs - this->F(index, snAbs, std::pow(10.0,Ve), psi) - eta * std::pow(10.0,Ve);
                 };
                 try {
-                    V = zeroIn(a, b, fF);
+                    auto Ve = zeroIn(-216, std::log10(b), fF);
+                    V = std::pow(10.0,Ve);
                 } catch (std::exception const&) {
                     std::cout << "sigma_n = " << snAbs << std::endl
                               << "|tau| = " << tauAbs << std::endl
                               << "psi = " << psi << std::endl
                               << "L = " << a << std::endl
                               << "U = " << b << std::endl
-                              << "F(L) = " << fF(a) << std::endl
-                              << "F(U) = " << fF(b) << std::endl;
+                              << "F(L) = " << fF(-216) << std::endl
+                              << "F(U) = " << fF(std::log10(b)) << std::endl;
                     throw;
                 }
             }
