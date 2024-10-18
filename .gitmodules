@@ -4,3 +4,9 @@
 [submodule "submodules/yateto"]
 	path = submodules/yateto
 	url = https://github.com/SeisSol/yateto.git
+[submodule "external/extern/pybind11"]
+	path = external/extern/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "external/pybind11/extern/pybind11"]
+	path = external/pybind11/extern/pybind11
+	url = https://github.com/pybind/pybind11.git

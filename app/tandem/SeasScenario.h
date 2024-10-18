@@ -9,7 +9,7 @@
 #include "script/LuaLib.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
-
+#include "script/PythonLib.h"
 #include <array>
 #include <functional>
 #include <optional>
@@ -36,18 +36,40 @@ public:
     constexpr static char InitialDisplacement[] = "initial_displacement";
     constexpr static char InitialVelocity[] = "initial_velocity";
 
-    SeasScenario(std::string const& lib, std::string const& scenario) {
+      SeasScenario(std::string const& lib, std::string const& scenario,std::string const& libPy)  {
+
+       
+      
         lib_.loadFile(lib);
+        PyLib_.loadFile(libPy);
+             
+       //if (PyLib_.hasMember(scenario, Mu)) {
+            
+        //    mu_ = PyLib_.getFunction<DomainDimension, 1>(scenario, Mu);
+           
+        //}
+
+        if (PyLib_.hasMember(scenario, Mu)) {
+            mu_ = PyLib_.getFunction<DomainDimension, 1>(scenario, Mu);
+        }
+
+        if (PyLib_.hasMember(scenario, Lam)) {
+            lam_ = PyLib_.getFunction<DomainDimension, 1>(scenario, Lam);
+                  
+        }
+
+
+        
 
         if (lib_.hasMember(scenario, Warp)) {
             warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
-        if (lib_.hasMember(scenario, Mu)) {
-            mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
-        }
-        if (lib_.hasMember(scenario, Lam)) {
-            lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
-        }
+       // if (lib_.hasMember(scenario, Mu)) {
+       //     mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
+       // }
+       // if (lib_.hasMember(scenario, Lam)) {
+        //    lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
+       // }
         if (lib_.hasMember(scenario, Rho)) {
             rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension, 1>(scenario, Rho));
         }
@@ -91,6 +113,8 @@ public:
 
 protected:
     LuaLib lib_;
+    PythonLib PyLib_;
+    //PythonLib PyLib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
         return {1.0};

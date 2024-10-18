@@ -108,6 +108,7 @@ void setConfigSchema(TableSchema<Config>& schema,
         })
         .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; });
     schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists());
+    schema.add_value("libPy", &Config::libPy).converter(path_converter).validator(PathExists());
     schema.add_value("scenario", &Config::scenario);
     auto default_up = std::array<double, DomainDimension>{};
     default_up.back() = 1.0;

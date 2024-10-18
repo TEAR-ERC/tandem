@@ -66,6 +66,7 @@ struct Config {
     SeasMode mode;
     LocalOpType type;
     std::string lib;
+    std::string libPy;
     std::string scenario;
     std::array<double, DomainDimension> up;
     std::array<double, DomainDimension> ref_normal;

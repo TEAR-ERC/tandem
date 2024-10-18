@@ -35,7 +35,7 @@
 #include <limits>
 #include <mpi.h>
 #include <petscsys.h>
-
+#include "script/PythonLib.h"
 #include <algorithm>
 #include <array>
 #include <ctime>
@@ -53,10 +53,13 @@ namespace tndm::detail {
 
 template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+
     return std::make_unique<seas::Context<Type>>(
-        mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
+        mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario,cfg.libPy),
         std::make_unique<DieterichRuinaAgeingScenario>(cfg.lib, cfg.scenario), cfg.up,
         cfg.ref_normal);
+
+
 }
 
 template <std::size_t N>

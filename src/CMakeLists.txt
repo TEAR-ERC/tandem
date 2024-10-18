@@ -25,6 +25,7 @@ target_link_libraries(tandem-fem-lib PUBLIC
     Eigen3::Eigen
 )
 
+
 # Add everything else here
 add_library(tandem-lib
     form/BoundaryMap.cpp
@@ -52,6 +53,7 @@ add_library(tandem-lib
     parallel/SortedDistribution.cpp
     parallel/Summary.cpp
     script/LuaLib.cpp
+    script/PythonLib.cpp
     util/TablePrinter.cpp
     util/Zero.cpp
 )
@@ -61,7 +63,16 @@ find_package(MPI REQUIRED)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
+
+
+
 include(../cmake/filesystem.cmake)
+
+
+
+
+
+
 
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
@@ -79,4 +90,7 @@ target_link_libraries(tandem-lib PUBLIC
     tinyxml2
     toml
     ZLIB::ZLIB
+    pybind11::embed
 )
+
+

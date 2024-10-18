@@ -6,6 +6,8 @@ project(tandem VERSION 1.0
 include(cmake/user_options.cmake)
 include(cmake/cpu_arch_flags.cmake)
 
+
+
 get_arch_flags(${ARCH} ${CMAKE_CXX_COMPILER_ID})
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -18,7 +20,13 @@ endif()
 
 add_subdirectory(app)
 add_subdirectory(external)
+add_subdirectory(external/pybind11)
+
+
+
 add_subdirectory(src)
 
 enable_testing()
 add_subdirectory(test)
+
+

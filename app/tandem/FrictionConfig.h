@@ -45,13 +45,19 @@ public:
 
     DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
+        
+        //PyLib_.loadFile(libPy);
+        
+
 
         a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
         eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Eta);
         L_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, L);
+        
         if (lib_.hasMember(scenario, SnPre)) {
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
         }
+        
         if (lib_.hasMember(scenario, TauPre)) {
             tau_pre_ =
                 lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
@@ -91,6 +97,8 @@ public:
                 lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario,
                                                                            FaultSolution)));
         }
+
+        
     }
 
     auto const& constant_params() const { return cp_; }
