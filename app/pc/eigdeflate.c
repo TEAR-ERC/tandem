@@ -173,7 +173,7 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     PetscFunctionReturn(0);
 }
 
-PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject, PC pc) {
+PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems* PetscOptionsObject) {
     PC_eigdeflate* ctx;
     PetscInt M;
     PetscBool flg;
@@ -181,7 +181,7 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
     PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
 
-    PetscOptionsHead(PetscOptionsObject, "Eigdeflate options");
+    PetscOptionsHeadBegin(PetscOptionsObject, "Eigdeflate options");
     PetscOptionsBoundedInt("-pc_eigdeflate_nev", "Number of deflated eigenvalues", "", ctx->nev,
                            &ctx->nev, &flg, 1);
     PetscOptionsBoundedInt("-pc_eigdeflate_nev_oversample",
@@ -195,7 +195,7 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PetscOptionItems* PetscOptionsObject,
                            ctx->npost, &ctx->npost, &flg, 0);
     PetscOptionsReal("-pc_eigdeflate_relax_factor", "Relaxation factor", "", ctx->factor,
                      &ctx->factor, &flg);
-    PetscOptionsTail();
+    PetscOptionsHeadEnd();
     PetscFunctionReturn(0);
 }
 
@@ -203,14 +203,14 @@ PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
     PC_eigdeflate* ctx = (PC_eigdeflate*)pc->data;
 
     PetscFunctionBegin;
-    PetscViewerASCIIPrintf(viewer, "num. eigenvectors: %D\n", ctx->nev);
+    PetscViewerASCIIPrintf(viewer, "num. eigenvectors: %"PetscInt_FMT "\n", ctx->nev);
     PetscViewerASCIIPrintf(viewer, "emin: %+1.4e\n", ctx->e_min);
     PetscViewerASCIIPrintf(viewer, "emax: %+1.4e\n", ctx->e_max);
-    PetscViewerASCIIPrintf(viewer, "Randomized eigenvalue calculation\n", ctx->nev_oversample);
-    PetscViewerASCIIPrintf(viewer, "over sampling: %D\n", ctx->nev_oversample);
-    PetscViewerASCIIPrintf(viewer, "power iterations: %D\n", ctx->power_its);
-    PetscViewerASCIIPrintf(viewer, "pre-smooth iterations:  %D\n", ctx->npre);
-    PetscViewerASCIIPrintf(viewer, "post-smooth iterations: %D\n", ctx->npost);
+    PetscViewerASCIIPrintf(viewer, "Randomized eigenvalue calculation\n");
+    PetscViewerASCIIPrintf(viewer, "over sampling: %"PetscInt_FMT "\n", ctx->nev_oversample);
+    PetscViewerASCIIPrintf(viewer, "power iterations: %"PetscInt_FMT "\n", ctx->power_its);
+    PetscViewerASCIIPrintf(viewer, "pre-smooth iterations:  %"PetscInt_FMT "\n", ctx->npre);
+    PetscViewerASCIIPrintf(viewer, "post-smooth iterations: %"PetscInt_FMT "\n", ctx->npost);
     if (ctx->npre > 0 || ctx->npost > 0) {
         PetscViewerASCIIPrintf(viewer, "optimal relaxation: %+1.4e\n", ctx->alpha);
     }
@@ -228,7 +228,7 @@ PetscErrorCode PCCreate_eigdeflate(PC pc) {
     PC_eigdeflate* edef;
 
     PetscFunctionBegin;
-    CHKERRQ(PetscNewLog(pc, &edef));
+    CHKERRQ(PetscNew(&edef));
     pc->data = (void*)edef;
 
     edef->reig = NULL;
