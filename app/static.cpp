@@ -322,8 +322,9 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
     MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
+    auto node_mask = affinity.to_string(affinity.worker_mask_on_node(PETSC_COMM_WORLD));
     if (rank == 0) {
-        Banner::standard(std::cout, affinity);
+        Banner::standard(std::cout, affinity, node_mask);
     }
 
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
