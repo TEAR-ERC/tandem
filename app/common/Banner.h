@@ -30,9 +30,10 @@ public:
                                std::size_t length = std::string_view::npos);
     static void print_version(std::ostream& out);
     static void print_stack_limit(std::ostream& out);
-    static void print_affinity(std::ostream& out, Affinity const& affinity);
+    static void print_affinity(std::ostream& out, Affinity const& affinity,
+                               std::string_view node_mask);
 
-    static void standard(std::ostream& out, Affinity const& affinity);
+    static void standard(std::ostream& out, Affinity const& affinity, std::string_view node_mask);
 
 private:
     static constexpr std::size_t logo_width();
