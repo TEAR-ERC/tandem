@@ -54,9 +54,9 @@ add_custom_command(
 # Generate kernels
 
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
-    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
 else()
-    find_package(PythonInterp 3 REQUIRED)
+    find_package(PythonInterp 3.9 REQUIRED)
     set(Python3_EXECUTABLE ${PYTHON_EXECUTABLE})
 endif()
 
