@@ -37,6 +37,9 @@ void Banner::print_centered(std::ostream& out, std::string_view str, std::size_t
 
 void Banner::print_version(std::ostream& out) {
     print_centered(out, "tandem version " + std::string(VersionString));
+    print_centered(out, "Domain dimension " + std::to_string(DomainDimension));
+    print_centered(out, "polynomial degree " + std::to_string(PolynomialDegree));
+    print_centered(out, "Minimum order of quadrature rule " + std::to_string(MinQuadOrder()));
 }
 
 void Banner::print_stack_limit(std::ostream& out) {
