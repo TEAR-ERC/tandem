@@ -57,15 +57,15 @@ struct ProbeOutputConfig : TabularOutputConfig {
     std::vector<Probe<DomainDimension>> probes;
 };
 
-enum tsCheckpointStorageType { NONE, UNLIMITED, LIMITED, UNKNOWN };
+enum TsCheckpointStorageType { NONE, UNLIMITED, LIMITED, UNKNOWN };
 
-struct tsCheckpointConfig {
+struct TsCheckpointConfig {
     std::optional<std::string> load_directory;
     std::string save_directory;
     int frequency_step;
     double frequency_cputime_minutes;
     double frequency_time_physical;
-    tsCheckpointStorageType storage_type;
+    TsCheckpointStorageType storage_type;
     int storage_limited_size;
 };
 
@@ -97,7 +97,7 @@ struct Config {
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
 
-    tsCheckpointConfig ts_checkpoint_config;
+    TsCheckpointConfig ts_checkpoint_config;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,
