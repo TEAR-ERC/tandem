@@ -17,11 +17,14 @@ Tandem simulation parameters are written in the toml script. Here are the key pa
 - **mg_coarse_level**: Polynomial degree of coarsest MG level. Default = 1.
 - **mg_strategy**: MG level selection strategy. Available options: [TwoLevel | Logarithmic | Full]. Default = TwoLevel.
 
-When using :code:`mode=QDGreen`, you can use Green's function checkpointing feature by defining the following parameters:
 
-- **gf_checkpoint_prefix**: Path where Green's function operator and RHS will be checkpointed.
-- **gf_checkpoint_every_nmins**: Time interval, in minutes, at which the Green's function operator data is saved to disk. Default = 30.0.
+Green's function operator checkpointing
+---------------------------------------
 
+When using :code:`mode=QDGreen`, Green's function checkpointing is parameterized by the **[gf_checkpoint]** section. Here are the key parameters and their descriptions:
+
+- **prefix**: Path where Green's function operator and RHS will be checkpointed.
+- **freq_cputime**: CPU time (minutes) frequency between Green's function operator checkpoints.
         
 Output configurations
 ---------------------
