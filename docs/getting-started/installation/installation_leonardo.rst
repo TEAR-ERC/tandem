@@ -11,8 +11,19 @@ Installation
 ------------
 
 Installation on Leonardo leverages the preinstalled software, while relying on the latest spack.
+First we "patch" the cuda module so that petsc can be installed (https://github.com/spack/spack/issues/47163):
 
-First we extract the preinstalled packages from the system stack
+.. code-block:: bash
+
+    module load cuda/12.1
+    cd /leonardo/pub/userexternal/tulrich0/
+    cp -r $CUDA_HOME .
+    mv none/ cuda_12.1/
+    cd cuda_12.1/
+    ln -s /leonardo/pub/userexternal/tulrich0/cuda_12.1/compat/libcuda.so.1 lib64/
+
+
+We then extract the preinstalled packages from the system stack
 
 .. code-block:: bash
 
@@ -21,7 +32,13 @@ First we extract the preinstalled packages from the system stack
     spack config get packages >  ~/.spack/packages.yaml
     module unload spack
 
-and comment lines 13 to 21 of the `~/.spack/packages.yaml` (cuda related, because we will install our own cuda).
+
+and update the cuda module with:
+
+.. code-block:: yaml
+
+    - spec: cuda@12.1.66
+      prefix: /leonardo/pub/userexternal/$USER/cuda_12.1
 
 Then we create a file `~/.spack/config.yaml`, setting up the path to install:
 
@@ -54,8 +71,6 @@ Then we create a file  `~/.spack/modules.yaml`, setting up the modules:
           enable:
           - tcl
 
-
-
 Then we install the latest spack:
 
 .. code-block:: bash
@@ -77,22 +92,6 @@ And discover system programs (avoiding having to install them) and the gcc compi
     spack compiler find
 
 We then launch the tandem installation with:
-
-.. code-block:: bash
-
-    spack install -j 30 tandem@develop polynomial_degree=4 domain_dimension=3 %gcc@12 +cuda cuda_arch=80 arch=linux-rhel8-icelake +python +libxsmm ^cuda@12.6.2 ^petsc@main
-
-The petsc installation will fail (https://github.com/spack/spack/issues/47163).
-To fix it you need to create a symbolic link (update to your installed cuda path):
-
-.. code-block:: bash
-
-    module use /leonardo/pub/userexternal/$USER/spack-0.23.0-dev0/modules/linux-rhel8-icelake
-    module load cuda/12.6
-    ln -s $CUDA_HOME/targets/x86_64-linux/lib/stubs/libcuda.so $CUDA_HOME/lib64/libcuda.so.1
-
-
-Then we can relaunch the installation:
 
 .. code-block:: bash
 
