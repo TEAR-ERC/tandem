@@ -80,8 +80,7 @@ We then launch the tandem installation with:
 
 .. code-block:: bash
 
-    spack install -j 30 tandem@develop  %gcc@12 +cuda cuda_arch=80 arch=linux-rhel8-icelake +python ^cuda@12.6.2 ^petsc@main
-
+    spack install -j 30 tandem@develop polynomial_degree=4 domain_dimension=3 %gcc@12 +cuda cuda_arch=80 arch=linux-rhel8-icelake +python +libxsmm ^cuda@12.6.2 ^petsc@main
 
 The petsc installation will fail (https://github.com/spack/spack/issues/47163).
 To fix it you need to create a symbolic link (update to your installed cuda path):
@@ -97,7 +96,7 @@ Then we can relaunch the installation:
 
 .. code-block:: bash
 
-    spack install -j 30 tandem@develop  %gcc@12 +cuda cuda_arch=80 arch=linux-rhel8-icelake +python ^cuda@12.6.2 ^petsc@main
+    spack install -j 30 tandem@develop polynomial_degree=4 domain_dimension=3 %gcc@12 +cuda cuda_arch=80 arch=linux-rhel8-icelake +python +libxsmm ^cuda@12.6.2 ^petsc@main
 
 Finally we can create and discover the modules with:
 
