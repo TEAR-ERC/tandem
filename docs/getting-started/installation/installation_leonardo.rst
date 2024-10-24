@@ -105,3 +105,12 @@ Finally we can create and discover the modules with:
     spack module tcl refresh
     echo "module use /leonardo/pub/userexternal/$USER/spack-0.23.0-dev0/modules/linux-rhel8-icelake" >> $HOME/.bashrc
 
+And install some lua modules if required:
+
+.. code-block:: bash
+
+    source ~/.bashrc
+    module load tandem
+    luarocks install luaposix
+    luarocks install csv
+
