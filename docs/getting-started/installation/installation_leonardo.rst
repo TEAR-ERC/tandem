@@ -113,3 +113,48 @@ And install some lua modules if required:
     luarocks install luaposix
     luarocks install csv
 
+
+
+running tandem on Leonardo
+--------------------------
+
+Here is a jobscript to use static with 4 GPU/node, 1 node.
+
+.. code-block:: bash
+
+    #!/bin/bash
+    #SBATCH -p boost_usr_prod
+    #SBATCH --time 00:10:00     # format: HH:MM:SS
+    #SBATCH --nodes=1
+    #SBATCH --cpus-per-task=1
+    #SBATCH --exclusive
+    #SBATCH --ntasks-per-node=4
+    #SBATCH --gres=gpu:4    
+    #SBATCH --job-name=tandem
+    #SBATCH --qos=normal
+    ##SBATCH --account=<PROJECT_NAME>
+    #SBATCH --mem=200G
+
+    cat << EOF > select_gpu
+    #!/bin/bash
+
+    export CUDA_VISIBLE_DEVICES=\$SLURM_LOCALID
+    "\$@"
+    EOF
+
+    chmod +x ./select_gpu
+
+    export MPICH_GPU_SUPPORT_ENABLED=1
+
+    ulimit -Ss 2097152
+
+    echo "Allocated GPUs: $SLURM_JOB_GPUS"
+    echo "CPU Bind: $SLURM_CPU_BIND"
+    echo "Topology Address: $SLURM_TOPOLOGY_ADDR"
+    #numactl --hardware
+
+    module load tandem/develop-gcc-12.2.0-d3-p4-cuda-x7mtzb4
+    CPU_BIND="map_cpu:0,8,16,24"
+
+    time -p srun --cpu-bind=$CPU_BIND ./select_gpu static ridge.toml --mg_strategy twolevel --mg_coarse_level 1  --petsc -ksp_max_it 400 -pc_type mg -mg_levels_ksp_max_it 4 -mg_levels_ksp_type cg -mg_levels_pc_type bjacobi -ksp_rtol 1.0e-6 -mg_coarse_pc_type gamg -mg_coarse_ksp_type cg -mg_coarse_ksp_rtol 1.0e-1 -ksp_type gcr -log_view -vec_type cuda -mat_type aijcusparse -on_error_attach_debugger
+
