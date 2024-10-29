@@ -86,7 +86,7 @@ public:
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
-        double max_xi = -std::pow(2, 8);
+        int max_xi = 8;
         double a, b;
         if (eta == 0.0)
         {
@@ -107,7 +107,7 @@ public:
                 {
                     return tauAbs - this->F(index, snAbs, std::pow(10.0,Ve), psi) - eta * std::pow(10.0,Ve);
                 };
-                for (int xi = 5; xi < 9; ++xi)
+                for (int xi = 5; xi < max_xi + 1; ++xi)
                 {
                     try
                     {
@@ -118,7 +118,7 @@ public:
                     }
                     catch (std::exception const&)
                     {
-                        if (a == max_xi)
+                        if (xi == max_xi)
                         {
                             std::cout << "sigma_n = " << snAbs << std::endl
                                 << "|tau| = " << tauAbs << std::endl
