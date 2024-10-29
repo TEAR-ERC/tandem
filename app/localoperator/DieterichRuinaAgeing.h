@@ -107,7 +107,7 @@ public:
                 {
                     return tauAbs - this->F(index, snAbs, std::pow(10.0,Ve), psi) - eta * std::pow(10.0,Ve);
                 };
-                for (int xi = 5; xi < max_xi + 1; ++xi)
+                for (int xi = 5; xi <= max_xi; ++xi)
                 {
                     try
                     {
