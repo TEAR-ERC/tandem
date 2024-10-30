@@ -80,14 +80,16 @@ public:
 
     auto slip_rate(std::size_t index, double sn,
                    std::array<double, TangentialComponents> const& tau, double psi) const
-        -> std::array<double, TangentialComponents> {
+        -> std::array<double, TangentialComponents> 
+    {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
-        int max_xi = 8;
-        double a, b;
+        double a = -32;
+        double a_min = std::log10(std::nextafter(0, INFINITY));
+        double b;
         if (eta == 0.0)
         {
             V = Finv(index, snAbs, tauAbs, psi);
@@ -107,32 +109,32 @@ public:
                 {
                     return tauAbs - this->F(index, snAbs, std::pow(10.0,Ve), psi) - eta * std::pow(10.0,Ve);
                 };
-                for (int xi = 5; xi <= max_xi; ++xi)
+                try
+                {
+                    auto Ve = zeroIn(a, b, fF);
+                    V = std::pow(10.0, Ve);
+                }
+                catch (std::exception const&)
                 {
                     try
                     {
-                        a = -std::pow(2.0, xi);
-                        auto Ve = zeroIn(a, b, fF);
+                        auto Ve = zeroIn(a_min, b, fF);
                         V = std::pow(10.0, Ve);
-                        break;
                     }
-                    catch (std::exception const&)
+                    catch(std::exception const&)
                     {
-                        if (xi == max_xi)
-                        {
-                            std::cout << "sigma_n = " << snAbs << std::endl
-                                << "|tau| = " << tauAbs << std::endl
-                                << "psi = " << psi << std::endl
-                                << "L = " << a << std::endl
-                                << "U = " << b << std::endl
-                                << "F(L) = " << fF(a) << std::endl
-                                << "F(U) = " << fF(b) << std::endl;
-                            throw;
-                        } 
+                        std::cout << "sigma_n = " << snAbs << std::endl
+                            << "|tau| = " << tauAbs << std::endl
+                            << "psi = " << psi << std::endl
+                            << "L = " << a << std::endl
+                            << "U = " << b << std::endl
+                            << "F(L) = " << fF(a) << std::endl
+                            << "F(U) = " << fF(b) << std::endl;
+                        throw;
                     }
+                }
             }
         }
-    }
     return -(V / tauAbs) * tauAbsVec;
     }
 
