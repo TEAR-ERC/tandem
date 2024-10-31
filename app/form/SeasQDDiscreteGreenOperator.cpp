@@ -259,23 +259,27 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     PetscViewer v;
     PetscLogDouble t0, t1;
     int commsize;
-
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"MPI_Comm_size(base::comm(), &commsize);\n"));
     MPI_Comm_size(base::comm(), &commsize);
-
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscTime(&t0));\n"));
     CHKERRTHROW(PetscTime(&t0));
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), gf_operator_filename_.c_str(), FILE_MODE_WRITE, &v));\n"));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_WRITE, &v));
 
     {
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"PetscInt commsize_checkpoint = (PetscInt)commsize;\n"));
         PetscInt commsize_checkpoint = (PetscInt)commsize;
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));\n"));
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
     }
-
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscViewerBinaryWrite(v, &current_gf, 1, PETSC_INT));\n"));
     CHKERRTHROW(PetscViewerBinaryWrite(v, &current_gf, 1, PETSC_INT));
-
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(MatView(G_, v));\n"));
     CHKERRTHROW(MatView(G_, v));
-
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscViewerDestroy(&v));\n"));
     CHKERRTHROW(PetscViewerDestroy(&v));
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),"CHKERRTHROW(PetscTime(&t1));\n"));
     CHKERRTHROW(PetscTime(&t1));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "write_discrete_greens_operator():matrix %1.2e (sec)\n",
