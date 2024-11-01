@@ -157,9 +157,9 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto t_mat = traction_mat(traction);
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
-	if (delta_sn_) {
+        if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
-	}
+        }
         auto psi = s_mat(node, PsiIndex);
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
@@ -218,9 +218,9 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
     std::size_t index = faultNo * nbf;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto sn = t_mat(node, 0);
-	if (delta_sn_) {
+        if (delta_sn_) {
             sn = sn + get_delta_sn(time, faultNo, node);
-	}
+        }
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);

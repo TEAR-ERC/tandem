@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/RateAndStateBase.h"
 #include "tandem/SeasSolution.h"
 
@@ -18,13 +19,13 @@
 
 namespace tndm {
 
-class DieterichRuinaAgeingScenario {
+class DieterichRuinaScenario {
 public:
     template <std::size_t D>
     using functional_t = std::function<std::array<double, 1>(std::array<double, D> const&)>;
     template <std::size_t D>
     using vector_functional_t =
-        std::function<std::array<double, DieterichRuinaAgeing::TangentialComponents>(
+        std::function<std::array<double, RateAndStateBase::TangentialComponents>(
             std::array<double, D> const&)>;
     static constexpr std::size_t NumQuantities = RateAndStateBase::NumQuantities;
 
@@ -43,7 +44,7 @@ public:
     constexpr static char DeltaSn[] = "delta_sn";
     constexpr static char FaultSolution[] = "fault_solution";
 
-    DieterichRuinaAgeingScenario(std::string const& lib, std::string const& scenario) {
+    DieterichRuinaScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
 
         a_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, A);
@@ -54,15 +55,15 @@ public:
         }
         if (lib_.hasMember(scenario, TauPre)) {
             tau_pre_ =
-                lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
                     scenario, TauPre);
         }
         Vinit_ =
-            lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+            lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
                 scenario, Vinit);
         if (lib_.hasMember(scenario, Sinit)) {
             Sinit_ =
-                lib_.getMemberFunction<DomainDimension, DieterichRuinaAgeing::TangentialComponents>(
+                lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
                     scenario, Sinit);
         }
         if (lib_.hasMember(scenario, Source)) {
@@ -72,7 +73,7 @@ public:
         if (lib_.hasMember(scenario, DeltaTau)) {
             delta_tau_ = std::make_optional(
                 lib_.getMemberFunction<DomainDimension + 1,
-                                       DieterichRuinaAgeing::TangentialComponents>(scenario,
+                                       RateAndStateBase::TangentialComponents>(scenario,
                                                                                    DeltaTau));
         }
         if (lib_.hasMember(scenario, DeltaSn)) {
@@ -126,10 +127,10 @@ protected:
     functional_t<DomainDimension> sn_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)
-        -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
+        -> std::array<double, RateAndStateBase::TangentialComponents> { return {}; };
     vector_functional_t<DomainDimension> Vinit_;
     vector_functional_t<DomainDimension> Sinit_ = [](std::array<double, DomainDimension> const& x)
-        -> std::array<double, DieterichRuinaAgeing::TangentialComponents> { return {}; };
+        -> std::array<double, RateAndStateBase::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_ = std::nullopt;
     std::optional<vector_functional_t<DomainDimension + 1>> delta_tau_ = std::nullopt;
     std::optional<functional_t<DomainDimension + 1>> delta_sn_ = std::nullopt;
