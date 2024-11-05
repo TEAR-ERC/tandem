@@ -2,8 +2,7 @@
 #define FRICTIONCONFIG_20201027_H
 
 #include "config.h"
-#include "localoperator/DieterichRuinaAging.h"
-#include "localoperator/DieterichRuinaSlip.h"
+#include "localoperator/DieterichRuinaBase.h"
 #include "localoperator/RateAndStateBase.h"
 #include "tandem/SeasSolution.h"
 
@@ -58,9 +57,8 @@ public:
                 lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
                     scenario, TauPre);
         }
-        Vinit_ =
-            lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
-                scenario, Vinit);
+        Vinit_ = lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
+            scenario, Vinit);
         if (lib_.hasMember(scenario, Sinit)) {
             Sinit_ =
                 lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
@@ -72,15 +70,12 @@ public:
         }
         if (lib_.hasMember(scenario, DeltaTau)) {
             delta_tau_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1,
-                                       RateAndStateBase::TangentialComponents>(scenario,
-                                                                                   DeltaTau));
+                lib_.getMemberFunction<DomainDimension + 1, RateAndStateBase::TangentialComponents>(
+                    scenario, DeltaTau));
         }
         if (lib_.hasMember(scenario, DeltaSn)) {
             delta_sn_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1,
-                                       1>(scenario,
-                                                                                   DeltaSn));
+                lib_.getMemberFunction<DomainDimension + 1, 1>(scenario, DeltaSn));
         }
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
@@ -97,7 +92,7 @@ public:
     auto const& constant_params() const { return cp_; }
     auto param_fun() const {
         return [this](std::array<double, DomainDimension> const& x) {
-            DieterichRuinaAging::Params p;
+            DieterichRuinaBase::Params p;
             p.a = this->a_(x)[0];
             p.eta = this->eta_(x)[0];
             p.L = this->L_(x)[0];
@@ -121,7 +116,7 @@ public:
     }
 
 protected:
-    DieterichRuinaAging::ConstantParams cp_;
+    DieterichRuinaBase::ConstantParams cp_;
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;
     functional_t<DomainDimension> sn_pre_ =

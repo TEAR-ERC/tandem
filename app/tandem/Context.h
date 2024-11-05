@@ -7,8 +7,7 @@
 #include "form/AdapterOperator.h"
 #include "form/FrictionOperator.h"
 #include "form/SeasQDOperator.h"
-#include "localoperator/DieterichRuinaAging.h"
-#include "localoperator/DieterichRuinaSlip.h"
+#include "localoperator/DieterichRuinaBase.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -49,11 +48,12 @@ template <typename Type> class Context : public ContextBase {
 public:
     using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
-    #if defined(DR_AGING_LAW)
-        using friction_lop_t = RateAndState<DieterichRuinaAging>;
-    #elif defined(DR_SLIP_LAW)
-        using friction_lop_t = RateAndState<DieterichRuinaSlip>;
-    #endif
+
+#if defined(DR_AGING_LAW)
+    using friction_lop_t = RateAndState<DieterichRuinaAging>;
+#elif defined(DR_SLIP_LAW)
+    using friction_lop_t = RateAndState<DieterichRuinaSlip>;
+#endif
     using friction_t = FrictionOperator<friction_lop_t>;
 
     Context(LocalSimplexMesh<DomainDimension> const& mesh,
