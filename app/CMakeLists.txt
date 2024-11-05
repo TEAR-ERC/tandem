@@ -34,6 +34,16 @@ target_compile_options(test-scatter PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(test-scatter PRIVATE ../external/)
 target_link_libraries(test-scatter PRIVATE tandem-lib)
 
+
+add_executable(test_0 test/t_0/test_DieterichRuinaAgeing.cpp)
+target_compile_options(test_0 PRIVATE ${CPU_ARCH_FLAGS})
+include_directories(test_0 "${CMAKE_SOURCE_DIR}/app/")
+include_directories(test_0 "${CMAKE_SOURCE_DIR}/src/")
+include_directories(test_0 "${CMAKE_BINARY_DIR}/app/")
+target_link_libraries(test_0 PRIVATE tandem-lib)
+set_target_properties(test_0 PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/app/test/t_0")
+
+
 # Preprocessing for kernel generation
 
 set(OPTIONS_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/options.json)
