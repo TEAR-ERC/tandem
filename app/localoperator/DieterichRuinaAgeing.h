@@ -87,7 +87,7 @@ public:
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
         double a = -32;
-        double a_min = std::log10(std::nextafter(0, INFINITY));
+        double a_min = std::log10(std::nextafter(0, 1));
         double b;
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
