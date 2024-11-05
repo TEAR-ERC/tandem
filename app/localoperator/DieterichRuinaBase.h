@@ -1,5 +1,5 @@
-#ifndef DIETERICHRUINAAGEING_20201027_H
-#define DIETERICHRUINAAGEING_20201027_H
+#ifndef DIETERICHRUINABASE_20241105_H
+#define DIETERICHRUINABASE_20241105_H
 
 #include "config.h"
 
@@ -17,7 +17,7 @@
 
 namespace tndm {
 
-class DieterichRuinaAgeing {
+class DieterichRuinaBase {
 public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
 
@@ -79,8 +79,8 @@ public:
     auto S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     auto slip_rate(std::size_t index, double sn,
-                   std::array<double, TangentialComponents> const& tau, double psi) const
-        -> std::array<double, TangentialComponents> {
+                   std::array<double, TangentialComponents> const& tau,
+                   double psi) const -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
@@ -90,7 +90,7 @@ public:
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
             if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
             } else {
@@ -118,11 +118,7 @@ public:
         }
         return -(V / tauAbs) * tauAbsVec;
     }
-
-    double state_rhs(std::size_t index, double V, double psi) const {
-        double myL = p_[index].get<L>();
-        return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
-    }
+    virtual double state_rhs(std::size_t index, double V, double psi) const = 0;
 
     auto param_names() const {
         auto names = std::vector<std::string>(4 + TangentialComponents);
@@ -199,4 +195,4 @@ protected:
 
 } // namespace tndm
 
-#endif // DIETERICHRUINAAGEING_20201027_H
+#endif // DIETERICHRUINABASE_20241105_H
