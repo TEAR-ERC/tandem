@@ -49,8 +49,8 @@ public:
     using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
 
-#if defined(DR_AGING_LAW)
-    using friction_lop_t = RateAndState<DieterichRuinaAging>;
+#if defined(DR_AGEING_LAW)
+    using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
 #elif defined(DR_SLIP_LAW)
     using friction_lop_t = RateAndState<DieterichRuinaSlip>;
 #endif

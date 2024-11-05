@@ -1,5 +1,5 @@
-#ifndef DIETERICHRUINAGING_20241105_H
-#define DIETERICHRUINAGING_20241105_H
+#ifndef DIETERICHRUINAAGEING_20241105_H
+#define DIETERICHRUINAAGEING_20241105_H
 
 #include "config.h"
 
@@ -18,7 +18,7 @@
 
 namespace tndm {
 
-class DieterichRuinaAging : public DieterichRuinaBase {
+class DieterichRuinaAgeing : public DieterichRuinaBase {
 public:
     double state_rhs(std::size_t index, double V, double psi) const override {
         double myL = p_[index].get<L>();
@@ -28,4 +28,4 @@ public:
 
 } // namespace tndm
 
-#endif // DIETERICHRUINAAGING_20241105_H
+#endif // DIETERICHRUINAAGEING_20241105_H
