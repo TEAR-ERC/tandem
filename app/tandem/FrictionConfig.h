@@ -24,7 +24,7 @@ public:
     using functional_t = std::function<std::array<double, 1>(std::array<double, D> const&)>;
     template <std::size_t D>
     using vector_functional_t =
-        std::function<std::array<double, RateAndStateBase::TangentialComponents>(
+        std::function<std::array<double, DieterichRuinaBase::TangentialComponents>(
             std::array<double, D> const&)>;
     static constexpr std::size_t NumQuantities = RateAndStateBase::NumQuantities;
 
@@ -54,14 +54,14 @@ public:
         }
         if (lib_.hasMember(scenario, TauPre)) {
             tau_pre_ =
-                lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents>(
                     scenario, TauPre);
         }
-        Vinit_ = lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
+        Vinit_ = lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents>(
             scenario, Vinit);
         if (lib_.hasMember(scenario, Sinit)) {
             Sinit_ =
-                lib_.getMemberFunction<DomainDimension, RateAndStateBase::TangentialComponents>(
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents>(
                     scenario, Sinit);
         }
         if (lib_.hasMember(scenario, Source)) {
@@ -70,7 +70,7 @@ public:
         }
         if (lib_.hasMember(scenario, DeltaTau)) {
             delta_tau_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1, RateAndStateBase::TangentialComponents>(
+                lib_.getMemberFunction<DomainDimension + 1, DieterichRuinaBase::TangentialComponents>(
                     scenario, DeltaTau));
         }
         if (lib_.hasMember(scenario, DeltaSn)) {
@@ -122,10 +122,10 @@ protected:
     functional_t<DomainDimension> sn_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)
-        -> std::array<double, RateAndStateBase::TangentialComponents> { return {}; };
+        -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };
     vector_functional_t<DomainDimension> Vinit_;
     vector_functional_t<DomainDimension> Sinit_ = [](std::array<double, DomainDimension> const& x)
-        -> std::array<double, RateAndStateBase::TangentialComponents> { return {}; };
+        -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_ = std::nullopt;
     std::optional<vector_functional_t<DomainDimension + 1>> delta_tau_ = std::nullopt;
     std::optional<functional_t<DomainDimension + 1>> delta_sn_ = std::nullopt;
