@@ -80,8 +80,7 @@ public:
 
     auto slip_rate(std::size_t index, double sn,
                    std::array<double, TangentialComponents> const& tau, double psi) const
-        -> std::array<double, TangentialComponents> 
-    {
+        -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
@@ -90,52 +89,40 @@ public:
         double a = -32;
         double a_min = std::log10(std::nextafter(0, INFINITY));
         double b;
-        if (eta == 0.0)
-        {
+        if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
-        }
-        else
-        {
-            if (snAbs <= 0.0)
-            { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+        } else {
+            if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
-            }
-            else
-            {
+            } else {
                 b = std::log10(tauAbs / eta);
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve)
-                {
-                    return tauAbs - this->F(index, snAbs, std::pow(10.0,Ve), psi) - eta * std::pow(10.0,Ve);
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
+                    return tauAbs - this->F(index, snAbs, std::pow(10.0, Ve), psi) -
+                           eta * std::pow(10.0, Ve);
                 };
-                try
-                {
+                try {
                     auto Ve = zeroIn(a, b, fF);
                     V = std::pow(10.0, Ve);
-                }
-                catch (std::exception const&)
-                {
-                    try
-                    {
+                } catch (std::exception const&) {
+                    try {
                         auto Ve = zeroIn(a_min, b, fF);
                         V = std::pow(10.0, Ve);
-                    }
-                    catch(std::exception const&)
-                    {
+                    } catch (std::exception const&) {
                         std::cout << "sigma_n = " << snAbs << std::endl
-                            << "|tau| = " << tauAbs << std::endl
-                            << "psi = " << psi << std::endl
-                            << "L = " << a << std::endl
-                            << "U = " << b << std::endl
-                            << "F(L) = " << fF(a) << std::endl
-                            << "F(U) = " << fF(b) << std::endl;
+                                  << "|tau| = " << tauAbs << std::endl
+                                  << "psi = " << psi << std::endl
+                                  << "L = " << a << std::endl
+                                  << "U = " << b << std::endl
+                                  << "F(L) = " << fF(a) << std::endl
+                                  << "F(U) = " << fF(b) << std::endl;
                         throw;
                     }
                 }
             }
         }
-    return -(V / tauAbs) * tauAbsVec;
+        return -(V / tauAbs) * tauAbsVec;
     }
 
     double state_rhs(std::size_t index, double V, double psi) const {
