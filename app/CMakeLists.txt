@@ -51,6 +51,18 @@ add_custom_command(
         ${OPTIONS_FILE_NAME}
 )
 
+# Define options for state evolution law
+set(FRICTION_LAW "dieterich_ruina_aging" CACHE STRING "Define the state variable evolution law")
+if (FRICTION_LAW STREQUAL "dieterich_ruina_aging")
+    add_definitions(-DDR_AGING_LAW)
+    message(STATUS "State evolution law: Dieterich-Ruina Aging Law")
+elseif (FRICTION_LAW STREQUAL "dieterich_ruina_slip")
+    add_definitions(-DDR_SLIP_LAW)
+    message(STATUS "State evolution law: Dieterich-Ruina Slip Law")
+else()
+    message(FATAL_ERROR "Cannot recognize the given option. Your option should be either [dieterich_ruina_aging] or [dieterich_ruina_slip].")
+endif()
+
 # Generate kernels
 
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
