@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
             std::cout << "psi = " << psi_Vec[i] << std::endl;
             std::cout << "Expected: " << slip_rate_Vec[i] << " " << state_rhs_Vec[i] << std::endl;
             std::cout << "Got: " << res.first << " " << res.second << std::endl;
-            std::cout << "Requierd precision: " << presion << std::endl;
+            std::scout << "Requierd precision: " << presion << std::endl;
             std::cout << "Difference: " << std::abs(slip_rate_Vec[i] - res.first) << " " << std::abs(state_rhs_Vec[i] - res.second) << std::endl;
             return -1;
         }

@@ -1,0 +1,3 @@
+Point testing app/localoperator/DieterichRuinaAgeing.h  by evaluating the calculated velocity and dpsi/dt
+for 100 different values of a, b, eta, L, Vinit, sn, psi
+with: V0=1e-6, f0 = 0.6, n_pre = 0, tau_pre = 0, Sinit = 0
