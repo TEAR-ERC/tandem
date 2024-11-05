@@ -88,11 +88,16 @@ public:
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
         int ierr = 0;
-
+/*
         if (snAbs > 100e6){
             snAbs=100e6;
         }
 
+        if (tauAbs > 100e6){
+            tauAbs=100e6;
+        }
+
+    */
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
         } else {

@@ -34,19 +34,6 @@
 
 using namespace tndm;
 
-std::string BCToString(BC bc) {
-    switch (bc) {
-        case BC::None:
-            return "None";
-        case BC::Fault:
-            return "fault";
-        case BC::Dirichlet:
-        
-            return "Dirichlet";
-        default:
-            return "Unknown";
-    }
-}
 
 int main(int argc, char** argv) {
     auto affinity = Affinity();
@@ -96,12 +83,9 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         Banner::standard(std::cout, affinity);
 
-        //int i = 0;
-        //std::cout << "Paused. Go?\n";
-        //std::cin >> i;
     }
 
-    //std::vector<boundaryTag<D>> faultTagBoundaries;
+    
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
 
     if (cfg->mesh_file) {
@@ -110,7 +94,7 @@ int main(int argc, char** argv) {
         if (rank == 0) {
             GMSHParser parser(&builder);
             ok = parser.parseFile(*cfg->mesh_file);
-            //faultTagBoundaries=builder.returnFaultTypeBoundaries();
+            
             
             if (!ok) {
                 std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
@@ -140,33 +124,9 @@ int main(int argc, char** argv) {
     }
     globalMesh->repartition(cfg->partitionFaultWeight);
     auto mesh = globalMesh->getLocalMesh(1);
-    
 
-    auto aa=mesh.get();
-    const auto& facets = aa->facets();
-    /*
-    Simplex<1> simplexToFind1 = {3-1, 10-1};
-    auto bb1=facets.getLocalIndex(simplexToFind1);
-    Simplex<1> simplexToFind2 = {10-1, 4-1};
-    auto bb2=facets.getLocalIndex(simplexToFind2);
-    Simplex<1> simplexToFind3 = {4-1, 11-1};
-    auto bb3=facets.getLocalIndex(simplexToFind3);
-    Simplex<1> simplexToFind4 = {11-1, 1-1};
-    auto bb4=facets.getLocalIndex(simplexToFind4);
-    */
-    const auto& face=facets.faces();
-    const auto& vertices =aa->vertices();
 
-    //facets.printLocalFaces();
-   // vertices.printG2L();
 
-    auto boundaryData = dynamic_cast<BoundaryData const*>(facets.data());
-    auto aaa=boundaryData->getBoundaryConditions();
-    //printSimplexBaseVectorWithRank(facets,rank);
-   // std::cout << "MPI Rank " << rank << ": BC Vector: ";
-    //for (std::size_t i = 0; i < aaa.size(); ++i) {
-    //    std::cout <<"rank:"<<rank<<"-"<< i << ": " << BCToString(aaa[i]) << std::endl;
-    //}
 
     
 

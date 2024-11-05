@@ -55,10 +55,10 @@ bool GMSHParser::parseFile(std::string const& fileName) {
     return parse_();
 }
 
-// function that make sure the phsyical string only has strings digis and - or _  --- Bar july 2024
+// function that make sure the phsyical string only has strings digis  or _  --- Bar july 2024
 bool GMSHParser::validateString(const std::string& inputString) {
     for (char c : inputString) {
-        if (!(std::isalpha(c) || std::isdigit(c) || c == '-' || c == '_')) {
+        if (!(std::isalpha(c) || std::isdigit(c) || c == '_')) {
             return false;
         }
     }
@@ -214,7 +214,7 @@ bool GMSHParser::parsePhysicalNames() {
 
   
     if (!validated) {  // Correct syntax for checking if validated is false
-        return logErrorAnnotated<bool>("Expected only digits/letters/_/-      .Change tag name to resolve the issue");
+        return logErrorAnnotated<bool>("Expected only digits/letters/_      .Change tag name to resolve the issue");
     }
 
     builder->addBoundaryTag(PhysicalEntity_tag_string,PhysicalEntity_id,PhysicalEntity_dimension);
