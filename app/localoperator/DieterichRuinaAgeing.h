@@ -86,33 +86,39 @@ public:
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
+        double a = -32;
+        double a_min = std::log10(std::nextafter(0, 1));
+        double b;
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
             if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
             } else {
-                double a = 0.0;
-                double b = tauAbs / eta;
-                if (a > b) {
-                    std::swap(a, b);
-                }
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
-                    return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+                b = std::log10(tauAbs / eta);
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
+                    return tauAbs - this->F(index, snAbs, std::pow(10.0, Ve), psi) -
+                           eta * std::pow(10.0, Ve);
                 };
                 try {
-                    V = zeroIn(a, b, fF);
+                    auto Ve = zeroIn(a, b, fF);
+                    V = std::pow(10.0, Ve);
                 } catch (std::exception const&) {
-                    std::cout << "sigma_n = " << snAbs << std::endl
-                              << "|tau| = " << tauAbs << std::endl
-                              << "psi = " << psi << std::endl
-                              << "L = " << a << std::endl
-                              << "U = " << b << std::endl
-                              << "F(L) = " << fF(a) << std::endl
-                              << "F(U) = " << fF(b) << std::endl;
-                    throw;
+                    try {
+                        auto Ve = zeroIn(a_min, b, fF);
+                        V = std::pow(10.0, Ve);
+                    } catch (std::exception const&) {
+                        std::cout << "sigma_n = " << snAbs << std::endl
+                                  << "|tau| = " << tauAbs << std::endl
+                                  << "psi = " << psi << std::endl
+                                  << "L = " << a << std::endl
+                                  << "U = " << b << std::endl
+                                  << "F(L) = " << fF(a) << std::endl
+                                  << "F(U) = " << fF(b) << std::endl;
+                        throw;
+                    }
                 }
             }
         }
