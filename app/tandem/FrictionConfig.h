@@ -77,9 +77,7 @@ public:
         }
         if (lib_.hasMember(scenario, DeltaSn)) {
             delta_sn_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1,
-                                       1>(scenario,
-                                                                                   DeltaSn));
+                lib_.getMemberFunction<DomainDimension + 1, 1>(scenario, DeltaSn));
         }
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);

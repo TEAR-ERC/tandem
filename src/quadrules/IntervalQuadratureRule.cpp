@@ -17,4 +17,4 @@ void IntervalQuadratureRule::changeInterval(double start, double stop) {
     }
 }
 
-}
+} // namespace tndm

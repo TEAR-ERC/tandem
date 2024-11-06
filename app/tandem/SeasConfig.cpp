@@ -97,7 +97,8 @@ void setConfigSchema(TableSchema<Config>& schema,
             }
         })
         .validator([](SeasMode const& mode) { return mode != SeasMode::Unknown; })
-        .help("Mode of SEAS simulation (QuasiDynamic/QD|QuasiDynamicDiscreteGreen/QDGreen|FullyDynamic/FD).");
+        .help("Mode of SEAS simulation "
+              "(QuasiDynamic/QD|QuasiDynamicDiscreteGreen/QDGreen|FullyDynamic/FD).");
     schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
             if (iEquals(value, "poisson")) {
@@ -110,15 +111,20 @@ void setConfigSchema(TableSchema<Config>& schema,
         })
         .validator([](LocalOpType const& type) { return type != LocalOpType::Unknown; })
         .help("Type of problem (poisson|elastic/elasticity).");
-    schema.add_value("lib", &Config::lib).converter(path_converter).validator(PathExists())
+    schema.add_value("lib", &Config::lib)
+        .converter(path_converter)
+        .validator(PathExists())
         .help("Lua file containing material & frictional paramters.");
     schema.add_value("scenario", &Config::scenario)
         .help("Name of the specific scenario defined in the Lua library.");
     auto default_up = std::array<double, DomainDimension>{};
     default_up.back() = 1.0;
-    schema.add_array("up", &Config::up).default_value(std::move(default_up)).of_values()
+    schema.add_array("up", &Config::up)
+        .default_value(std::move(default_up))
+        .of_values()
         .help("Define up direction vector.");
-    schema.add_array("ref_normal", &Config::ref_normal).of_values()
+    schema.add_array("ref_normal", &Config::ref_normal)
+        .of_values()
         .help("Define reference normal vector.");
     schema.add_value("boundary_linear", &Config::boundary_linear)
         .default_value(false)
