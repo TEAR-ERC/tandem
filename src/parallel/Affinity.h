@@ -1,9 +1,9 @@
 #ifndef AFFINITY_20210311_H
 #define AFFINITY_20210311_H
 
-#include <string>
 #include <cstdint>
 #include <mpi.h>
+#include <string>
 
 #ifdef __linux__
 
