@@ -57,6 +57,7 @@ Then we add `spack.yaml` in the folder:
           tcl:
             hash_length: 3
             naming_scheme: '{name}/{version}-{compiler.name}'
+            hierarchy: []
             all:
               suffixes:
                 domain_dimension=2: d2
@@ -134,7 +135,7 @@ We can install the GPU version of tandem, with:
 
 .. code-block:: yaml
 
-    spack install -j 20 --add tandem@gpu polynomial_degree=4 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
+    spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
 
 
 Using modules
