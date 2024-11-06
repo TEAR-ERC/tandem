@@ -40,7 +40,63 @@ void setGfCheckpointConfigSchema(TableSchema<Derived>& gfCheckpointSchema) {
         .add_value("freq_cputime", up_cast<Derived>(&Derived::frequency_cputime_minutes))
         .default_value(30.0)
         .help("CPU time (minutes) frequency between Green's function operator checkpoints");
-}
+};
+
+template <typename Derived> void setTsCheckpointConfigSchema(TableSchema<Derived>& tsCheckpointSchema) {
+
+    tsCheckpointSchema.add_value("load_directory", up_cast<Derived>(&Derived::load_directory))
+        .validator(PathExists())
+        .help("directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to "
+              "let tandem retrieve the name of the last checkpoint file");
+
+    tsCheckpointSchema.add_value("save_directory", up_cast<Derived>(&Derived::save_directory))
+        .default_value("checkpoint")
+        .validator(ParentPathExists())
+        .help("directory from which a checkpoint is saved");
+
+    tsCheckpointSchema.add_value("freq_step", up_cast<Derived>(&Derived::frequency_step))
+        .default_value(1000)
+        .validator([](auto&& x) { return x > 0; })
+        .help("time step frequency between checkpoints");
+
+    tsCheckpointSchema
+        .add_value("freq_cputime", up_cast<Derived>(&Derived::frequency_cputime_minutes))
+        .default_value(30)
+        .validator([](auto&& x) { return x > 0; })
+        .help("CPU time (minutes) frequency between checkpoints");
+
+    tsCheckpointSchema
+        .add_value("freq_physical_time", up_cast<Derived>(&Derived::frequency_time_physical))
+        .default_value(1.0e10)
+        .validator([](auto&& x) { return x > 0; })
+        .help("physical time frequency between checkpoints");
+
+    tsCheckpointSchema.add_value("storage_type", up_cast<Derived>(&Derived::storage_type))
+        .converter([](std::string_view value) {
+            if (iEquals(value, "none")) {
+                return tsCheckpointStorageType::NONE;
+            } else if (iEquals(value, "limited")) {
+                return tsCheckpointStorageType::LIMITED;
+            } else if (iEquals(value, "unlimited")) {
+                return tsCheckpointStorageType::UNLIMITED;
+            } else {
+                return tsCheckpointStorageType::UNKNOWN;
+            }
+        })
+        .default_value(tsCheckpointStorageType::LIMITED)
+        .validator([](tsCheckpointStorageType const& type) {
+            return type != tsCheckpointStorageType::UNKNOWN;
+        })
+        .help("type of storage for checkpoints. limited will store a finite number of unique "
+              "checkpoints on disk. unlimited stores all checkpoints. Use none to completely "
+              "deactivate checkpointing.");
+
+    tsCheckpointSchema
+        .add_value("storage_limited_size", up_cast<Derived>(&Derived::storage_limited_size))
+        .default_value(2)
+        .validator([](auto&& x) { return x > 0; })
+        .help("number of unique checkpoints stored on disk (with storage_type=limited)");
+};
 
 template <typename Derived> void setDomainOutputConfigSchema(TableSchema<Derived>& outputSchema) {
     setOutputConfigSchema(outputSchema);
@@ -176,6 +232,8 @@ void setConfigSchema(TableSchema<Config>& schema,
 
     auto& gfCheckpointSchema = schema.add_table("gf_checkpoint", &Config::gf_checkpoint_config);
     detail::setGfCheckpointConfigSchema(gfCheckpointSchema);
-}
 
+    auto& tsCheckpointSchema = schema.add_table("ts_checkpoint", &Config::ts_checkpoint_config);
+    detail::setTsCheckpointConfigSchema(tsCheckpointSchema);
+}
 } // namespace tndm

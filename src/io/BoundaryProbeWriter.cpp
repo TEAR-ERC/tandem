@@ -8,6 +8,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <filesystem>
 
 namespace tndm {
 
@@ -83,7 +84,12 @@ void BoundaryProbeWriter<D>::write(double time,
             out_->open(probe.file_name, false);
             write_header(probe, functions);
         } else {
-            out_->open(probe.file_name, true);
+            if (std::filesystem::exists(probe.file_name)) {
+                out_->open(probe.file_name, true);
+            } else {
+                out_->open(probe.file_name, false);
+                write_header(probe, functions);
+            }
         }
 
         *out_ << time;
