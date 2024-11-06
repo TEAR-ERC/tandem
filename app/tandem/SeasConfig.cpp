@@ -74,18 +74,18 @@ template <typename Derived> void setTsCheckpointConfigSchema(TableSchema<Derived
     tsCheckpointSchema.add_value("storage_type", up_cast<Derived>(&Derived::storage_type))
         .converter([](std::string_view value) {
             if (iEquals(value, "none")) {
-                return tsCheckpointStorageType::NONE;
+                return TsCheckpointStorageType::NONE;
             } else if (iEquals(value, "limited")) {
-                return tsCheckpointStorageType::LIMITED;
+                return TsCheckpointStorageType::LIMITED;
             } else if (iEquals(value, "unlimited")) {
-                return tsCheckpointStorageType::UNLIMITED;
+                return TsCheckpointStorageType::UNLIMITED;
             } else {
-                return tsCheckpointStorageType::UNKNOWN;
+                return TsCheckpointStorageType::UNKNOWN;
             }
         })
-        .default_value(tsCheckpointStorageType::LIMITED)
-        .validator([](tsCheckpointStorageType const& type) {
-            return type != tsCheckpointStorageType::UNKNOWN;
+        .default_value(TsCheckpointStorageType::LIMITED)
+        .validator([](TsCheckpointStorageType const& type) {
+            return type != TsCheckpointStorageType::UNKNOWN;
         })
         .help("type of storage for checkpoints. limited will store a finite number of unique "
               "checkpoints on disk. unlimited stores all checkpoints. Use none to completely "

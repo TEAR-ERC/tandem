@@ -26,6 +26,22 @@ When using :code:`mode=QDGreen`, Green's function checkpointing is parameterized
 - **prefix**: Path where Green's function operator and RHS will be checkpointed.
 - **freq_cputime**: CPU time (minutes) frequency between Green's function operator checkpoints.
         
+Time stepping checkpointing
+---------------------------
+
+Time stepping checkpointing is parameterized by the **[ts_checkpoint]** section. Here are the key parameters and their descriptions:
+
+- **load_directory**: directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to let tandem retrieve the name of the last checkpoint file.
+- **save_directory**: Directory where checkpoints are saved. If not specified, it defaults to checkpoint.
+- **freq_step**: Time step frequency between checkpoints. This determines how often checkpoints are saved based on the number of time steps. The default value is 1000 steps.
+- **freq_cputime**: CPU time frequency between checkpoints, specified in minutes. Checkpoints are saved based on the elapsed CPU time. The default value is 30 minutes.
+- **freq_physical_time**: Physical time frequency between checkpoints. This determines how often checkpoints are saved based on the physical time of the simulation. Desactivated by default.
+- **storage_type**: Type of storage for checkpoints. It can be one of the following:
+    - **none**: Completely deactivate checkpointing.
+    - **limited**: Store a finite number of unique checkpoints on disk.
+    - **unlimited**: Store all checkpoints without any limit.
+- **storage_limited_size**: Number of unique checkpoints stored on disk when storage_type is set to limited. The default value is 2.
+ 
 Output configurations
 ---------------------
 Five types of outputs are available: **fault output**, **fault probe output**, **fault scalar output**, **domain output**, and **domain probe output**. 
