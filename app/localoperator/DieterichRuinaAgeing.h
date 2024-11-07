@@ -86,7 +86,10 @@ public:
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
-        double V = 0.0;
+        double V = 0.0, Ve = 0.0;
+        double Va = -32.0;
+        double Va_min = std::log10(std::nextafter(0.0, 1.0));
+        double Vb, a, b;
         int ierr = 0;
 
         if (eta == 0.0) {
@@ -98,19 +101,31 @@ public:
                 V = tauAbs / eta;
                 ierr = 1;
             } else {
-                double Va = 0.0;
-                double Vb = tauAbs / eta;
-                if (Va > Vb) {
-                    std::swap(Va, Vb);
-                }
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
-                    return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
+                    return tauAbs - this->F(index, snAbs, std::pow(10.0, Ve), psi) -
+                           eta * std::pow(10.0, Ve);
                 };
+
+                Vb = std::log10(tauAbs / eta);
+
                 try {
-                    V = zeroIn(Va, Vb, fF);
+		    a = Va;
+		    b = Vb;
+                    if (a > b) { std::swap(a, b); }
+                    Ve = zeroIn(a, b, fF);
+                    V = std::pow(10.0, Ve);
                 } catch (std::exception const&) {
-                    V = NAN;
-                    ierr = 2;
+                    try {
+			a = Va_min;
+			b = Vb;
+			if (a > b) { std::swap(a, b); }
+                        Ve = zeroIn(a, b, fF);
+                        V = std::pow(10.0, Ve);
+                    } catch (std::exception const&) {
+                        V = NAN;
+			ierr = 2;
+                    }
                 }
 
                 if (ierr != 0) {
@@ -138,10 +153,12 @@ public:
                     std::cout << "  sigma_n = " << snAbs << std::endl;
                     std::cout << "  |tau|   = " << tauAbs << std::endl;
                     std::cout << "  psi     = " << psi << std::endl;
-                    std::cout << "  V_lower = " << Va << std::endl;
-                    std::cout << "  V_upper = " << Vb << std::endl;
-                    std::cout << "  R(V_lower) = " << fF(Va) << std::endl;
-                    std::cout << "  R(V_upper) = " << fF(Vb) << std::endl;
+                    std::cout << "  log10(V_lower) = " << a << std::endl;
+                    std::cout << "  log10(V_upper) = " << b << std::endl;
+		    std::cout << "  V_lower = " << std::pow(10.0, a) << std::endl;
+                    std::cout << "  V_upper = " << std::pow(10.0, b) << std::endl;
+                    std::cout << "  R(V_lower) = " << fF(a) << std::endl;
+                    std::cout << "  R(V_upper) = " << fF(b) << std::endl;
                     std::cout << "  x = { ";
                     for (std::size_t t = 0; t < DomainDimension - 1; t++) {
                         std::cout << x[t] << ", ";
