@@ -16,7 +16,7 @@ static PetscErrorCode _VecView_Nest(Vec x,PetscViewer viewer)
   ierr = VecNestGetSubVecs(x,&nb,&v);CHKERRQ(ierr);
   if (isascii) {
     ierr = PetscViewerASCIIPushTab(viewer);CHKERRQ(ierr);
-    ierr = PetscViewerASCIIPrintf(viewer,"VecNest, rows=%D,  structure: \n",nb);CHKERRQ(ierr);
+    ierr = PetscViewerASCIIPrintf(viewer,"VecNest, rows=%" PetscInt_FMT ",  structure: \n",nb);CHKERRQ(ierr);
     for (i=0; i<nb; i++) {
       VecType  type;
       char     name[256] = "",prefix[256] = "";
@@ -30,7 +30,7 @@ static PetscErrorCode _VecView_Nest(Vec x,PetscViewer viewer)
       if (obj_name) {ierr = PetscSNPrintf(name,sizeof(name),"name=\"%s\", ",obj_name);CHKERRQ(ierr);}
       if (obj_prefix) {ierr = PetscSNPrintf(prefix,sizeof(prefix),"prefix=\"%s\", ",obj_prefix);CHKERRQ(ierr);}
 
-      ierr = PetscViewerASCIIPrintf(viewer,"(%D) : %s%stype=%s, rows=%D \n",i,name,prefix,type,NR);CHKERRQ(ierr);
+      ierr = PetscViewerASCIIPrintf(viewer,"(%" PetscInt_FMT ") : %s%stype=%s, rows=%" PetscInt_FMT " \n",i,name,prefix,type,NR);CHKERRQ(ierr);
 
       ierr = PetscViewerASCIIPushTab(viewer);CHKERRQ(ierr);             /* push1 */
       ierr = VecView(v[i],viewer);CHKERRQ(ierr);
