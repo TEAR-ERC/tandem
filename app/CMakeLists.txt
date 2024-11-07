@@ -199,7 +199,7 @@ set(APP_COMMON_SRCS
     localoperator/Poisson.cpp
     localoperator/PoissonAdapter.cpp
     localoperator/RateAndStateBase.cpp
-    #pc/lspoly.c
+    pc/lspoly.c
     pc/register.cpp
     common/ts_util.c
     common/vecnest_util.c
