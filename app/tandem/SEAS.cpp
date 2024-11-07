@@ -54,8 +54,7 @@ template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     return std::make_unique<seas::Context<Type>>(
         mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
-        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up,
-        cfg.ref_normal);
+        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up, cfg.ref_normal);
 }
 
 template <std::size_t N>

@@ -160,7 +160,8 @@ PetscInt SeasQDDiscreteGreenOperator::create_discrete_greens_function() {
     CHKERRTHROW(MatCreateDense(comm, ind.m, ind.n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
     CHKERRTHROW(MatSetBlockSizes(G_, ind.m_bs, ind.n_bs));
     CHKERRTHROW(MatGetSize(G_, &M, &N));
-    CHKERRTHROW(PetscPrintf(comm, "Green's function operator size: %" PetscInt_FMT " x %" PetscInt_FMT "\n", M, N));
+    CHKERRTHROW(PetscPrintf(
+        comm, "Green's function operator size: %" PetscInt_FMT " x %" PetscInt_FMT "\n", M, N));
 
     S_ = std::make_unique<PetscVector>(ind.slip_block_size, ind.num_local_elements, comm);
     t_boundary_ = std::make_unique<PetscVector>(ind.m_bs, ind.num_local_elements, comm);
@@ -228,7 +229,8 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
                             "write_discrete_greens_operator():matrix %1.2e (sec)\n",
                             (double)(t1 - t0)));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                            "  status: computed %" PetscInt_FMT " / pending %" PetscInt_FMT "\n", current_gf, n_gf - current_gf));
+                            "  status: computed %" PetscInt_FMT " / pending %" PetscInt_FMT "\n",
+                            current_gf, n_gf - current_gf));
 
     write_facet_labels_IS(mesh);
 }
@@ -466,7 +468,8 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t1));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "load_discrete_greens_operator() %1.2e (sec)\n", (double)(t1 - t0)));
-    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_), "  status: loaded %" PetscInt_FMT " / pending %" PetscInt_FMT "\n",
+    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
+                            "  status: loaded %" PetscInt_FMT " / pending %" PetscInt_FMT "\n",
                             current_gf, n_gf - current_gf));
 
     if (repartition_gfs_) {
@@ -505,15 +508,18 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
     auto ghost = scatter.template recv_prototype<double>(ind.slip_block_size, ALIGNMENT);
 
     if (start > 0) {
-	CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                            "partial_assemble_discrete_greens_function() [%" PetscInt_FMT " , %" PetscInt_FMT ")\n", start, N));
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
+                                "partial_assemble_discrete_greens_function() [%" PetscInt_FMT
+                                " , %" PetscInt_FMT ")\n",
+                                start, N));
     }
     double solve_time = 0.0;
     double solve_time_from_start = 0.0;
     for (PetscInt i = start; i < N; ++i) {
 
-        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                                "Computing Green's function %" PetscInt_FMT " / %" PetscInt_FMT "\n", i, N));
+        CHKERRTHROW(PetscPrintf(
+            PetscObjectComm((PetscObject)G_),
+            "Computing Green's function %" PetscInt_FMT " / %" PetscInt_FMT "\n", i, N));
         sw.start();
         CHKERRTHROW(VecZeroEntries(S_->vec()));
         if (i >= ind.nb_offset && i < ind.nb_offset + ind.m) {

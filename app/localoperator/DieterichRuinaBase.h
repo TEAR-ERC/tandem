@@ -112,14 +112,18 @@ public:
                 try {
                     a = Va;
                     b = Vb;
-                    if (a > b) { std::swap(a, b); }
+                    if (a > b) {
+                        std::swap(a, b);
+                    }
                     Ve = zeroIn(a, b, fF);
                     V = std::pow(10.0, Ve);
                 } catch (std::exception const&) {
                     try {
                         a = Va_min;
                         b = Vb;
-                        if (a > b) { std::swap(a, b); }
+                        if (a > b) {
+                            std::swap(a, b);
+                        }
                         Ve = zeroIn(a, b, fF);
                         V = std::pow(10.0, Ve);
                     } catch (std::exception const&) {

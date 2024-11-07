@@ -1,8 +1,8 @@
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/pcimpl.h>
 #include <petscksp.h>
-#include <petscsys.h>
 #include <petscpc.h>
+#include <petscsys.h>
 
 typedef struct {
     PetscReal alpha, beta; /* Coefficients of w(x) = (1-x)^\alpha (1+x)^\beta */
@@ -140,19 +140,19 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
             CHKERRQ(KSPGetIterationNumber(cheb->kspest, &its));
             if (ksp->normtype == KSP_NORM_NONE) {
                 PetscInt sendbuf, recvbuf;
-		CHKERRQ(PCReduceFailedReason(ksp->pc));
+                CHKERRQ(PCReduceFailedReason(ksp->pc));
             }
             CHKERRQ(PCGetFailedReason(ksp->pc, &pcreason));
             ksp->reason = KSP_DIVERGED_PC_FAILED;
             CHKERRQ(PetscInfo(ksp, "Eigen estimator failed: %s %s at iteration %" PetscInt_FMT "",
-                               KSPConvergedReasons[reason], PCFailedReasons[pcreason], its));
+                              KSPConvergedReasons[reason], PCFailedReasons[pcreason], its));
             PetscFunctionReturn(0);
         } else if (reason == KSP_CONVERGED_RTOL || reason == KSP_CONVERGED_ATOL) {
             CHKERRQ(PetscInfo(ksp, "Eigen estimator converged prematurely. Should not happen "
                                    "except for small or low rank problem\n"));
         } else if (reason < 0) {
             CHKERRQ(PetscInfo(ksp, "Eigen estimator failed %s, using estimates anyway\n",
-                               KSPConvergedReasons[reason]));
+                              KSPConvergedReasons[reason]));
         }
 
         CHKERRQ(KSPLSPolyComputeExtremeEigenvalues_Private(cheb->kspest, &max));
@@ -194,8 +194,8 @@ static PetscErrorCode KSPSolve_LSPoly(KSP ksp) {
     CHKERRQ(PCGetDiagonalScale(ksp->pc, &diagonalscale));
     if (diagonalscale)
         SETERRQ(PetscObjectComm((PetscObject)ksp), PETSC_ERR_SUP,
-                 "Krylov method %s does not support diagonal scaling",
-                 ((PetscObject)ksp)->type_name);
+                "Krylov method %s does not support diagonal scaling",
+                ((PetscObject)ksp)->type_name);
 
     CHKERRQ(PCGetOperators(ksp->pc, &Amat, &Pmat));
     CHKERRQ(PetscObjectSAWsTakeAccess((PetscObject)ksp));

@@ -69,8 +69,9 @@ public:
                 lib_.getMemberFunction<DomainDimension + 1, 1>(scenario, Source));
         }
         if (lib_.hasMember(scenario, DeltaTau)) {
-            delta_tau_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1, DieterichRuinaBase::TangentialComponents>(
+            delta_tau_ =
+                std::make_optional(lib_.getMemberFunction<DomainDimension + 1,
+                                                          DieterichRuinaBase::TangentialComponents>(
                     scenario, DeltaTau));
         }
         if (lib_.hasMember(scenario, DeltaSn)) {

@@ -10,8 +10,8 @@
 #include <cmath>
 #include <cstddef>
 #include <functional>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 

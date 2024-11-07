@@ -20,7 +20,6 @@ namespace tndm {
 
 class DieterichRuinaAgeing : public DieterichRuinaBase {
 public:
-
     double state_rhs(std::size_t index, double V, double psi) const override {
         double myL = p_[index].get<L>();
         return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);

@@ -1,8 +1,8 @@
 #include "ScalarWriter.h"
 
+#include <filesystem>
 #include <iomanip>
 #include <ios>
-#include <filesystem>
 
 namespace tndm {
 
