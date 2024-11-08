@@ -66,7 +66,7 @@ static PetscErrorCode _VecView_Nest(Vec x, PetscViewer viewer) {
             CHKERRQ(ierr);
         }
     }
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode _VecLoad_Nest(Vec x, PetscViewer viewer) {
@@ -87,15 +87,16 @@ static PetscErrorCode _VecLoad_Nest(Vec x, PetscViewer viewer) {
         ierr = VecLoad(v[i], viewer);
         CHKERRQ(ierr);
     }
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode VecNestUpgradeOperations(Vec x) {
     PetscBool isnest;
+    PetscFunctionBegin;
     PetscObjectTypeCompare((PetscObject)x, VECNEST, &isnest);
     if (isnest) {
         x->ops->view = _VecView_Nest;
         x->ops->load = _VecLoad_Nest;
     }
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }

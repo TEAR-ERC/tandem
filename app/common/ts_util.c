@@ -236,7 +236,7 @@ static PetscErrorCode _TSAdaptMembersView(TSAdapt adapt, PetscViewer viewer) {
     ierr = PetscViewerBinaryWrite(viewer, &adapt->timestepjustdecreased, 1, PETSC_INT);
     CHKERRQ(ierr);
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode _TSView(TS ts, PetscViewer viewer) {
@@ -341,7 +341,7 @@ static PetscErrorCode _TSView(TS ts, PetscViewer viewer) {
     /*ierr = DMGetDMTS(ts->dm,&sdm);CHKERRQ(ierr);*/
     /*ierr = DMTSView(sdm,viewer);CHKERRQ(ierr);*/
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /*#include <../src/ts/impls/explicit/rk/rk.h>*/
@@ -465,7 +465,7 @@ static PetscErrorCode _TSImplView_RK(TS ts, PetscViewer viewer) {
         }
     } else if (isdraw) {
     }
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode _TSAdaptMembersLoad(TSAdapt adapt, PetscViewer viewer) {
@@ -508,7 +508,7 @@ static PetscErrorCode _TSAdaptMembersLoad(TSAdapt adapt, PetscViewer viewer) {
     ierr = PetscViewerBinaryRead(viewer, &adapt->timestepjustdecreased, 1, NULL, PETSC_INT);
     CHKERRQ(ierr);
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode _TSLoad(TS ts, PetscViewer viewer) {
@@ -599,7 +599,7 @@ static PetscErrorCode _TSLoad(TS ts, PetscViewer viewer) {
     ierr = _TSAdaptMembersLoad(ts->adapt, viewer);
     CHKERRQ(ierr);
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode _TSImplLoad_RK(TS ts, PetscViewer viewer) {
@@ -648,7 +648,7 @@ PetscErrorCode _TSImplLoad_RK(TS ts, PetscViewer viewer) {
         }
     }
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 typedef enum {
@@ -701,7 +701,7 @@ static PetscErrorCode ts_checkpoint_create_path(TS ts, TSCheckPoint cp, PetscInt
         }
     }
     MPICreateDirectory(PetscObjectComm((PetscObject)ts), cp->path_step);
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool* generate) {
@@ -747,7 +747,7 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool* gene
         *generate = PETSC_TRUE;
     }
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
@@ -845,7 +845,7 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
     }
 
     cp->n++;
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode ts_checkpoint_load(TS ts, const char pathname[]) {
@@ -884,7 +884,7 @@ static PetscErrorCode ts_checkpoint_load(TS ts, const char pathname[]) {
     ierr = PetscViewerDestroy(&viewer);
     CHKERRQ(ierr);
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode ts_checkpoint(TS ts) {
@@ -914,7 +914,7 @@ PetscErrorCode ts_checkpoint(TS ts) {
         CHKERRQ(ierr);
     }
     tsc->path_step[0] = '\0';
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirectory,
@@ -979,7 +979,7 @@ PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirect
         PetscFree(tsc);
     }
 
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 PetscErrorCode ts_checkpoint_restart(TS ts, const char* tsCheckpointLoadDirectory) {
@@ -994,5 +994,5 @@ PetscErrorCode ts_checkpoint_restart(TS ts, const char* tsCheckpointLoadDirector
     CHKERRQ(ierr);
     ierr = TSSetFromOptions(ts);
     CHKERRQ(ierr);
-    PetscFunctionReturn(0);
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
