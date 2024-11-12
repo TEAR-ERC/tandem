@@ -121,13 +121,13 @@ public:
                     auto _Eta = p_[index].get<Eta>();
                     auto _L = p_[index].get<L>();
                     auto _SnPre = p_[index].get<SnPre>();
-                    //auto f0 = p_[index].get<f0>();
+                    auto f0 = p_[index].get<base_fric>();
                     auto const& tau_pre = p_[index].get<TauPre>();
 
                     std::cout << "fault_basis_index [" << index << "], fault_index [" << fault_index
                               << "]" << std::endl;
                     std::cout << "  ierr = " << ierr << std::endl;
-                    //std::cout << "  f0 = " << f0 << " (const)" << std::endl;
+                    std::cout << "  f0 = " << f0 << std::endl;
                     std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
                     std::cout << "  b  = " << cp_.b << " (const)" << std::endl;
                     std::cout << "  a(x)   = " << _A << std::endl;
