@@ -194,7 +194,6 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
             ++old_id;
         }
         auto vertexData = std::make_unique<VertexData<D>>(std::move(new_vertices));
-        auto elements1=elements;
         auto elementData =
        
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);

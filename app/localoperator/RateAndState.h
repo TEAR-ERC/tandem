@@ -63,8 +63,8 @@ public:
        }
        */
 
-       
-        int verficationCounter=0;
+        std::vector<bool> nodes_changed(num_nodes, false);
+        
         for ( auto faultTag_i : faultTags){
 
             auto facesInLocalBoundaryMap=faultTag_i.returnNonNullFacesInLocalBoundaryMap();
@@ -77,9 +77,10 @@ public:
                 for (const auto& faceinLocalBoundaryMap_i : facesInLocalBoundaryMap ) {
                     for (std::size_t j = 0; j < nq; ++j) {
                         size_t storage_index=nq*faceinLocalBoundaryMap_i+j;
+                        auto coords=fault_.storage()[storage_index].template get<Coords>();
                         auto params_from_fault_tagging = param_generator_for_fault_tagging(fault_.storage()[storage_index].template get<Coords>());
                         law_.set_params(storage_index, params_from_fault_tagging);
-                        verficationCounter=verficationCounter+1;
+                        nodes_changed[storage_index]=true;
                        
 
                     }
@@ -87,9 +88,11 @@ public:
             }
         }
 
-        if (verficationCounter =! num_nodes){
-            throw std::runtime_error("fault tagging did not call all expected fault faces ");
-        }
+   if (!std::all_of(nodes_changed.begin(), nodes_changed.end(), [](bool val) { return val; })) {
+        // Throw an error if not all values are true
+        throw std::runtime_error("Error: Not all values in nodes_changed are true.");
+    }
+
 
     }
 
