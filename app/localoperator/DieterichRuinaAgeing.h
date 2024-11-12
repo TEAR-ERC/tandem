@@ -24,13 +24,14 @@ public:
     struct ConstantParams {
         double V0;
         double b;
-        double f0;
+    
     };
     struct Params {
         double a;
         double eta;
         double L;
         double sn_pre;
+        double base_fric;
         std::array<double, TangentialComponents> tau_pre;
         std::array<double, TangentialComponents> Vinit;
         std::array<double, TangentialComponents> Sinit;
@@ -42,10 +43,12 @@ public:
         p_[index].get<A>() = params.a;
         p_[index].get<Eta>() = params.eta;
         p_[index].get<L>() = params.L;
+        p_[index].get<base_fric>() = params.base_fric;
         p_[index].get<SnPre>() = params.sn_pre;
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
+        
     }
 
     double psi_init(std::size_t index, double sn,
@@ -54,7 +57,7 @@ public:
         double tauAbs = norm(tau + p_[index].get<TauPre>());
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
-            return cp_.f0;
+            return p_[index].get<base_fric>();
         }
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
@@ -88,16 +91,7 @@ public:
         double tauAbs = norm(tauAbsVec);
         double V = 0.0;
         int ierr = 0;
-/*
-        if (snAbs > 100e6){
-            snAbs=100e6;
-        }
 
-        if (tauAbs > 100e6){
-            tauAbs=100e6;
-        }
-
-    */
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
@@ -127,12 +121,13 @@ public:
                     auto _Eta = p_[index].get<Eta>();
                     auto _L = p_[index].get<L>();
                     auto _SnPre = p_[index].get<SnPre>();
+                    //auto f0 = p_[index].get<f0>();
                     auto const& tau_pre = p_[index].get<TauPre>();
 
                     std::cout << "fault_basis_index [" << index << "], fault_index [" << fault_index
                               << "]" << std::endl;
                     std::cout << "  ierr = " << ierr << std::endl;
-                    std::cout << "  f0 = " << cp_.f0 << " (const)" << std::endl;
+                    //std::cout << "  f0 = " << f0 << " (const)" << std::endl;
                     std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
                     std::cout << "  b  = " << cp_.b << " (const)" << std::endl;
                     std::cout << "  a(x)   = " << _A << std::endl;
@@ -165,7 +160,8 @@ public:
 
     double state_rhs(std::size_t index, double V, double psi) const {
         double myL = p_[index].get<L>();
-        return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
+        double f0 = p_[index].get<base_fric>();
+        return cp_.b * cp_.V0 / myL * (exp((f0 - psi) / cp_.b) - V / cp_.V0);
     }
 
     auto param_names() const {
@@ -232,13 +228,16 @@ private:
     struct L {
         using type = double;
     };
+    struct base_fric {
+        using type = double;
+    };
     struct Vinit {
         using type = std::array<double, TangentialComponents>;
     };
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L,base_fric, Vinit, Sinit> p_;
 };
 
 } // namespace tndm

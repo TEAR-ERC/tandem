@@ -32,7 +32,7 @@ public:
     constexpr static char B[] = "b";
     constexpr static char V0[] = "V0";
     constexpr static char L[] = "L";
-    constexpr static char F0[] = "f0";
+    constexpr static char base_friction[] = "base_friction";
     constexpr static char Eta[] = "eta";
     constexpr static char SnPre[] = "sn_pre";
     constexpr static char TauPre[] = "tau_pre";
@@ -57,6 +57,7 @@ public:
         }
             eta_ = lib_.getMemberFunction<DomainDimension, 1>(scenarioSpecificForEta, Eta);
         L_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, L);
+        base_fric_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, base_friction);
         if (lib_.hasMember(scenario, SnPre)) {
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
         }
@@ -92,7 +93,7 @@ public:
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
         cp_.b = lib_.getMemberConstant(scenario, B);
-        cp_.f0 = lib_.getMemberConstant(scenario, F0);
+        //cp_.f0 = lib_.getMemberConstant(scenario, F0);
 
         if (lib_.hasMember(scenario, FaultSolution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
@@ -109,6 +110,7 @@ public:
             p.eta = this->eta_(x)[0];
             p.L = this->L_(x)[0];
             p.sn_pre = this->sn_pre_(x)[0];
+            p.base_fric = this->base_fric_(x)[0];
             p.tau_pre = this->tau_pre_(x);
             p.Vinit = this->Vinit_(x);
             p.Sinit = this->Sinit_(x);
@@ -137,7 +139,7 @@ protected:
     std::optional<std::string> etaScenario;
     DieterichRuinaAgeing::ConstantParams cp_;
     LuaLib lib_;
-    functional_t<DomainDimension> a_, eta_, L_;
+    functional_t<DomainDimension> a_, eta_, L_,base_fric_;
     functional_t<DomainDimension> sn_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)
