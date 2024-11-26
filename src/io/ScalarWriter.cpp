@@ -1,5 +1,6 @@
 #include "ScalarWriter.h"
 
+#include <filesystem>
 #include <iomanip>
 #include <ios>
 
@@ -19,7 +20,12 @@ void ScalarWriter::write(double time, mneme::span<double> scalars) const {
         out_->open(file_name_, false);
         write_header();
     } else {
-        out_->open(file_name_, true);
+        if (std::filesystem::exists(file_name_)) {
+            out_->open(file_name_, true);
+        } else {
+            out_->open(file_name_, false);
+            write_header();
+        }
     }
 
     *out_ << time;

@@ -57,17 +57,30 @@ public:
     void init(double time, BlockVector const& traction, BlockVector& state) override {
         auto traction_handle = traction.begin_access_readonly();
         auto state_handle = state.begin_access();
+        bool init_success = true;
         VMax_ = 0.0;
         scratch_.reset();
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
-            double VMax = lop_->init(time, faultNo, traction_block, state_block, scratch_);
-
+            int ierr = 0;
+            double VMax = lop_->init(time, faultNo, traction_block, state_block, scratch_, &ierr);
+            if (ierr == 2) {
+                init_success = false;
+            }
             VMax_ = std::max(VMax_, VMax);
         }
         state.end_access(state_handle);
         traction.end_access_readonly(traction_handle);
+        if (init_success == false) {
+            int comm_rank;
+            MPI_Comm_rank(this->comm(), &comm_rank);
+            std::cout << "[rank " << comm_rank
+                      << "] init(): The friction solver of one or more fault basis returned an "
+                         "exit code of 2"
+                      << std::endl;
+            throw;
+        }
     }
 
     void rhs(double time, BlockVector const& traction, BlockVector const& state,
@@ -75,20 +88,34 @@ public:
         auto traction_handle = traction.begin_access_readonly();
         auto state_handle = state.begin_access_readonly();
         auto result_handle = result.begin_access();
+        bool rhs_success = true;
         VMax_ = 0.0;
         scratch_.reset();
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
             auto result_block = result_handle.subtensor(slice{}, faultNo);
-            double VMax =
-                lop_->rhs(time, faultNo, traction_block, state_block, result_block, scratch_);
+            int ierr = 0;
+            double VMax = lop_->rhs(time, faultNo, traction_block, state_block, result_block,
+                                    scratch_, &ierr);
+            if (ierr == 2) {
+                rhs_success = false;
+            }
 
             VMax_ = std::max(VMax_, VMax);
         }
         result.end_access(result_handle);
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
+        if (rhs_success == false) {
+            int comm_rank;
+            MPI_Comm_rank(this->comm(), &comm_rank);
+            std::cout << "[rank " << comm_rank
+                      << "] rhs(): The friction solver of one or more fault basis returned an exit "
+                         "code of 2"
+                      << std::endl;
+            throw;
+        }
     }
 
     template <typename Iterator>
