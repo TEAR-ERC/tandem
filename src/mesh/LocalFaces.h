@@ -4,7 +4,7 @@
 #include "MeshData.h"
 #include "Simplex.h"
 #include "util/Range.h"
-
+#include <iostream>
 #include "mneme/displacements.hpp"
 #include "mneme/span.hpp"
 
@@ -89,6 +89,46 @@ public:
         permuteSharedRanks(permutation);
         makeG2LMap();
     }
+
+
+    std::size_t getLocalIndex(Simplex<D> const& globalIndex) const {
+        auto it = g2l_.find(globalIndex);
+        if (it != g2l_.end()) {
+            return it->second;
+        } else {
+            return -1;
+        }
+    }
+/*
+        void printG2L() const {
+        std::cout << "g2l_ contents:\n";
+        for (const auto& pair : g2l_) {
+            std::cout << "Simplex: {";
+            for (std::size_t i = 0; i < pair.first.size(); ++i) {
+                std::cout << pair.first[i];
+                if (i < pair.first.size() - 1) {
+                    std::cout << ", ";
+                }
+            }
+            std::cout << "} -> Local Index: " << pair.second << "\n";
+        }
+    }
+
+    void printLocalFaces(const LocalFaces<1>& localFaces) {
+    std::cout << "Local Faces:" << std::endl;
+    for (std::size_t i = 0; i < localFaces.size(); ++i) {
+        const auto& simplex = localFaces[i];
+        std::cout << "Local Index: " << i << " -> Simplex: {";
+        for (std::size_t j = 0; j < simplex.size(); ++j) {
+            std::cout << simplex[j];
+            if (j < simplex.size() - 1) {
+                std::cout << ", ";
+            }
+        }
+        std::cout << "} -> Global Index: " << localFaces.l2cg(i) << std::endl;
+    }
+}
+*/
 
 private:
     void permuteSharedRanks(std::vector<std::size_t> const& permutation) {

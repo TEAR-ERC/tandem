@@ -4,7 +4,7 @@
 
 namespace tndm {
 
-std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr, idx_t ncommonnodes,
+std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr, idx_t ncommonnodes,std::vector<idx_t>& elementWeights,
                                                real_t imbalanceTol, MPI_Comm comm) {
     int rank, procs;
     MPI_Comm_rank(comm, &rank);
@@ -15,8 +15,9 @@ std::vector<idx_t> MetisPartitioner::partition(DistributedCSR<idx_t>& csr, idx_t
     idx_t* elmdist = csr.dist.data();
     idx_t* eptr = csr.rowPtr.data();
     idx_t* eind = csr.colInd.data();
-    idx_t* elmwgt = nullptr;
-    idx_t wgtflag = 0;
+    //idx_t* elmwgt = nullptr;
+    idx_t* elmwgt = elementWeights.data(); 
+    idx_t wgtflag = 2;
     idx_t numflag = 0;
     idx_t ncon = 1;
     idx_t nparts = procs;

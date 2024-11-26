@@ -18,7 +18,9 @@ enum class GMSHToken {
     elements,
     end_elements,
     unknown_section,
-    unknown_token
+    unknown_token,
+    physical_names,
+    end_physical_names
 };
 
 struct GMSHSourceLocation {
@@ -34,6 +36,7 @@ private:
     char lastChar = ' ';
     std::istream* in = nullptr;
     GMSHSourceLocation loc = {1, 1};
+    std::string extractedString;
 
     void advance();
 
@@ -50,6 +53,7 @@ public:
     auto getInteger() const { return integer; }
     auto getReal() const { return real; }
     auto getSourceLoc() const { return loc; }
+    auto getString() const { return extractedString; }
 };
 
 } // namespace tndm

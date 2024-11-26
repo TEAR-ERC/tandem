@@ -29,6 +29,7 @@ public:
     }
 
     // Declare but not define copy constructor to satisfy compiler (we use copy elision)
+    
     Managed(Managed<Tensor> const& other);
     Managed& operator=(Managed<Tensor> const& other);
 
@@ -42,6 +43,7 @@ public:
     }
     virtual ~Managed() = default;
 
+  
 protected:
     struct Deleter {
         void operator()(real_t* ptr) { std::free(ptr); }

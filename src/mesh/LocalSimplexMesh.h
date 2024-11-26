@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "mesh/MultiplyBoundaryTags.h"
 
 namespace tndm {
 
@@ -39,6 +40,14 @@ public:
     std::size_t numFacets() const { return size<D - 1>(); }
     auto const& elements() const { return faces<D>(); }
     std::size_t numElements() const { return size<D>(); }
+
+    void saveFaultTags(std::vector<localBoundaryTag> localfaultTagsRecivied) {
+        this->localFaultTags = std::move(localfaultTagsRecivied);
+    }
+
+    auto getFaultTags() const {
+        return localFaultTags;
+    }
 
     template <std::size_t Dto, std::size_t Dfrom> auto downward(std::size_t lid) const {
         return downward<Dto, Dfrom>(faces<Dfrom>()[lid]);
@@ -87,6 +96,7 @@ private:
 
     storage_t lfs;
     std::array<upward_map_t, D> upwardMaps;
+    std::vector<localBoundaryTag> localFaultTags;
 };
 
 } // namespace tndm

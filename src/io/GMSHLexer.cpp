@@ -59,6 +59,12 @@ GMSHToken GMSHLexer::getToken() {
         case "EndElements"_fnv1a:
             token = GMSHToken::end_elements;
             break;
+        case "PhysicalNames"_fnv1a:
+            token = GMSHToken::physical_names;
+            break;
+        case "EndPhysicalNames"_fnv1a:
+            token = GMSHToken::end_physical_names;
+            break;
         default:
             break;
         }
@@ -93,12 +99,17 @@ GMSHToken GMSHLexer::getToken() {
     }
 
     if (lastChar == '"') {
+        std::string localString;
         do {
             advance();
+            localString += lastChar;
         } while (lastChar != '"');
         advance();
+        extractedString=localString;
         return GMSHToken::string;
     }
+
+    
     return GMSHToken::unknown_token;
 }
 

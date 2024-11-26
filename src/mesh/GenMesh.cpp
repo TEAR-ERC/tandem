@@ -61,7 +61,7 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     for (auto& np1 : Np1) {
         numVertsGlobal *= np1;
     }
-
+    
     // A vertex has multi-index (v_1,...,v_d)
     // For parallel mesh generation we flatten the index and equally distribute vertices
     auto vertsLocal = distribute(Range(numVertsGlobal), rank, size);
@@ -145,6 +145,7 @@ std::unique_ptr<typename GenMesh<D>::boundary_mesh_t>
 GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     std::vector<boundary_simplex_t> boundaryElements;
     std::vector<BC> boundaryConditions;
+    std::cout << "please be here 1" << std::endl;
     for (auto& elem : mesh.getElements()) {
         for (auto& face : elem.downward()) {
             auto v0 = unflatten(face[0], Np1);

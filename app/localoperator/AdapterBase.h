@@ -41,6 +41,7 @@ public:
     void begin_preparation(std::size_t numFaultFaces);
     void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator<double>& scratch);
     void end_preparation() {}
+    //auto getNQ() {return quad_rule_.size();}
 
 protected:
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;
