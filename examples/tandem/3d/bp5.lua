@@ -54,12 +54,16 @@ function BP5:in_nucleation(x, y, z)
     return false
 end
 
-function BP5:L(x, y, z)
+function BP5:Lini(x, y, z)
     if self:in_nucleation(x, y, z) then
         return 0.13
     end
     return 0.14
 end
+
+
+
+
 
 function BP5:Sinit(x, y, z)
     return 0.0, 0.0
@@ -130,6 +134,12 @@ function BP5:a_alternative(x, y, z)
     return (1-phi)*self.amax + phi*self.a0
 end
 
+function BP5:L(x, y, z)
+    local x_center = - (0.5*self.l - 0.5*self.w)
+    local z_center = - (0.5*self.H + self.h_t + self.h_s)
+    local phi = self:smooth_square_patch(3, x-x_center, z-z_center, self.w+self.h_t, self.H+self.h_t, self.h_t, self.h_t)
+    return (1-phi)*0.14 + phi*0.13
+end
 
 function BP5:a(x, y, z)
     local d = -z

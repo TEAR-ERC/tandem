@@ -1,5 +1,5 @@
 DefineConstant[ res =   {40, Min 0, Max 1000, Name "Resolution" } ];
-DefineConstant[ res_f = {1, Min 0, Max 1000, Name "Fault resolution" } ];
+DefineConstant[ res_f = {3, Min 0, Max 1000, Name "Fault resolution" } ];
 DefineConstant[ size =  {100, Min 0, Max 1000, Name "Domain size" } ];
 
 h_s = 2;
