@@ -6,8 +6,8 @@ mode = "QD"
 type = "elasticity"
 ref_normal = [0, -1, 0]
 boundary_linear = true
-# comment mg_strategy for QDGreen
-mg_strategy = "logarithmic"
+# do not use mg_strategy with gamg 
+# mg_strategy = "logarithmic"
 matrix_free = false
 
 [fault_probe_output]
