@@ -189,6 +189,7 @@ set(APP_COMMON_SRCS
     common/PetscLinearSolver.cpp
     common/PetscVector.cpp
     common/PetscTimeSolver.cpp
+    common/PetscLoggingUtils.h
     form/SeasFDOperator.cpp
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
