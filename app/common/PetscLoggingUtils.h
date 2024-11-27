@@ -1,6 +1,5 @@
-// PetscLoggingUtils.h
-#ifndef PETSC_LOGGING_UTILS_H
-#define PETSC_LOGGING_UTILS_H
+#ifndef PETSC_LOGGING_UTILS_20241127_H
+#define PETSC_LOGGING_UTILS_20241127_H
 
 #include <chrono>
 #include <ctime>
@@ -71,4 +70,4 @@ inline std::string format_time(PetscReal t) {
 
 } // namespace tndm
 
-#endif // PETSC_LOGGING_UTILS_H
+#endif // PETSC_LOGGING_UTILS_20241127_H
