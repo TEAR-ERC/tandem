@@ -1,0 +1,50 @@
+final_time = 56764800000
+mesh_file = "bp5.msh"
+lib = "bp5.lua"
+scenario = "bp5_outside"
+mode = "QD"
+type = "elasticity"
+ref_normal = [0, -1, 0]
+boundary_linear = true
+# do not use mg_strategy with gamg 
+# mg_strategy = "logarithmic"
+matrix_free = false
+
+[fault_probe_output]
+prefix = "fltst_"
+t_max = 9460800
+probes = [
+    { name = "strk-36dp+00", x = [-36, 0,   0] },
+    { name = "strk-16dp+00", x = [-16, 0,   0] },
+    { name = "strk+00dp+00", x = [  0, 0,   0] },
+    { name = "strk+16dp+00", x = [ 16, 0,   0] },
+    { name = "strk+36dp+00", x = [ 36, 0,   0] },
+    { name = "strk-24dp+10", x = [-24, 0, -10] },
+    { name = "strk-16dp+10", x = [-16, 0, -10] },
+    { name = "strk+00dp+10", x = [  0, 0, -10] },
+    { name = "strk+16dp+10", x = [ 16, 0, -10] },
+    { name = "strk+00dp+22", x = [  0, 0, -22] }
+]
+
+[fault_output]
+prefix = "fault_output/bp5-fault"
+rtol = 0.1
+
+[domain_output]
+prefix = "domain_output/bp5-domain"
+rtol = 0.1
+
+[domain_probe_output]
+prefix = "blkst_"
+t_max = 9460800
+probes = [
+    { name = "strk-16fn+08dp+00", x = [-16,  8,   0] },
+    { name = "strk+00fn+08dp+00", x = [  0,  8,   0] },
+    { name = "strk+16fn+08dp+00", x = [ 16,  8,   0] },
+    { name = "strk+00fn+16dp+00", x = [  0, 16,   0] },
+    { name = "strk+00fn+32dp+00", x = [  0, 32,   0] },
+    { name = "strk+00fn+48dp+00", x = [  0, 48,   0] },
+    { name = "strk+00fn+08dp+10", x = [  0,  8, -10] },
+    { name = "strk+00fn+16dp+10", x = [  0, 16, -10] },
+    { name = "strk+00fn+32dp+10", x = [  0, 32, -10] }
+]
