@@ -69,7 +69,7 @@ public:
         std::string formatted_dt = tndm::format_time(dt);
         std::string current_datetime = tndm::get_current_date_time_string();
         // Print the step, formatted time, time step, and current date-time
-        CHKERRTHROW(PetscPrintf(PETSC_COMM_WORLD, "%s Step %D: Time = %s, Time step = %s\n",
+        CHKERRTHROW(PetscPrintf(PETSC_COMM_WORLD, "%s Step %D: t = %s, dt = %s\n",
                                 current_datetime.c_str(), step, formatted_time.c_str(),
                                 formatted_dt.c_str()));
         return 0;
