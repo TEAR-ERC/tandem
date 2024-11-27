@@ -1,6 +1,6 @@
 final_time = 56764800000
-mesh_file = "bp5.msh"
-lib = "bp5.lua"
+mesh_file = "bp5_half.msh"
+lib = "bp5_half.lua"
 scenario = "bp5_outside"
 mode = "QD"
 type = "elasticity"
