@@ -1,7 +1,51 @@
 LUMI
 ====
 
-Installation on LUMI leverages the preinstalled spack software stack there.
+Installation of tandem on LUMI-C/G can be done either using spack or manually.
+Unfortunately, the spack module based on the 23.09 programming environment only have rocm 5.6.1, which is unstable with petsc when running on GPUs
+(because of this issue https://gitlab.com/petsc/petsc/-/issues/1529, fixed in rocm-6.0.2).
+Therefore, petsc and tandem should be installed manually for LUMI-G.
+
+Step by step installation
+-------------------------
+
+We first compile PETSc with:
+
+```
+module load cray-mpich/8.1.29
+module load craype-x86-trento
+module load craype-accel-amd-gfx90a
+module load rocm/6.0.3
+export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
+export blas_dir=/opt/cray/pe/libsci/24.03.0/CRAYCLANG/17.0/x86_64
+git clone --branch v3.22.1 --single-branch https://gitlab.com/petsc/petsc
+cd petsc
+export PETSC_DIR=$(pwd) 
+export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.22.1
+
+./configure --download-c2html=0 --download-cmake --with-debugging=no  --download-hwloc=0 --download-metis --download-parmetis --download-sowing=0 --with-64-bit-indices --with-fortran-bindings=0 --with-hip --with-hip-arch=gfx90a --with-hipc=hipcc --with-memalign=32 --with-mpi-dir=${MPICH_DIR} --with-x=0 PETSC_ARCH=${PETSC_ARCH} --with-blaslapack-lib="${blas_dir}/lib/libsci_cray.a ${blas_dir}/lib/libsci_cray.so ${blas_dir}/lib/libsci_cray_mpi.a ${blas_dir}/lib/libsci_cray_mpi.so"
+
+make -j 30 all
+
+```
+
+Eigen and lua then need to be installed.
+
+Then we can proceed with tandem
+
+```
+git clone --branch dmay/staging --recursive https://github.com/TEAR-ERC/tandem
+cd tandem
+mkdir build_gpu
+CC=/opt/rocm-6.0.3/bin/amdclang CXX=/opt/rocm-6.0.3/bin/amdclang++ cmake .. -DCMAKE_PREFIX_PATH=${PETSC_DIR}/${PETSC_ARCH} -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+make -j 30 all
+
+```
+
+spack installation
+------------------
+
+We can use spack on LUMI to leverage the preinstalled spack software stack there when installing tandem.
 It requires setting up a spack environment and installing tandem there.
 
 Preparing spack for installation
@@ -48,16 +92,17 @@ Then we add `spack.yaml` in the folder:
 
     spack:
       concretizer:
-        unify: true
+        unify: when_possible
+      view: false
       modules:
         default:
           roots:
             tcl: $SPACK_USER_PREFIX/spack-modules
-          arch_folder: False
+          arch_folder: false
           tcl:
             hash_length: 3
-            naming_scheme: '{name}/{version}-{compiler.name}'
-            hierarchy: []
+            #naming_scheme: '{name}/{version}-{compiler.name}'
+            hierarchy: []    # or just remove the hierarchy line completely
             all:
               suffixes:
                 domain_dimension=2: d2
@@ -84,7 +129,7 @@ We then add the seissol-spack-aid repository which contains the latest version o
 
 .. code-block:: bash
 
-    git clone --branch NG https://github.com/SeisSol/seissol-spack-aid
+    git clone --branch spack_0.22 https://github.com/SeisSol/seissol-spack-aid
     spack repo add seissol-spack-aid/spack/
 
 Next step is to discover the more recent compilers (e.g. gcc-13)
@@ -127,7 +172,6 @@ We can now install tandem, e.g. with:
     spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@13
 
 
-
 Installation of tandem on LUMI-G
 --------------------------------
 
@@ -135,8 +179,7 @@ We can install the GPU version of tandem, with:
 
 .. code-block:: yaml
 
-    spack install -j 20 --add tandem@main polynomial_degree=4 domain_dimension=3 %gcc@13 +rocm amdgpu_target=gfx90a ^petsc amdgpu_target=gfx90a ^hipsolver ~build_fortran_bindings
-
+    spack install -j 20 --add tandem@main%gcc+rocm amdgpu_target=gfx90a domain_dimension=3 polynomial_degree=4
 
 Using modules
 -------------
@@ -145,7 +188,7 @@ Modules can be created, with:
 
 .. code-block:: bash
 
-    spack module tcl refresh --upstream-modules $(spack find -d --format "{name}{/hash:5}" tandem) 
+    spack module tcl refresh
 
 Once you have installed tandem with spack, you can use modules instead of spack to load tandem, e.g. by changing the ``~/.bashrc`` to, e.g.:
 
@@ -159,8 +202,6 @@ Once you have installed tandem with spack, you can use modules instead of spack 
     #eval $(spack env activate --sh $SPACK_USER_PREFIX)
     export MODULEPATH=$SPACK_USER_PREFIX/spack-modules:$MODULEPATH
     module load gcc tandem
-
-Note that this may not work with spack/23.09 because the module folder of the preinstalled modules is currently not accessible for reading.
 
 Running tandem
 --------------
@@ -187,3 +228,35 @@ Here is an example of slurm job file for running static on LUMI-C:
     srun static ridge.toml  --output ridgecrest  --mg_strategy twolevel --mg_coarse_level 1  --petsc -ksp_max_it 400 -pc_type mg -mg_levels_ksp_max_it 4 -mg_levels_ksp_type cg -mg_levels_pc_type bjacobi -ksp_rtol 1.0e-6 -mg_coarse_pc_type gamg -mg_coarse_ksp_type cg -mg_coarse_ksp_rtol 1.0e-1 -ksp_type gcr -log_view
 
 
+Here is an example of slurm job file for running static on LUMI-G:
+
+.. code-block:: bash
+
+    #!/bin/bash -l
+    #SBATCH --job-name=static
+    #SBATCH --partition=dev-g  # partition name
+    #SBATCH --nodes=4              # Total number of nodes 
+    #SBATCH --ntasks-per-node=8     # 8 MPI ranks per node, 16 total (2x8)
+    #SBATCH --gpus-per-node=8      # Allocate one gpu per MPI rank
+    #SBATCH --account=project_465000831
+    #SBATCH --time=00:30:00
+    #SBATCH --cpus-per-task=1
+    #SBATCH --exclusive
+    #SBATCH --mem=224G #debug, standard
+    #SBATCH --export=ALL
+
+    export MPICH_GPU_SUPPORT_ENABLED=1
+
+    module load cray-mpich/8.1.29
+    module load craype-x86-trento
+    module load craype-accel-amd-gfx90a
+    module load rocm/6.0.3
+    module load lua
+
+    echo "Allocated nodes: ${SLURM_JOB_NUM_NODES:-1}"
+    echo "Tasks per node: ${SLURM_TASKS_PER_NODE}"
+    echo "GPUs per node: ${SLURM_GPUS_PER_NODE}"
+    #echo "Allocated GPUs in node: $SLURM_JOB_GPUS"
+    CPU_BIND="core"
+
+    time -p srun --cpu-bind=$CPU_BIND static ridge.toml --mg_strategy twolevel --mg_coarse_level 1  --petsc -ksp_max_it 400 -pc_type mg -mg_levels_ksp_max_it 4 -mg_levels_ksp_type cg -mg_levels_pc_type bjacobi -ksp_rtol 1.0e-6 -mg_coarse_pc_type gamg -mg_coarse_ksp_type cg -mg_coarse_ksp_rtol 1.0e-1 -ksp_type gcr -log_view  -vec_type hip -mat_type aijhipsparse -log_view_gpu_time
