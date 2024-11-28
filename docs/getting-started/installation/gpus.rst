@@ -30,7 +30,7 @@ For Cuda, use:
 
 .. code-block:: bash
 
-    -mg_levels_mat_type aijcusparse -vec_type cuda -mat_type aijcusparse
+    -vec_type cuda -mat_type aijcusparse
 
 For ROCM, use:
 
