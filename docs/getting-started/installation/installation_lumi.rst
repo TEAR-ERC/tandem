@@ -11,42 +11,41 @@ Step by step installation
 
 We first compile PETSc with:
 
-```
-module load cray-mpich/8.1.29
-module load craype-x86-trento
-module load craype-accel-amd-gfx90a
-module load rocm/6.0.3
-export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
-export blas_dir=/opt/cray/pe/libsci/24.03.0/CRAYCLANG/17.0/x86_64
-git clone --branch v3.22.1 --single-branch https://gitlab.com/petsc/petsc
-cd petsc
-export PETSC_DIR=$(pwd) 
-export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.22.1
+.. code-block:: bash
 
-./configure --download-c2html=0 --download-cmake --with-debugging=no  --download-hwloc=0 --download-metis --download-parmetis --download-sowing=0 --with-64-bit-indices --with-fortran-bindings=0 --with-hip --with-hip-arch=gfx90a --with-hipc=hipcc --with-memalign=32 --with-mpi-dir=${MPICH_DIR} --with-x=0 PETSC_ARCH=${PETSC_ARCH} --with-blaslapack-lib="${blas_dir}/lib/libsci_cray.a ${blas_dir}/lib/libsci_cray.so ${blas_dir}/lib/libsci_cray_mpi.a ${blas_dir}/lib/libsci_cray_mpi.so"
+    module load cray-mpich/8.1.29
+    module load craype-x86-trento
+    module load craype-accel-amd-gfx90a
+    module load rocm/6.0.3
+    export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
+    export blas_dir=/opt/cray/pe/libsci/24.03.0/CRAYCLANG/17.0/x86_64
+    git clone --branch v3.22.1 --single-branch https://gitlab.com/petsc/petsc
+    cd petsc
+    export PETSC_DIR=$(pwd) 
+    export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.22.1
 
-make -j 30 all
+    ./configure --download-c2html=0 --download-cmake --with-debugging=no  --download-hwloc=0 --download-metis --download-parmetis --download-sowing=0 --with-64-bit-indices --with-fortran-bindings=0 --with-hip --with-hip-arch=gfx90a --with-hipc=hipcc --with-memalign=32 --with-mpi-dir=${MPICH_DIR} --with-x=0 PETSC_ARCH=${PETSC_ARCH} --with-blaslapack-lib="${blas_dir}/lib/libsci_cray.a ${blas_dir}/lib/libsci_cray.so ${blas_dir}/lib/libsci_cray_mpi.a ${blas_dir}/lib/libsci_cray_mpi.so"
 
-```
+    make -j 30 all
 
 Eigen and lua then need to be installed.
-
 Then we can proceed with tandem
 
-```
-git clone --branch dmay/staging --recursive https://github.com/TEAR-ERC/tandem
-cd tandem
-mkdir build_gpu
-CC=/opt/rocm-6.0.3/bin/amdclang CXX=/opt/rocm-6.0.3/bin/amdclang++ cmake .. -DCMAKE_PREFIX_PATH=${PETSC_DIR}/${PETSC_ARCH} -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
-make -j 30 all
+.. code-block:: bash
 
-```
+    git clone --branch dmay/staging --recursive https://github.com/TEAR-ERC/tandem
+    cd tandem
+    mkdir build_gpu
+    CC=/opt/rocm-6.0.3/bin/amdclang CXX=/opt/rocm-6.0.3/bin/amdclang++ cmake .. -DCMAKE_PREFIX_PATH=${PETSC_DIR}/${PETSC_ARCH} -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+    make -j 30 all
+
 
 spack installation
 ------------------
 
 We can use spack on LUMI to leverage the preinstalled spack software stack there when installing tandem.
 It requires setting up a spack environment and installing tandem there.
+(but again note that the tandem compiled with spack will fail during solve on GPUs due to the deprecated rocm of the spack 23.09 programming environment).
 
 Preparing spack for installation
 --------------------------------
