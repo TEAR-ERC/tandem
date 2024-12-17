@@ -3,6 +3,7 @@ import meshio
 import numpy as np
 import argparse
 import os
+import warnings
 
 # Seissol specific vertexing for a particular tetrahedral face.
 # https://seissol.readthedocs.io/en/latest/PUML-mesh-format.html
@@ -33,6 +34,7 @@ each_face_bc_tag_i8 = np.dtype(
 )
 
 
+# TODO: This mapping should essentially be handled by a yaml file or something similar
 def seissol_to_tandem_tag_conversion(x):
     """
     Converts SeisSol tag to its corresponding Tandem tag.
@@ -85,10 +87,10 @@ def get_boundary_condition_masks(boundary):
         )
         masking = [x > 0 for x in boundary_condition_decoded_i8]
         for x in boundary_condition_decoded_i8:
-            # Handle unsupported boundary conditions
+            # Handle unsupported boundary conditions with a warning
             if x in unsupported_conditions:
-                raise ValueError(
-                    f"Unsupported boundary condition: {x} = {unsupported_conditions[x]}."
+                warnings.warn(
+                    f"Unsupported boundary condition: {x} = {unsupported_conditions[x]}. Writing as it is for now."
                 )
 
         # Store the results
@@ -138,7 +140,7 @@ def retrieve_lower_order_elements(
 def convert_h5_to_msh(h5_file, msh_file):
     """
 
-    Docstrings
+    Convert an h5 file to a msh file.
 
     """
     # Extract values from the .h5 mesh file
@@ -176,7 +178,9 @@ def convert_h5_to_msh(h5_file, msh_file):
     }
 
     # Create the mesh using meshio
-    # TODO: Explicitly define geometric tags to avoid warning
+    # TODO: Explicitly define geometric tags to avoid warning. Since the geometric tag information is not
+    # parsed/lost during the pumgen conversion, currently there is an error which should be explicitly
+    # coded here.
     mesh = meshio.Mesh(
         points=geometry,  # Node coordinates
         cells=elements,  # Element connectivity
@@ -220,4 +224,3 @@ if __name__ == "__main__":
 
     # Run the conversion
     convert_h5_to_msh(input_file, output_file)
-
