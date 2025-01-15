@@ -73,7 +73,13 @@ def load_yaml_mapping(file_path):
     """
     try:
         with open(file_path, "r") as yaml_file:
-            mapping = yaml.safe_load(yaml_file)
+            data = yaml.safe_load(yaml_file)
+            # Access the mapping under the mapping header
+            mapping = data.get("seissol_to_tandem_tag_mapping")
+            if mapping is None:
+                raise ValueError(
+                    "The key 'seissol_to_tandem_tag_mapping' is missing in the YAML file."
+                )
             return mapping
     except yaml.YAMLError as e:
         raise ValueError(f"Error parsing the tag mapping YAML file: {e}")
@@ -85,7 +91,7 @@ def seissol_to_tandem_tag_conversion(seissol_tag, seissol_to_tandem_tag_map):
 
     Parameters:
     x (int8): The SeisSol tag value to be converted.
-    seissol_to_tandem_tag_map [dict]: A dictionary mapping SeisSol boundary tags to Tandem boundary tagsu
+    seissol_to_tandem_tag_map [dict]: A dictionary mapping SeisSol boundary tags to Tandem boundary tags
 
     Returns:
     int8: The corresponding Tandem tag value.
