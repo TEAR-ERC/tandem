@@ -99,7 +99,12 @@ def seissol_to_tandem_tag_conversion(seissol_tag, seissol_to_tandem_tag_map):
     if seissol_tag in seissol_to_tandem_tag_map:
         tandem_tag = seissol_to_tandem_tag_map[seissol_tag]
     else:
-        tandem_tag = seissol_tag
+        # Raise an error incase user does not provide mapping in yaml file for the Seissol tag
+        raise ValueError(
+            f"Error: The SeisSol tag '{seissol_tag}' inside the h5 file was not found in the provided mapping. "
+            "Please check that the mapping for this tag exists in the 'seissol_to_tandem_tag_mapping' file."
+        )
+
     return np.int8(tandem_tag)
 
 
