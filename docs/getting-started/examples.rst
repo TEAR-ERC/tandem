@@ -115,11 +115,14 @@ Now go to your build folder (inside the Docker container, if you used Docker) an
 
    $ ./app/tandem ../examples/tandem/2d/bp1_sym.toml \
          --petsc -options_file ../examples/options/lu_mumps.cfg \
-         -options_file ../examples/options/rk45.cfg -ts_monitor 
+         -options_file ../examples/options/rk45.cfg
 
 In comparison to the Elasticity example, we added the :code:`rk45.cfg` options
 file which selects an adaptive Runge-Kutta time-stepping scheme.
-The option :code:`-ts_monitor` enables monitoring of time and time-step size.
+
+By default, tandem enables monitoring of time and time-step size in a user-friendly format (values given in year, days, hours, etc.).
+The option :code:`-ts_monitor` enables monitoring of time and time-step size in the default PETSc layout, that is time step and time in seconds.
+Finally, the option :code:`-disable_custom_ts_monitor` allows disable any time step monitoring.
 
 Time to fetch a coffee, as this is going to take a while.
 In order to speed things up, add :code:`--mode QDGreen`:
@@ -128,7 +131,7 @@ In order to speed things up, add :code:`--mode QDGreen`:
 
    $ ./app/tandem ../examples/tandem/2d/bp1_sym.toml --mode QDGreen \
          --petsc -options_file ../examples/options/lu_mumps.cfg \
-         -options_file ../examples/options/rk45.cfg -ts_monitor 
+         -options_file ../examples/options/rk45.cfg
 
 Tandem now spends some time in a pre-computation step, but the time-stepping itself
 will be much faster.
