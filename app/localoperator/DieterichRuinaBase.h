@@ -86,10 +86,7 @@ public:
         auto tauAbsVec = tau + p_[index].get<TauPre>();
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tauAbsVec);
-        double V = 0.0, Ve = 0.0;
-        double Va = -32.0;
-        double Va_min = std::log10(std::nextafter(0.0, 1.0));
-        double Vb, a, b;
+        double V = 0.0;
         int ierr = 0;
 
         if (eta == 0.0) {
@@ -101,35 +98,20 @@ public:
                 V = tauAbs / eta;
                 ierr = 1;
             } else {
-
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
-                    return tauAbs - this->F(index, snAbs, std::pow(10.0, Ve), psi) -
-                           eta * std::pow(10.0, Ve);
+                double a = 0.0;
+                double b = tauAbs / eta;
+                if (a > b) {
+                    std::swap(a, b);
+                }
+                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
+                    return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
                 };
 
-                Vb = std::log10(tauAbs / eta);
-
                 try {
-                    a = Va;
-                    b = Vb;
-                    if (a > b) {
-                        std::swap(a, b);
-                    }
-                    Ve = zeroIn(a, b, fF);
-                    V = std::pow(10.0, Ve);
+                    V = zeroIn(a, b, fF);
                 } catch (std::exception const&) {
-                    try {
-                        a = Va_min;
-                        b = Vb;
-                        if (a > b) {
-                            std::swap(a, b);
-                        }
-                        Ve = zeroIn(a, b, fF);
-                        V = std::pow(10.0, Ve);
-                    } catch (std::exception const&) {
-                        V = NAN;
-                        ierr = 2;
-                    }
+                    V = NAN;
+                    ierr = 2;
                 }
                 if (ierr != 0) {
                     auto _A = p_[index].get<A>();
@@ -156,10 +138,8 @@ public:
                     std::cout << "  sigma_n = " << snAbs << std::endl;
                     std::cout << "  |tau|   = " << tauAbs << std::endl;
                     std::cout << "  psi     = " << psi << std::endl;
-                    std::cout << "  log10(V_lower) = " << a << std::endl;
-                    std::cout << "  log10(V_upper) = " << b << std::endl;
-                    std::cout << "  V_lower = " << std::pow(10.0, a) << std::endl;
-                    std::cout << "  V_upper = " << std::pow(10.0, b) << std::endl;
+                    std::cout << "  V_lower = " << a << std::endl;
+                    std::cout << "  V_upper = " << b << std::endl;
                     std::cout << "  R(V_lower) = " << fF(a) << std::endl;
                     std::cout << "  R(V_upper) = " << fF(b) << std::endl;
                     std::cout << "  x = { ";
