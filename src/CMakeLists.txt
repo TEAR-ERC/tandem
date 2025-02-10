@@ -61,7 +61,9 @@ find_package(MPI REQUIRED)
 find_package(ParMETIS REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
-include(../cmake/filesystem.cmake)
+
+find_package(FILESYSTEM REQUIRED)
+target_link_libraries(tandem-lib INTERFACE std::filesystem)
 
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
