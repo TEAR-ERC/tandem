@@ -18,10 +18,12 @@
 #include <mpi.h>
 
 #include <cstddef>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -49,7 +51,23 @@ public:
     virtual void write(double time, mneme::span<FiniteElementFunction<3u>> data) {}
 
     inline void increase_step(double time, double VMax) {
+
         ++output_step_;
+        last_output_time_ = time;
+        last_output_VMax_ = VMax;
+
+        // Open a file for appending (creates the file if it doesn't exist)
+        std::ofstream output_file(prefix_ + "_status.txt");
+        if (output_file.is_open()) {
+            output_file << output_step_ << " " << time << " " << VMax << std::endl;
+        } else {
+            std::cerr << "Error opening file for writing!" << std::endl;
+        }
+        output_file.close();
+    }
+
+    virtual void set_state(std::size_t step, double time, double VMax) {
+        output_step_ = step;
         last_output_time_ = time;
         last_output_VMax_ = VMax;
     }
@@ -90,6 +108,10 @@ public:
             writer_.write(time, std::move(data));
         }
     }
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        writer_.truncate_after_restart(step);
+    }
 
 private:
     BoundaryProbeWriter<D> writer_;
@@ -110,6 +132,10 @@ public:
         if (writer_.num_probes() > 0) {
             writer_.write(time, std::move(data));
         }
+    }
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        writer_.truncate_after_restart(step);
     }
 
 private:
@@ -151,6 +177,15 @@ public:
             piece.addPointData(fun);
         }
         writer.write(prefix_ + "-static");
+    }
+
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            pvd_.truncate_after_restart(step);
+        }
     }
 
 private:
@@ -219,6 +254,15 @@ public:
             piece.addPointData(fun);
         }
         writer.write(prefix_ + "-static");
+    }
+
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            pvd_.truncate_after_restart(step);
+        }
     }
 
 private:

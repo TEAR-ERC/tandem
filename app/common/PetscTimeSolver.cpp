@@ -10,10 +10,35 @@ PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm, Config const& cfg) {
 
     auto const& cfgcp = cfg.ts_checkpoint_config;
 
-    CHKERRTHROW(
-        ts_checkpoint_configure(ts_, cfgcp.save_directory.c_str(), cfgcp.frequency_step,
-                                cfgcp.frequency_cputime_minutes, cfgcp.frequency_time_physical,
-                                static_cast<int>(cfgcp.storage_type), cfgcp.storage_limited_size));
+    // we need the output prefixes for reading their status files
+    const char* fault_probe_output_prefix = 0;
+    if (cfg.fault_probe_output) {
+        auto const& oc = *cfg.fault_probe_output;
+        fault_probe_output_prefix = oc.prefix.c_str();
+    }
+
+    const char* domain_probe_output_prefix = 0;
+    if (cfg.domain_probe_output) {
+        auto const& oc = *cfg.domain_probe_output;
+        domain_probe_output_prefix = oc.prefix.c_str();
+    }
+
+    const char* fault_output_prefix = 0;
+    if (cfg.fault_output) {
+        auto const& oc = *cfg.fault_output;
+        fault_output_prefix = oc.prefix.c_str();
+    }
+    const char* domain_output_prefix = 0;
+    if (cfg.domain_output) {
+        auto const& oc = *cfg.domain_output;
+        domain_output_prefix = oc.prefix.c_str();
+    }
+
+    CHKERRTHROW(ts_checkpoint_configure(
+        ts_, cfgcp.save_directory.c_str(), cfgcp.frequency_step, cfgcp.frequency_cputime_minutes,
+        cfgcp.frequency_time_physical, static_cast<int>(cfgcp.storage_type),
+        cfgcp.storage_limited_size, fault_probe_output_prefix, domain_probe_output_prefix,
+        fault_output_prefix, domain_output_prefix));
 
     TSType time_scheme;
     CHKERRTHROW(TSGetType(ts_, &time_scheme));
