@@ -1,0 +1,149 @@
+name: tandem-build
+
+on:
+  push:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check-petsc-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      petsc_version: ${{ steps.get-current-version.outputs.version }}
+      needs_rebuild: ${{ steps.check-version.outputs.rebuild }}
+      dependencies_image: ${{ steps.check-version.outputs.dependencies_image }}
+      tandem_image: ${{ steps.check-version.outputs.tandem_image }}
+    steps:
+      - name: Get Current PETSc Version
+        id: get-current-version
+        run: |
+          VERSION=$(curl -s https://pypi.org/pypi/petsc/json | jq -r '.info.version')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Check if versioned image exists
+        id: check-version
+        run: |
+          IMAGE_TAG=${{ steps.get-current-version.outputs.version }}
+          # Convert repository to lowercase
+          REPO_NAME=${{ github.repository }}
+          REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
+
+          TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
+          DEPENDENCIES_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-dependencies"
+
+          echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
+          echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
+
+          # Check if the image exists using GHCR API
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${DEPENDENCIES_IMAGE}/manifests/${IMAGE_TAG}")
+
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "rebuild=false" >> $GITHUB_OUTPUT
+          else
+            echo "rebuild=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-dependencies-image:
+    needs: check-petsc-version
+    if: needs.check-petsc-version.outputs.needs_rebuild == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push Dependencies Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: dependencies.Dockerfile 
+          push: true
+          tags: ${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
+          platforms: linux/amd64
+          build-args: |
+              PETSC_VERSION=${{ needs.check-petsc-version.outputs.petsc_version }}
+              CC=gcc-13
+              CXX=g++-13
+
+  build-and-push-tandem-image:
+    needs: [check-petsc-version, build-dependencies-image]
+    if: always() && !cancelled() && !failure()
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - cc: gcc-13
+            cxx: g++-13
+          - cc: clang-18
+            cxx: clang++-18
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ needs.check-petsc-version.outputs.tandem_image  }}:${{ matrix.compiler.cc }}
+          platforms: linux/amd64
+          build-args: |
+            DEPENDENCIES_IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
+            CC=${{ matrix.compiler.cc }}
+            CXX=${{ matrix.compiler.cxx }}
+
+  verify:
+    needs: [build-and-push-tandem-image, check-petsc-version]
+    if: success()
+    runs-on: ubuntu-24.04 
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - cc: gcc-13
+            cxx: g++-13
+          - cc: clang-18
+            cxx: clang++-18
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Run Static Verification
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ matrix.compiler.cc }} \
+            -c "ulimit -Ss 65536 && cd examples/elasticity/2d && \
+              gmsh -2 circular_hole.geo && \
+              ../../../build_2d_p3/app/static circular_hole.toml \
+                --resolution 0.8 \
+                --matrix_free yes \
+                --mg_strategy twolevel \
+                --mg_coarse_level 1 \
+                --petsc -options_file ../../options/mg_cheby.cfg && \
+              cd ../3d && \
+              gmsh -3 spherical_hole.geo && \
+              ../../../build_3d_p3/app/static spherical_hole.toml \
+                --resolution 0.8 \
+                --matrix_free yes \
+                --mg_strategy twolevel \
+                --mg_coarse_level 1 \
+                --petsc -options_file ../../options/mg_cheby.cfg"
