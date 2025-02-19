@@ -42,8 +42,9 @@ RUN mkdir build_3d_p3 && cd build_3d_p3 && \
     make -j$(nproc) && \
     make test
 
-USER myuser
 # Change ownership of relevant directories (if needed)
 RUN chown -R myuser:myuser /app
+
+USER myuser
 
 ENTRYPOINT ["/bin/bash"]
