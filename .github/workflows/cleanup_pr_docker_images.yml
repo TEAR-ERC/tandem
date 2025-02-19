@@ -1,0 +1,74 @@
+name: cleanup-pr-docker-images
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup-pr-images:
+    needs: [build-and-push-tandem-image]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Get Merged PR Number
+        id: get-pr-number
+        run: |
+          # Get the commit SHA from the push event
+          COMMIT_SHA="${{ github.sha }}"
+
+          # Use the GitHub API to find the PR associated with the commit
+          PR_NUMBER=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/search/issues?q=type:pr+merged:yes+sha:${COMMIT_SHA}+repo:${{ github.repository }}" | jq -r '.items[0].number')
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "No merged PR found for this commit."
+          fi
+
+      - name: Delete PR Images (if PR found)
+        if: steps.get-pr-number.outputs.pr_number != '' # Only run if a PR number was found
+        run: |
+          REPO_NAME=${{ github.repository }}
+          REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
+          TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
+          PR_TAG="pr-${{ steps.get-pr-number.outputs.pr_number }}"
+
+          # Check if the tag exists
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${TANDEM_IMAGE}/manifests/${PR_TAG}-gcc-13") # Check with gcc-13, clang-18 should also exist
+
+          if [[ "$STATUS_CODE" -eq 200 ]]; then
+            echo "Deleting image: ${TANDEM_IMAGE}:${PR_TAG}-gcc-13"
+            # Get the manifest digest for the tag (gcc-13)
+            DIGEST_GCC=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://ghcr.io/v2/${TANDEM_IMAGE}/manifests/${PR_TAG}-gcc-13" | jq -r '."config"."digest"')
+            # Delete the manifest (and thus the image)
+            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${TANDEM_IMAGE}/manifests/${DIGEST_GCC}"
+
+            echo "Deleting image: ${TANDEM_IMAGE}:${PR_TAG}-clang-18"
+            # Get the manifest digest for the tag (clang-18)
+            DIGEST_CLANG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://ghcr.io/v2/${TANDEM_IMAGE}/manifests/${PR_TAG}-clang-18" | jq -r '."config"."digest"')
+            # Delete the manifest (and thus the image)
+            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${TANDEM_IMAGE}/manifests/${DIGEST_CLANG}"
+
+          else
+            echo "No PR images found for this PR number."
+          fi
+
