@@ -39,6 +39,12 @@ jobs:
 
           echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
           echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
+          # Check if the image exists using GHCR API
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+              "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_NO_GHCR}/manifests/${IMAGE_TAG}")
+          echo "Status code: $STATUS_CODE"
 
           # Check if the image exists using GHCR API
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
