@@ -42,6 +42,7 @@ jobs:
           # Check if the image exists using GHCR API
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://ghcr.io/v2/${DEPENDENCIES_IMAGE}/manifests/${IMAGE_TAG}")
+          echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE}/manifests/${IMAGE_TAG}"
           echo "STATUS_CODE=${STATUS_CODE}"
 
           if [ "$STATUS_CODE" -eq 200 ]; then
@@ -144,8 +145,6 @@ jobs:
       - name: Run Static Verification
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
             ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
             -c "ulimit -Ss 65536 && cd examples/elasticity/2d && \
               gmsh -2 circular_hole.geo && ls ../../.. && ls /workspace && \
