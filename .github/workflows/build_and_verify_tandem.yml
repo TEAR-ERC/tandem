@@ -44,15 +44,14 @@ jobs:
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_NO_GHCR}/manifests/${IMAGE_TAG}")
           echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_NO_GHCR}/manifests/${IMAGE_TAG}"
-         echo $STATUS_CODE
+          echo $STATUS_CODE
 
           # Check if the image exists using GitHub API
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/v2/packages/container/${DEPENDENCIES_IMAGE_NO_GHCR}/versions/${IMAGE_TAG}")
-
-         echo $STATUS_CODE
+          echo $STATUS_CODE
 
 
           if [ "$STATUS_CODE" -eq 200 ]; then
