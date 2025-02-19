@@ -8,9 +8,7 @@ on:
 
 permissions:
   contents: read
-  packages:
-    read: true
-    write: true
+  packages: write
 
 jobs:
   check-petsc-version:
