@@ -35,15 +35,14 @@ jobs:
 
           TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
           DEPENDENCIES_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-dependencies"
+          DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
 
           echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
           echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
 
           # Check if the image exists using GHCR API
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://ghcr.io/v2/${DEPENDENCIES_IMAGE}/manifests/${IMAGE_TAG}")
-          echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE}/manifests/${IMAGE_TAG}"
-          echo "STATUS_CODE=${STATUS_CODE}"
+            "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_NO_GHCR}/manifests/${IMAGE_TAG}")
 
           if [ "$STATUS_CODE" -eq 200 ]; then
             echo "rebuild=false" >> $GITHUB_OUTPUT
