@@ -9,6 +9,10 @@ ARG CXX
 ENV CC=$CC
 ENV CXX=$CXX
 ENV PETSC_INSTALL_DIR=/opt/petsc/
+# Create a non-root user (replace "myuser" with your desired username)
+# this is to avoid mpirun error 
+RUN useradd -ms /bin/bash myuser
+
 
 # Create build directory
 WORKDIR /app
@@ -37,5 +41,9 @@ RUN mkdir build_3d_p3 && cd build_3d_p3 && \
         -DCMAKE_CXX_COMPILER="$CXX" && \
     make -j$(nproc) && \
     make test
+
+USER myuser
+# Change ownership of relevant directories (if needed)
+RUN chown -R myuser:myuser /app
 
 ENTRYPOINT ["/bin/bash"]
