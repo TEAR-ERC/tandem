@@ -21,8 +21,11 @@ WORKDIR /app
 COPY . /app
 
 # Build Tandem (using build args for compiler)
-RUN mkdir build_2d_p3 && cd build_2d_p3 && \
-    cmake .. \
+WORKDIR /app
+RUN mkdir build_2d_p3 build_3d_p3
+
+WORKDIR /app/build_2d_p3
+RUN cmake .. \
         -DCMAKE_PREFIX_PATH=${PETSC_INSTALL_DIR} \
         -DDOMAIN_DIMENSION=2 \
         -DPOLYNOMIAL_DEGREE=3 \
@@ -31,9 +34,8 @@ RUN mkdir build_2d_p3 && cd build_2d_p3 && \
     make -j$(nproc) && \
     make test
 
-# Build Tandem (using build args for compiler)
-RUN mkdir build_3d_p3 && cd build_3d_p3 && \
-    cmake .. \
+WORKDIR /app/build_3d_p3
+RUN cmake .. \
         -DCMAKE_PREFIX_PATH=${PETSC_INSTALL_DIR} \
         -DDOMAIN_DIMENSION=3 \
         -DPOLYNOMIAL_DEGREE=3 \
@@ -41,6 +43,8 @@ RUN mkdir build_3d_p3 && cd build_3d_p3 && \
         -DCMAKE_CXX_COMPILER="$CXX" && \
     make -j$(nproc) && \
     make test
+
+RUN ls -lah /app
 
 # Change ownership of relevant directories (if needed)
 RUN chown -R myuser:myuser /app
