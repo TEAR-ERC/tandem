@@ -463,6 +463,17 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
 
     CHKERRTHROW(MatLoad(G_, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
+    //##############################################################################
+    PetscPrintf(PETSC_COMM_WORLD,"GF matrix <info>\n");
+    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD, PETSC_VIEWER_ASCII_INFO);
+    MatView(G_, PETSC_VIEWER_STDOUT_WORLD);
+    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+
+    PetscPrintf(PETSC_COMM_WORLD,"GF matrix <info-detail>\n");
+    PetscViewerPushFormat(PETSC_VIEWER_STDOUT_WORLD, PETSC_VIEWER_ASCII_INFO_DETAIL);
+    MatView(G_, PETSC_VIEWER_STDOUT_WORLD);
+    PetscViewerPopFormat(PETSC_VIEWER_STDOUT_WORLD);
+    //##############################################################################
     CHKERRTHROW(PetscTime(&t1));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "load_discrete_greens_operator() %1.2e (sec)\n", (double)(t1 - t0)));
