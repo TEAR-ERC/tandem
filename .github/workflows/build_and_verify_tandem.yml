@@ -24,7 +24,10 @@ jobs:
         run: |
           VERSION=$(curl -s https://pypi.org/pypi/petsc/json | jq -r '.info.version')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
+          
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        
       - name: Check if versioned image exists
         id: check-version
         run: |
@@ -32,24 +35,23 @@ jobs:
           # Convert repository to lowercase
           REPO_NAME=${{ github.repository }}
           REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
-
           TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
           DEPENDENCIES_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-dependencies"
           DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
-
           echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
           echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
-
           # Check if the image exists using GHCR API
-          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_NO_GHCR}/manifests/${IMAGE_TAG}")
           echo $STATUS_CODE
-
           if [ "$STATUS_CODE" -eq 200 ]; then
             echo "rebuild=false" >> $GITHUB_OUTPUT
           else
             echo "rebuild=true" >> $GITHUB_OUTPUT
           fi
+
 
   build-dependencies-image:
     needs: check-petsc-version
@@ -61,6 +63,19 @@ jobs:
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Delete existing image
+        run: |
+          # Get repository name in lowercase
+          REPO_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
+          
+          # Delete existing image version if it exists
+          curl -L -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/user/packages/container/${DEPENDENCIES_IMAGE_NO_GHCR}/versions/${needs.check-petsc-version.outputs.petsc_version}"
+        continue-on-error: true
 
       - name: Build and push Dependencies Image
         uses: docker/build-push-action@v4
