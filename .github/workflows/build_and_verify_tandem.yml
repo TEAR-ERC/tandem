@@ -167,16 +167,16 @@ jobs:
         run: |
           docker run --rm \
             ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            bash -c "ulimit -Ss 65536 && cd examples/elasticity/2d && gmsh -2 circular_hole.geo"
+            -c "ulimit -Ss 65536 && cd examples/elasticity/2d && gmsh -2 circular_hole.geo"
           docker run --rm \
             ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            bash -c "ulimit -Ss 65536 && cd examples/elasticity/2d && /app/build_2d_p3/app/static circular_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
+            -c "ulimit -Ss 65536 && cd examples/elasticity/2d && /app/build_2d_p3/app/static circular_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
       - name: Run Static Verification 3D
         run: |
           docker run --rm \
             ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            bash -c "ulimit -Ss 65536 && cd examples/elasticity/3d && gmsh -3 spherical_hole.geo"
+            -c "ulimit -Ss 65536 && cd examples/elasticity/3d && gmsh -3 spherical_hole.geo"
           docker run --rm \
             ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            bash -c "ulimit -Ss 65536 && cd examples/elasticity/3d && /app/build_3d_p3/app/static spherical_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
+            -c "ulimit -Ss 65536 && cd examples/elasticity/3d && /app/build_3d_p3/app/static spherical_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
 
