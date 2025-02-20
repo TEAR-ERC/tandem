@@ -71,7 +71,7 @@ jobs:
 
       - name: Delete existing image
         run: |
-        # Get repository name in lowercase
+            # Get repository name in lowercase
             REPO_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
             DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
             VERSION="${{ needs.check-petsc-version.outputs.petsc_version }}"
