@@ -44,6 +44,7 @@ RUN cmake .. \
     make -j$(nproc) && \
     make test
 
+WORKDIR /app
 RUN ls -lah /app
 
 # Change ownership of relevant directories (if needed)
