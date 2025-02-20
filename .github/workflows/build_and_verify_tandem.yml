@@ -50,6 +50,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}")
+          echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}"
           echo $STATUS_CODE
           if [ "$STATUS_CODE" -eq 200 ]; then
             echo "rebuild=false" >> $GITHUB_OUTPUT
