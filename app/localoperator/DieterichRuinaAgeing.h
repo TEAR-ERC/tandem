@@ -77,8 +77,11 @@ public:
         -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
-        double snAbs = -sn + p_[index].get<SnPre>();
+        double snAbs = 25;
         double tauAbs = norm(tauAbsVec);
+        if (tauAbs > 40.0) {
+            tauAbs = 40;
+        }
         double V = 0.0;
         if (eta == 0.0) {
             V = Finv(index, snAbs, tauAbs, psi);
@@ -99,13 +102,24 @@ public:
                 try {
                     V = zeroIn(a, b, fF);
                 } catch (std::exception const&) {
-                    std::cout << "sigma_n = " << snAbs << std::endl
+                    auto at = p_[index].get<A>();
+                    std::cout << "################################################" << std::endl
+                              << "sigma_n = " << snAbs << std::endl
                               << "|tau| = " << tauAbs << std::endl
                               << "psi = " << psi << std::endl
+                              << "a = " << at << std::endl
+                              << "V = " << V << std::endl
+                              << "eta = " << eta << std::endl
                               << "L = " << a << std::endl
                               << "U = " << b << std::endl
-                              << "F(L) = " << fF(a) << std::endl
-                              << "F(U) = " << fF(b) << std::endl;
+                              << "exp(psi / a)" << exp(psi / at) << std::endl
+                              << "a * asinh((V / (2.0 * cp_.V0)) * e) - L" << at * asinh((a / (2.0 * cp_.V0)) * exp(psi / at)) << std::endl
+                              << "a * asinh((V / (2.0 * cp_.V0)) * e) - U" << at * asinh((b / (2.0 * cp_.V0)) * exp(psi / at)) << std::endl
+                              << "F(L) = " << this->F(index, snAbs, a, psi) << std::endl
+                              << "F(U) = " << this->F(index, snAbs, b, psi) << std::endl
+                              << "fF(L) = " << fF(a) << std::endl
+                              << "fF(U) = " << fF(b) << std::endl
+                              << "################################################" << std::endl;
                     throw;
                 }
             }

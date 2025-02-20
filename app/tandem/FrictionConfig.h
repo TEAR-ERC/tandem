@@ -54,7 +54,6 @@ public:
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
         }
         if (lib_.hasMember(scenario, State)) {
-            std::cout << "reading state function" << std::endl;
             state_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, State);
         }
         if (lib_.hasMember(scenario, TauPre)) {
