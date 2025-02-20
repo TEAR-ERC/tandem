@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: read
+  id-token: write  # Add this if needed
+  checks: write    # Add this if needed
+
+
 
 jobs:
   check-petsc-version:
@@ -66,15 +71,16 @@ jobs:
 
       - name: Delete existing image
         run: |
-          # Get repository name in lowercase
-          REPO_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
-          
-          # Delete existing image version if it exists
-          curl -L -X DELETE \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/user/packages/container/${DEPENDENCIES_IMAGE_NO_GHCR}/versions/${needs.check-petsc-version.outputs.petsc_version}"
+        # Get repository name in lowercase
+            REPO_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            DEPENDENCIES_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-dependencies"
+            VERSION="${{ needs.check-petsc-version.outputs.petsc_version }}"
+            
+            # Delete existing image version if it exists
+            curl -L -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/user/packages/container/${DEPENDENCIES_IMAGE_NO_GHCR}/versions/${VERSION}"
         continue-on-error: true
 
       - name: Build and push Dependencies Image
