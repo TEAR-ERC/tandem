@@ -1,8 +1,18 @@
 #include "ScalarWriter.h"
 
-#include <filesystem>
 #include <iomanip>
 #include <ios>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 
@@ -20,7 +30,7 @@ void ScalarWriter::write(double time, mneme::span<double> scalars) const {
         out_->open(file_name_, false);
         write_header();
     } else {
-        if (std::filesystem::exists(file_name_)) {
+        if (fs::exists(file_name_)) {
             out_->open(file_name_, true);
         } else {
             out_->open(file_name_, false);

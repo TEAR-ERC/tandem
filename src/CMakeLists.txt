@@ -64,6 +64,10 @@ find_package(ZLIB REQUIRED)
 
 find_package(FILESYSTEM REQUIRED)
 target_link_libraries(tandem-lib INTERFACE std::filesystem)
+message(STATUS "USE_EXPERIMENTAL_FS: ${USE_EXPERIMENTAL_FS}")
+if (USE_EXPERIMENTAL_FS)
+    target_compile_definitions(tandem-lib PUBLIC EXPERIMENTAL_FS)
+endif()
 
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 

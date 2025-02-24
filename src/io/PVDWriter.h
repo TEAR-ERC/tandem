@@ -1,10 +1,19 @@
 #ifndef PVDWRITER_20201021_H
 #define PVDWRITER_20201021_H
 
-#include <tinyxml2.h>
-
-#include <filesystem>
 #include <string_view>
+#include <tinyxml2.h>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 
@@ -27,7 +36,7 @@ public:
     bool write();
 
 private:
-    std::filesystem::path base_;
+    fs::path base_;
     tinyxml2::XMLDocument doc_;
     tinyxml2::XMLElement* collection_;
 };

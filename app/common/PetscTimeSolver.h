@@ -16,6 +16,17 @@ extern "C" {
 #include <cassert>
 #include <memory>
 #include <tuple>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 
@@ -67,13 +78,13 @@ public:
             std::string sload;
             if (rank == 0) {
                 sload = ts_checkpoint_load_directory.value();
-                if (std::filesystem::is_regular_file(sload)) {
+                if (fs::is_regular_file(sload)) {
                     std::cout << "Retrieving the name of the last checkpoint from " << sload
                               << std::endl;
                     std::ifstream file(sload);
                     if (file.is_open()) {
                         if (std::getline(file, sload)) {
-                            if (not std::filesystem::is_directory(sload)) {
+                            if (not fs::is_directory(sload)) {
                                 throw std::runtime_error(
                                     "The first line of the file does not point to an existing "
                                     "directory.");

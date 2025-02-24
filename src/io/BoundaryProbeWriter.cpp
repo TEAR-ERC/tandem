@@ -4,11 +4,22 @@
 #include "io/ProbeWriterUtil.h"
 #include "util/LinearAllocator.h"
 
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
+
 #include <mpi.h>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 
@@ -79,12 +90,13 @@ void BoundaryProbeWriter<D>::write_header(
 template <std::size_t D>
 void BoundaryProbeWriter<D>::write(double time,
                                    mneme::span<FiniteElementFunction<D - 1>> functions) const {
+
     for (auto const& probe : probes_) {
         if (time <= 0.0) {
             out_->open(probe.file_name, false);
             write_header(probe, functions);
         } else {
-            if (std::filesystem::exists(probe.file_name)) {
+            if (fs::exists(probe.file_name)) {
                 out_->open(probe.file_name, true);
             } else {
                 out_->open(probe.file_name, false);

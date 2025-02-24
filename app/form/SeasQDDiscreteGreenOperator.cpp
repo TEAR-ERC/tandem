@@ -6,8 +6,17 @@
 #include "util/Stopwatch.h"
 
 #include <cassert>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
 namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 

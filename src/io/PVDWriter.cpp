@@ -1,7 +1,17 @@
 #include "PVDWriter.h"
 #include "io/Endianness.h"
 #include "tinyxml2.h"
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 PVDWriter::PVDWriter(std::string_view baseName) : base_(baseName) {
@@ -18,9 +28,13 @@ PVDWriter::PVDWriter(std::string_view baseName) : base_(baseName) {
 }
 
 void PVDWriter::addTimestep(double time, std::string_view fileName) {
-    auto relpath = std::filesystem::relative(
-        std::filesystem::path(fileName),
-        base_.has_parent_path() ? base_.parent_path() : std::filesystem::current_path());
+#ifdef EXPERIMENTAL_FS
+    //experimental/filesystem does not have relative
+    auto relpath = fs::path(fileName).filename();
+#else
+    auto relpath = fs::relative(fs::path(fileName),
+                                base_.has_parent_path() ? base_.parent_path() : fs::current_path());
+#endif
     auto d = collection_->InsertNewChildElement("DataSet");
     d->SetAttribute("timestep", time);
     d->SetAttribute("group", "");

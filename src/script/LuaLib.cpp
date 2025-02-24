@@ -1,6 +1,10 @@
 #include "LuaLib.h"
 #include <cmath>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
 #include <iostream>
 
 extern "C" {
@@ -24,7 +28,11 @@ static int math_atanh(lua_State* L) {
 }
 }
 
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
 namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 

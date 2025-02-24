@@ -12,8 +12,19 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <filesystem>
 #include <sstream>
+
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 using tinyxml2::XMLAttribute;
 using tinyxml2::XMLDocument;
@@ -357,7 +368,7 @@ template <std::size_t D> bool VTUWriter<D>::write(std::string const& baseName) {
     std::fclose(fp);
 
     if (writer_no == 0) {
-        auto relative_base = std::filesystem::path(baseName).filename().string();
+        auto relative_base = fs::path(baseName).filename().string();
         std::string pvtuName = pvtuFileName(baseName);
         fp = std::fopen(pvtuName.c_str(), "w");
         if (!fp) {

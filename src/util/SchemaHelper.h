@@ -2,12 +2,22 @@
 #define SCHEMAHELPER_20200930_H
 
 #include <algorithm>
+#ifdef EXPERIMENTAL_FS
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
 #include <functional>
 #include <string>
 #include <string_view>
 
 #include <iostream>
+
+#ifdef EXPERIMENTAL_FS
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 namespace tndm {
 
@@ -21,7 +31,7 @@ public:
 class ParentPathExists {
 public:
     bool operator()(std::string const& path) {
-        auto p = std::filesystem::path(path);
+        auto p = fs::path(path);
         if (!p.has_parent_path()) {
             return true;
         }
@@ -34,7 +44,7 @@ public:
     template <typename Fun> MakePathRelativeToOtherPath(Fun otherPath) : otherPath_(otherPath) {}
 
     auto operator()(std::string_view path) {
-        auto p = std::filesystem::path(path);
+        auto p = fs::path(path);
         if (p.is_relative()) {
             auto newPath = std::filesystem::path(otherPath_()).parent_path();
             newPath /= p;
