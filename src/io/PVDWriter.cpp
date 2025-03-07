@@ -1,8 +1,10 @@
 #include "PVDWriter.h"
 #include "io/Endianness.h"
 #include "tinyxml2.h"
+#include <fcntl.h> // For O_WRONLY
 #include <filesystem>
 #include <iostream>
+#include <unistd.h> // For open(), fsync(), close()
 #include <vector>
 
 namespace tndm {
@@ -84,9 +86,28 @@ void PVDWriter::truncate_after_restart(std::size_t lastTimestepIndex) {
 }
 
 bool PVDWriter::write() {
-    std::string fileName = base_.string() + ".pvd";
-    auto success = doc_.SaveFile(fileName.c_str());
-    return success == tinyxml2::XML_SUCCESS;
+    std::string tempFileName = base_.string() + ".pvd.tmp";
+    std::string finalFileName = base_.string() + ".pvd";
+
+    // Attempt to save to temporary file
+    if (doc_.SaveFile(tempFileName.c_str()) != tinyxml2::XML_SUCCESS) {
+        return false; // Saving failed
+    }
+
+    // Ensure data is flushed to disk (POSIX only)
+#ifdef __linux__
+    int fd = open(tempFileName.c_str(), O_WRONLY);
+    if (fd >= 0) {
+        if (fsync(fd) != 0) {
+            close(fd);
+            return false; // fsync failed
+        }
+        close(fd);
+    }
+#endif
+
+    // Rename temporary file to final file
+    return (std::rename(tempFileName.c_str(), finalFileName.c_str()) == 0);
 }
 
 } // namespace tndm
