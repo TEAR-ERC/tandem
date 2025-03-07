@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /*
 https://stackoverflow.com/questions/2336242/recursive-mkdir-system-call-on-unix
@@ -880,6 +881,33 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
             /* Write a helper file that enables restating from the last checkpoint written */
             PetscSNPrintf(infoname, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.txt",
                           cp->path_prefix);
+
+            if (cp->mode == TSCP_STORAGE_LIMITED) {
+                // Rotate existing checkpoint files
+                char old_filename[PETSC_MAX_PATH_LEN];
+                char new_filename[PETSC_MAX_PATH_LEN];
+
+                // Rotate from the highest number down to 0
+                for (int k = cp->limited_size - 1; k > 0; --k) {
+                    if (k == 1) {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.txt", cp->path_prefix);
+                    } else {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.%d.txt", cp->path_prefix, k - 1);
+                    }
+                    PetscSNPrintf(new_filename, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.%d.txt",
+                                  cp->path_prefix, k);
+
+                    if (access(old_filename, F_OK) != -1) { // Check if file exists
+                        if (rename(old_filename, new_filename) != 0) {
+                            PetscPrintf(PETSC_COMM_SELF, "Error renaming %s to %s: %s\n",
+                                        old_filename, new_filename, strerror(errno));
+                        }
+                    }
+                }
+            }
+
             ierr = PetscViewerASCIIOpen(PETSC_COMM_SELF, infoname, &viewer);
             CHKERRQ(ierr);
             PetscViewerASCIIPrintf(viewer, "%s\n", cp->path_step);
