@@ -785,8 +785,8 @@ PetscErrorCode read_status_file(const char* filename, const char* output_name,
         fclose(fp);
         return 1;
     }
-    ierr = PetscSNPrintf(output_status, PETSC_MAX_PATH_LEN, "%s %d %g %g", output_name, step, time,
-                         VMax);
+    ierr = PetscSNPrintf(output_status, PETSC_MAX_PATH_LEN, "%s %d %lf %lf", output_name, step,
+                         time, VMax);
     CHKERRQ(ierr);
 
     fclose(fp);

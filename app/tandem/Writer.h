@@ -59,7 +59,9 @@ public:
         // Open a file for appending (creates the file if it doesn't exist)
         std::ofstream output_file(prefix_ + "_status.txt");
         if (output_file.is_open()) {
-            output_file << output_step_ << " " << time << " " << VMax << std::endl;
+            output_file << output_step_ << " " << std::scientific
+                        << std::setprecision(std::numeric_limits<double>::digits10 + 1) << time
+                        << " " << VMax << std::endl;
         } else {
             std::cerr << "Error opening file for writing!" << std::endl;
         }
