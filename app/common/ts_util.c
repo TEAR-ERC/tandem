@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /*
 https://stackoverflow.com/questions/2336242/recursive-mkdir-system-call-on-unix
@@ -663,6 +664,10 @@ const char* TSCheckPointStorageTypes[] = {
 struct _TSCheckPoint {
     char path_prefix[PETSC_MAX_PATH_LEN];
     char path_step[PETSC_MAX_PATH_LEN];
+    char fault_probe_output_status_file[PETSC_MAX_PATH_LEN];
+    char domain_probe_output_status_file[PETSC_MAX_PATH_LEN];
+    char fault_output_status_file[PETSC_MAX_PATH_LEN];
+    char domain_output_status_file[PETSC_MAX_PATH_LEN];
     PetscInt checkpoint_frequency_step;
     PetscReal checkpoint_frequency_cputime_minutes;
     PetscReal checkpoint_frequency_time_physical;
@@ -750,6 +755,65 @@ static PetscErrorCode ts_checkpoint_test(TS ts, TSCheckPoint cp, PetscBool* gene
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+PetscErrorCode read_status_file(const char* filename, const char* output_name,
+                                char output_status[PETSC_MAX_PATH_LEN]) {
+    FILE* fp;
+    char line[PETSC_MAX_PATH_LEN];
+    int step;
+    double time, VMax;
+    PetscErrorCode ierr = 0;
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        PetscErrorPrintf("Error opening file %s\n", filename);
+        return 1;
+    }
+
+    if (fgets(line, PETSC_MAX_PATH_LEN, fp) == NULL) {
+        PetscErrorPrintf("Error reading line from file %s\n", filename);
+        fclose(fp);
+        return 1;
+    }
+
+    size_t len = strlen(line);
+    if (len > 0 && line[len - 1] == '\n') {
+        line[len - 1] = '\0';
+    }
+
+    if (sscanf(line, "%d %lf %lf", &step, &time, &VMax) != 3) {
+        PetscErrorPrintf("Error parsing line from file %s\n", filename);
+        fclose(fp);
+        return 1;
+    }
+    ierr = PetscSNPrintf(output_status, PETSC_MAX_PATH_LEN, "%s %d %lf %lf", output_name, step,
+                         time, VMax);
+    CHKERRQ(ierr);
+
+    fclose(fp);
+    return ierr;
+}
+
+PetscErrorCode append_status(const char* status_file, const char* output_name, PetscViewer viewer) {
+    PetscErrorCode ierr = 0;
+    if (strcmp(status_file, "status.txt") == 0) {
+        PetscPrintf(PETSC_COMM_SELF,
+                    "fault output not enabled, skipping writing status in checkpoint\n");
+    } else {
+        PetscBool fileExists;
+        ierr = PetscTestFile(status_file, FILE_MODE_READ, &fileExists);
+        CHKERRQ(ierr);
+        if (fileExists) {
+            char output_status[PETSC_MAX_PATH_LEN];
+            ierr = read_status_file(status_file, output_name, output_status);
+            CHKERRQ(ierr);
+            PetscViewerASCIIPrintf(viewer, "%s\n", output_status);
+        } else {
+            PetscPrintf(PETSC_COMM_SELF, "File %s does not exist. Skipping.\n", status_file);
+        }
+    }
+    return ierr;
+}
+
 static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
     PetscInt step;
     PetscReal time, dt;
@@ -799,6 +863,7 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
         int commrank;
         MPI_Comm_rank(PetscObjectComm((PetscObject)ts), &commrank);
         if (commrank == 0) {
+
             char infoname[PETSC_MAX_PATH_LEN];
 
             /* Write a CSV file with basic time info */
@@ -816,16 +881,54 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
             /* Write a helper file that enables restating from the last checkpoint written */
             PetscSNPrintf(infoname, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.txt",
                           cp->path_prefix);
+
+            if (cp->mode == TSCP_STORAGE_LIMITED) {
+                // Rotate existing checkpoint files
+                char old_filename[PETSC_MAX_PATH_LEN];
+                char new_filename[PETSC_MAX_PATH_LEN];
+
+                // Rotate from the highest number down to 0
+                for (int k = cp->limited_size - 1; k > 0; --k) {
+                    if (k == 1) {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.txt", cp->path_prefix);
+                    } else {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.%d.txt", cp->path_prefix, k - 1);
+                    }
+                    PetscSNPrintf(new_filename, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.%d.txt",
+                                  cp->path_prefix, k);
+
+                    if (access(old_filename, F_OK) != -1) { // Check if file exists
+                        if (rename(old_filename, new_filename) != 0) {
+                            PetscPrintf(PETSC_COMM_SELF, "Error renaming %s to %s: %s\n",
+                                        old_filename, new_filename, strerror(errno));
+                        }
+                    }
+                }
+            }
+
             ierr = PetscViewerASCIIOpen(PETSC_COMM_SELF, infoname, &viewer);
             CHKERRQ(ierr);
             PetscViewerASCIIPrintf(viewer, "%s\n", cp->path_step);
+
+            ierr = append_status(cp->fault_probe_output_status_file, "fault_probe_output", viewer);
+            CHKERRQ(ierr);
+            ierr =
+                append_status(cp->domain_probe_output_status_file, "domain_probe_output", viewer);
+            CHKERRQ(ierr);
+            ierr = append_status(cp->fault_output_status_file, "fault_output", viewer);
+            CHKERRQ(ierr);
+            ierr = append_status(cp->domain_output_status_file, "domain_output", viewer);
+            CHKERRQ(ierr);
+
             PetscViewerASCIIPrintf(viewer, "# is the last written checkpoint file\n");
             PetscViewerASCIIPrintf(viewer,
                                    "# time, time_step, step_number, checkpoint_number, path\n");
             PetscViewerASCIIPrintf(viewer, "# %1.18e,%1.18e,%ld,%d,%s\n", (double)time, (double)dt,
                                    (long int)step, (int)cp->n, cp->path_step);
 
-            PetscViewerASCIIPrintf(viewer, "\n# Previously used checkpoint options\n");
+            PetscViewerASCIIPrintf(viewer, "#\n# Previously used checkpoint options\n");
             PetscViewerASCIIPrintf(viewer, "#ts_checkpoint.save_directory %s\n", cp->path_prefix);
             PetscViewerASCIIPrintf(viewer, "#ts_checkpoint.freq_step %d\n",
                                    (int)cp->checkpoint_frequency_step);
@@ -917,11 +1020,13 @@ PetscErrorCode ts_checkpoint(TS ts) {
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirectory,
-                                       int tsCheckpointFrequencyStep,
-                                       double tsCheckpointFrequencyCputimeMinutes,
-                                       double tsCheckpointFrequencyPhysical, int storageType,
-                                       int tsCheckpointStorageLimitedSize) {
+PetscErrorCode
+ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirectory, int tsCheckpointFrequencyStep,
+                        double tsCheckpointFrequencyCputimeMinutes,
+                        double tsCheckpointFrequencyPhysical, int storageType,
+                        int tsCheckpointStorageLimitedSize, const char* fault_probe_output_prefix,
+                        const char* domain_probe_output_prefix, const char* fault_output_prefix,
+                        const char* domain_output_prefix) {
     PetscContainer container = NULL;
     TSCheckPoint tsc = NULL;
     MPI_Comm comm;
@@ -939,6 +1044,23 @@ PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirect
 
     tsc->path_prefix[0] = '\0';
     PetscSNPrintf(tsc->path_prefix, PETSC_MAX_PATH_LEN, "%s", tsCheckpointSaveDirectory);
+
+    tsc->fault_probe_output_status_file[0] = '\0';
+    PetscSNPrintf(tsc->fault_probe_output_status_file, PETSC_MAX_PATH_LEN, "%s_status.txt",
+                  fault_probe_output_prefix);
+
+    tsc->domain_probe_output_status_file[0] = '\0';
+    PetscSNPrintf(tsc->domain_probe_output_status_file, PETSC_MAX_PATH_LEN, "%s_status.txt",
+                  domain_probe_output_prefix);
+
+    tsc->fault_output_status_file[0] = '\0';
+    PetscSNPrintf(tsc->fault_output_status_file, PETSC_MAX_PATH_LEN, "%s_status.txt",
+                  fault_output_prefix);
+
+    tsc->domain_output_status_file[0] = '\0';
+    PetscSNPrintf(tsc->domain_output_status_file, PETSC_MAX_PATH_LEN, "%s_status.txt",
+                  domain_output_prefix);
+
     tsc->path_step[0] = '\0';
 
     PetscPrintf(comm, "TS ts_checkpoint.storage_type %s\n",

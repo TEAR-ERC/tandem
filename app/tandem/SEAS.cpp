@@ -67,6 +67,138 @@ auto make_state_vecs(std::array<std::size_t, N> const& block_sizes,
     return state;
 }
 
+using WriterState = std::tuple<std::size_t, double, double>; // step, time, Vmax
+enum class WriterType { FaultProbe, DomainProbe, Fault, FaultScalar, Domain, Unknown };
+
+WriterType string_to_writer_type(const std::string& type) {
+    static const std::unordered_map<std::string, WriterType> type_map = {
+        {"fault_probe_output", WriterType::FaultProbe},
+        {"domain_probe_output", WriterType::DomainProbe},
+        {"fault_output", WriterType::Fault},
+        {"fault_scalar_output", WriterType::FaultScalar},
+        {"domain_output", WriterType::Domain}};
+
+    auto it = type_map.find(type);
+    return it != type_map.end() ? it->second : WriterType::Unknown;
+}
+
+void broadcast_writer_states(std::vector<WriterType>& writer_types, std::vector<int>& steps,
+                             std::vector<double>& times, std::vector<double>& vmax_values, int root,
+                             MPI_Comm comm) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+
+    // Broadcast the number of writers
+    int num_writers = writer_types.size();
+    MPI_Bcast(&num_writers, 1, MPI_INT, root, comm);
+
+    if (rank != root) {
+        writer_types.resize(num_writers);
+        steps.resize(num_writers);
+        times.resize(num_writers);
+        vmax_values.resize(num_writers);
+    }
+
+    // Broadcast writer types as integers
+    std::vector<int> type_ids(num_writers);
+    if (rank == root) {
+        for (size_t i = 0; i < num_writers; ++i) {
+            type_ids[i] = static_cast<int>(writer_types[i]);
+        }
+    }
+
+    MPI_Bcast(type_ids.data(), num_writers, MPI_INT, root, comm);
+
+    if (rank != root) {
+        for (size_t i = 0; i < num_writers; ++i) {
+            writer_types[i] = static_cast<WriterType>(type_ids[i]);
+        }
+    }
+
+    // Broadcast steps, times, and Vmax values
+    MPI_Bcast(steps.data(), num_writers, MPI_INT, root, comm);
+    MPI_Bcast(times.data(), num_writers, MPI_DOUBLE, root, comm);
+    MPI_Bcast(vmax_values.data(), num_writers, MPI_DOUBLE, root, comm);
+}
+
+std::map<WriterType, WriterState> read_writer_states(const std::string& checkpoint_file,
+                                                     const MPI_Comm& comm) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+
+    std::map<WriterType, WriterState> writer_states;
+    std::vector<WriterType> writer_types;
+    std::vector<int> steps;
+    std::vector<double> times;
+    std::vector<double> vmax_values;
+
+    if (rank == 0) {
+        if (!std::filesystem::is_regular_file(checkpoint_file)) {
+            throw std::runtime_error("Checkpoint file does not exist: " + checkpoint_file);
+        }
+
+        std::ifstream file(checkpoint_file);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open checkpoint file: " + checkpoint_file);
+        }
+
+        std::cout << "Retrieving writer states from " << checkpoint_file << std::endl;
+
+        std::string line;
+        // Skip first line containing checkpoint directory
+        if (!std::getline(file, line)) {
+            throw std::runtime_error("The file is empty.");
+        }
+
+        while (std::getline(file, line)) {
+            // Skip lines starting with '#'
+            if (!line.empty() && line[0] == '#') {
+                continue; // Go to the next line
+            }
+            std::istringstream line_stream(line);
+            std::string writer_type_str, data;
+
+            if (!(line_stream >> writer_type_str)) {
+                throw std::runtime_error("Malformed line in checkpoint file: " + line);
+            }
+
+            std::getline(line_stream, data);
+            if (data.empty()) {
+                throw std::runtime_error("Missing state data for " + writer_type_str);
+            }
+
+            WriterType type = string_to_writer_type(writer_type_str);
+            if (type == WriterType::Unknown) {
+                throw std::runtime_error("Unknown or unsupported writer type: " + writer_type_str);
+            }
+
+            std::istringstream iss(data);
+            std::size_t step;
+            double time, Vmax;
+
+            if (!(iss >> step >> time >> Vmax)) {
+                throw std::runtime_error("Invalid state format for " + writer_type_str);
+            }
+
+            writer_types.push_back(type);
+            steps.push_back(step);
+            times.push_back(time);
+            vmax_values.push_back(Vmax);
+
+            std::cout << "Loaded " << writer_type_str << " state: step=" << step
+                      << ", time=" << time << ", Vmax=" << Vmax << std::endl;
+        }
+    }
+
+    broadcast_writer_states(writer_types, steps, times, vmax_values, 0, comm);
+
+    for (size_t i = 0; i < writer_types.size(); ++i) {
+        writer_states[writer_types[i]] = std::make_tuple(steps[i], times[i], vmax_values[i]);
+    }
+
+    return writer_states;
+}
+
 auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
@@ -76,34 +208,70 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
                 "Fault output prefix and domain output prefix must not be identical");
         }
     }
+
+    std::map<WriterType, WriterState> writer_states;
+    auto ts_checkpoint_load_directory = cfg.ts_checkpoint_config.load_directory;
+    if (ts_checkpoint_load_directory.has_value()) {
+        writer_states = read_writer_states(ts_checkpoint_load_directory.value(), comm);
+    }
+
     if (cfg.fault_probe_output) {
         auto const& oc = *cfg.fault_probe_output;
-        monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
             oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            fault_map, comm));
+            fault_map, comm);
+        if (writer_states.find(WriterType::FaultProbe) != writer_states.end()) {
+            auto [step, time, Vmax] = writer_states[WriterType::FaultProbe];
+            writer->set_state(step, time, Vmax);
+        }
+        monitor.add_writer(std::move(writer));
     }
+
     if (cfg.domain_probe_output) {
         auto const& oc = *cfg.domain_probe_output;
-        monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
             oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            comm));
+            comm);
+        if (writer_states.find(WriterType::DomainProbe) != writer_states.end()) {
+            auto [step, time, Vmax] = writer_states[WriterType::DomainProbe];
+            writer->set_state(step, time, Vmax);
+        }
+        monitor.add_writer(std::move(writer));
     }
+
     if (cfg.fault_output) {
         auto const& oc = *cfg.fault_output;
-        monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::FaultWriter<DomainDimension>>(
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
-            comm));
+            comm);
+        if (writer_states.find(WriterType::Fault) != writer_states.end()) {
+            auto [step, time, Vmax] = writer_states[WriterType::Fault];
+            writer->set_state(step, time, Vmax);
+        }
+        monitor.add_writer(std::move(writer));
     }
+
     if (cfg.fault_scalar_output) {
         auto const& oc = *cfg.fault_scalar_output;
-        monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
-            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm));
+        auto writer = std::make_unique<seas::FaultScalarWriter>(
+            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm);
+        if (writer_states.find(WriterType::FaultScalar) != writer_states.end()) {
+            auto [step, time, Vmax] = writer_states[WriterType::FaultScalar];
+            writer->set_state(step, time, Vmax);
+        }
+        monitor.add_writer(std::move(writer));
     }
+
     if (cfg.domain_output) {
         auto const& oc = *cfg.domain_output;
-        monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::DomainWriter<DomainDimension>>(
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
-            comm));
+            comm);
+        if (writer_states.find(WriterType::Domain) != writer_states.end()) {
+            auto [step, time, Vmax] = writer_states[WriterType::Domain];
+            writer->set_state(step, time, Vmax);
+        }
+        monitor.add_writer(std::move(writer));
     }
 }
 
