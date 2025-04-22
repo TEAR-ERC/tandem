@@ -42,6 +42,7 @@ public:
     constexpr static char DeltaTau[] = "delta_tau";
     constexpr static char DeltaSn[] = "delta_sn";
     constexpr static char FaultSolution[] = "fault_solution";
+    constexpr static char State[] = "state";
 
     DieterichRuinaScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
@@ -51,6 +52,9 @@ public:
         L_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, L);
         if (lib_.hasMember(scenario, SnPre)) {
             sn_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, SnPre);
+        }
+        if (lib_.hasMember(scenario, State)) {
+            state_pre_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, State);
         }
         if (lib_.hasMember(scenario, TauPre)) {
             tau_pre_ =
@@ -101,6 +105,7 @@ public:
             p.tau_pre = this->tau_pre_(x);
             p.Vinit = this->Vinit_(x);
             p.Sinit = this->Sinit_(x);
+            p.state_pre = this->state_pre_(x)[0];
             return p;
         };
     }
@@ -121,6 +126,8 @@ protected:
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;
     functional_t<DomainDimension> sn_pre_ =
+        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
+    functional_t<DomainDimension> state_pre_ =
         [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ = [](std::array<double, DomainDimension> const& x)
         -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };

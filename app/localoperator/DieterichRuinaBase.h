@@ -31,6 +31,7 @@ public:
         double eta;
         double L;
         double sn_pre;
+        double state_pre;
         std::array<double, TangentialComponents> tau_pre;
         std::array<double, TangentialComponents> Vinit;
         std::array<double, TangentialComponents> Sinit;
@@ -46,21 +47,13 @@ public:
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
+        p_[index].get<State_pre>() = params.state_pre;
     }
 
     double psi_init(std::size_t index, double sn,
                     std::array<double, TangentialComponents> const& tau) const {
-        double snAbs = -sn + p_[index].get<SnPre>();
-        double tauAbs = norm(tau + p_[index].get<TauPre>());
-        auto Vi = norm(p_[index].get<Vinit>());
-        if (Vi == 0.0) {
-            return cp_.f0;
-        }
-        auto a = p_[index].get<A>();
-        auto eta = p_[index].get<Eta>();
-        double s = sinh((tauAbs - eta * Vi) / (a * snAbs));
-        double l = log((2.0 * cp_.V0 / Vi) * s);
-        return a * l;
+        double state_pre = p_[index].get<State_pre>();
+        return state_pre;
     }
 
     /**
@@ -84,8 +77,12 @@ public:
         -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
-        double snAbs = -sn + p_[index].get<SnPre>();
+        //double snAbs = -sn + p_[index].get<SnPre>();
+        double snAbs = 25;
         double tauAbs = norm(tauAbsVec);
+        if (tauAbs > 40.0) {
+            tauAbs = 40;
+        }
         double V = 0.0, Ve = 0.0;
         double Va = -32.0;
         double Va_min = std::log10(std::nextafter(0.0, 1.0));
@@ -240,13 +237,16 @@ protected:
     struct L {
         using type = double;
     };
+    struct State_pre {
+        using type = double;
+    };
     struct Vinit {
         using type = std::array<double, TangentialComponents>;
     };
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, State_pre, Vinit, Sinit> p_;
 };
 
 } // namespace tndm
