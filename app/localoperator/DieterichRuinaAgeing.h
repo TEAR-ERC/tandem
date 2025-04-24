@@ -17,8 +17,8 @@
 
 namespace tndm {
 
-    static constexpr double MIN_SN  = 25.0;
-    static constexpr double MAX_SN  = 70.0;
+    static constexpr double MIN_SN  = 10.0;
+    static constexpr double MAX_SN  = 170.0;
     static constexpr double MIN_TAU = 25.0 * 0.6;  // = 15.0
     static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42.0
 
@@ -80,9 +80,9 @@ public:
                     std::array<double, TangentialComponents> const& tau) const {
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
-        double scale = clampSnTauByRatio(snAbs, tauAbs);
-        tauAbs *= scale;
-        snAbs *= scale;
+        //double scale = clampSnTauByRatio(snAbs, tauAbs);
+        //tauAbs *= scale;
+        //snAbs *= scale;
         
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
