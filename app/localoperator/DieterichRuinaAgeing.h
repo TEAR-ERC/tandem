@@ -21,7 +21,8 @@ namespace tndm {
     static constexpr double MAX_SN  = 170.0;
     static constexpr double MIN_TAU = 25.0 * 0.6;  // = 15.0
     static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42.0
-
+    static constexpr double norm_init  = 56.588; //(50^2+26.5^2)^0.5
+    static constexpr double normFactor  = 5;
 
 class DieterichRuinaAgeing {
 public:
@@ -45,6 +46,22 @@ public:
         std::array<double, TangentialComponents> Sinit;
     };
 
+
+
+    static double clampByNormFactor(double& sn, double& tau) {
+        double rawNorm = std::hypot(sn, tau);
+        double rho     = rawNorm / norm_init;
+    
+        double scale = 1.0;
+    
+        if (rho > normFactor) {
+            scale = normFactor / rho;  // scale down
+        } else if (rho < 1.0 / normFactor) {
+            scale = (1.0 / normFactor) / rho;  // scale up
+        }
+    
+        return scale;
+    }
 
     static double clampSnTauByRatio(double& snVal, double& tauVal) {
         double scale = 1.0;
@@ -121,10 +138,10 @@ double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
 
-//double scale = clampSnTauByRatio(snAbs, tauAbs);
-//tauAbs *= scale;
-//snAbs *= scale;
-snAbs= verifyStress(snAbs, MIN_SN, MAX_SN);
+double scale = clampSnTauByRatio(snAbs, tauAbs);
+tauAbs *= scale;
+snAbs *= scale;
+//snAbs= verifyStress(snAbs, MIN_SN, MAX_SN);
 
 if (eta == 0.0) {
  V = Finv(index, snAbs, tauAbs, psi);
