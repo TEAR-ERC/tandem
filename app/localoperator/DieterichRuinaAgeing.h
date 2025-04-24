@@ -1,5 +1,5 @@
-#ifndef DIETERICHRUINABASE_20241105_H
-#define DIETERICHRUINABASE_20241105_H
+#ifndef DIETERICHRUINAAGEING_20201027_H
+#define DIETERICHRUINAAGEING_20201027_H
 
 #include "config.h"
 
@@ -17,20 +17,21 @@
 
 namespace tndm {
 
-class DieterichRuinaBase {
+class DieterichRuinaAgeing {
 public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
 
     struct ConstantParams {
         double V0;
         double b;
-        double f0;
+    
     };
     struct Params {
         double a;
         double eta;
         double L;
         double sn_pre;
+        double base_fric;
         std::array<double, TangentialComponents> tau_pre;
         std::array<double, TangentialComponents> Vinit;
         std::array<double, TangentialComponents> Sinit;
@@ -42,10 +43,12 @@ public:
         p_[index].get<A>() = params.a;
         p_[index].get<Eta>() = params.eta;
         p_[index].get<L>() = params.L;
+        p_[index].get<base_fric>() = params.base_fric;
         p_[index].get<SnPre>() = params.sn_pre;
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
+        
     }
 
     double psi_init(std::size_t index, double sn,
@@ -54,7 +57,7 @@ public:
         double tauAbs = norm(tau + p_[index].get<TauPre>());
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
-            return cp_.f0;
+            return p_[index].get<base_fric>();
         }
         auto a = p_[index].get<A>();
         auto eta = p_[index].get<Eta>();
@@ -79,102 +82,89 @@ public:
     auto S_init(std::size_t index) const { return p_[index].get<Sinit>(); }
 
     auto slip_rate(std::size_t index, std::size_t fault_index, double sn,
-                   std::array<double, TangentialComponents> const& tau, double psi,
-                   std::array<double, DomainDimension> const& x, int* _ierr) const
-        -> std::array<double, TangentialComponents> {
-        auto eta = p_[index].get<Eta>();
-        auto tauAbsVec = tau + p_[index].get<TauPre>();
-        double snAbs = -sn + p_[index].get<SnPre>();
-        double tauAbs = norm(tauAbsVec);
-        double V = 0.0, Ve = 0.0;
-        double Va = -32.0;
-        double Va_min = std::log10(std::nextafter(0.0, 1.0));
-        double Vb, a, b;
-        int ierr = 0;
+        std::array<double, TangentialComponents> const& tau, double psi,
+        std::array<double, DomainDimension> const& x, int* _ierr) const
+-> std::array<double, TangentialComponents> {
+auto eta = p_[index].get<Eta>();
+auto tauAbsVec = tau + p_[index].get<TauPre>();
+double snAbs = -sn + p_[index].get<SnPre>();
+double tauAbs = norm(tauAbsVec);
+double V = 0.0;
+int ierr = 0;
 
-        if (eta == 0.0) {
-            V = Finv(index, snAbs, tauAbs, psi);
-        } else {
-            if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0;    /* Just to illustrate what we are doing */
-                /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
-                V = tauAbs / eta;
-                ierr = 1;
-            } else {
+if (eta == 0.0) {
+ V = Finv(index, snAbs, tauAbs, psi);
+} else {
+ if (snAbs <= 0.0) { // fault is experiencing tension/opening
+     snAbs = 0.0;
+     V = tauAbs / eta;
+     ierr = 1;
+ } else {
+     double Va = 0.0;
+     double Vb = tauAbs / eta;
+     if (Va > Vb) {
+         std::swap(Va, Vb);
+     }
+     auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double V) {
+         return tauAbs - this->F(index, snAbs, V, psi) - eta * V;
+     };
+     try {
+         V = zeroIn(Va, Vb, fF);
+     } catch (std::exception const&) {
+         V = NAN;
+         ierr = 2;
+     }
+     int rank;
+     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+     // Print debug info if an error occurred OR if fault_basis_index==20 and fault_index==2
+     if (ierr != 0 || (index == 20 && fault_index == 2 && rank == 2)) {
 
-                auto fF = [this, &index, &snAbs, &tauAbs, &psi, &eta](double Ve) {
-                    return tauAbs - this->F(index, snAbs, std::pow(10.0, Ve), psi) -
-                           eta * std::pow(10.0, Ve);
-                };
 
-                Vb = std::log10(tauAbs / eta);
+        auto _A     = p_[index].get<A>();
+        auto _Eta   = p_[index].get<Eta>();
+        auto _L     = p_[index].get<L>();
+        auto _SnPre = p_[index].get<SnPre>();
+        auto f0     = p_[index].get<base_fric>();
+        auto const& tau_pre = p_[index].get<TauPre>();
 
-                try {
-                    a = Va;
-                    b = Vb;
-                    if (a > b) {
-                        std::swap(a, b);
-                    }
-                    Ve = zeroIn(a, b, fF);
-                    V = std::pow(10.0, Ve);
-                } catch (std::exception const&) {
-                    try {
-                        a = Va_min;
-                        b = Vb;
-                        if (a > b) {
-                            std::swap(a, b);
-                        }
-                        Ve = zeroIn(a, b, fF);
-                        V = std::pow(10.0, Ve);
-                    } catch (std::exception const&) {
-                        V = NAN;
-                        ierr = 2;
-                    }
-                }
-                if (ierr != 0) {
-                    auto _A = p_[index].get<A>();
-                    auto _Eta = p_[index].get<Eta>();
-                    auto _L = p_[index].get<L>();
-                    auto _SnPre = p_[index].get<SnPre>();
-                    auto const& tau_pre = p_[index].get<TauPre>();
+        std::cout << "rank [" << rank << "], fault_basis_index [" << index 
+                  << "], fault_index [" << fault_index << "]\n"
+                   << "  ierr = " << ierr << "\n"
+                   << "  f0 = " << f0 << "\n"
+                   << "  V0 = " << cp_.V0 << " (const)\n"
+                   << "  b  = " << cp_.b << " (const)\n"
+                   << "  a(x)   = " << _A << "\n"
+                   << "  eta(x) = " << _Eta << "\n"
+                   << "  L(x)   = " << _L << "\n"
+                   << "  sigma_n_pre(x) = " << _SnPre << "\n"
+                   << "  tau_pre(x)     = { ";
+         for (std::size_t t = 0; t < DomainDimension - 2; ++t)
+             std::cout << tau_pre[t] << ", ";
+         std::cout << tau_pre[DomainDimension - 2] << " }\n"
+                   << "  sigma_n = " << snAbs << "\n"
+                   << "  |tau|   = " << tauAbs << "\n"
+                   << "  psi     = " << psi << "\n"
+                   << "  V_lower = " << Va << "\n"
+                   << "  V_upper = " << Vb << "\n"
+                   << "  R(V_lower) = " << fF(Va) << "\n"
+                   << "  R(V_upper) = " << fF(Vb) << "\n"
+                   << "  x = { ";
+         for (std::size_t t = 0; t < DomainDimension - 1; ++t)
+             std::cout << x[t] << ", ";
+         std::cout << x[DomainDimension - 1] << " }\n";
+     }
+ }
+}
+*_ierr = ierr;
+return -(V / tauAbs) * tauAbsVec;
+}
 
-                    std::cout << "fault_basis_index [" << index << "], fault_index [" << fault_index
-                              << "]" << std::endl;
-                    std::cout << "  ierr = " << ierr << std::endl;
-                    std::cout << "  f0 = " << cp_.f0 << " (const)" << std::endl;
-                    std::cout << "  V0 = " << cp_.V0 << " (const)" << std::endl;
-                    std::cout << "  b  = " << cp_.b << " (const)" << std::endl;
-                    std::cout << "  a(x)   = " << _A << std::endl;
-                    std::cout << "  eta(x) = " << _Eta << std::endl;
-                    std::cout << "  L(x)   = " << _L << std::endl;
-                    std::cout << "  sigma_n_pre(x) = " << _SnPre << std::endl;
-                    std::cout << "  tau_pre(x)     = { ";
-                    for (std::size_t t = 0; t < DomainDimension - 2; t++) {
-                        std::cout << tau_pre[t] << ", ";
-                    }
-                    std::cout << tau_pre[DomainDimension - 2] << " }" << std::endl;
-                    std::cout << "  sigma_n = " << snAbs << std::endl;
-                    std::cout << "  |tau|   = " << tauAbs << std::endl;
-                    std::cout << "  psi     = " << psi << std::endl;
-                    std::cout << "  log10(V_lower) = " << a << std::endl;
-                    std::cout << "  log10(V_upper) = " << b << std::endl;
-                    std::cout << "  V_lower = " << std::pow(10.0, a) << std::endl;
-                    std::cout << "  V_upper = " << std::pow(10.0, b) << std::endl;
-                    std::cout << "  R(V_lower) = " << fF(a) << std::endl;
-                    std::cout << "  R(V_upper) = " << fF(b) << std::endl;
-                    std::cout << "  x = { ";
-                    for (std::size_t t = 0; t < DomainDimension - 1; t++) {
-                        std::cout << x[t] << ", ";
-                    }
-                    std::cout << x[DomainDimension - 1] << " }" << std::endl;
-                }
-            }
-        }
-        *_ierr = ierr;
-        return -(V / tauAbs) * tauAbsVec;
+
+    double state_rhs(std::size_t index, double V, double psi) const {
+        double myL = p_[index].get<L>();
+        double f0 = p_[index].get<base_fric>();
+        return cp_.b * cp_.V0 / myL * (exp((f0 - psi) / cp_.b) - V / cp_.V0);
     }
-
-    virtual double state_rhs(std::size_t index, double V, double psi) const = 0;
 
     auto param_names() const {
         auto names = std::vector<std::string>(4 + TangentialComponents);
@@ -205,7 +195,7 @@ public:
         }
     }
 
-protected:
+private:
     double F(std::size_t index, double snAbs, double V, double psi) const {
         auto a = p_[index].get<A>();
         double e = exp(psi / a);
@@ -240,15 +230,18 @@ protected:
     struct L {
         using type = double;
     };
+    struct base_fric {
+        using type = double;
+    };
     struct Vinit {
         using type = std::array<double, TangentialComponents>;
     };
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L,base_fric, Vinit, Sinit> p_;
 };
 
 } // namespace tndm
 
-#endif // DIETERICHRUINABASE_20241105_H
+#endif // DIETERICHRUINAAGEING_20201027_H
