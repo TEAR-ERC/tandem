@@ -46,18 +46,16 @@ public:
     };
 
 
-// clamp a raw normal‐stress
-    static double verifySn(double s) {
-        if (s < MIN_SN) return MIN_SN;
-        if (s > MAX_SN) return MAX_SN;
-        return s;
+    static double clampSnTauByRatio(double& snVal, double& tauVal) {
+        double scale = 1.0;
+        if      (snVal < MIN_SN)  scale = MIN_SN  / snVal;
+        else if (snVal > MAX_SN)  scale = MAX_SN  / snVal;
+        else if (tauVal < MIN_TAU) scale = MIN_TAU / tauVal;
+        else if (tauVal > MAX_TAU) scale = MAX_TAU / tauVal;
+    
+        return scale;
     }
-    // clamp a raw shear‐stress
-    static double verifyTau(double t) {
-        if (t < MIN_TAU) return MIN_TAU;
-        if (t > MAX_TAU) return MAX_TAU;
-        return t;
-}
+
     void set_num_nodes(std::size_t num_nodes) { p_.resize(num_nodes); }
     void set_constant_params(ConstantParams const& params) { cp_ = params; }
     void set_params(std::size_t index, Params const& params) {
@@ -76,8 +74,9 @@ public:
                     std::array<double, TangentialComponents> const& tau) const {
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
-        snAbs  = verifySn(snAbs);
-        tauAbs = verifyTau(tauAbs);
+        double scale = clampSnTauByRatio(snAbs, tauAbs);
+        tauAbs *= scale;
+        snAbs *= scale;
         
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
@@ -116,8 +115,9 @@ double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
 
-snAbs  = verifySn(snAbs);
-tauAbs = verifyTau(tauAbs);
+double scale = clampSnTauByRatio(snAbs, tauAbs);
+tauAbs *= scale;
+snAbs *= scale;
 
 
 if (eta == 0.0) {
