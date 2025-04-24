@@ -17,13 +17,17 @@
 
 namespace tndm {
 
+    static constexpr double MIN_SN  = 25.0;
     static constexpr double MAX_SN  = 70.0;
-    static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42
+    static constexpr double MIN_TAU = 25.0 * 0.6;  // = 15.0
+    static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42.0
 
 
 class DieterichRuinaAgeing {
 public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
+
+
 
     struct ConstantParams {
         double V0;
@@ -41,6 +45,19 @@ public:
         std::array<double, TangentialComponents> Sinit;
     };
 
+
+// clamp a raw normal‐stress
+    static double verifySn(double s) {
+        if (s < MIN_SN) return MIN_SN;
+        if (s > MAX_SN) return MAX_SN;
+        return s;
+    }
+    // clamp a raw shear‐stress
+    static double verifyTau(double t) {
+        if (t < MIN_TAU) return MIN_TAU;
+        if (t > MAX_TAU) return MAX_TAU;
+        return t;
+}
     void set_num_nodes(std::size_t num_nodes) { p_.resize(num_nodes); }
     void set_constant_params(ConstantParams const& params) { cp_ = params; }
     void set_params(std::size_t index, Params const& params) {
@@ -59,8 +76,9 @@ public:
                     std::array<double, TangentialComponents> const& tau) const {
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
-        snAbs  = std::min(snAbs,  MAX_SN);
-        tauAbs = std::min(tauAbs, MAX_TAU);
+        snAbs  = verifySn(snAbs);
+        tauAbs = verifyTau(tauAbs);
+        
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
             return p_[index].get<base_fric>();
@@ -98,8 +116,9 @@ double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
 
-snAbs  = std::min(snAbs,  MAX_SN);
-tauAbs = std::min(tauAbs, MAX_TAU);
+snAbs  = verifySn(snAbs);
+tauAbs = verifyTau(tauAbs);
+
 
 if (eta == 0.0) {
  V = Finv(index, snAbs, tauAbs, psi);
