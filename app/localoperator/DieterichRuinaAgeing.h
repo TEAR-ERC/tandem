@@ -56,6 +56,12 @@ public:
         return scale;
     }
 
+    static double verifyStress(double val, double minVal, double maxVal) {
+        if (val < minVal) return minVal;
+        if (val > maxVal) return maxVal;
+        return val;
+    }
+
     void set_num_nodes(std::size_t num_nodes) { p_.resize(num_nodes); }
     void set_constant_params(ConstantParams const& params) { cp_ = params; }
     void set_params(std::size_t index, Params const& params) {
@@ -115,10 +121,10 @@ double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
 
-double scale = clampSnTauByRatio(snAbs, tauAbs);
-tauAbs *= scale;
-snAbs *= scale;
-
+//double scale = clampSnTauByRatio(snAbs, tauAbs);
+//tauAbs *= scale;
+//snAbs *= scale;
+snAbs= verifyStress(snAbs, MIN_SN, MAX_SN);
 
 if (eta == 0.0) {
  V = Finv(index, snAbs, tauAbs, psi);
