@@ -17,6 +17,10 @@
 
 namespace tndm {
 
+    static constexpr double MAX_SN  = 70.0;
+    static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42
+
+
 class DieterichRuinaAgeing {
 public:
     static constexpr std::size_t TangentialComponents = DomainDimension - 1u;
@@ -55,6 +59,8 @@ public:
                     std::array<double, TangentialComponents> const& tau) const {
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
+        snAbs  = std::min(snAbs,  MAX_SN);
+        tauAbs = std::min(tauAbs, MAX_TAU);
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
             return p_[index].get<base_fric>();
@@ -91,6 +97,9 @@ double snAbs = -sn + p_[index].get<SnPre>();
 double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
+
+snAbs  = std::min(snAbs,  MAX_SN);
+tauAbs = std::min(tauAbs, MAX_TAU);
 
 if (eta == 0.0) {
  V = Finv(index, snAbs, tauAbs, psi);
