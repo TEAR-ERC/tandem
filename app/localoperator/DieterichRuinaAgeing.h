@@ -144,8 +144,8 @@ if (eta == 0.0) {
      }
      int rank;
      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-     // Print debug info if an error occurred OR if fault_basis_index==20 and fault_index==2
-     if (ierr != 0 || (index == 20 && fault_index == 2 && rank == 2)) {
+     
+     if (ierr != 0 ) {
 
 
         auto _A     = p_[index].get<A>();
