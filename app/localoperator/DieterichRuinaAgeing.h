@@ -18,7 +18,7 @@
 namespace tndm {
 
     static constexpr double MIN_SN  = 10.0;
-    static constexpr double MAX_SN  = 170.0;
+    static constexpr double MAX_SN  = 110.0;
     static constexpr double MIN_TAU = 25.0 * 0.6;  // = 15.0
     static constexpr double MAX_TAU = 70.0 * 0.6;  // = 42.0
     static constexpr double norm_init  = 56.588; //(50^2+26.5^2)^0.5
