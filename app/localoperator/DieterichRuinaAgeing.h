@@ -138,10 +138,10 @@ double tauAbs = norm(tauAbsVec);
 double V = 0.0;
 int ierr = 0;
 
-double scale = clampSnTauByRatio(snAbs, tauAbs);
-tauAbs *= scale;
-snAbs *= scale;
-//snAbs= verifyStress(snAbs, MIN_SN, MAX_SN);
+//double scale = clampSnTauByRatio(snAbs, tauAbs);
+//tauAbs *= scale;
+// snAbs *= scale;
+snAbs= verifyStress(snAbs, MIN_SN, MAX_SN);
 
 if (eta == 0.0) {
  V = Finv(index, snAbs, tauAbs, psi);
