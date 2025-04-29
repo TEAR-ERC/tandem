@@ -97,9 +97,7 @@ public:
                     std::array<double, TangentialComponents> const& tau) const {
         double snAbs = -sn + p_[index].get<SnPre>();
         double tauAbs = norm(tau + p_[index].get<TauPre>());
-        //double scale = clampSnTauByRatio(snAbs, tauAbs);
-        //tauAbs *= scale;
-        //snAbs *= scale;
+ 
         
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
