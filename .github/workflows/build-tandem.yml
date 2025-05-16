@@ -47,7 +47,7 @@ jobs:
         run: |
           UBUNTU_VERSION=$(lsb_release -r | awk '{print $2}')
           echo "UBUNTU_VERSION=$UBUNTU_VERSION" >> $GITHUB_ENV
-          petsc_version=$(curl -s https://pypi.org/pypi/petsc/json | jq -r '.info.version')
+          petsc_version=3.22.0
           echo "PETSC_VERSION=$petsc_version" >> $GITHUB_ENV
 
       - name: Cache PETSc Installation
