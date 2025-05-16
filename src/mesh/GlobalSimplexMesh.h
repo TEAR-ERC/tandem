@@ -58,9 +58,11 @@ public:
     GlobalSimplexMesh(std::vector<simplex_t>&& elements,
                       std::unique_ptr<MeshData> vertexDat = nullptr,
                       std::unique_ptr<MeshData> elementDat = nullptr,
+                      std::unique_ptr<MeshData> volumeTagDat = nullptr,
                       MPI_Comm comm = MPI_COMM_WORLD)
         : elems_(std::move(elements)), vertexData(std::move(vertexDat)),
-          elementData(std::move(elementDat)), comm(comm), isPartitionedByHash(false) {
+          elementData(std::move(elementDat)), volumeData(std::move(volumeTagDat)), comm(comm),
+          isPartitionedByHash(false) {
         if (vertexData) {
             vtxdist = makeSortedDistribution(vertexData->size(), comm);
         }
@@ -404,6 +406,7 @@ private:
     std::vector<simplex_t> elems_;
     std::unique_ptr<MeshData> vertexData;
     std::unique_ptr<MeshData> elementData;
+    std::unique_ptr<MeshData> volumeData;
     MPI_Comm comm;
     bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;
