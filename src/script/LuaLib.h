@@ -127,17 +127,17 @@ public:
 
             // Get method from table
             lua_getfield(myL, -1, method_name); // push method
-            lua_insert(myL, -2);                // swap: [method, self]
+            lua_insert(myL, -2); 
 
             // Push spatial coordinates
             for (int d = 0; d < Din; ++d) {
                 lua_pushnumber(myL, x[d]);
             }
 
-            // Push physicalTag as integer (or double if needed)
-            lua_pushinteger(myL, tag); // 4th argument
+            // Push physicalTag as integer
+            lua_pushinteger(myL, tag);
 
-            // Call method: 1 (self) + Din (x,y,z) + 1 (tag) = 1+Din+1
+            // Call method: 1 (self) + Din + 1 (tag) = 1+Din+1
             int num_inputs = 1 + Din + 1;
             int error = lua_pcall(myL, num_inputs, Dout, 0);
             if (error) {
