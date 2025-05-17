@@ -41,6 +41,14 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
     }
+    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
+    if (boundaryData) {
+        facetTags = boundaryData->getFacetTags();
+    } else {
+        std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
+                  << std::endl;
+        facetTags.resize(mesh.numElements(), -1);
+    }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
     if (volumeData) {
         volumeTags = volumeData->getVolumeTags();
@@ -158,7 +166,7 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
 }
 
 template <std::size_t D>
-TensorBase<Vector<long int>> Curvilinear<D>::volumeTagsInfo(std::size_t numPoints) const {
+TensorBase<Vector<long int>> Curvilinear<D>::tagsInfo(std::size_t numPoints) const {
     return TensorBase<Vector<long int>>(numPoints);
 }
 
@@ -166,6 +174,13 @@ template <std::size_t D>
 void Curvilinear<D>::setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const {
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
         result(i) = volumeTags[eleNo];
+    }
+}
+
+template <std::size_t D>
+void Curvilinear<D>::setFacetTags(FacetInfo const& info, Tensor<long int, 1u>& result) const {
+    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
+        result(i) = info.facetTag;
     }
 }
 
