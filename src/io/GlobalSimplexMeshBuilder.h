@@ -52,6 +52,7 @@ private:
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
     std::vector<BC> bcs;
+    std::vector<long int> facet_tags;
     std::vector<long int> volume_tags;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
