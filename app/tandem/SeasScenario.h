@@ -24,7 +24,6 @@ public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     using functional_t = LuaLib::functional_t<DomainDimension, 1>;
-    using functional_t_region = LuaLib::functional_t_region<DomainDimension, 1>;
     using time_functional_t = LuaLib::functional_t<DomainDimension + 1, NumQuantities>;
     using vector_functional_t = LuaLib::functional_t<DomainDimension, NumQuantities>;
 
@@ -56,22 +55,26 @@ public:
 
         if (lib_.hasMember(scenario, Boundary)) {
             boundary_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Boundary));
+                lib_.getMemberFunctionTagged<DomainDimension + 1u, NumQuantities>(scenario,
+                                                                                  Boundary));
         }
 
         if (lib_.hasMember(scenario, Solution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
-                lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario, Solution)));
+                lib_.getMemberFunctionTagged<DomainDimension + 1, NumQuantities>(scenario,
+                                                                                 Solution)));
         }
 
         if (lib_.hasMember(scenario, InitialDisplacement)) {
-            u_ini_ = std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities>(
-                scenario, InitialDisplacement));
+            u_ini_ =
+                std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, NumQuantities>(
+                    scenario, InitialDisplacement));
         }
 
         if (lib_.hasMember(scenario, InitialVelocity)) {
-            v_ini_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, InitialVelocity));
+            v_ini_ =
+                std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, NumQuantities>(
+                    scenario, InitialVelocity));
         }
     }
 
@@ -94,11 +97,11 @@ public:
 protected:
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
-    functional_t_region mu_ = [](std::array<double, DomainDimension> const& v,
-                                 long int&) -> std::array<double, 1> { return {1.0}; };
-    functional_t_region lam_ = [](std::array<double, DomainDimension> const& v,
-                                  long int&) -> std::array<double, 1> { return {0.0}; };
-    std::optional<functional_t_region> rho_ = std::nullopt;
+    functional_t mu_ = [](std::array<double, DomainDimension> const& v,
+                          long int&) -> std::array<double, 1> { return {1.0}; };
+    functional_t lam_ = [](std::array<double, DomainDimension> const& v,
+                           long int&) -> std::array<double, 1> { return {0.0}; };
+    std::optional<functional_t> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
     std::optional<vector_functional_t> u_ini_ = std::nullopt;

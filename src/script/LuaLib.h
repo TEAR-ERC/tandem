@@ -18,9 +18,7 @@ namespace tndm {
 class LuaLib {
 public:
     template <std::size_t Din, std::size_t Dout>
-    using functional_t = std::function<std::array<double, Dout>(std::array<double, Din> const& x)>;
-    template <std::size_t Din, std::size_t Dout>
-    using functional_t_region =
+    using functional_t =
         std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int& tag)>;
 
     LuaLib();
@@ -127,7 +125,7 @@ public:
 
             // Get method from table
             lua_getfield(myL, -1, method_name); // push method
-            lua_insert(myL, -2); 
+            lua_insert(myL, -2);
 
             // Push spatial coordinates
             for (int d = 0; d < Din; ++d) {
