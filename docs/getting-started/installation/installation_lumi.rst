@@ -9,7 +9,7 @@ Therefore, petsc and tandem should be installed manually for LUMI-G.
 Step by step installation
 -------------------------
 
-We first compile PETSc with:
+We first compile PETSc (and parmetis) with:
 
 .. code-block:: bash
 
@@ -19,24 +19,56 @@ We first compile PETSc with:
     module load rocm/6.0.3
     export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
     export blas_dir=/opt/cray/pe/libsci/24.03.0/CRAYCLANG/17.0/x86_64
-    git clone --branch v3.22.1 --single-branch https://gitlab.com/petsc/petsc
+    git clone --branch v3.23.3 --depth 1 --single-branch https://gitlab.com/petsc/petsc
     cd petsc
-    export PETSC_DIR=$(pwd) 
-    export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.22.1
+    export PETSC_DIR=$(pwd)
+    export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.23.3
 
     ./configure --download-c2html=0 --download-cmake --with-debugging=no  --download-hwloc=0 --download-metis --download-parmetis --download-sowing=0 --with-64-bit-indices --with-fortran-bindings=0 --with-hip --with-hip-arch=gfx90a --with-hipc=hipcc --with-memalign=32 --with-mpi-dir=${MPICH_DIR} --with-x=0 PETSC_ARCH=${PETSC_ARCH} --with-blaslapack-lib="${blas_dir}/lib/libsci_cray.a ${blas_dir}/lib/libsci_cray.so ${blas_dir}/lib/libsci_cray_mpi.a ${blas_dir}/lib/libsci_cray_mpi.so"
 
     make -j 30 all
 
-Eigen and lua then need to be installed.
+Eigen, lua and parametis must also be installed.
+
+.. code-block:: bash
+    # define TANDEM_DEP, e.g.
+    # export SCRATCH=/scratch/project_$your_project_number$/$your_name$
+    # export TANDEM_DEP=$SCRATCH/local
+
+    # install eigen
+    wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+    tar -xf eigen-3.4.0.tar.gz
+    cd eigen-3.4.0
+    mkdir build && cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=$TANDEM_DEP
+    make install
+    cd ../..
+
+
+    # install lua
+    wget https://www.lua.org/ftp/lua-5.4.6.tar.gz
+    tar -xf lua-5.4.6.tar.gz
+    cd lua-5.4.6
+    make all install INSTALL_TOP=$TANDEM_DEP
+    cd ..
+
+    # install luarocks
+    wget https://luarocks.org/releases/luarocks-3.11.0.tar.gz
+    tar zxpf luarocks-3.11.0.tar.gz
+    cd luarocks-3.11.0
+    ./configure --prefix=$TANDEM_DEP --with-lua=$TANDEM_DEP
+    $TANDEM_DEP/bin/luarocks install csv
+    $TANDEM_DEP/bin/luarocks install luaposix
+
+
 Then we can proceed with tandem
 
 .. code-block:: bash
 
-    git clone --branch dmay/staging --recursive https://github.com/TEAR-ERC/tandem
+    git clone --branch thomas/petsc_v3.23.2 --recursive https://github.com/TEAR-ERC/tandem
     cd tandem
-    mkdir build_gpu
-    CC=/opt/rocm-6.0.3/bin/amdclang CXX=/opt/rocm-6.0.3/bin/amdclang++ cmake .. -DCMAKE_PREFIX_PATH=${PETSC_DIR}/${PETSC_ARCH} -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+    mkdir build_gpu && cd build_gpu
+    CC=/opt/rocm-6.0.3/bin/amdclang CXX=/opt/rocm-6.0.3/bin/amdclang++ cmake .. -DCMAKE_PREFIX_PATH="${PETSC_DIR}/${PETSC_ARCH};$TANDEM_DEP" -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
     make -j 30 all
 
 
