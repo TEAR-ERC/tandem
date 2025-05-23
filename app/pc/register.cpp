@@ -14,7 +14,7 @@ namespace tndm {
 PetscErrorCode register_PCs() {
     PetscFunctionBegin;
 #ifdef HAVE_LAPACK
-    CHKERRQ(PCRegister("eigdeflate", PCCreate_eigdeflate));
+//CHKERRQ(PCRegister("eigdeflate", PCCreate_eigdeflate));
 #endif
     PetscFunctionReturn(0);
 }

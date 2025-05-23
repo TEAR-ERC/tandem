@@ -128,7 +128,10 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
         KSPConvergedReason reason;
         CHKERRQ(KSPSetPC(cheb->kspest, ksp->pc));
 
-        CHKERRQ(KSPSetNoisy_Private(ksp->work[1]));
+        Mat A;
+        CHKERRQ(KSPGetOperators(cheb->kspest, &A, NULL));
+        CHKERRQ(KSPSetNoisy_Private(A, ksp->work[1]));
+
         CHKERRQ(KSPSolve(cheb->kspest, ksp->work[1], ksp->work[0]));
         CHKERRQ(KSPGetConvergedReason(cheb->kspest, &reason));
         if (reason == KSP_DIVERGED_ITS) {
@@ -163,22 +166,28 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
     PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems* PetscOptionsObject) {
+static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems PetscOptionsObject) {
     KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
-
     PetscFunctionBegin;
-    PetscOptionsHeadBegin(PetscOptionsObject, "KSP LSPoly Options");
+
+    PetscOptionsBegin(PetscObjectComm((PetscObject)ksp), ((PetscObject)ksp)->prefix,
+                      "KSP LSPoly Options", "KSP");
+
     CHKERRQ(PetscOptionsInt("-ksp_lspoly_esteig_steps", "Number of est steps in LSPoly", "",
                             cheb->eststeps, &cheb->eststeps, NULL));
+
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_esteig_bias",
                              "Maximum eigenvalue is multiplied with this factor", "", cheb->estbias,
                              &cheb->estbias, NULL));
+
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_alpha", "Weighting function (1-x)^alpha", "", cheb->alpha,
                              &cheb->alpha, NULL));
+
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
-    PetscOptionsHeadEnd();
-    PetscFunctionReturn(0);
+
+    PetscOptionsEnd();
+    PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode KSPSolve_LSPoly(KSP ksp) {
