@@ -204,12 +204,7 @@ set(APP_COMMON_SRCS
     common/ts_util.c
     common/vecnest_util.c
 )
-if(${LAPACK_FOUND})
-    list(APPEND APP_COMMON_SRCS
-         pc/eigdeflate.c
-         pc/reig_aux.c
-    )
-endif()
+
 add_library(app-common ${APP_COMMON_SRCS})
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
