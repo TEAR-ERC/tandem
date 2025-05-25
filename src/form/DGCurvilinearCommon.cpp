@@ -64,6 +64,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
                                             LinearAllocator<double>& scratch) {
     double* Jmem = scratch.allocate(fctRule.size() * D * D);
     double* detJmem = scratch.allocate(fctRule.size());
+    auto& facet_data = fct[fctNo];
+    auto& normal_data = facet_data.template get<Normal>();
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(fctRule.size()));
     auto detJ = Tensor(detJmem, cl_->detJResultInfo(fctRule.size()));
 
@@ -79,9 +81,9 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, jInv0);
     cl_->normal(info.localNo[0], detJ, jInv0, normal);
-    auto& length = fct[fctNo].template get<NormalLength>();
+    auto& length = facet_data.template get<NormalLength>();
     for (std::size_t i = 0; i < length.size(); ++i) {
-        length[i] = norm(fct[fctNo].template get<Normal>()[i]);
+        length[i] = norm(normal_data[i]);
     }
     cl_->normal(info.localNo[0], detJ, jInv0, unit_normal);
     cl_->normalize(unit_normal);

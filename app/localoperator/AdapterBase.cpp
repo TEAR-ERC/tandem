@@ -48,11 +48,14 @@ void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
     auto J = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
     auto JInv = make_scratch_tensor(scratch, cl_->jacobianResultInfo(nq));
     auto detJ = make_scratch_tensor(scratch, cl_->detJResultInfo(nq));
+    auto& fault_data = fault_[faultNo];
+    auto& normal_vec = fault_data.template get<Normal>();
     auto normal =
         Tensor(fault_[faultNo].template get<Normal>().data()->data(), cl_->normalResultInfo(nq));
-    auto& nl = fault_[faultNo].template get<NormalLength>();
+    auto& nl = fault_data.template get<NormalLength>();
     auto fault_basis_q = Tensor(fault_[faultNo].template get<FaultBasis>().data()->data(),
                                 cl_->facetBasisResultInfo(nq));
+    auto& sign_flipped_vec = fault_data.template get<SignFlipped>();
     auto m = make_scratch_tensor<Matrix<double>>(scratch, nbf_, nbf_);
     auto mInv = Matrix<double>(mass_[faultNo].template get<MInv>().data(), nbf_, nbf_);
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
@@ -60,22 +63,21 @@ void AdapterBase::prepare(std::size_t faultNo, FacetInfo const& info,
     cl_->jacobianInv(J, JInv);
     cl_->normal(info.localNo[0], detJ, JInv, normal);
     for (std::size_t i = 0; i < nq; ++i) {
-        auto& sign_flipped = fault_[faultNo].template get<SignFlipped>()[i];
-        auto& normal_i = fault_[faultNo].template get<Normal>()[i];
+        auto& normal_i = normal_vec[i];
         nl[i] = norm(normal_i);
 
         auto n_ref_dot_n = dot(ref_normal_, normal_i);
         if (std::fabs(n_ref_dot_n) < 10000.0 * std::numeric_limits<double>::epsilon()) {
             throw std::logic_error("Normal and reference normal are almost perpendicular.");
         }
-        sign_flipped = n_ref_dot_n < 0;
-        if (sign_flipped) {
+        sign_flipped_vec[i] = n_ref_dot_n < 0;
+        if (sign_flipped_vec[i]) {
             normal_i = -1.0 * normal_i;
         }
     }
     cl_->facetBasis(up_, normal, fault_basis_q);
     for (std::size_t q = 0; q < nq; ++q) {
-        if (fault_[faultNo].template get<SignFlipped>()[q]) {
+        if (sign_flipped_vec[q]) {
             for (std::size_t i = 0; i < fault_basis_q.shape(1); ++i) {
                 for (std::size_t j = 0; j < fault_basis_q.shape(0); ++j) {
                     fault_basis_q(i, j, q) *= -1.0;
