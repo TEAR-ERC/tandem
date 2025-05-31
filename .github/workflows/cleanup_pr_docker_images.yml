@@ -3,7 +3,7 @@ name: cleanup-pr-docker-images
 on:
   push:
     branches:
-      - main
+      - '*' # Trigger on all branches
 
 permissions:
   contents: read

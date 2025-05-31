@@ -1,7 +1,7 @@
 name: tandem-build
 
 on:
-  pull_request:
+  push:
     branches:
       - '*'
       - main
@@ -108,7 +108,7 @@ jobs:
       - name: Set Image Tag
         id: set-image-tag
         run: |
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+          if [[ ${{ github.event_name }} == 'push' ]]; then
             TAG="pr-${{ github.event.number }}"
           else
             TAG="latest"
