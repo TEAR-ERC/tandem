@@ -6,7 +6,7 @@ jobs:
   clang-format:
     name: clang-format
     runs-on: ubuntu-22.04
-    steps:
+    steps: 
       - uses: actions/checkout@v4
 
       - name: apt-get
