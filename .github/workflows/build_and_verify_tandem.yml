@@ -158,7 +158,7 @@ jobs:
                 pytest /app/test/regression/static_fault/test_regression_2D.py
               else
                 gmsh -3 spherical_hole.geo
-                mpirun --oversubscribe -n \$(nproc) /app/build_3d_p3/app/static spherical_hole.toml \
+                /app/build_3d_p3/app/static spherical_hole.toml \
                   --resolution 0.8 \
                   --matrix_free yes \
                   --mg_strategy twolevel \
