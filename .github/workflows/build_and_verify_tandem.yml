@@ -153,11 +153,13 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/regression/static_fault \
                   --petsc -options_file ../../options/mg_cheby.cfg
+                ls *
               fi
 
               # Run regression test
               if [ '${{ matrix.dimension }}' = '2' ]; then
                 cd /app/test/regression/static_fault
+                ls *
                 pytest test_regression_2D.py
               fi
             "
