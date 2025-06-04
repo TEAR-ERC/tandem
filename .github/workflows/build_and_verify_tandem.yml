@@ -86,7 +86,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: dependencies.Dockerfile
+          file: Dockerfile
           push: true
           tags: ${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
           platforms: linux/amd64

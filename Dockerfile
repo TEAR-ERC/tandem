@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev liblua5.3-dev \
     libomp-dev libgomp1 wget git jq curl gmsh \
     python3 python3-dev python3-pip python3-setuptools \
+    python3-venv \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
