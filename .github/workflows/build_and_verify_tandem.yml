@@ -132,8 +132,8 @@ jobs:
             $IMAGE \
             bash -c "
               set -e
-              update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
-              update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
 
               mkdir -p build_${{ matrix.dimension }}d_p3 && cd build_${{ matrix.dimension }}d_p3
               cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
