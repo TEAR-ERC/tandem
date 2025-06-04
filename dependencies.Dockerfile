@@ -47,3 +47,17 @@ RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
 RUN useradd -m -s /bin/bash tandem && \
     chown -R tandem:tandem /opt/petsc && \
     echo "tandem ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create and activate a venv for the 'tandem' user
+USER tandem
+WORKDIR /home/tandem
+
+# Create the venv
+RUN python3 -m venv tempEnv
+
+# Upgrade pip and install necessary packages in the venv
+RUN /home/tandem/tempEnv/bin/pip install --upgrade pip && \
+    /home/tandem/tempEnv/bin/pip install meshio numpy matplotlib pytest
+
+# Automatically activate the venv in every shell
+RUN echo 'source ~/tempEnv/bin/activate' >> ~/.bashrc

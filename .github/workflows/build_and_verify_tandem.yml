@@ -153,7 +153,9 @@ jobs:
                   --matrix_free yes \
                   --mg_strategy twolevel \
                   --mg_coarse_level 1 \
-                  --petsc -options_file ../../options/mg_cheby.cfg
+                  --petsc -options_file ../../options/mg_cheby.cfg \
+                  --output output
+                cp output_0.vtu /app/test/regression/static_fault/output_0.vtu
               else
                 gmsh -3 spherical_hole.geo
                 mpirun --oversubscribe -n \$(nproc) /app/build_3d_p3/app/static spherical_hole.toml \
@@ -162,5 +164,11 @@ jobs:
                   --mg_strategy twolevel \
                   --mg_coarse_level 1 \
                   --petsc -options_file ../../options/mg_cheby.cfg
+              fi
+
+              # Run regression test
+              if [ '${{ matrix.dimension }}' = '2' ]; then
+                cd /app/test/regression/static_fault
+                pytest test_regression_2D.py
               fi
             "

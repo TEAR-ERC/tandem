@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<VTKFile type="PUnstructuredGrid" version="1.0" header_type="UInt64" byte_order="LittleEndian" compressor="vtkZLibDataCompressor">
+    <PUnstructuredGrid GhostLevel="0">
+        <PPoints>
+            <PDataArray type="Float64" Name="Points" NumberOfComponents="3"/>
+        </PPoints>
+        <PCells>
+            <PDataArray type="Int32" Name="connectivity" NumberOfComponents="1"/>
+            <PDataArray type="Int32" Name="offsets" NumberOfComponents="1"/>
+            <PDataArray type="UInt8" Name="types" NumberOfComponents="1"/>
+        </PCells>
+        <PCellData>
+            <PDataArray type="Int32" Name="partition" NumberOfComponents="1"/>
+        </PCellData>
+        <PPointData>
+            <PDataArray type="Float64" Name="u0" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="u1" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="du0_d0" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="du1_d0" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="du0_d1" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="du1_d1" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="lambda" NumberOfComponents="1"/>
+            <PDataArray type="Float64" Name="mu" NumberOfComponents="1"/>
+        </PPointData>
+        <Piece Source="ref_output_0.vtu"/>
+    </PUnstructuredGrid>
+</VTKFile>
