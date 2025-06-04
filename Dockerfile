@@ -54,11 +54,11 @@ USER tandem
 WORKDIR /home/tandem
 
 # Create the venv
-RUN python3 -m venv tempEnv
+RUN python3 -m venv /home/tandem/venv && \
+    /home/tandem/venv/bin/pip install --upgrade pip && \
+    /home/tandem/venv/bin/pip install meshio numpy matplotlib pytest
 
-# Upgrade pip and install necessary packages in the venv
-RUN /home/tandem/tempEnv/bin/pip install --upgrade pip && \
-    /home/tandem/tempEnv/bin/pip install meshio numpy matplotlib pytest
-
+# Set PATH to include venv binaries
+ENV PATH="/home/tandem/venv/bin:$PATH"
 # Automatically activate the venv in every shell
-RUN echo 'source ~/tempEnv/bin/activate' >> ~/.bashrc
+RUN echo 'source ~/venv/bin/activate' >> ~/.bashrc
