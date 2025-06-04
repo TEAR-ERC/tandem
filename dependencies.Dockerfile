@@ -1,5 +1,4 @@
 FROM ubuntu:24.04
-
 ARG PETSC_VERSION
 ARG CC
 ARG CXX
@@ -14,11 +13,14 @@ RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 \
     cmake openmpi-bin libopenmpi-dev \
     libmetis-dev libparmetis-dev \
-    libeigen3-dev python3 python3-numpy \
-    python3-distutils python-is-python3 \
+    libeigen3-dev python3-numpy \
     libopenblas-dev liblua5.3-dev \
-    libomp-dev libgomp1 wget git jq curl gmsh && \
-    rm -rf /var/lib/apt/lists/*
+    libomp-dev libgomp1 wget git jq curl gmsh \
+    python3 python3-dev python3-pip python3-setuptools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install distutils via pip since it's not available in Ubuntu 24.04 repos
+RUN python3 -m pip install --break-system-packages setuptools
 
 # Install libxsmm (using build-args for compiler)
 RUN git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git && \
@@ -38,4 +40,4 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     rm -rf petsc-${PETSC_VERSION}.tar.gz petsc-${PETSC_VERSION}
 
 # Save PETSc version for reference
-RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt 
+RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
