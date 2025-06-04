@@ -69,18 +69,31 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Check if image exists
+        id: check-image
+        run: |
+          IMAGE_URL="${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}"
+          if docker manifest inspect $IMAGE_URL >/dev/null 2>&1; then
+            echo "Image already exists, skipping build"
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Image does not exist, will build"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push Dependencies Image
+        if: steps.check-image.outputs.image_exists == 'false'
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: dependencies.Dockerfile 
+          file: dependencies.Dockerfile
           push: true
           tags: ${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
           platforms: linux/amd64
           build-args: |
-              PETSC_VERSION=${{ needs.check-petsc-version.outputs.petsc_version }}
-              CC=gcc-13
-              CXX=g++-13
+            PETSC_VERSION=${{ needs.check-petsc-version.outputs.petsc_version }}
+            CC=gcc-13
+            CXX=g++-13
 
   build-and-test-tandem:
     needs: [check-petsc-version, build-dependencies-image]
