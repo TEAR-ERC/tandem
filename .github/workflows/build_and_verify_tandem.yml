@@ -151,8 +151,8 @@ jobs:
                   --matrix_free yes \
                   --mg_strategy twolevel \
                   --mg_coarse_level 1 \
-                  --petsc -options_file ../../options/mg_cheby.cfg \
-                  --output /app/test/regression/static_fault
+                  --output /app/test/regression/static_fault \
+                  --petsc -options_file ../../options/mg_cheby.cfg
               fi
 
               # Run regression test
