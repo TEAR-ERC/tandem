@@ -1,5 +1,7 @@
 import vtk
 import argparse
+import numpy as np
+from vtk.util.numpy_support import vtk_to_numpy
 
 
 def read_dataset(filename):
@@ -73,14 +75,21 @@ def compute_and_save_differences(
                 v2 = arr2.GetComponent(i, j)
                 diff = v1 - v2
                 diff_array.SetComponent(i, j, diff)
-                max_diff = max(max_diff, abs(diff))
-                maxv1v2 = max(v1, v2)
-                if maxv1v2:
-                    max_rel_diff = max(max_rel_diff, abs(diff) / maxv1v2)
+
+        # Convert VTK array to NumPy array
+        abs_err = np.abs(vtk_to_numpy(diff_array)).reshape((n, comp))
+        ref = np.abs(vtk_to_numpy(arr1)).reshape((n, comp))
+        rel_err = np.zeros_like(abs_err)
+        mask = ref != 0
+        rel_err[mask] = abs_err[mask] / ref[mask]
 
         print(
-            f"Field '{name}': max absolute difference = {max_diff:.4e}, "
-            f"max relative difference = {max_rel_diff:.4e}"
+            f"{name}: L2 = {np.sqrt(np.mean(abs_err**2)):.3e}, "
+            f"L∞ = {np.max(abs_err):.3e}, "
+            f"L1 = {np.mean(abs_err):.3e}, "
+            f"relative errors: L2 = {np.sqrt(np.mean(rel_err**2)):.3e}, "
+            f"L∞ = {np.max(rel_err):.3e}, "
+            f"L1 = {np.mean(rel_err):.3e}"
         )
 
         diff_grid.GetPointData().AddArray(diff_array)
