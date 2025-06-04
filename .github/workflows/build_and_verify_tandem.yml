@@ -103,7 +103,9 @@ jobs:
         compiler:
           - cc: gcc-13
             cxx: g++-13
-        dimension: [2]
+          - cc: clang-18
+            cxx: clang++-18
+        dimension: [2, 3]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -151,15 +153,18 @@ jobs:
                   --matrix_free yes \
                   --mg_strategy twolevel \
                   --mg_coarse_level 1 \
-                  --output /app/test/regression/static_fault/output \
+                  --output /app/test/regression/static_fault/output2D \
+                  --petsc -options_file ../../options/mg_cheby.cfg \
+                pytest /app/test/regression/static_fault/test_regression_2D.py
+              else
+                gmsh -3 spherical_hole.geo
+                mpirun --oversubscribe -n \$(nproc) /app/build_3d_p3/app/static spherical_hole.toml \
+                  --resolution 0.8 \
+                  --matrix_free yes \
+                  --mg_strategy twolevel \
+                  --mg_coarse_level 1 \
+                  --output /app/test/regression/static_fault/output3D \
                   --petsc -options_file ../../options/mg_cheby.cfg
-                ls /app/test/regression/static_fault 
-              fi
-
-              # Run regression test
-              if [ '${{ matrix.dimension }}' = '2' ]; then
-                cd /app/test/regression/static_fault
-                ls *
-                pytest test_regression_2D.py
+                pytest /app/test/regression/static_fault/test_regression_3D.py
               fi
             "
