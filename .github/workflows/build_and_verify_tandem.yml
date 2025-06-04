@@ -27,7 +27,7 @@ jobs:
       - name: Get Current PETSc Version
         id: get-current-version
         run: |
-          VERSION=$(curl -s https://pypi.org/pypi/petsc/json | jq -r '.info.version')
+          VERSION=3.13.6
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           
       - name: Login to GHCR
@@ -82,20 +82,17 @@ jobs:
               CC=gcc-13
               CXX=g++-13
 
-  build-and-push-tandem-image:
+  build-and-test-tandem:
     needs: [check-petsc-version, build-dependencies-image]
-    if: always() && !cancelled() && !failure()
-    outputs:
-      tandem_image_tag: ${{ steps.set-image-tag.outputs.image_tag }}
     runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false
       matrix:
         compiler:
           - cc: gcc-13
             cxx: g++-13
           - cc: clang-18
             cxx: clang++-18
+        dimension: [2, 3]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -105,73 +102,49 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Set Image Tag
-        id: set-image-tag
+      - name: Pull dependencies image
         run: |
-          if [[ ${{ github.event_name }} == 'push' ]]; then
-            TAG="pr-${{ github.event.number }}"
-          else
-            TAG="latest"
-          fi
-          echo "image_tag=$TAG" >> $GITHUB_OUTPUT
+          IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
+          docker pull $IMAGE
 
-      - name: Delete existing image
+      - name: Build, Test, and Verify
         run: |
-            # Get repository name in lowercase
-            REPO_NAME_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-            TANDEM_IMAGE_NO_GHCR="${REPO_NAME_LOWER}/tandem-build"
-            VERSION="${{ steps.set-image-tag.outputs.image_tag }}-${{ matrix.compiler.cc }}"
-            
-            # Delete existing image version if it exists
-            curl -L -X DELETE \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/user/packages/container/${TANDEM_IMAGE_NO_GHCR}/versions/${VERSION}"
-            echo "url to version to delete: https://api.github.com/user/packages/container/${TANDEM_IMAGE_NO_GHCR}/versions/${VERSION}"
-        continue-on-error: true
+          IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ steps.set-image-tag.outputs.image_tag }}-${{ matrix.compiler.cc }}
-          platforms: linux/amd64
-          build-args: |
-            DEPENDENCIES_IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
-            CC=${{ matrix.compiler.cc }}
-            CXX=${{ matrix.compiler.cxx }}
+          docker run --rm -v ${{ github.workspace }}:/app -w /app \
+            -e CC=${{ matrix.compiler.cc }} -e CXX=${{ matrix.compiler.cxx }} \
+            $IMAGE \
+            bash -c "
+              set -e
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
 
-  verify:
-    needs: [build-and-push-tandem-image, check-petsc-version]
-    if: success()
-    runs-on: ubuntu-24.04 
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler:
-          - cc: gcc-13
-            cxx: g++-13
-          - cc: clang-18
-            cxx: clang++-18
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+              mkdir -p build_${{ matrix.dimension }}d_p3 && cd build_${{ matrix.dimension }}d_p3
+              cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
+                      -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
+                      -DPOLYNOMIAL_DEGREE=3 \
+                      -DCMAKE_C_COMPILER=\$CC \
+                      -DCMAKE_CXX_COMPILER=\$CXX
+              make -j$(nproc)
+              make test
 
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Run Static Verification 2D
-        run: |
-          docker run --rm \
-            ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            -c "ulimit -Ss 65536 && cd examples/elasticity/2d && gmsh -2 circular_hole.geo && /app/build_2d_p3/app/static circular_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
-      - name: Run Static Verification 3D
-        run: |
-          docker run --rm \
-            ${{ needs.check-petsc-version.outputs.tandem_image }}:${{ needs.build-and-push-tandem-image.outputs.tandem_image_tag }}-${{ matrix.compiler.cc }} \
-            -c "ulimit -Ss 65536 && cd examples/elasticity/3d && gmsh -3 spherical_hole.geo && mpirun --oversubscribe -n $(nproc) /app/build_3d_p3/app/static spherical_hole.toml --resolution 0.8 --matrix_free yes --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file ../../options/mg_cheby.cfg"
-
+              # Verification
+              cd /app/examples/elasticity/${{ matrix.dimension }}d
+              if [ '${{ matrix.dimension }}' = '2' ]; then
+                gmsh -2 circular_hole.geo
+                /app/build_2d_p3/app/static circular_hole.toml \
+                  --resolution 0.8 \
+                  --matrix_free yes \
+                  --mg_strategy twolevel \
+                  --mg_coarse_level 1 \
+                  --petsc -options_file ../../options/mg_cheby.cfg
+              else
+                gmsh -3 spherical_hole.geo
+                mpirun --oversubscribe -n \$(nproc) /app/build_3d_p3/app/static spherical_hole.toml \
+                  --resolution 0.8 \
+                  --matrix_free yes \
+                  --mg_strategy twolevel \
+                  --mg_coarse_level 1 \
+                  --petsc -options_file ../../options/mg_cheby.cfg
+              fi
+            "
