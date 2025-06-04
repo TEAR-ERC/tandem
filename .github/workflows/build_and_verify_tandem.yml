@@ -27,7 +27,7 @@ jobs:
       - name: Get Current PETSc Version
         id: get-current-version
         run: |
-          VERSION=3.13.6
+          VERSION=3.22.0
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           
       - name: Login to GHCR
