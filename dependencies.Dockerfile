@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev liblua5.3-dev \
     libomp-dev libgomp1 wget git jq curl gmsh \
     python3 python3-dev python3-pip python3-setuptools \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Install distutils via pip since it's not available in Ubuntu 24.04 repos
@@ -41,3 +42,8 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
 
 # Save PETSc version for reference
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
+
+# Create a non-root user for MPI operations
+RUN useradd -m -s /bin/bash tandem && \
+    chown -R tandem:tandem /opt/petsc && \
+    echo "tandem ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers

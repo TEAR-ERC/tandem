@@ -123,9 +123,12 @@ jobs:
       - name: Build, Test, and Verify
         run: |
           IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
-
-          docker run --rm -v ${{ github.workspace }}:/app -w /app \
-            -e CC=${{ matrix.compiler.cc }} -e CXX=${{ matrix.compiler.cxx }} \
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            -e CC=${{ matrix.compiler.cc }} \
+            -e CXX=${{ matrix.compiler.cxx }} \
+            --user tandem \
             $IMAGE \
             bash -c "
               set -e
