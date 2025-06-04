@@ -2,9 +2,9 @@ import meshio
 from numpy.testing import assert_allclose
 import os
 
-def test_static_solver_vtu_consistency():
-    ref_path = "/app/test/regression/static_fault/ref_data/ref_output_0.vtu"
-    test_path = "/app/test/regression/static_fault/output_0.vtu"
+def test_static_solver_vtu_consistency_2D():
+    ref_path = "/app/test/regression/static_fault/ref_data/ref_output_2D.vtu"
+    test_path = "/app/test/regression/static_fault/output2D_0.vtu"
 
     assert os.path.exists(test_path), f"Output file {test_path} not found."
     assert os.path.exists(ref_path), f"Reference file {ref_path} not found."
