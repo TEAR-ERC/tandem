@@ -154,7 +154,7 @@ jobs:
                   --mg_strategy twolevel \
                   --mg_coarse_level 1 \
                   --output /app/test/regression/static_fault/output2D \
-                  --petsc -options_file ../../options/mg_cheby.cfg \
+                  --petsc -options_file ../../options/mg_cheby.cfg
                 pytest /app/test/regression/static_fault/test_regression_2D.py
               else
                 gmsh -3 spherical_hole.geo
