@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 \
     cmake openmpi-bin libopenmpi-dev \
     libmetis-dev libparmetis-dev \
-    libeigen3-dev python3-numpy \
+    libeigen3-dev python3 python3-numpy \
+    python3-distutils python-is-python3 \
     libopenblas-dev liblua5.3-dev \
     libomp-dev libgomp1 wget git jq curl gmsh && \
     rm -rf /var/lib/apt/lists/*
