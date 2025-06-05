@@ -3,7 +3,7 @@ name: tandem-build
 on:
   push:
     branches:
-      - '*'
+      - '**'
 
 permissions:
   contents: read
