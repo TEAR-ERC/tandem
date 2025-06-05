@@ -15,7 +15,7 @@ permissions:
 
 
 
-jobs:
+jobs: 
   check-petsc-version:
     runs-on: ubuntu-24.04
     outputs:
