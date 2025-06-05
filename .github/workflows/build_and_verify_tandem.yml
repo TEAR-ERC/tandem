@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - '*'
-      - main
 
 permissions:
   contents: read
@@ -106,7 +105,7 @@ jobs:
           - cc: clang-18
             cxx: clang++-18
         dimension: [2, 3]
-        degree: [3, 3]
+        degree: [3]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
