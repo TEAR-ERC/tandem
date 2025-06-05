@@ -4,18 +4,17 @@ on:
   push:
     branches:
       - '*'
-      - main
 
 permissions:
   contents: read
   packages: write
   actions: read
-  id-token: write  # Add this if needed
-  checks: write    # Add this if needed
+  id-token: write
+  checks: write
 
 
 
-jobs:
+jobs: 
   check-petsc-version:
     runs-on: ubuntu-24.04
     outputs:
@@ -106,6 +105,7 @@ jobs:
           - cc: clang-18
             cxx: clang++-18
         dimension: [2, 3]
+        degree: [3]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -120,7 +120,7 @@ jobs:
           IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
           docker pull $IMAGE
 
-      - name: Build, Test, and Verify
+      - name: Build and test
         run: |
           IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
           docker run --rm \
@@ -135,16 +135,16 @@ jobs:
               sudo update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
               sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
 
-              mkdir -p build_${{ matrix.dimension }}d_p3 && cd build_${{ matrix.dimension }}d_p3
+              mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
               cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
-                      -DPOLYNOMIAL_DEGREE=3 \
+                      -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
                       -DCMAKE_CXX_COMPILER=\$CXX
               make -j$(nproc)
               make test
 
-              # Verification
+              # Generate test outputs
               cd /app/examples/elasticity/${{ matrix.dimension }}d
               if [ '${{ matrix.dimension }}' = '2' ]; then
                 gmsh -2 circular_hole.geo
@@ -155,7 +155,6 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/regression/static_fault/output2D \
                   --petsc -options_file ../../options/mg_cheby.cfg
-                pytest /app/test/regression/static_fault/test_regression_2D.py
               else
                 gmsh -3 spherical_hole.geo
                 /app/build_3d_p3/app/static spherical_hole.toml \
@@ -165,6 +164,32 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/regression/static_fault/output3D \
                   --petsc -options_file ../../options/mg_cheby.cfg
-                pytest /app/test/regression/static_fault/test_regression_3D.py
               fi
             "
+
+      - name: Static regression test
+        run: |
+          IMAGE=${{ needs.check-petsc-version.outputs.dependencies_image }}:${{ needs.check-petsc-version.outputs.petsc_version }}
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            --user tandem \
+            $IMAGE \
+            bash -c "
+              cd /app/test/regression/static_fault
+              if [ '${{ matrix.dimension }}' = '2' ]; then
+                pytest test_regression_2D.py
+              else
+                pytest test_regression_3D.py
+              fi
+            "
+
+      - name: Parallel consistency test
+        run: |
+          # TODO: Run with multiple processors to check for consistency
+          echo "Parallel consistency test to be implemented"
+
+      - name: SEAS regression test
+        run: |
+          # TODO: Check for cycle simulation e.g, BP1 with a-b >0 and a-b<0
+          echo "SEAS regression test to be implemented"
