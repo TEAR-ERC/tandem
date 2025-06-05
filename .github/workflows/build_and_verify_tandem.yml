@@ -9,8 +9,8 @@ permissions:
   contents: read
   packages: write
   actions: read
-  id-token: write  # Add this if needed
-  checks: write    # Add this if needed
+  id-token: write
+  checks: write
 
 
 
