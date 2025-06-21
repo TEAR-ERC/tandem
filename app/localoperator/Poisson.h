@@ -107,7 +107,7 @@ public:
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
-
+    double* get_mu_field(FacetInfo const& info) const ;
 private:
     double penalty(std::size_t fctNo) const {
         if (method_ == DGMethod::BR2) {
