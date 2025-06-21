@@ -66,8 +66,6 @@ find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 find_package(HDF5 COMPONENTS C HL REQUIRED)
 message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
-# set(HDF5_LIBRARIES "/home/pkarki/hdf5/lib/libhdf5.a")  # The exact 
-# set(HDF5_INCLUDE_DIRS "/home/pkarki/hdf5/include")  # HDF5 include directory
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
     ${HDF5_INCLUDE_DIRS}
