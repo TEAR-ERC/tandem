@@ -265,7 +265,6 @@ public:
     }
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
-        std::cout << "Destructor called for simulation writer" << std::endl;
     }
     void write_static() override {
         // Get the vertex data from the adapter
