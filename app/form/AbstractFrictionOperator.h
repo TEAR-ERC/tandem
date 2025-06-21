@@ -21,6 +21,7 @@ public:
     virtual std::size_t num_local_elements() const = 0;
     virtual std::size_t number_of_local_dofs() const { return num_local_elements() * block_size(); }
     virtual double VMax_local() const = 0;
+    virtual std::vector<double> moment_rate_local() const = 0;
 
     virtual void pre_init(BlockVector& state) = 0;
     virtual void init(double time, BlockVector const& traction, BlockVector& state) = 0;
