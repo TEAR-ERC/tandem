@@ -30,7 +30,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     generator.add('assembleVolume',
         A['kl'] <= J_Q['q'] * W['q'] * K['m'] * matE_Q_T['qm'] * Dx_Q['kiq'] * Dx_Q['liq']
     )
-
+    mu_avg_q = Tensor('mu_avg_q', (nq,))
+    mu_q = [Tensor('mu_q({})'.format(x), (nq,)) for x in range(2)]
+    generator.add('mu_avg', mu_avg_q['q'] <= 0.5 * (mu_q[0]['q'] + mu_q[1]['q']))
     G_q = Tensor('G_q', (dim, dim, nq))
     n_q = Tensor('n_q', (dim, nq))
     n_unit_q = Tensor('n_unit_q', (dim, nq))
