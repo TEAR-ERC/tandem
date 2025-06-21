@@ -103,7 +103,7 @@ jobs:
           set -euo pipefail
           mkdir build && cd build
           cmake .. \
-                -DCMAKE_PREFIX_PATH=${{ env.PETSC_CACHE_FOLDER }};${{ env.HDF5_DIR }}" \
+                -DCMAKE_PREFIX_PATH=${{ env.PETSC_CACHE_FOLDER }};${{ env.HDF5_DIR }} \
                 -DDOMAIN_DIMENSION=3 \
                 -DPOLYNOMIAL_DEGREE=2 \
                 -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} \
