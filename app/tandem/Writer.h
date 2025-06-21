@@ -252,23 +252,24 @@ public:
         auto numElements = data.size() / (D - 1);
 
         // Create a dataset for the moment rate
-        int extensibleIndex = 1;
+        int extensibleIndexMoment = 1;
         if (momentRateDataset_ == -1) {
             momentRateDataset_ = writer_.createExtendibleDataset(
                 "Moment_rate", H5T_IEEE_F64LE, {1, numElements, D - 1},
-                {H5S_UNLIMITED, numElements, D - 1}, extensibleIndex);
+                {H5S_UNLIMITED, numElements, D - 1}, extensibleIndexMoment);
         }
         // Write the data
         writer_.writeToDataset(momentRateDataset_, H5T_IEEE_F64LE, output_step_, data.data(),
-                               {output_step_ + 1, numElements, D - 1}, extensibleIndex);
+                               {output_step_ + 1, numElements, D - 1}, extensibleIndexMoment);
         // Create a dataset for timestep
+        int extensibleIndexTimeStep = 0;
         if (timeStepDataset_ == -1) {
-            timeStepDataset_ = writer_.createExtendibleDataset("time", H5T_IEEE_F64LE, {1},
-                                                               {H5S_UNLIMITED}, extensibleIndex);
+            timeStepDataset_ = writer_.createExtendibleDataset(
+                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, extensibleIndexTimeStep);
         }
         // Write the data
         writer_.writeToDataset(timeStepDataset_, H5T_IEEE_F64LE, output_step_, &time,
-                               {output_step_ + 1}, extensibleIndex);
+                               {output_step_ + 1}, extensibleIndexTimeStep);
     }
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
