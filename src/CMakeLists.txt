@@ -40,7 +40,7 @@ add_library(tandem-lib
     io/PVDWriter.cpp
     io/VTUWriter.cpp
     io/HDF5Writer.cpp
-    io/HDF5BoundaryProbeWriter.cpp
+    io/HDF5ProbeWriter.cpp
     io/VTUWriter.cpp
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
