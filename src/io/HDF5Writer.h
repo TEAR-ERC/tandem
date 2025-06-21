@@ -18,11 +18,12 @@ public:
     // Returns the dataset ID for later writing
     hid_t createExtendibleDataset(const std::string_view name, hid_t type,
                                   std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
-                                  int extensibleIndex, bool isStatic);
+                                  int extensibleDimension, bool isDistributed = true);
 
     // Takes the dataset ID as parameter
     void writeToDataset(hid_t dset, hid_t type, hsize_t localElements, const void* data,
-                        std::vector<hsize_t> dims, int extensibleIndex, bool isStatic);
+                        std::vector<hsize_t> dims, int glueDimension, int extensibleDimension,
+                        bool isDistributed = true);
 
     // Add explicit close function
     void closeDataset(hid_t dset);
