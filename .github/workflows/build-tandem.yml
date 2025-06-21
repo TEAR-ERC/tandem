@@ -5,6 +5,7 @@ on:
 
 env:
   PETSC_CACHE_FOLDER: ${{ github.workspace }}/.petsc
+  HDF5_CACHE_FOLDER: ${{ github.workspace }}/.HDF5
   ARCHITECTURE: arch-linux-c-opt
 
 jobs:
@@ -75,13 +76,34 @@ jobs:
           make PETSC_DIR=`pwd` PETSC_ARCH=${{ env.ARCHITECTURE }} -j$(nproc)
           make PETSC_DIR=`pwd` PETSC_ARCH=${{ env.ARCHITECTURE }} install
           cd ..
+      - name: Install HDF5
+        run: |
+          set -euo pipefail
+          version=1.12.3
+          install_dir=${{ github.workspace }}/.hdf5
+          mkdir -p $install_dir
 
+          wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-${version}/src/hdf5-${version}.tar.gz
+          tar -xvzf hdf5-${version}.tar.gz
+          cd hdf5-${version}
+
+          export CC=mpicc
+          export CXX=mpicxx
+          ./configure --prefix=$install_dir \
+                      --enable-parallel \
+                      CC=mpicc CXX=mpicxx
+          make -j$(nproc)
+          make install
+
+          echo "HDF5_DIR=$install_dir" >> $GITHUB_ENV
+          cd ..
+          
       - name: Build and Test Tandem
         run: |
           set -euo pipefail
           mkdir build && cd build
           cmake .. \
-                -DCMAKE_PREFIX_PATH=${{ env.PETSC_CACHE_FOLDER }} \
+                -DCMAKE_PREFIX_PATH=${{ env.PETSC_CACHE_FOLDER }};${{ env.HDF5_DIR }}" \
                 -DDOMAIN_DIMENSION=3 \
                 -DPOLYNOMIAL_DEGREE=2 \
                 -DCMAKE_C_COMPILER=${{ matrix.compiler.cc }} \
