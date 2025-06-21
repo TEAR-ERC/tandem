@@ -26,19 +26,18 @@ HDF5Writer::~HDF5Writer() {}
 
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t type,
                                           std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
-                                          int extensibleIndex, bool isStatic = false) {
+                                          int glueDimension, bool isDistributed) {
     if (rank_ == 0) {
         std::cout << "Creating dataset: " << name << std::endl;
     }
 
     // Compute total number of faults and rank offsets
-    auto [totalDataPoints, _] = calculateOffsets(dims[extensibleIndex]);
-    dims[extensibleIndex] = (dims.size() > 1 || isStatic)
-                                ? totalDataPoints
-                                : dims[extensibleIndex]; // Update the dimension for the dataset
+    auto [totalDataPoints, _] = calculateOffsets(dims[glueDimension]);
+    dims[glueDimension] = isDistributed
+                              ? totalDataPoints
+                              : dims[glueDimension]; // Update the dimension for the dataset
     // Set initial and max dimensions
-    max_dims[extensibleIndex] =
-        (dims.size() > 1 || isStatic) ? totalDataPoints : max_dims[extensibleIndex];
+    max_dims[glueDimension] = isDistributed ? totalDataPoints : max_dims[glueDimension];
 
     // Define chunking for efficient access
     std::vector<hsize_t> chunk_dims = dims;
@@ -62,8 +61,8 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 }
 
 void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const void* data,
-                                std::vector<hsize_t> dims, int extensibleIndex,
-                                bool isStatic = false) {
+                                std::vector<hsize_t> dims, int glueDimension,
+                                int extensibleDimension, bool isDistributed) {
 
     hid_t filespace = H5Dget_space(dset);
     int ndims = H5Sget_simple_extent_ndims(filespace);
@@ -73,18 +72,18 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     // Make sure dataset is extended before writing
     std::vector<hsize_t> count = dims;
     // Calculate fault offsets for parallel writes
-    auto [totalFaults, offset] = calculateOffsets(dims[extensibleIndex]);
+    auto [totalFaults, offset] = calculateOffsets(dims[glueDimension]);
     // Select hyperslab
 
     std::vector<hsize_t> start(ndims, 0);
-    start[extensibleIndex] = (dims.size() > 1 || isStatic) ? offset : start[extensibleIndex];
-    if (timestep >= current_dims[0]) {
+    start[glueDimension] = isDistributed ? offset : start[glueDimension];
+    if (timestep >= current_dims[extensibleDimension]) {
         // Extend the dataset if the timestep exceeds current dimensions
-        count[0] = 1; // Only extend the first dimension
-        start[0] = timestep;
+        count[extensibleDimension] = 1; // Only extend the first dimension
+        start[extensibleDimension] = timestep;
         std::vector<hsize_t> new_dims(ndims);
         new_dims = current_dims;
-        new_dims[0] = timestep + 1;
+        new_dims[extensibleDimension] = timestep + 1;
         herr_t status = H5Dset_extent(dset, new_dims.data());
         if (status < 0) {
             std::cerr << "Error extending dataset at timestep " << timestep << std::endl;
@@ -95,8 +94,7 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
         H5Sget_simple_extent_dims(filespace, current_dims.data(), NULL);
     }
 
-    count[extensibleIndex] =
-        (dims.size() > 1 || isStatic) ? dims[extensibleIndex] : count[extensibleIndex];
+    count[glueDimension] = isDistributed ? dims[glueDimension] : count[glueDimension];
     herr_t select_status =
         H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start.data(), NULL, count.data(), NULL);
     if (select_status < 0) {

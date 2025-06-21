@@ -247,36 +247,39 @@ public:
     bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> data) override {
         // Get the vertex data from the adapter
-        bool isStatic = false;
         auto numElements = data.size() / (D - 1);
 
         // Create a dataset for the moment rate
-        int extensibleIndexMoment = 1;
+        int glueDimensionMoment = 0;
+        int extensibleDimensionMoment = 1;
+
         if (momentRateDataset_ == -1) {
             momentRateDataset_ = writer_.createExtendibleDataset(
-                "Moment_rate", H5T_IEEE_F64LE, {1, numElements, D - 1},
-                {H5S_UNLIMITED, numElements, D - 1}, extensibleIndexMoment, false);
+                "Moment_rate", H5T_IEEE_F64LE, {numElements, 1, D - 1},
+                {numElements, H5S_UNLIMITED, D - 1}, glueDimensionMoment);
         }
         // Write the data
         writer_.writeToDataset(momentRateDataset_, H5T_IEEE_F64LE, output_step_, data.data(),
-                               {output_step_ + 1, numElements, D - 1}, extensibleIndexMoment,
-                               false);
+                               {numElements, output_step_ + 1, D - 1}, glueDimensionMoment,
+                               extensibleDimensionMoment);
         // Create a dataset for timestep
-        int extensibleIndexTimeStep = 0;
+        int glueDimensionTimeStep = 0;
+        int extensibleDimensionTimeStep = 0;
+        bool isDistributed = false;
         if (timeStepDataset_ == -1) {
             timeStepDataset_ = writer_.createExtendibleDataset(
-                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, extensibleIndexTimeStep, isStatic);
+                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, glueDimensionTimeStep, isDistributed);
         }
         // Write the data
         writer_.writeToDataset(timeStepDataset_, H5T_IEEE_F64LE, output_step_, &time,
-                               {output_step_ + 1}, extensibleIndexTimeStep, isStatic);
+                               {output_step_ + 1}, glueDimensionTimeStep,
+                               extensibleDimensionTimeStep, isDistributed);
     }
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
         writer_.closeDataset(timeStepDataset_);
     }
     void write_static() override {
-        bool isStatic = true;
         // Get the vertex data from the adapter
         auto faultVertices = adapter_.getVertices();
         auto numFaultBasis = (degree_ + 1) * (degree_ + 2) / 2;
@@ -285,22 +288,23 @@ public:
         hsize_t numElements = faultVertices.size() / (numFaultBasis * D);
 
         // Create a dataset for the vertices
-        int extensibleIndex = 0;
+        int glueDimension = 0;
+        int extensibleDimension = 0;
         hid_t verticesDataset_ =
             writer_.createExtendibleDataset("faultVertices", H5T_IEEE_F64LE, {numElements, 3, D},
-                                            {numElements, 3, D}, extensibleIndex, isStatic);
+                                            {numElements, 3, D}, glueDimension);
         // Write the data
         writer_.writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, faultVertices.data(),
-                               {numElements, 3, D}, extensibleIndex, isStatic);
+                               {numElements, 3, D}, glueDimension, extensibleDimension);
         writer_.closeDataset(verticesDataset_);
 
         auto globalFctNos = adapter_.getGlobalFctNos();
         hsize_t numFcts = globalFctNos.size();
         hid_t fctNoDataset_ = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
-                                                              {numFcts}, extensibleIndex, true);
+                                                              {numFcts}, extensibleDimension);
 
-        writer_.writeToDataset(fctNoDataset_, H5T_NATIVE_LLONG, 0, globalFctNos.data(),
-                               {numFcts, 1, 1}, extensibleIndex, true);
+        writer_.writeToDataset(fctNoDataset_, H5T_NATIVE_LLONG, 0, globalFctNos.data(), {numFcts},
+                               glueDimension, extensibleDimension);
 
         writer_.closeDataset(fctNoDataset_);
     }
