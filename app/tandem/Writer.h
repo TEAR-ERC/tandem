@@ -290,7 +290,7 @@ public:
                                             {numElements, 3, D}, extensibleIndex);
         // Write the data
         writer_.writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, faultVertices.data(),
-                               {numElements, 3, D}, 0);
+                               {numElements, 3, D}, extensibleIndex);
         // Close dataset when completely done (maybe in destructor)`
         writer_.closeDataset(verticesDataset_);
     }
