@@ -54,3 +54,7 @@ doctest_discover_tests(test-tensor)
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
+
+add_executable(test-HDF5Writer HDF5Writer.cpp)
+target_link_libraries(test-HDF5Writer test-runner-mpi)
+doctest_discover_tests(test-HDF5Writer)
