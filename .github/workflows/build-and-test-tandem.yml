@@ -87,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: doctest-logs-${{ matrix.dimension }}d-p${{ matrix.degree }}
-          path: /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log
+          path: ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log
       - name: Parallel consistency test
         run: |
           # TODO: Run with multiple processors to check for consistency
