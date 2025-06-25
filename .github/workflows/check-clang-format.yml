@@ -1,6 +1,6 @@
-name: clang-format
+name: Clang Format Check
 on:
-  - push
+  workflow_call:
 
 jobs:
   clang-format:
