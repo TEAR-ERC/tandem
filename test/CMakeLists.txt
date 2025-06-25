@@ -58,7 +58,9 @@ doctest_discover_tests(test-util)
 # Find Python and pytest
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
-if(DEFINED DOMAIN_DIMENSION)
+option(WITH_PYTEST "Enable Python pytest integration" OFF)
+
+if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
     set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
     set(TEST_FILE "test_regression_${DOMAIN_DIMENSION}D.py")
     

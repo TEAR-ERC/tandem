@@ -50,12 +50,12 @@ jobs:
 
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
               cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
+                      -DWITH_PYTEST=ON \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
                       -DCMAKE_CXX_COMPILER=\$CXX
               make -j$(nproc)
-              make test
 
               # Generate test outputs
               cd /app/examples/elasticity/${{ matrix.dimension }}d
@@ -78,25 +78,15 @@ jobs:
                   --output /app/test/test_data/reference_results/output3D \
                   --petsc -options_file ../../options/mg_cheby.cfg
               fi
+              make test
             "
 
-      - name: Static regression test
-        run: |
-          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
-          docker run --rm \
-            -v ${{ github.workspace }}:/app \
-            -w /app \
-            --user tandem \
-            $IMAGE \
-            bash -c "
-              cd /app/test/regression/static_fault
-              if [ '${{ matrix.dimension }}' = '2' ]; then
-                pytest test_regression_2D.py
-              else
-                pytest test_regression_3D.py
-              fi
-            "
-
+      - name: Upload doctest logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doctest-logs-${{ matrix.dimension }}d-p${{ matrix.degree }}
+          path: /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log
       - name: Parallel consistency test
         run: |
           # TODO: Run with multiple processors to check for consistency
