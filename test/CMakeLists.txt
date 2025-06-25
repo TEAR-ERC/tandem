@@ -54,3 +54,21 @@ doctest_discover_tests(test-tensor)
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
+
+# Find Python and pytest
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+if(DEFINED DOMAIN_DIMENSION)
+    set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
+    set(TEST_FILE "test_regression_${DOMAIN_DIMENSION}D.py")
+    
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
+        add_test(
+            NAME ${TEST_NAME}
+            COMMAND ${Python_EXECUTABLE} -m pytest ${TEST_FILE}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    else()
+        message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
+    endif()
+endif()
