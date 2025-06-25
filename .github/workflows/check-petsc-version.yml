@@ -1,0 +1,64 @@
+name: Check PETSc Version
+
+on:
+  workflow_call:
+    outputs:
+      petsc_version:
+        description: "Latest PETSc version"
+        value: ${{ jobs.check-petsc-version.outputs.petsc_version }}
+      needs_rebuild:
+        description: "Whether a rebuild is needed"
+        value: ${{ jobs.check-petsc-version.outputs.needs_rebuild }}
+      dependencies_image:
+        value: ${{ jobs.check-petsc-version.outputs.dependencies_image }}
+      tandem_image:
+        value: ${{ jobs.check-petsc-version.outputs.tandem_image }}
+
+jobs:
+  check-petsc-version:
+    runs-on: ubuntu-24.04
+    outputs:
+      petsc_version: ${{ steps.get-petsc-version.outputs.version }}
+      needs_rebuild: ${{ steps.check-version.outputs.rebuild }}
+      dependencies_image: ${{ steps.check-version.outputs.dependencies_image }}
+      tandem_image: ${{ steps.check-version.outputs.tandem_image }}
+    steps:
+      - name: Get the latest PETSc 3.22 patch version
+        id: get-petsc-version
+        run: |
+          MAJOR_VERSION=3
+          MINOR_VERSION=22
+          VERSION=$(curl -s https://web.cels.anl.gov/projects/petsc/download/release-snapshots/ \
+            | grep -oP "petsc-${MAJOR_VERSION}\.${MINOR_VERSION}\.\d+\.tar\.gz" \
+            | sed 's/[^0-9]*\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/' \
+            | sort -V \
+            | tail -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Check if versioned image exists
+        id: check-version
+        run: |
+          IMAGE_TAG=${{ steps.get-petsc-version.outputs.version }}
+          # Convert repository to lowercase
+          REPO_NAME=${{ github.repository }}
+          REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
+          TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
+          DEPENDENCIES_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-dependencies"
+          DEPENDENCIES_IMAGE_GHCR_NAME="${REPO_NAME_LOWER}/tandem-dependencies"
+          echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
+          echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
+          # Check if the image exists using GHCR API
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}")
+          echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}"
+          echo $STATUS_CODE
+          if [ "$STATUS_CODE" -eq 200 ]; then
+            echo "rebuild=false" >> $GITHUB_OUTPUT
+          else
+            echo "rebuild=true" >> $GITHUB_OUTPUT
+          fi
