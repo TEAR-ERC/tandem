@@ -3,8 +3,8 @@ from numpy.testing import assert_allclose
 import os
 
 def test_static_solver_vtu_consistency_2D():
-    ref_path = "/app/test/regression/static_fault/ref_data/ref_output_2D.vtu"
-    test_path = "/app/test/regression/static_fault/output2D_0.vtu"
+    ref_path = "./test_data/reference_results/ref_regression_2D_output.vtu"
+    test_path = "./test_data/reference_results/output2D_0.vtu"
 
     assert os.path.exists(test_path), f"Output file {test_path} not found."
     assert os.path.exists(ref_path), f"Reference file {ref_path} not found."
