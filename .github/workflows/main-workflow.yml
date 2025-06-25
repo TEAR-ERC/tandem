@@ -17,7 +17,7 @@ jobs:
     uses: ./.github/workflows/check-clang-format.yml
 
   check-petsc-version:
-    uses: ./.github/workflows/get-petsc-version.yml
+    uses: ./.github/workflows/check-petsc-version.yml
 
   build-dependencies-image:
     needs: check-petsc-version
@@ -31,7 +31,7 @@ jobs:
   build-and-test-tandem:
     needs: [check-petsc-version, build-dependencies-image]
     if: always() && !cancelled() && !failure()
-    uses: ./.github/workflows/build-and-test.yml
+    uses: ./.github/workflows/build-and-test-tandem.yml
     with:
       petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
       dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
