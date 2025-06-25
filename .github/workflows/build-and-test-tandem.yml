@@ -86,14 +86,14 @@ jobs:
         if: always()
         run: |
           mv "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log" \
-            "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}.log"
+            "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log"
 
       - name: Upload doctest logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: doctest-logs-${{ matrix.dimension }}d-p${{ matrix.degree }}
-          path: ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}.log
+          name: doctest-logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-${{ matrix.compiler.cc }}
+          path: ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log
 
       - name: Parallel consistency test
         run: |
