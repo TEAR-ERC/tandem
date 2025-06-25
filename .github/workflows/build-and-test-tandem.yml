@@ -1,0 +1,108 @@
+name: Build and Test Tandem
+
+on:
+  workflow_call:
+    inputs:
+      petsc_version:
+        required: true
+        type: string
+      dependencies_image:
+        required: true
+        type: string
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler:
+          - cc: gcc-13
+            cxx: g++-13
+          - cc: clang-18
+            cxx: clang++-18
+        dimension: [2, 3]
+        degree: [3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull dependencies image
+        run: docker pull ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+
+      - name: Build and test
+        run: |
+          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            -e CC=${{ matrix.compiler.cc }} \
+            -e CXX=${{ matrix.compiler.cxx }} \
+            --user tandem \
+            $IMAGE \
+            bash -c "
+              set -e
+              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
+              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
+
+              mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
+              cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
+                      -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
+                      -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
+                      -DCMAKE_C_COMPILER=\$CC \
+                      -DCMAKE_CXX_COMPILER=\$CXX
+              make -j$(nproc)
+              make test
+
+              # Generate test outputs
+              cd /app/examples/elasticity/${{ matrix.dimension }}d
+              if [ '${{ matrix.dimension }}' = '2' ]; then
+                gmsh -2 circular_hole.geo
+                /app/build_2d_p3/app/static circular_hole.toml \
+                  --resolution 0.8 \
+                  --matrix_free yes \
+                  --mg_strategy twolevel \
+                  --mg_coarse_level 1 \
+                  --output /app/test/regression/static_fault/output2D \
+                  --petsc -options_file ../../options/mg_cheby.cfg
+              else
+                gmsh -3 spherical_hole.geo
+                /app/build_3d_p3/app/static spherical_hole.toml \
+                  --resolution 0.8 \
+                  --matrix_free yes \
+                  --mg_strategy twolevel \
+                  --mg_coarse_level 1 \
+                  --output /app/test/regression/static_fault/output3D \
+                  --petsc -options_file ../../options/mg_cheby.cfg
+              fi
+            "
+
+      - name: Static regression test
+        run: |
+          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            --user tandem \
+            $IMAGE \
+            bash -c "
+              cd /app/test/regression/static_fault
+              if [ '${{ matrix.dimension }}' = '2' ]; then
+                pytest test_regression_2D.py
+              else
+                pytest test_regression_3D.py
+              fi
+            "
+
+      - name: Parallel consistency test
+        run: |
+          # TODO: Run with multiple processors to check for consistency
+          echo "Parallel consistency test to be implemented"
+
+      - name: SEAS regression test
+        run: |
+          # TODO: Check for cycle simulation e.g, BP1 with a-b >0 and a-b<0
+          echo "SEAS regression test to be implemented"
