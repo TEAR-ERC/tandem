@@ -62,7 +62,7 @@ option(WITH_PYTEST "Enable Python pytest integration" OFF)
 
 if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
     set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
-    set(TEST_FILE "test_regression_${DOMAIN_DIMENSION}D.py")
+    set(TEST_FILE "test_regression_static_${DOMAIN_DIMENSION}D.py")
     
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
         add_test(
