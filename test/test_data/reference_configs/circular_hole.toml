@@ -1,0 +1,4 @@
+mesh_file = "circular_hole.msh"
+type = "elasticity"
+lib = "circular_hole.lua"
+scenario = "circular_hole"

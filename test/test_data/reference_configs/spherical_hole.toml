@@ -1,0 +1,4 @@
+mesh_file = "spherical_hole.msh"
+type = "elasticity"
+lib = "spherical_hole.lua"
+scenario = "spherical_hole"
