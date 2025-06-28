@@ -41,7 +41,7 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install && \
     rm -rf petsc-${PETSC_VERSION}.tar.gz petsc-${PETSC_VERSION}
 
-# Save PETSc version for reference
+# Save PETSc version for reference 
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
 
 # Create a non-root user for MPI operations
