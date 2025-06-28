@@ -10,7 +10,7 @@ RUN mkdir -p $PETSC_INSTALL_DIR
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    gcc-13 g++-13 clang-18 clang++-18 \
+    gcc-13 g++-13 clang-18 clang++-18 gfortran \
     cmake openmpi-bin libopenmpi-dev \
     libmetis-dev libparmetis-dev \
     libeigen3-dev python3-numpy \
@@ -33,7 +33,7 @@ RUN git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git && 
 RUN echo "Using PETSc version $PETSC_VERSION" && \
     wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && rm -rf petsc-${PETSC_VERSION}.tar.gz && cd petsc-${PETSC_VERSION} && \
-    PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=0 --with-debugging=0 \
+    PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=1 --with-fc=gfortran --with-debugging=0 \
     --with-memalign=32 --download-mumps --with-64-bit-indices \
     --with-cc="$CC" --with-cxx="$CXX" --with-fc=0 --prefix=$PETSC_INSTALL_DIR \
     --COPTFLAGS="-g -O3" --CXXOPTFLAGS="-g -O3" --with-mpi-dir=/usr/lib/x86_64-linux-gnu/openmpi && \
