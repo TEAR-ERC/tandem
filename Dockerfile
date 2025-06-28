@@ -34,7 +34,7 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && rm -rf petsc-${PETSC_VERSION}.tar.gz && cd petsc-${PETSC_VERSION} && \
     PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=0 --with-debugging=0 \
-    --with-memalign=32 --with-64-bit-indices \
+    --with-memalign=32 --download-mumps --download-scalapack --with-64-bit-indices \
     --with-cc="$CC" --with-cxx="$CXX" --with-fc=0 --prefix=$PETSC_INSTALL_DIR \
     --COPTFLAGS="-g -O3" --CXXOPTFLAGS="-g -O3" --with-mpi-dir=/usr/lib/x86_64-linux-gnu/openmpi && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
