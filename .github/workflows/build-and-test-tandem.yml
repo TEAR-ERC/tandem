@@ -68,6 +68,13 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/test_data/reference_results/output2D \
                   --petsc -options_file mg_cheby.cfg
+
+                gmsh -2 bp1_ref.geo
+                /app/build_2d_p3/app/static bp1_ref_QD.toml \
+                  --petsc -options_file solver.cfg
+                /app/build_2d_p3/app/static bp1_ref_QDGreen.toml \
+                  --petsc -options_file solver.cfg
+                
               else
                 gmsh -3 spherical_hole.geo
                 /app/build_3d_p3/app/static spherical_hole.toml \
