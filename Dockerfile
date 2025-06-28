@@ -33,11 +33,11 @@ RUN git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git && 
 RUN echo "Using PETSc version $PETSC_VERSION" && \
     wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && rm -rf petsc-${PETSC_VERSION}.tar.gz && cd petsc-${PETSC_VERSION} && \
-    PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=0 --with-debugging=0 --with-memalign=32 --with-64-bit-indices CC=mpicc CXX=mpicxx FC=mpif90 COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" --download-mumps --download-scalapack --prefix=--prefix=$PETSC_INSTALL_DIR && \
+    PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=0 --with-debugging=0 --with-memalign=32 --with-64-bit-indices CC=mpicc CXX=mpicxx FC=mpif90 COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" --download-mumps --download-scalapack --prefix=$PETSC_INSTALL_DIR && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install && \
     rm -rf petsc-${PETSC_VERSION}.tar.gz petsc-${PETSC_VERSION}
-    
+
 # Save PETSc version for reference
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
 
