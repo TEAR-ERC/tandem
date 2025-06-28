@@ -70,9 +70,9 @@ jobs:
                   --petsc -options_file mg_cheby.cfg
 
                 gmsh -2 bp1_ref.geo
-                /app/build_2d_p3/app/static bp1_ref_QD.toml \
+                /app/build_2d_p3/app/tandem bp1_ref_QD.toml \
                   --petsc -options_file solver.cfg
-                /app/build_2d_p3/app/static bp1_ref_QDGreen.toml \
+                /app/build_2d_p3/app/tandem bp1_ref_QDGreen.toml \
                   --petsc -options_file solver.cfg
                 
               else
