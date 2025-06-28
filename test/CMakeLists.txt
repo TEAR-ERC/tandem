@@ -73,4 +73,16 @@ if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
     else()
         message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
     endif()
+    set(TEST_NAME "SEAS-regression-test-${DOMAIN_DIMENSION}D")
+    set(TEST_FILE "test_regression_SEAS_${DOMAIN_DIMENSION}D.py")
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
+        add_test(
+            NAME ${TEST_NAME}
+            COMMAND ${Python_EXECUTABLE} -m pytest ${TEST_FILE}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    else()
+        message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
+    endif()
 endif()
