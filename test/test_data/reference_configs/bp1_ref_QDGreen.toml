@@ -8,7 +8,7 @@ ref_normal = [-1, 0]
 boundary_linear = true
 
 [gf_checkpoint]
-prefix = "/gf_bp1/"
+prefix = "./gf_bp1/"
 
 [fault_scalar_output]
 t_max = 9460800
