@@ -9,7 +9,7 @@ def path():
     return Path("/app/test/test_data/reference_results")
 
 def detect_peaks(file_name, window_size=1e9, relative_error=0.5):
-    df = pd.read_csv(file_name)
+    df = pd.read_csv(file_name, comment="#")
     time = df["Time"].values
     vmax = df["VMax"].values
 
