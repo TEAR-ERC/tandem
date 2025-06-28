@@ -31,8 +31,17 @@ jobs:
             echo "image_exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check if Dockerfile changed
+        id: dockerfile-changed
+        run: |
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^Dockerfile$"; then
+            echo "dockerfile_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "dockerfile_changed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push
-        if: steps.check-image.outputs.image_exists == 'false'
+        if: steps.check-image.outputs.image_exists == 'false' || steps.dockerfile-changed.outputs.dockerfile_changed == 'true'
         uses: docker/build-push-action@v4
         with:
           context: .
