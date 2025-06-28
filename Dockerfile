@@ -35,7 +35,7 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && rm -rf petsc-${PETSC_VERSION}.tar.gz && cd petsc-${PETSC_VERSION} && \
     PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=1 --with-fc=gfortran --with-debugging=0 \
     --with-memalign=32 --download-scalapack --download-mumps --with-64-bit-indices \
-    --with-cc="$CC" --with-cxx="$CXX" --with-fc=0 --prefix=$PETSC_INSTALL_DIR \
+    --with-cc="$CC" --with-cxx="$CXX" --prefix=$PETSC_INSTALL_DIR \
     --COPTFLAGS="-g -O3" --CXXOPTFLAGS="-g -O3" --with-mpi-dir=/usr/lib/x86_64-linux-gnu/openmpi && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install && \
