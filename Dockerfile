@@ -11,7 +11,7 @@ RUN mkdir -p $PETSC_INSTALL_DIR
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 gfortran \
-    cmake openmpi-bin libopenmpi-dev libopenmpi-fortran-dev \
+    cmake openmpi-bin libopenmpi-dev \
     libmetis-dev libparmetis-dev \
     libeigen3-dev python3-numpy \
     libopenblas-dev liblua5.3-dev \
