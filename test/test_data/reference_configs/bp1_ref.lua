@@ -65,10 +65,4 @@ function BP1:tau_pre(x, y)
     return -(sn * self.amax * math.asinh((Vi / (2.0 * self.V0)) * e) + self:eta(x, y) * Vi)
 end
 
-bp1 = BP1:new()
-
 bp1_ref = BP1:new()
-function bp1_ref:boundary(x, y, t)
-    return self.Vp/2.0 * t
-end
-
