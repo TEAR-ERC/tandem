@@ -11,7 +11,7 @@ RUN mkdir -p $PETSC_INSTALL_DIR
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 gfortran \
-    cmake openmpi-bin libopenmpi-dev \
+    cmake openmpi-bin libopenmpi-dev libopenmpi-fortran-dev \
     libmetis-dev libparmetis-dev \
     libeigen3-dev python3-numpy \
     libopenblas-dev liblua5.3-dev \
@@ -36,7 +36,8 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     PETSC_DIR=$(pwd) && ./configure --with-fortran-bindings=1 --with-fc=gfortran --with-debugging=0 \
     --with-memalign=32 --download-scalapack --download-mumps --with-64-bit-indices \
     --with-cc="$CC" --with-cxx="$CXX" --prefix=$PETSC_INSTALL_DIR \
-    --COPTFLAGS="-g -O3" --CXXOPTFLAGS="-g -O3" --with-mpi-dir=/usr/lib/x86_64-linux-gnu/openmpi && \
+    --COPTFLAGS="-g -O3" --CXXOPTFLAGS="-g -O3" \
+    --with-mpi=1 --with-mpi-compilers=1 && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install && \
     rm -rf petsc-${PETSC_VERSION}.tar.gz petsc-${PETSC_VERSION}
