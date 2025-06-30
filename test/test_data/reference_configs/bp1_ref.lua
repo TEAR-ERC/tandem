@@ -18,13 +18,7 @@ function BP1:new(o)
 end
 
 function BP1:boundary(x, y, t)
-    if x > 1.0 then
-        return self.Vp/2.0 * t
-    elseif x < -1.0 then
-        return -self.Vp/2.0 * t
-    else
-        return self.Vp * t
-    end
+    return self.Vp/2.0 * t
 end
 
 function BP1:mu(x, y)
