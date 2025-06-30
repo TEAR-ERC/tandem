@@ -71,9 +71,9 @@ jobs:
 
                 gmsh -2 bp1_ref.geo
                 /app/build_2d_p3/app/tandem bp1_ref_QD.toml \
-                  --petsc -options_file solver.cfg
+                  --petsc -options_file solver.cfg  > /app/log_SEAS_QD _${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}>&1
                 /app/build_2d_p3/app/tandem bp1_ref_QDGreen.toml \
-                  --petsc -options_file solver.cfg
+                  --petsc -options_file solver.cfg > /app/log_SEAS_QDGreen _${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}>&1
                 
               else
                 gmsh -3 spherical_hole.geo
@@ -95,12 +95,15 @@ jobs:
           mv "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log" \
             "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log"
 
-      - name: Upload doctest logs
+      - name: Upload test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: doctest-logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-${{ matrix.compiler.cc }}
-          path: ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log
+          name: logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-${{ matrix.compiler.cc }}
+          path: |
+            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log
+            ${{ github.workspace }}/log_SEAS_QD_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}
+            ${{ github.workspace }}/log_SEAS_QDGreen_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}
 
       - name: Parallel consistency test
         run: |
