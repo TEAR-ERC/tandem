@@ -76,7 +76,12 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/test_data/reference_results/output2D \
                   --petsc -options_file mg_cheby.cfg
-
+                for i in 1 2 4 8; do
+                  mpirun -np --oversubscribe $i /app/build_3d_p3/app/static circular_hole.toml \
+                    --resolution 0.8 --matrix_free yes --mg_strategy twolevel \
+                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/output2D_$i \
+                    --petsc -options_file mg_cheby.cfg
+                done
                 gmsh -2 bp1_ref.geo
                 /app/build_2d_p3/app/tandem bp1_ref_QD.toml \
                   --petsc -options_file solver.cfg  > /app/log_SEAS_QD _${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}>&1
@@ -92,6 +97,12 @@ jobs:
                   --mg_coarse_level 1 \
                   --output /app/test/test_data/reference_results/output3D \
                   --petsc -options_file mg_cheby.cfg
+                for i in 1 2 4 8; do
+                  mpirun -np --oversubscribe $i /app/build_3d_p3/app/static spherical_hole.toml \
+                    --resolution 0.8 --matrix_free yes --mg_strategy twolevel \
+                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/output3D_$i \
+                    --petsc -options_file mg_cheby.cfg
+                done
               fi"
 
       - name: Run Tests
