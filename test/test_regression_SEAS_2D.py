@@ -1,12 +1,6 @@
 import pandas as pd
 import numpy as np
-import pytest
-from pathlib import Path
 
-
-@pytest.fixture(scope="module")
-def path():
-    return Path("/app/test/test_data/reference_results")
 
 def detect_peaks(file_name, window_size=1e9, relative_error=0.5):
     df = pd.read_csv(file_name, comment="#")
@@ -77,17 +71,19 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf):
     ), "Peak time intervals do not match between files."
 
 
-def test_SEAS_consistency_QD_2D(path):
-    file_vmax_ref = path / "vmax_ref_QD.csv"
-    file_vmax_output = path / "vmax_output_QD.csv"
+def test_SEAS_consistency_QD_2D(results_path):
+    file_vmax_ref = results_path / "vmax_ref_QD.csv"
+    file_vmax_output = results_path / "vmax_output_QD.csv"
     check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output)
 
-def test_SEAS_consistency_QDGreen_2D(path):
-    file_vmax_ref = path / "vmax_ref_QDGreen.csv"
-    file_vmax_output = path / "vmax_output_QDGreen.csv"
+
+def test_SEAS_consistency_QDGreen_2D(results_path):
+    file_vmax_ref = results_path / "vmax_ref_QDGreen.csv"
+    file_vmax_output = results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output)
 
-def test_SEAS_consistency_QD_vs_QDGreen_2D(path):
-    file_vmax = path / "vmax_output_QD.csv"
-    file_vmax_gf = path / "vmax_output_QDGreen.csv"
+
+def test_SEAS_consistency_QD_vs_QDGreen_2D(results_path):
+    file_vmax = results_path / "vmax_output_QD.csv"
+    file_vmax_gf = results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency_2D(file_vmax, file_vmax_gf)
