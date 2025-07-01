@@ -1,2 +1,0 @@
-test_data/reference_meshes filter=lfs diff=lfs merge=lfs -text
-test_data/reference_results filter=lfs diff=lfs merge=lfs -text
