@@ -57,7 +57,7 @@ jobs:
                       -DCMAKE_CXX_COMPILER=\$CXX
               make -j$(nproc)
 
-              # Generate test outputs
+              # Generate test outputs 
               cd /app/test/test_data/reference_configs/
               if [ '${{ matrix.dimension }}' = '2' ]; then
                 gmsh -2 circular_hole.geo
