@@ -1,8 +1,6 @@
 import meshio
 from numpy.testing import assert_allclose
 import os
-import pytest
-from pathlib import Path
 
 
 def test_static_solver_vtu_consistency_3D(results_path, tolerance):
