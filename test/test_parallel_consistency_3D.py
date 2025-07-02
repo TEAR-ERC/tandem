@@ -30,8 +30,8 @@ def test_parallel_consistency_3D(
     compute_l2_error_with_reference_data,
     tolerance,
 ):
-    reference_file = results_path / "output3D_0.vtu"
-    output_prefix = results_path / "output3D_"
+    reference_file = results_path / "parallel_output3D_0.vtu"
+    output_prefix = results_path / "parallel_output3D_"
     field_name = "u0"
     files = glob.glob(f"{output_prefix}*.vtu")
     number_of_configs = len(files)
