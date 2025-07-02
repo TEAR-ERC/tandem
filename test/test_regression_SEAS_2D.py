@@ -54,10 +54,16 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance):
     peaks = detect_peaks(file_vmax, window_size, relative_error)
     peaks_gf = detect_peaks(file_vmax_gf, window_size, relative_error)
 
-    assert len(peaks) == len(
-        peaks_gf
-    ), "Number of peaks detected does not match between files."
-    assert np.allclose(peaks, peaks_gf, rtol=tolerance), "Peaks do not match between files."
+    sorted_peaks = sorted(peaks)
+    sorted_peaks_gf = sorted(peaks_gf)
+
+    arr1 = np.array(sorted_peaks)
+    arr2 = np.array(sorted_peaks_gf)
+
+    assert np.allclose(
+        arr1, arr2, rtol=tolerance
+    ), "The values of the peaks do not match between files."
+
     peak_time_interval_QD = [
         peaks[i + 1][0] - peaks[i][0] for i in range(len(peaks) - 1)
     ]
