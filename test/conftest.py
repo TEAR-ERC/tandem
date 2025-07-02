@@ -6,9 +6,12 @@ from pathlib import Path
 
 
 @pytest.fixture(scope="module")
-def tolerance():
+def tolerance_static():
     return 1e-10
 
+@pytest.fixture(scope="module")
+def tolerance_seas():
+    return 1e-10
 
 @pytest.fixture(scope="module")
 def results_path():
