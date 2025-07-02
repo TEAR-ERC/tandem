@@ -79,7 +79,7 @@ jobs:
                 for i in 1 2 4 8; do
                   mpirun --oversubscribe -n \$i /app/build_2d_p3/app/static circular_hole.toml \
                     --resolution 0.8 --matrix_free yes --mg_strategy twolevel \
-                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/output2D_\$i \
+                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/parallel_output2D_\$i \
                     --petsc -options_file mg_cheby.cfg
                 done
                 gmsh -2 bp1_ref.geo
@@ -100,7 +100,7 @@ jobs:
                 for i in 1 2 4 8; do
                   mpirun --oversubscribe -n \$i /app/build_3d_p3/app/static spherical_hole.toml \
                     --resolution 0.8 --matrix_free yes --mg_strategy twolevel \
-                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/output3D_\$i \
+                    --mg_coarse_level 1 --output /app/test/test_data/reference_results/parallel_output3D_\$i \
                     --petsc -options_file mg_cheby.cfg
                 done
               fi"
