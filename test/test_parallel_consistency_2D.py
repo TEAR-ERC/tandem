@@ -9,7 +9,7 @@ def compare_one_vs_many(
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
-    tolerance,
+    tolerance_static,
 ):
     ref_data = load_vtu_file(reference_file)
     output_procs = [2**j for j in range(1, number_of_configs)]
@@ -20,7 +20,7 @@ def compare_one_vs_many(
         data = load_vtu_file(vtu_file)
         cmp_dict = get_cell_centroid_point_dofs(data, field_name)
         L2_norm = compute_l2_error_with_reference_data(ref_dict, cmp_dict)
-        assert L2_norm < tolerance, f"L2 error too large for {output_procs[idx]} procs."
+        assert L2_norm < tolerance_static, f"L2 error too large for {output_procs[idx]} procs."
 
 
 def test_parallel_consistency_2D(
@@ -28,7 +28,7 @@ def test_parallel_consistency_2D(
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
-    tolerance,
+    tolerance_static,
 ):
     reference_file = results_path / "parallel_output2D_1_0.vtu"
     output_prefix = results_path / "parallel_output2D_"
@@ -44,5 +44,5 @@ def test_parallel_consistency_2D(
         load_vtu_file,
         get_cell_centroid_point_dofs,
         compute_l2_error_with_reference_data,
-        tolerance,
+        tolerance_static,
     )
