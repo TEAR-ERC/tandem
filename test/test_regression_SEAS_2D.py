@@ -95,8 +95,8 @@ def test_SEAS_consistency_QDGreen_2D(
 
 
 def test_SEAS_consistency_QD_vs_QDGreen_2D(
-    temp_results_path, reference_results_path, tolerance_seas
+    temp_results_path, tolerance_seas
 ):
-    file_vmax = reference_results_path / "vmax_output_QD.csv"
+    file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas)
