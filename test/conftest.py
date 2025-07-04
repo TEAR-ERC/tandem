@@ -9,13 +9,20 @@ from pathlib import Path
 def tolerance_static():
     return 1e-10
 
+
 @pytest.fixture(scope="module")
 def tolerance_seas():
     return 1e-10
 
+
 @pytest.fixture(scope="module")
-def results_path():
-    return Path("/app/test/test_data/reference_results")
+def reference_results_path():
+    return Path("test_data/reference_results")
+
+
+@pytest.fixture(scope="module")
+def temp_results_path():
+    return Path("test_data/temp_test_results")
 
 
 @pytest.fixture(scope="module")
