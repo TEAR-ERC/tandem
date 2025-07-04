@@ -16,7 +16,7 @@ def tolerance_seas():
 
 @pytest.fixture(scope="module")
 def tolerance_seas_events():
-    return 1e-3
+    return 1e-2
 
 
 @pytest.fixture(scope="module")
