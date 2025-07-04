@@ -63,7 +63,7 @@ add_test(NAME generate-test-outputs
     "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/generate_test_outputs.sh ${DOMAIN_DIMENSION} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}"
 )
 
-if(DEFINED DOMAIN_DIMENSION AND RUN_CI_TESTS=ON)
+if(DEFINED DOMAIN_DIMENSION AND RUN_CI_TESTS)
     set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
     set(TEST_FILE "test_regression_static_${DOMAIN_DIMENSION}D.py")
 
