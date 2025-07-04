@@ -2,12 +2,12 @@ import pandas as pd
 import numpy as np
 
 
-def detect_peaks(file_name, window_size=1e9, relative_error=0.5):
+def detect_events(file_name, window_size=1e9, relative_error=0.5):
     df = pd.read_csv(file_name, comment="#")
     time = df["Time"].values
     vmax = df["VMax"].values
 
-    peaks = []
+    events = []
     i = 0
     n = len(time)
 
@@ -38,44 +38,44 @@ def detect_peaks(file_name, window_size=1e9, relative_error=0.5):
         right_check = abs(v_max - v_right) / v_max >= relative_error
 
         if left_check and right_check:
-            peaks.append((t_max, v_max))
+            events.append((t_max, v_max))
 
             # Move to end of window to avoid overlapping detections
             i = window_indices[-1] + 1
         else:
             i += 1
-    return peaks
+    return events
 
 
 def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
     window_size = 1e9
     relative_error = 0.5
 
-    peaks = detect_peaks(file_vmax, window_size, relative_error)
-    peaks_gf = detect_peaks(file_vmax_gf, window_size, relative_error)
+    events = detect_events(file_vmax, window_size, relative_error)
+    events_gf = detect_events(file_vmax_gf, window_size, relative_error)
 
-    sorted_peaks = sorted(peaks)
-    sorted_peaks_gf = sorted(peaks_gf)
+    sorted_events = sorted(events)
+    sorted_events_gf = sorted(events_gf)
 
-    arr1 = np.array(sorted_peaks)
-    arr2 = np.array(sorted_peaks_gf)
+    arr1 = np.array(sorted_events)
+    arr2 = np.array(sorted_events_gf)
 
     assert np.allclose(
         arr1, arr2, rtol=tolerance_seas, atol=tolerance_seas
-    ), "The values of the peaks do not match between files."
+    ), "The values of the events do not match between files."
 
-    peak_time_interval_QD = [
-        peaks[i + 1][0] - peaks[i][0] for i in range(len(peaks) - 1)
+    event_time_interval_QD = [
+        events[i + 1][0] - events[i][0] for i in range(len(events) - 1)
     ]
-    peak_time_intervals_QDGreen = [
-        peaks_gf[i + 1][0] - peaks_gf[i][0] for i in range(len(peaks_gf) - 1)
+    event_time_intervals_QDGreen = [
+        events_gf[i + 1][0] - events_gf[i][0] for i in range(len(events_gf) - 1)
     ]
     assert np.allclose(
-        peak_time_interval_QD,
-        peak_time_intervals_QDGreen,
+        event_time_interval_QD,
+        event_time_intervals_QDGreen,
         rtol=tolerance_seas,
         atol=tolerance_seas,
-    ), "Peak time intervals do not match between files."
+    ), "event time intervals do not match between files."
 
 
 def test_SEAS_consistency_QD_2D(
