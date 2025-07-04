@@ -50,7 +50,6 @@ jobs:
 
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
               cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
-                      -DWITH_PYTEST=ON \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
