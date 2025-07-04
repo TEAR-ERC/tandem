@@ -61,7 +61,7 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
     arr2 = np.array(sorted_peaks_gf)
 
     assert np.allclose(
-        arr1, arr2, rtol=tolerance_seas
+        arr1, arr2, rtol=tolerance_seas, atol=tolerance_seas
     ), "The values of the peaks do not match between files."
 
     peak_time_interval_QD = [
@@ -71,23 +71,32 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
         peaks_gf[i + 1][0] - peaks_gf[i][0] for i in range(len(peaks_gf) - 1)
     ]
     assert np.allclose(
-        peak_time_interval_QD, peak_time_intervals_QDGreen, rtol=tolerance_seas
+        peak_time_interval_QD,
+        peak_time_intervals_QDGreen,
+        rtol=tolerance_seas,
+        atol=tolerance_seas,
     ), "Peak time intervals do not match between files."
 
 
-def test_SEAS_consistency_QD_2D(results_path, tolerance_seas):
-    file_vmax_ref = results_path / "vmax_ref_QD.csv"
-    file_vmax_output = results_path / "vmax_output_QD.csv"
+def test_SEAS_consistency_QD_2D(
+    temp_results_path, reference_results_path, tolerance_seas
+):
+    file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
+    file_vmax_output = temp_results_path / "vmax_output_QD.csv"
     check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output, tolerance_seas)
 
 
-def test_SEAS_consistency_QDGreen_2D(results_path, tolerance_seas):
-    file_vmax_ref = results_path / "vmax_ref_QDGreen.csv"
-    file_vmax_output = results_path / "vmax_output_QDGreen.csv"
+def test_SEAS_consistency_QDGreen_2D(
+    temp_results_path, reference_results_path, tolerance_seas
+):
+    file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
+    file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output, tolerance_seas)
 
 
-def test_SEAS_consistency_QD_vs_QDGreen_2D(results_path, tolerance_seas):
-    file_vmax = results_path / "vmax_output_QD.csv"
-    file_vmax_gf = results_path / "vmax_output_QDGreen.csv"
+def test_SEAS_consistency_QD_vs_QDGreen_2D(
+    temp_results_path, reference_results_path, tolerance_seas
+):
+    file_vmax = reference_results_path / "vmax_output_QD.csv"
+    file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas)

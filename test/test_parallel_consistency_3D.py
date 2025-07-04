@@ -24,14 +24,14 @@ def compare_one_vs_many(
 
 
 def test_parallel_consistency_3D(
-    results_path,
+    temp_results_path,
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
     tolerance_static,
 ):
-    reference_file = results_path / "parallel_output3D_1_0.vtu"
-    output_prefix = results_path / "parallel_output3D_"
+    reference_file = temp_results_path / "parallel_output3D_1_0.vtu"
+    output_prefix = temp_results_path / "parallel_output3D_"
     field_name = "u0"
     files = glob.glob(f"{output_prefix}*.vtu")
     number_of_configs = len(files)

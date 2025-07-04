@@ -58,12 +58,15 @@ doctest_discover_tests(test-util)
 # Find Python and pytest
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
-option(WITH_PYTEST "Enable Python pytest integration" OFF)
+add_test(NAME generate-test-outputs
+    COMMAND bash -c
+    "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/generate_test_outputs.sh ${DOMAIN_DIMENSION} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}"
+)
 
-if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
+if(DEFINED DOMAIN_DIMENSION AND RUN_CI_TESTS=ON)
     set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
     set(TEST_FILE "test_regression_static_${DOMAIN_DIMENSION}D.py")
-    
+
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
         add_test(
             NAME ${TEST_NAME}
@@ -73,9 +76,10 @@ if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
     else()
         message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
     endif()
+
+
     set(TEST_NAME "SEAS-regression-test-${DOMAIN_DIMENSION}D")
     set(TEST_FILE "test_regression_SEAS_${DOMAIN_DIMENSION}D.py")
-
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
         add_test(
             NAME ${TEST_NAME}
@@ -98,3 +102,7 @@ if(DEFINED DOMAIN_DIMENSION AND WITH_PYTEST)
         message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
     endif()
 endif()
+add_test(NAME cleanup-test-outputs
+    COMMAND bash -c
+    "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
+)
