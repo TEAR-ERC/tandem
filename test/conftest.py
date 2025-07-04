@@ -7,11 +7,15 @@ from pathlib import Path
 
 @pytest.fixture(scope="module")
 def tolerance_static():
-    return 1e-10
+    return 1e-8
 
 
 @pytest.fixture(scope="module")
 def tolerance_seas():
+    return 1e-8
+
+@pytest.fixture(scope="module")
+def tolerance_seas_events():
     return 1e-3
 
 

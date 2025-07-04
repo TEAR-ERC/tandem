@@ -47,9 +47,11 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
-    window_size = 1e9
-    relative_error = 0.5
+def check_SEAS_consistency_2D(
+    file_vmax, file_vmax_gf, tolerance_seas, tolerance_seas_events
+):
+    window_size = 1e9  # seconds
+    relative_error = 0.5  # the max in a window_size window has to be relatively 50% above the values at the two edges of the window to be considered an event
 
     events = detect_events(file_vmax, window_size, relative_error)
     events_gf = detect_events(file_vmax_gf, window_size, relative_error)
@@ -60,9 +62,16 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
     arr1 = np.array(sorted_events)
     arr2 = np.array(sorted_events_gf)
 
+    times1 = arr1[:, 0]
+    times2 = arr2[:, 0]
+
+    values1 = arr1[:, 1]
+    values2 = arr2[:, 1]
+
+    assert np.allclose(times1, times2, rtol=tolerance_seas), "Event times do not match"
     assert np.allclose(
-        arr1, arr2, rtol=tolerance_seas, atol=tolerance_seas
-    ), "The values of the events do not match between files."
+        values1, values2, rtol=tolerance_seas_events
+    ), "Event slip rate magnitudes do not match"
 
     event_time_interval_QD = [
         events[i + 1][0] - events[i][0] for i in range(len(events) - 1)
@@ -74,29 +83,34 @@ def check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas):
         event_time_interval_QD,
         event_time_intervals_QDGreen,
         rtol=tolerance_seas,
-        atol=tolerance_seas,
     ), "event time intervals do not match between files."
 
 
 def test_SEAS_consistency_QD_2D(
-    temp_results_path, reference_results_path, tolerance_seas
+    temp_results_path, reference_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
-    check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output, tolerance_seas)
+    check_SEAS_consistency_2D(
+        file_vmax_ref, file_vmax_output, tolerance_seas, tolerance_seas_events
+    )
 
 
 def test_SEAS_consistency_QDGreen_2D(
-    temp_results_path, reference_results_path, tolerance_seas
+    temp_results_path, reference_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency_2D(file_vmax_ref, file_vmax_output, tolerance_seas)
+    check_SEAS_consistency_2D(
+        file_vmax_ref, file_vmax_output, tolerance_seas, tolerance_seas_events
+    )
 
 
 def test_SEAS_consistency_QD_vs_QDGreen_2D(
-    temp_results_path, tolerance_seas
+    temp_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency_2D(file_vmax, file_vmax_gf, tolerance_seas)
+    check_SEAS_consistency_2D(
+        file_vmax, file_vmax_gf, tolerance_seas, tolerance_seas_events
+    )
