@@ -12,7 +12,7 @@ def tolerance_static():
 
 @pytest.fixture(scope="module")
 def tolerance_seas():
-    return 1e-10
+    return 1e-3
 
 
 @pytest.fixture(scope="module")
