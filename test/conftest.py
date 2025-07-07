@@ -14,9 +14,26 @@ def tolerance_static():
 def tolerance_seas():
     return 1e-8
 
+
 @pytest.fixture(scope="module")
 def tolerance_seas_events():
     return 1e-2
+
+
+@pytest.fixture(scope="module")
+def tolerance_convergence():
+    return 1e-12
+
+
+@pytest.fixture(scope="module")
+def domain_dim(request):
+    return request.config.getoption("domain_dimension")
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--domain_dimension", action="store", help="Domain dimension (2 or 3)"
+    )
 
 
 @pytest.fixture(scope="module")
