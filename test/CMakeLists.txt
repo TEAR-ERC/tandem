@@ -101,6 +101,17 @@ if(DEFINED DOMAIN_DIMENSION AND RUN_CI_TESTS)
     else()
         message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
     endif()
+    set(TEST_NAME "static-regression-test-${DOMAIN_DIMENSION}D")
+    set(TEST_FILE "test_regression_static.py")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_FILE}")
+        add_test(
+            NAME ${TEST_NAME}
+            COMMAND ${Python_EXECUTABLE} -m pytest ${TEST_FILE} --domain_dimension=${DOMAIN_DIMENSION}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    else()
+        message(WARNING "Python test file ${TEST_FILE} not found for DOMAIN_DIMENSION=${DOMAIN_DIMENSION}")
+    endif()
 endif()
 add_test(NAME cleanup-test-outputs
     COMMAND bash -c
