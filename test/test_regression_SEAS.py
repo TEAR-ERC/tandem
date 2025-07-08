@@ -47,7 +47,7 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency_2D(
+def check_SEAS_consistency(
     file_vmax, file_vmax_gf, tolerance_seas, tolerance_seas_events
 ):
     window_size = 1e9  # seconds
@@ -86,31 +86,31 @@ def check_SEAS_consistency_2D(
     ), "event time intervals do not match between files."
 
 
-def test_SEAS_consistency_QD_2D(
+def test_SEAS_consistency_QD(
     temp_results_path, reference_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
-    check_SEAS_consistency_2D(
+    check_SEAS_consistency(
         file_vmax_ref, file_vmax_output, tolerance_seas, tolerance_seas_events
     )
 
 
-def test_SEAS_consistency_QDGreen_2D(
+def test_SEAS_consistency_QDGreen(
     temp_results_path, reference_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency_2D(
+    check_SEAS_consistency(
         file_vmax_ref, file_vmax_output, tolerance_seas, tolerance_seas_events
     )
 
 
-def test_SEAS_consistency_QD_vs_QDGreen_2D(
+def test_SEAS_consistency_QD_vs_QDGreen(
     temp_results_path, tolerance_seas, tolerance_seas_events
 ):
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency_2D(
+    check_SEAS_consistency(
         file_vmax, file_vmax_gf, tolerance_seas, tolerance_seas_events
     )

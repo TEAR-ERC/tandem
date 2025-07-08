@@ -20,18 +20,22 @@ def compare_one_vs_many(
         data = load_vtu_file(vtu_file)
         cmp_dict = get_cell_centroid_point_dofs(data, field_name)
         L2_norm = compute_l2_error_with_reference_data(ref_dict, cmp_dict)
-        assert L2_norm < tolerance_static, f"L2 error too large for {output_procs[idx]} procs."
+        assert (
+            L2_norm < tolerance_static
+        ), f"L2 error too large for {output_procs[idx]} procs."
 
 
-def test_parallel_consistency_3D(
+def test_parallel_consistency(
+    request,
     temp_results_path,
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
     tolerance_static,
 ):
-    reference_file = temp_results_path / "parallel_output3D_1_0.vtu"
-    output_prefix = temp_results_path / "parallel_output3D_"
+    domain_dimension = request.config.getoption("domain_dimension")
+    reference_file = temp_results_path / f"parallel_output{domain_dimension}D_1_0.vtu"
+    output_prefix = temp_results_path / f"parallel_output{domain_dimension}D_"
     field_name = "u0"
     files = glob.glob(f"{output_prefix}*.vtu")
     number_of_configs = len(files)
