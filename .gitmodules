@@ -4,3 +4,7 @@
 [submodule "submodules/yateto"]
 	path = submodules/yateto
 	url = https://github.com/SeisSol/yateto.git
+[submodule "test/test_data"]
+	path = test/test_data
+	url = https://github.com/piyushkarki/tandem_test_data.git
+	branch = master

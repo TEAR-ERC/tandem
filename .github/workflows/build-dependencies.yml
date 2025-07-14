@@ -1,0 +1,57 @@
+name: Build Dependencies Image
+
+on:
+  workflow_call:
+    inputs:
+      petsc_version:
+        required: true
+        type: string
+      dependencies_image:
+        required: true
+        type: string
+      tandem_image:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Check image
+        id: check-image
+        run: |
+          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if Dockerfile changed
+        id: dockerfile-changed
+        run: |
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^Dockerfile$"; then
+            echo "dockerfile_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "dockerfile_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push
+        if: steps.check-image.outputs.image_exists == 'false' || steps.dockerfile-changed.outputs.dockerfile_changed == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          platforms: linux/amd64
+          build-args: |
+            PETSC_VERSION=${{ inputs.petsc_version }}
+            CC=gcc-13
+            CXX=g++-13

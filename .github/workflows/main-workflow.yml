@@ -1,0 +1,37 @@
+name: Tandem Main Workflow
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+  id-token: write
+  checks: write
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  check-clang-formatting:
+    uses: ./.github/workflows/check-clang-format.yml
+
+  check-petsc-version:
+    uses: ./.github/workflows/check-petsc-version.yml
+
+  build-dependencies-image:
+    needs: check-petsc-version
+    if: needs.check-petsc-version.outputs.needs_rebuild == 'true'
+    uses: ./.github/workflows/build-dependencies.yml
+    with:
+      petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
+      dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
+      tandem_image: ${{ needs.check-petsc-version.outputs.tandem_image }}
+
+  build-and-test-tandem:
+    needs: [check-petsc-version, build-dependencies-image]
+    if: always() && !cancelled() && !failure()
+    uses: ./.github/workflows/build-and-test-tandem.yml
+    with:
+      petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
+      dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
