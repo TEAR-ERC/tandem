@@ -6,23 +6,8 @@ from pathlib import Path
 
 
 @pytest.fixture(scope="module")
-def tolerance_static():
+def tolerance():
     return 1e-8
-
-
-@pytest.fixture(scope="module")
-def tolerance_seas():
-    return 1e-8
-
-
-@pytest.fixture(scope="module")
-def tolerance_seas_events():
-    return 1e-2
-
-
-@pytest.fixture(scope="module")
-def tolerance_convergence():
-    return 1e-12
 
 
 @pytest.fixture(scope="module")

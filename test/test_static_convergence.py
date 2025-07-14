@@ -58,7 +58,7 @@ def compute_all_slopes(data):
     return slope_l2, slope_h1
 
 
-def test_convergence(request, tolerance_convergence=1e-12):
+def test_convergence(request, tolerance):
     domain_dimension = request.config.getoption("domain_dimension")
     log_file = f"test_data/temp_test_results/convergence_{domain_dimension}D.log"
     data = parse_static_log(log_file)
@@ -72,8 +72,8 @@ def test_convergence(request, tolerance_convergence=1e-12):
     expected_l2, expected_h1 = expected[str(domain_dimension)]
 
     assert math.isclose(
-        l2_order, expected_l2, rel_tol=tolerance_convergence
+        l2_order, expected_l2, rel_tol=tolerance
     ), f"Computed L2 order {l2_order} does not match expected {expected_l2}"
     assert math.isclose(
-        h1_order, expected_h1, rel_tol=tolerance_convergence
+        h1_order, expected_h1, rel_tol=tolerance
     ), f"Computed H1 order {h1_order} does not match expected {expected_h1}"
