@@ -16,7 +16,7 @@ The sign of the fault normal is chosen such that
 
 .. math::
 
-   \vec n \cdot \vec n_{\text{ref}} > 0.
+   \vec{n} \cdot \mathbf n_{\text{ref}} > 0.
 
 We define that the fault normal points from the foot wall to the hanging wall.
 In this way the reference normal :math:`n_{\text{ref}}` selects the foot and
