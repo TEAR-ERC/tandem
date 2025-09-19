@@ -47,6 +47,13 @@ public:
     void begin_preparation(std::size_t numElements, std::size_t numLocalElements,
                            std::size_t numLocalFacets);
     void prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch);
+    void local_relaxation_time(std::size_t elNo, double& relaxation_time_global);
+    void set_relaxation_time_global(double relaxation_time) {
+        relaxation_time_global_ = relaxation_time;
+    }
+    void set_viscoelastic_time_step(double relaxation_time) {
+        dt_viscoelastic_ = 0.0;
+    }
     void prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                           LinearAllocator<double>& scratch);
     void prepare_boundary(std::size_t fctNo, FacetInfo const& info,
@@ -156,6 +163,10 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    struct relaxation_time {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
     struct AbsDetJWK {
         using type = std::array<double, Dim * Dim>;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
@@ -169,7 +180,7 @@ private:
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
-    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K>;
+    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, K, relaxation_time>;
     mneme::StridedView<material_vol_t> material;
 
     using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJWK>;
@@ -182,6 +193,8 @@ private:
 
     // Options
     constexpr static double epsilon = -1.0;
+    double relaxation_time_global_;
+    double dt_viscoelastic_;
 };
 
 } // namespace tndm

@@ -25,12 +25,18 @@ namespace kernel = tndm::elasticity::kernel;
 namespace tndm {
 
 Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                       functional_t<1> mu, std::optional<functional_t<1>> rho, DGMethod method)
+                       functional_t<1> mu, functional_t<1> mu0, functional_t<1> mu1,
+                       functional_t<1> viscosity, functional_t<1> relaxation_time, double theta,
+                       std::optional<functional_t<1>> rho, DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       fun_lam(make_volume_functional(std::move(lam))),
       fun_mu(make_volume_functional(std::move(mu))),
+      fun_mu0(make_volume_functional(std::move(mu0))),
+      fun_mu1(make_volume_functional(std::move(mu1))),
+      fun_viscosity(make_volume_functional(std::move(viscosity))),
+      fun_relaxation_time(make_volume_functional(std::move(relaxation_time))), theta_(theta),
       fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
 
     MhatInv = space_.inverseMassMatrix();
@@ -42,6 +48,7 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     negative_E_Q_T = Managed<Matrix<double>>(E_Q_T.shape(), std::size_t{ALIGNMENT});
     EigenMap(negative_E_Q_T) = -EigenMap(E_Q_T);
 
+    assert(theta >= 0.0 && theta <= 1.0);
     for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
         auto points = cl_->facetParam(f, fctRule.points());
         E_q.emplace_back(space_.evaluateBasisAt(points));
@@ -100,6 +107,15 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     cfl_dt_.resize(numLocalElements, 0.0);
 }
 
+void Elasticity::local_relaxation_time(std::size_t elNo, double& relaxation_time_global)
+{
+    auto relaxation_time_local = material[elNo].get<relaxation_time>().data();
+    // get global minimum relaxation time MPI
+    MPI_Allreduce(relaxation_time_local, &relaxation_time_global, 1, MPI_DOUBLE, MPI_MIN,
+                  MPI_COMM_WORLD);
+    
+}
+
 void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
@@ -110,6 +126,26 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     alignas(ALIGNMENT) double mu_Q_raw[tensor::mu_Q::size()];
     auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
     fun_mu(elNo, mu_Q);
+
+    // mu0 processing
+    alignas(ALIGNMENT) double mu0_Q_raw[tensor::mu_Q::size()];
+    auto mu0_Q = Matrix<double>(mu0_Q_raw, 1, volRule.size());
+    fun_mu0(elNo, mu0_Q);
+
+    // mu1 processing
+    alignas(ALIGNMENT) double mu1_Q_raw[tensor::mu_Q::size()];
+    auto mu1_Q = Matrix<double>(mu1_Q_raw, 1, volRule.size());
+    fun_mu1(elNo, mu1_Q);
+
+    // eta processing
+    alignas(ALIGNMENT) double viscosity_Q_raw[tensor::mu_Q::size()];
+    auto viscosity_Q = Matrix<double>(viscosity_Q_raw, 1, volRule.size());
+    fun_viscosity(elNo, viscosity_Q);
+
+    // relaxation_time processing
+    alignas(ALIGNMENT) double relaxation_time_Q_raw[tensor::mu_Q::size()];
+    auto relaxation_time_Q = Matrix<double>(relaxation_time_Q_raw, 1, volRule.size());
+    fun_relaxation_time(elNo, relaxation_time_Q);
 
     alignas(ALIGNMENT) double rhoInv_Q_raw[tensor::rhoInv_Q::size()];
     auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
@@ -150,6 +186,12 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
                              Eigen::InnerStride<1>>;
     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
+    using Mu0Map = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
+    using Mu1Map = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
+    using EtaMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
 
     auto proj = MMap(Mmem).fullPivLu();
 
@@ -161,6 +203,16 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     auto rhoInv_eigen = RhoInvMap(rhoInv_field);
     rhoInv_eigen = proj.solve(rhoInv_eigen);
+
+    // Add solving for mu0, mu1, eta
+    auto mu0_eigen = Mu0Map(material[elNo].get<mu0>().data());
+    mu0_eigen = proj.solve(mu0_eigen);
+
+    auto mu1_eigen = Mu1Map(material[elNo].get<mu1>().data());
+    mu1_eigen = proj.solve(mu1_eigen);
+
+    auto viscosity_eigen = EtaMap(material[elNo].get<viscosity>().data());
+    viscosity_eigen = proj.solve(viscosity_eigen);
 
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
@@ -932,12 +984,21 @@ void Elasticity::coefficients_volume(std::size_t elNo, Matrix<double>& C,
                                      LinearAllocator<double>&) const {
     auto const coeff_lam = material[elNo].get<lam>();
     auto const coeff_mu = material[elNo].get<mu>();
+    auto const coeff_mu0 = material[elNo].get<mu0>();
+    auto const coeff_mu1 = material[elNo].get<mu1>();
+    auto const coeff_viscosity = material[elNo].get<viscosity>();
     assert(coeff_lam.size() == C.shape(0));
     assert(coeff_mu.size() == C.shape(0));
-    assert(2 == C.shape(1));
+    assert(coeff_mu0.size() == C.shape(0));
+    assert(coeff_mu1.size() == C.shape(0));
+    assert(coeff_viscosity.size() == C.shape(0));
+    assert(5 == C.shape(1));
     for (std::size_t i = 0; i < C.shape(0); ++i) {
         C(i, 0) = coeff_lam[i];
         C(i, 1) = coeff_mu[i];
+        C(i, 2) = coeff_mu0[i];
+        C(i, 3) = coeff_mu1[i];
+        C(i, 4) = coeff_viscosity[i];
     }
 }
 

@@ -129,7 +129,14 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
 
     penalty_.resize(numLocalFacets);
 }
-
+void Poisson::local_relaxation_time(std::size_t elNo, double& relaxation_time_global)
+{
+    auto relaxation_time_local = material[elNo].get<relaxation_time>().data();
+    // get global minimum relaxation time MPI
+    MPI_Allreduce(relaxation_time_local, &relaxation_time_global, 1, MPI_DOUBLE, MPI_MIN,
+                  MPI_COMM_WORLD);
+    
+}
 void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 

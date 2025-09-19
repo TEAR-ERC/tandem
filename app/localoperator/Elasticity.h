@@ -36,8 +36,9 @@ public:
     constexpr static std::size_t NumQuantities = DomainDimension;
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
-               DGMethod method = DGMethod::IP);
+               functional_t<1> mu, functional_t<1> mu0, functional_t<1> mu1,
+               functional_t<1> viscosity, functional_t<1> relaxation_time, double theta,
+               std::optional<functional_t<1>> rho = std::nullopt, DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
     std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
@@ -100,13 +101,21 @@ public:
 
     FiniteElementFunction<DomainDimension>
     coefficients_prototype(std::size_t numLocalElements) const {
-        return FiniteElementFunction<DomainDimension>(materialSpace_.clone(), {"lambda", "mu"},
-                                                      numLocalElements);
+        return FiniteElementFunction<DomainDimension>(
+            materialSpace_.clone(), {"lambda", "mu", "mu0", "mu1", "viscosity"}, numLocalElements);
     }
     void coefficients_volume(std::size_t elNo, Matrix<double>& C, LinearAllocator<double>&) const;
 
     void set_force(functional_t<NumQuantities> fun) {
         fun_force = make_volume_functional(std::move(fun));
+    }
+    double theta() const { return theta_; }
+    void local_relaxation_time(std::size_t, double&);
+    void set_relaxation_time_global(double relaxation_time) {
+        relaxation_time_global_ = relaxation_time;
+    }
+    void set_viscoelastic_time_step(double relaxation_time) {
+        dt_viscoelastic_ = theta_ * relaxation_time;
     }
     void set_force(volume_functional_t fun) { fun_force = std::move(fun); }
     void set_dirichlet(functional_t<NumQuantities> fun) {
@@ -168,6 +177,10 @@ private:
     // Input
     volume_functional_t fun_lam;
     volume_functional_t fun_mu;
+    volume_functional_t fun_mu0;
+    volume_functional_t fun_mu1;
+    volume_functional_t fun_viscosity;
+    volume_functional_t fun_relaxation_time;
     volume_functional_t fun_rho;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
@@ -179,6 +192,22 @@ private:
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
     struct mu {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct mu0 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct mu1 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct viscosity {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct relaxation_time {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -227,7 +256,8 @@ private:
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
-    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, rhoInv>;
+    using material_vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam, mu, mu0, mu1, viscosity,
+                                               relaxation_time, rhoInv>;
     mneme::StridedView<material_vol_t> material;
 
     using vol_pre_t = mneme::MultiStorage<mneme::DataLayout::SoA, lam_W_J_Q, mu_W_J_Q,
@@ -240,7 +270,9 @@ private:
 
     std::vector<double> penalty_;
     std::vector<double> cfl_dt_;
-
+    double theta_;
+    double relaxation_time_global_;
+    double dt_viscoelastic_;
     // Options
     constexpr static double epsilon = -1.0;
 };
