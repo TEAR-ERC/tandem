@@ -13,6 +13,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     lam_Q = Tensor('lam_Q', (Nq,))
     mu = Tensor('mu', (Nbf,))
     mu_Q = Tensor('mu_Q', (Nq,))
+    mu0 = Tensor('mu0', (Nbf,))          
+    mu0_Q = Tensor('mu0_Q', (Nq,))       
+    mu1 = Tensor('mu1', (Nbf,))          
+    mu1_Q = Tensor('mu1_Q', (Nq,))       
+    viscosity = Tensor('viscosity', (Nbf,))
+    viscosity_Q = Tensor('viscosity_Q', (Nq,))
     rhoInv = Tensor('rhoInv', (Nbf,))
     rhoInv_Q = Tensor('rhoInv_Q', (Nq,))
     W = Tensor('W', (Nq,))
@@ -38,6 +44,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     generator.add('project_material_rhs', [
         lam['k'] <= lam_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
         mu['k'] <= mu_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
+        mu0['k'] <= mu0_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
+        mu1['k'] <= mu1_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
+        viscosity['k'] <= viscosity_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q'],
         rhoInv['k'] <= rhoInv_Q['q'] * matE_Q_T['qk'] * W['q'] * J['q']
     ])
 

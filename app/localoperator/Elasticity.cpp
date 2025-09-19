@@ -164,6 +164,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     auto lam_field = material[elNo].get<lam>().data();
     auto mu_field = material[elNo].get<mu>().data();
+    auto mu0_field = material[elNo].get<mu0>().data();
+    auto mu1_field = material[elNo].get<mu1>().data();
+    auto viscosity_field = material[elNo].get<viscosity>().data();
     auto rhoInv_field = material[elNo].get<rhoInv>().data();
     kernel::project_material_rhs krnl_rhs;
     krnl_rhs.matE_Q_T = matE_Q_T.data();
@@ -172,6 +175,12 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     krnl_rhs.lam_Q = lam_Q_raw;
     krnl_rhs.mu = mu_field;
     krnl_rhs.mu_Q = mu_Q_raw;
+    krnl_rhs.mu0 = mu0_field;
+    krnl_rhs.mu0_Q = mu0_Q_raw;
+    krnl_rhs.mu1 = mu1_field;
+    krnl_rhs.mu1_Q = mu1_Q_raw;
+    krnl_rhs.viscosity = viscosity_field;
+    krnl_rhs.viscosity_Q = viscosity_Q_raw;
     krnl_rhs.rhoInv = rhoInv_field;
     krnl_rhs.rhoInv_Q = rhoInv_Q_raw;
     krnl_rhs.W = volRule.weights().data();
