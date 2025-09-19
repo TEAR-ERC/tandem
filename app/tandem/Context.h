@@ -35,7 +35,7 @@ template <> struct make_lop<Poisson> {
 template <> struct make_lop<Elasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Elasticity> const& scenario) {
-        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
+        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(), scenario.mu0(), scenario.mu1(), scenario.viscosity(), scenario.relaxation_time(), scenario.theta(),
                                             scenario.rho(), DGMethod::IP);
     }
 };
