@@ -59,6 +59,14 @@ public:
 
         lop_->begin_preparation(topo_->numElements(), topo_->numLocalElements(),
                                 topo_->numLocalFacets());
+        double relaxation_time_element_local = 0.0;
+        for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+            lop_->local_relaxation_time(elNo, relaxation_time_element_local);
+        }
+        MPI_Allreduce(&relaxation_time_element_local, &relaxation_time_global_, 1, MPI_DOUBLE,
+                      MPI_MIN, MPI_COMM_WORLD);
+        lop_->set_relaxation_time_global(relaxation_time_global_);
+        lop_->set_viscoelastic_time_step(relaxation_time_global_);
         if constexpr (std::experimental::is_detected_v<prepare_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
                 scratch_.reset();
@@ -400,6 +408,7 @@ private:
     Scratch<double> scratch_;
     Scatter scatter_;
     SparseBlockVector<double> ghost_;
+    double relaxation_time_global_ = 0.0;
 };
 
 } // namespace tndm
