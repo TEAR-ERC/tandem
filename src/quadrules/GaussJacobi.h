@@ -23,6 +23,6 @@ static double const Tolerance = 10. * std::numeric_limits<double>::epsilon();
  */
 IntervalQuadratureRule GaussJacobi(unsigned n, unsigned a, unsigned b);
 
-}
+} // namespace tndm
 
 #endif // GAUSSJACOBI_20200615_H

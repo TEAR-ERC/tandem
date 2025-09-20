@@ -57,6 +57,23 @@ struct ProbeOutputConfig : TabularOutputConfig {
     std::vector<Probe<DomainDimension>> probes;
 };
 
+struct GfCheckpointConfig {
+    std::string prefix;
+    double frequency_cputime_minutes;
+};
+
+enum TsCheckpointStorageType { NONE, UNLIMITED, LIMITED, UNKNOWN };
+
+struct TsCheckpointConfig {
+    std::optional<std::string> load_directory;
+    std::string save_directory;
+    int frequency_step;
+    double frequency_cputime_minutes;
+    double frequency_time_physical;
+    TsCheckpointStorageType storage_type;
+    int storage_limited_size;
+};
+
 struct Config {
     std::optional<double> resolution;
     double final_time;
@@ -75,15 +92,14 @@ struct Config {
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
 
-    std::optional<std::string> gf_checkpoint_prefix;
-    double gf_checkpoint_every_nmins;
-
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::optional<OutputConfig> fault_output;
     std::optional<TabularOutputConfig> fault_scalar_output;
     std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
+    std::optional<GfCheckpointConfig> gf_checkpoint_config;
+    TsCheckpointConfig ts_checkpoint_config;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,

@@ -86,8 +86,8 @@ void PetscLinearSolver::setup_mg(AbstractDGOperator<DomainDimension>& dgop, PC p
         CHKERRTHROW(PCMGSetInterpolation(pc, l + 1, I.mat()));
 
         // Construct coarse level operator via A_c = Pt A P
-        //Mat A_l;
-        //CHKERRTHROW(MatPtAP(A_lp1, I.mat(), MAT_INITIAL_MATRIX, PETSC_DEFAULT, &A_l));
+        // Mat A_l;
+        // CHKERRTHROW(MatPtAP(A_lp1, I.mat(), MAT_INITIAL_MATRIX, PETSC_DEFAULT, &A_l));
 
         // PETSc manpage for MatPtAP() states that For matrix types without a
         // special implementation of PtAP, MatPtAP() fallbacks back to
@@ -97,6 +97,12 @@ void PetscLinearSolver::setup_mg(AbstractDGOperator<DomainDimension>& dgop, PC p
         CHKERRTHROW(MatMatMult(A_lp1, I.mat(), MAT_INITIAL_MATRIX, 1, &AP));
         CHKERRTHROW(MatTranspose(I.mat(), MAT_INITIAL_MATRIX, &Pt));
         CHKERRTHROW(MatMatMult(Pt, AP, MAT_INITIAL_MATRIX, 1, &A_l));
+
+        // When using MatType = aijhipsparse thip loses the blocksize somewhere during
+        // the computation of AP = A P and Ac = Pt AP - hence we force it here.
+        // The convergence of GAMG is strongly connected with preserving the block size.
+        CHKERRTHROW(MatSetBlockSize(A_l, (PetscInt)i_op->block_size(from_degree)));
+
         CHKERRTHROW(MatDestroy(&Pt));
         CHKERRTHROW(MatDestroy(&AP));
 
