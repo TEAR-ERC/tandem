@@ -1093,8 +1093,8 @@ PetscErrorCode RandEigsMax(Mat A,PetscInt k,PetscInt o,PetscInt pits,PetscRandom
   comm = PetscObjectComm((PetscObject)A);
   ierr = MPI_Comm_size(comm,&commsize);CHKERRQ(ierr);
   ierr = MatGetSize(A,&M,&N);CHKERRQ(ierr);
-  if (M != N) SETERRQ2(comm,PETSC_ERR_SUP,"Only valid for square matrices, found M = %D, N = %D\n",M,N);
-  if (k+o > M) SETERRQ4(comm,PETSC_ERR_SUP,"Random matrix has %D + %D = %D columns. Max num. columns is %D\n",k,o,k+o,M);
+  if (M != N) SETERRQ(comm,PETSC_ERR_SUP,"Only valid for square matrices, found M = %"PetscInt_FMT ", N = %"PetscInt_FMT "\n",M,N);
+  if (k+o > M) SETERRQ(comm,PETSC_ERR_SUP,"Random matrix has %"PetscInt_FMT " + %"PetscInt_FMT " = %"PetscInt_FMT " columns. Max num. columns is %"PetscInt_FMT "\n",k,o,k+o,M);
   ierr = RandEigsMax_3_InPlace(A,k,o,pits,prand,_eigs,_V);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -1112,8 +1112,8 @@ PetscErrorCode RandEigsMin(KSP ksp,PetscInt k,PetscInt o,PetscInt pits,PetscRand
   comm = PetscObjectComm((PetscObject)A);
   ierr = MPI_Comm_size(comm,&commsize);CHKERRQ(ierr);
   ierr = MatGetSize(A,&M,&N);CHKERRQ(ierr);
-  if (M != N) SETERRQ2(comm,PETSC_ERR_SUP,"Only valid for square matrices, found M = %D, N = %D\n",M,N);
-  if (k+o > M) SETERRQ4(comm,PETSC_ERR_SUP,"Random matrix has %D + %D = %D columns. Max num. columns is %D\n",k,o,k+o,M);
+  if (M != N) SETERRQ(comm,PETSC_ERR_SUP,"Only valid for square matrices, found M = %"PetscInt_FMT ", N = %"PetscInt_FMT "\n",M,N);
+  if (k+o > M) SETERRQ(comm,PETSC_ERR_SUP,"Random matrix has %"PetscInt_FMT " + %"PetscInt_FMT " = %"PetscInt_FMT " columns. Max num. columns is %"PetscInt_FMT "\n",k,o,k+o,M);
   ierr = RandEigsMin_3_InPlace(ksp,k,o,pits,prand,_eigs,_V);CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
