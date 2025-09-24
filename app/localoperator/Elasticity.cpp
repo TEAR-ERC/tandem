@@ -142,11 +142,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     auto viscosity_Q = Matrix<double>(viscosity_Q_raw, 1, volRule.size());
     fun_viscosity(elNo, viscosity_Q);
 
-    // relaxation_time processing
-    alignas(ALIGNMENT) double relaxation_time_Q_raw[tensor::mu_Q::size()];
-    auto relaxation_time_Q = Matrix<double>(relaxation_time_Q_raw, 1, volRule.size());
-    fun_relaxation_time(elNo, relaxation_time_Q);
-
     alignas(ALIGNMENT) double rhoInv_Q_raw[tensor::rhoInv_Q::size()];
     auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
     fun_rho(elNo, rhoInv_Q);
