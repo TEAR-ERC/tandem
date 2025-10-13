@@ -8,6 +8,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     G_Q = Tensor('G_Q', (dim, dim, Nq))
     K = Tensor('K', (Nbf,))
     K_Q = Tensor('K_Q', (Nq,))
+    mu0 = Tensor('mu0', (Nbf,))          
+    mu0_Q = Tensor('mu0_Q', (Nq,))       
+    mu1 = Tensor('mu1', (Nbf,))          
+    mu1_Q = Tensor('mu1_Q', (Nq,))       
+    viscosity = Tensor('viscosity', (Nbf,))
+    viscosity_Q = Tensor('viscosity_Q', (Nq,))
     W = Tensor('W', (Nq,))
     E_Q = Tensor('E_Q', (Nbf, Nq))
     matE_Q_T = Tensor('matE_Q_T', (Nq, Nbf))
@@ -24,8 +30,15 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
         MinvRef['kr'] * W['q'] * Jinv_Q['q'] * E_Q['rq'] * E_Q['sq'] * MinvRef['sl'])
 
     generator.add('project_K_lhs', matM['kl'] <= matE_Q_T['qk'] * W['q'] * J_Q['q'] * matE_Q_T['ql'])
-    generator.add('project_K_rhs', K['k'] <= K_Q['q'] * matE_Q_T['qk'] * W['q'] * J_Q['q'])
-
+    generator.add(
+        "project_K_rhs",
+        [
+            K["k"] <= K_Q["q"] * matE_Q_T["qk"] * W["q"] * J_Q["q"],
+            mu0["k"] <= mu0_Q["q"] * matE_Q_T["qk"] * W["q"] * J_Q["q"],
+            mu1["k"] <= mu1_Q["q"] * matE_Q_T["qk"] * W["q"] * J_Q["q"],
+            viscosity["k"] <= viscosity_Q["q"] * matE_Q_T["qk"] * W["q"] * J_Q["q"],
+        ],
+    )
     generator.add('Dx_Q', Dx_Q['kiq'] <= G_Q['eiq'] * Dxi_Q['keq'])
     generator.add('assembleVolume',
         A['kl'] <= J_Q['q'] * W['q'] * K['m'] * matE_Q_T['qm'] * Dx_Q['kiq'] * Dx_Q['liq']

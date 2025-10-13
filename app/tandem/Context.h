@@ -29,13 +29,17 @@ template <typename Type> struct make_lop;
 template <> struct make_lop<Poisson> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Poisson> const& scenario) {
-        return std::make_shared<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
+        return std::make_shared<Poisson>(
+            std::move(cl), scenario.mu(), scenario.mu0(), scenario.mu1(), scenario.viscosity(),
+            scenario.relaxation_time(), scenario.theta(), DGMethod::IP);
     }
 };
 template <> struct make_lop<Elasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Elasticity> const& scenario) {
-        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(), scenario.mu0(), scenario.mu1(), scenario.viscosity(), scenario.relaxation_time(), scenario.theta(),
+        return std::make_shared<Elasticity>(std::move(cl), scenario.lam(), scenario.mu(),
+                                            scenario.mu0(), scenario.mu1(), scenario.viscosity(),
+                                            scenario.relaxation_time(), scenario.theta(),
                                             scenario.rho(), DGMethod::IP);
     }
 };

@@ -25,12 +25,17 @@ namespace kernel = tndm::poisson::kernel;
 namespace tndm {
 
 Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> K,
-                 DGMethod method)
+                 functional_t<1> mu0, functional_t<1> mu1, functional_t<1> viscosity,
+                 functional_t<1> relaxation_time, double theta, DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
-      fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
-      fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
+      fun_K(make_volume_functional(std::move(K))), fun_mu0(make_volume_functional(std::move(mu0))),
+      fun_mu1(make_volume_functional(std::move(mu1))),
+      fun_viscosity(make_volume_functional(std::move(viscosity))),
+      fun_relaxation_time(make_volume_functional(std::move(relaxation_time))), theta_(theta),
+      fun_force(zero_volume_function), fun_dirichlet(zero_facet_function),
+      fun_slip(zero_facet_function) {
 
     Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
@@ -129,21 +134,38 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
 
     penalty_.resize(numLocalFacets);
 }
-void Poisson::local_relaxation_time(std::size_t elNo, double& relaxation_time_global)
-{
+void Poisson::local_relaxation_time(std::size_t elNo, double& relaxation_time_global) {
     auto relaxation_time_local = material[elNo].get<relaxation_time>().data();
     // get global minimum relaxation time MPI
     MPI_Allreduce(relaxation_time_local, &relaxation_time_global, 1, MPI_DOUBLE, MPI_MIN,
                   MPI_COMM_WORLD);
-    
 }
 void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
     auto Kfield = material[elNo].get<K>().data();
+    auto mu0_field = material[elNo].get<mu0>().data();
+    auto mu1_field = material[elNo].get<mu1>().data();
+    auto viscosity_field = material[elNo].get<viscosity>().data();
+
     alignas(ALIGNMENT) double K_Q_raw[tensor::K_Q::size()];
     auto K_Q = Matrix<double>(K_Q_raw, 1, volRule.size());
     fun_K(elNo, K_Q);
+
+    // mu0 processing
+    alignas(ALIGNMENT) double mu0_Q_raw[tensor::mu0_Q::size()];
+    auto mu0_Q = Matrix<double>(mu0_Q_raw, 1, volRule.size());
+    fun_mu0(elNo, mu0_Q);
+
+    // mu1 processing
+    alignas(ALIGNMENT) double mu1_Q_raw[tensor::mu1_Q::size()];
+    auto mu1_Q = Matrix<double>(mu1_Q_raw, 1, volRule.size());
+    fun_mu1(elNo, mu1_Q);
+
+    // eta processing
+    alignas(ALIGNMENT) double viscosity_Q_raw[tensor::viscosity_Q::size()];
+    auto viscosity_Q = Matrix<double>(viscosity_Q_raw, 1, volRule.size());
+    fun_viscosity(elNo, viscosity_Q);
 
     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
     kernel::project_K_lhs krnl_lhs;
@@ -158,15 +180,37 @@ void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch)
     krnl_rhs.J_Q = vol[elNo].get<AbsDetJ>().data();
     krnl_rhs.K = Kfield;
     krnl_rhs.K_Q = K_Q_raw;
+    krnl_rhs.mu0 = mu0_field;
+    krnl_rhs.mu0_Q = mu0_Q_raw;
+    krnl_rhs.mu1 = mu1_field;
+    krnl_rhs.mu1_Q = mu1_Q_raw;
+    krnl_rhs.viscosity = viscosity_field;
+    krnl_rhs.viscosity_Q = viscosity_Q_raw;
     krnl_rhs.W = volRule.weights().data();
     krnl_rhs.execute();
 
+    using Mu0Map = Eigen::Map<Eigen::Matrix<double, tensor::mu0::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
+    using Mu1Map = Eigen::Map<Eigen::Matrix<double, tensor::mu1::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
+    using EtaMap = Eigen::Map<Eigen::Matrix<double, tensor::mu0::Shape[0], 1>, Eigen::Unaligned,
+                              Eigen::InnerStride<1>>;
     using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
                             Eigen::Unaligned,
                             Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
     using KMap = Eigen::Map<Eigen::Matrix<double, tensor::K::Shape[0], 1>, Eigen::Unaligned,
                             Eigen::InnerStride<1>>;
+    // Add solving for mu0, mu1, eta
+    auto proj = MMap(Mmem).fullPivLu();
 
+    auto mu0_eigen = Mu0Map(material[elNo].get<mu0>().data());
+    mu0_eigen = proj.solve(mu0_eigen);
+
+    auto mu1_eigen = Mu1Map(material[elNo].get<mu1>().data());
+    mu1_eigen = proj.solve(mu1_eigen);
+
+    auto viscosity_eigen = EtaMap(material[elNo].get<viscosity>().data());
+    viscosity_eigen = proj.solve(viscosity_eigen);
     auto K_eigen = KMap(Kfield);
     K_eigen = MMap(Mmem).fullPivLu().solve(K_eigen);
 }
