@@ -716,9 +716,15 @@ std::size_t Poisson::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) c
 void Poisson::coefficients_volume(std::size_t elNo, Matrix<double>& C,
                                   LinearAllocator<double>&) const {
     auto const coeff_K = material[elNo].get<K>();
+    auto const coeff_mu0 = material[elNo].get<mu0>();
+    auto const coeff_mu1 = material[elNo].get<mu1>();
+    auto const coeff_viscosity = material[elNo].get<viscosity>();
     assert(coeff_K.size() == C.shape(0));
     for (std::size_t i = 0; i < coeff_K.size(); ++i) {
         C(i, 0) = coeff_K[i];
+        C(i, 1) = coeff_mu0[i];
+        C(i, 2) = coeff_mu1[i];
+        C(i, 3) = coeff_viscosity[i];
     }
 }
 
