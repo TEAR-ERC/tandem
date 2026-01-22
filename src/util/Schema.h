@@ -16,6 +16,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <algorithm>
 
 namespace tndm {
 
