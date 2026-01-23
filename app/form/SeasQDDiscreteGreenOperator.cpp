@@ -11,6 +11,23 @@ namespace fs = std::filesystem;
 
 namespace tndm {
 
+GreensFunctionIndices::GreensFunctionIndices(SeasQDDiscreteGreenOperator const& op) : n_bs(1) {
+    slip_block_size = op.base::friction().slip_block_size();
+    num_local_elements = op.base::adapter().num_local_elements();
+    m_bs = op.base::adapter().traction_block_size();
+    m = num_local_elements * m_bs;
+    n = num_local_elements * slip_block_size * n_bs;
+    comm = op.base::comm();
+    MPI_Comm_rank(comm, &rank);
+
+    mb_offset = 0;
+    nb_offset = 0;
+    MPI_Scan(&num_local_elements, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
+    mb_offset -= num_local_elements;
+    MPI_Scan(&n, &nb_offset, 1, MPIU_INT, MPI_SUM, comm);
+    nb_offset -= n;
+}
+
 SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<typename base::dg_t> dgop, std::unique_ptr<AbstractAdapterOperator> adapter,
     std::unique_ptr<AbstractFrictionOperator> friction,
@@ -56,11 +73,7 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
         prepend_checkpoint_path(sprefix);
         checkpoint_enabled_ = true;
     }
-    if (!checkpoint_enabled_) {
-        compute_discrete_greens_function();
-    } else {
-        get_discrete_greens_function(mesh);
-    }
+    get_discrete_greens_function(mesh);
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
@@ -112,93 +125,6 @@ void SeasQDDiscreteGreenOperator::update_traction(double time, BlockVector const
     CHKERRTHROW(VecAXPY(base::traction_.vec(), time, t_boundary_->vec()));
 }
 
-void SeasQDDiscreteGreenOperator::compute_discrete_greens_function() {
-    auto slip_block_size = base::friction().slip_block_size();
-
-    PetscInt num_local_elements = base::adapter().num_local_elements();
-    PetscInt m_bs = base::adapter().traction_block_size();
-    PetscInt n_bs = 1;
-    PetscInt m = num_local_elements * m_bs;
-    PetscInt n = num_local_elements * slip_block_size * n_bs;
-
-    MPI_Comm comm = base::comm();
-
-    int rank;
-    MPI_Comm_rank(comm, &rank);
-
-    PetscInt mb_offset = 0;
-    PetscInt nb_offset = 0;
-    MPI_Scan(&num_local_elements, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    mb_offset -= num_local_elements;
-    MPI_Scan(&n, &nb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    nb_offset -= n;
-
-    CHKERRTHROW(MatCreateDense(comm, m, n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
-    CHKERRTHROW(MatSetBlockSizes(G_, m_bs, n_bs));
-
-    S_ = std::make_unique<PetscVector>(slip_block_size, num_local_elements, comm);
-    t_boundary_ = std::make_unique<PetscVector>(m_bs, num_local_elements, comm);
-
-    auto scatter = Scatter(base::adapter().fault_map().scatter_plan());
-    auto ghost = scatter.template recv_prototype<double>(slip_block_size, ALIGNMENT);
-
-    PetscInt N;
-    CHKERRTHROW(VecGetSize(S_->vec(), &N));
-
-    Stopwatch sw;
-    double solve_time = 0.0;
-    for (PetscInt i = 0; i < N; ++i) {
-
-        if (rank == 0) {
-            std::cout << "Computing Green's function " << (i + 1) << "/" << N;
-        }
-        sw.start();
-        CHKERRTHROW(VecZeroEntries(S_->vec()));
-        if (i >= nb_offset && i < nb_offset + m) {
-            PetscScalar one = 1.0;
-            CHKERRTHROW(VecSetValue(S_->vec(), i, one, INSERT_VALUES));
-        }
-        S_->begin_assembly();
-        S_->end_assembly();
-
-        scatter.begin_scatter(*S_, ghost);
-        scatter.wait_scatter();
-
-        auto S_view = LocalGhostCompositeView(*S_, ghost);
-        base::solve(0.0, S_view);
-        base::update_traction(S_view);
-
-        auto traction_handle = base::traction_.begin_access_readonly();
-        for (std::size_t faultNo = 0; faultNo < num_local_elements; ++faultNo) {
-            PetscInt g_m = mb_offset + faultNo;
-            PetscInt g_n = i;
-            auto traction_block = traction_handle.subtensor(slice{}, faultNo);
-            CHKERRTHROW(
-                MatSetValuesBlocked(G_, 1, &g_m, 1, &g_n, traction_block.data(), INSERT_VALUES));
-        }
-        base::traction_.end_access_readonly(traction_handle);
-        solve_time += sw.stop();
-        if (rank == 0) {
-            constexpr double Days = 3600.0 * 24.0;
-            constexpr double Hours = 3600.0;
-            constexpr double Minutes = 60.0;
-            double avg_time = solve_time / (i + 1);
-            double etl = avg_time * (N - i - 1);
-            double etl_d = std::floor(etl / Days);
-            etl -= etl_d * Days;
-            double etl_h = std::floor(etl / Hours);
-            etl -= etl_h * Hours;
-            double etl_m = std::floor(etl / Minutes);
-            etl -= etl_m * Minutes;
-            std::cout << " (" << etl_d << "d " << etl_h << "h " << etl_m << "m " << std::floor(etl)
-                      << "s left)" << std::endl;
-        }
-    }
-
-    CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
-    CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
-}
-
 void SeasQDDiscreteGreenOperator::compute_boundary_traction() {
     MPI_Comm comm = base::comm();
     int rank;
@@ -223,35 +149,51 @@ void SeasQDDiscreteGreenOperator::compute_boundary_traction() {
 }
 
 PetscInt SeasQDDiscreteGreenOperator::create_discrete_greens_function() {
-    auto slip_block_size = base::friction().slip_block_size();
-    PetscInt M, N, n_gf;
-    PetscInt num_local_elements = base::adapter().num_local_elements();
-    PetscInt m_bs = base::adapter().traction_block_size();
-    PetscInt n_bs = 1;
-    PetscInt m = num_local_elements * m_bs;
-    PetscInt n = num_local_elements * slip_block_size * n_bs;
-    PetscInt mb_offset = 0;
-    PetscInt nb_offset = 0;
+    GreensFunctionIndices ind(*this);
     int rank;
+    PetscInt M, N, n_gf;
     MPI_Comm comm = base::comm();
 
     CHKERRTHROW(PetscPrintf(comm, "create_discrete_greens_function()\n"));
     MPI_Comm_rank(comm, &rank);
-    MPI_Scan(&num_local_elements, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    mb_offset -= num_local_elements;
-    MPI_Scan(&n, &nb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    nb_offset -= n;
 
-    CHKERRTHROW(MatCreateDense(comm, m, n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
-    CHKERRTHROW(MatSetBlockSizes(G_, m_bs, n_bs));
+    CHKERRTHROW(MatCreateDense(comm, ind.m, ind.n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
+    CHKERRTHROW(MatSetBlockSizes(G_, ind.m_bs, ind.n_bs));
     CHKERRTHROW(MatGetSize(G_, &M, &N));
     CHKERRTHROW(PetscPrintf(comm, "Green's function operator size: %D x %D\n", M, N));
 
-    S_ = std::make_unique<PetscVector>(slip_block_size, num_local_elements, comm);
-    t_boundary_ = std::make_unique<PetscVector>(m_bs, num_local_elements, comm);
+    S_ = std::make_unique<PetscVector>(ind.slip_block_size, ind.num_local_elements, comm);
+    t_boundary_ = std::make_unique<PetscVector>(ind.m_bs, ind.num_local_elements, comm);
 
     CHKERRTHROW(VecGetSize(S_->vec(), &n_gf));
     return n_gf;
+}
+
+void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
+    int rank;
+    MPI_Comm_rank(base::comm(), &rank);
+    std::string new_filename = file_to_backup + ".tmp";
+    std::string bu_filename = file_to_backup + ".bu";
+    if (rank == 0) {
+        if (fs::exists(file_to_backup)) {
+            try {
+                if (fs::exists(bu_filename)) {
+                    fs::remove(bu_filename);
+                }
+                fs::rename(file_to_backup, bu_filename);
+            } catch (fs::filesystem_error& e) {
+                std::cerr << "Error moving file: " << e.what() << std::endl;
+            }
+        }
+    }
+    MPI_Barrier(base::comm());
+    if (rank == 0) {
+        try {
+            fs::rename(new_filename, file_to_backup);
+        } catch (fs::filesystem_error& e) {
+            std::cerr << "Error moving file: " << e.what() << std::endl;
+        }
+    }
 }
 
 void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
@@ -263,9 +205,10 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     MPI_Comm_size(base::comm(), &commsize);
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
-                                      gf_operator_filename_.c_str(), FILE_MODE_WRITE, &v));
-
+    std::string new_filename = gf_operator_filename_ + ".tmp";
+    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
+                                      FILE_MODE_WRITE, &v));
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
@@ -276,7 +219,11 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     CHKERRTHROW(MatView(G_, v));
 
     CHKERRTHROW(PetscViewerDestroy(&v));
+
+    back_up_file(gf_operator_filename_);
+
     CHKERRTHROW(PetscTime(&t1));
+
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "write_discrete_greens_operator():matrix %1.2e (sec)\n",
                             (double)(t1 - t0)));
@@ -313,10 +260,13 @@ void SeasQDDiscreteGreenOperator ::write_facet_labels_IS(
                                 (const PetscInt*)idx_, PETSC_USE_POINTER, &is));
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), gf_facet_filename_.c_str(),
+    std::string new_filename = gf_facet_filename_ + ".tmp";
+    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
     CHKERRTHROW(ISView(is, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
+    back_up_file(gf_facet_filename_);
     CHKERRTHROW(PetscTime(&t1));
     CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
                             "write_discrete_greens_operator():facets %1.2e (sec)\n",
@@ -338,6 +288,7 @@ IS SeasQDDiscreteGreenOperator ::load_facet_labels_seq_IS(void) {
         CHKERRTHROW(PetscTime(&t0));
         CHKERRTHROW(
             PetscViewerBinaryOpen(PETSC_COMM_SELF, gf_facet_filename_.c_str(), FILE_MODE_READ, &v));
+        CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
         CHKERRTHROW(ISLoad(is, v));
         CHKERRTHROW(PetscViewerDestroy(&v));
         CHKERRTHROW(PetscTime(&t1));
@@ -492,6 +443,7 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_READ, &v));
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
 
     CHKERRTHROW(PetscViewerBinaryRead(v, &commsize_checkpoint, 1, NULL, PETSC_INT));
     MPI_Comm_size(comm, &commsize);
@@ -536,19 +488,11 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
 
 void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
     LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf, PetscInt n_gf) {
-    auto slip_block_size = base::friction().slip_block_size();
+    GreensFunctionIndices ind(*this);
 
-    PetscInt num_local_elements = base::adapter().num_local_elements();
-    PetscInt m_bs = base::adapter().traction_block_size();
-    PetscInt n_bs = 1;
-    PetscInt m = num_local_elements * m_bs;
-    PetscInt n = num_local_elements * slip_block_size * n_bs;
-    PetscInt mb_offset = 0;
-    PetscInt nb_offset = 0;
     PetscInt start = current_gf;
     PetscInt N = n_gf;
     Stopwatch sw;
-    double solve_time;
     int rank;
     MPI_Comm comm = base::comm();
 
@@ -556,24 +500,25 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
         return;
 
     MPI_Comm_rank(comm, &rank);
-    MPI_Scan(&num_local_elements, &mb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    mb_offset -= num_local_elements;
-    MPI_Scan(&n, &nb_offset, 1, MPIU_INT, MPI_SUM, comm);
-    nb_offset -= n;
 
     auto scatter = Scatter(base::adapter().fault_map().scatter_plan());
-    auto ghost = scatter.template recv_prototype<double>(slip_block_size, ALIGNMENT);
+    auto ghost = scatter.template recv_prototype<double>(ind.slip_block_size, ALIGNMENT);
 
-    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                            "partial_assemble_discrete_greens_function() [%D , %D)\n", start, N));
-    solve_time = 0.0;
+    if (start > 0) {
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
+                                "partial_assemble_discrete_greens_function() [%D , %D)\n", start,
+                                N));
+    }
+    double solve_time = 0.0;
+    double solve_time_from_start = 0.0;
     for (PetscInt i = start; i < N; ++i) {
 
-        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                                "Computing Green's function %D / %D\n", i, N));
+        if (rank == 0) {
+            std::cout << "Computing Green's function " << (i + 1) << "/" << N;
+        }
         sw.start();
         CHKERRTHROW(VecZeroEntries(S_->vec()));
-        if (i >= nb_offset && i < nb_offset + m) {
+        if (i >= ind.nb_offset && i < ind.nb_offset + ind.m) {
             PetscScalar one = 1.0;
             CHKERRTHROW(VecSetValue(S_->vec(), i, one, INSERT_VALUES));
         }
@@ -588,25 +533,45 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
         base::update_traction(S_view);
 
         auto traction_handle = base::traction_.begin_access_readonly();
-        for (std::size_t faultNo = 0; faultNo < num_local_elements; ++faultNo) {
-            PetscInt g_m = mb_offset + faultNo;
+        for (std::size_t faultNo = 0; faultNo < ind.num_local_elements; ++faultNo) {
+            PetscInt g_m = ind.mb_offset + faultNo;
             PetscInt g_n = i;
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             CHKERRTHROW(
                 MatSetValuesBlocked(G_, 1, &g_m, 1, &g_n, traction_block.data(), INSERT_VALUES));
         }
         base::traction_.end_access_readonly(traction_handle);
-        solve_time += sw.stop();
+        double step_time = sw.stop();
+        solve_time += step_time;
+        solve_time_from_start += step_time;
+
+        if (rank == 0) {
+            constexpr double Days = 3600.0 * 24.0;
+            constexpr double Hours = 3600.0;
+            constexpr double Minutes = 60.0;
+            double avg_time = solve_time_from_start / (i + 1 - start);
+            double etl = avg_time * (N - i - 1);
+            double etl_d = std::floor(etl / Days);
+            etl -= etl_d * Days;
+            double etl_h = std::floor(etl / Hours);
+            etl -= etl_h * Hours;
+            double etl_m = std::floor(etl / Minutes);
+            etl -= etl_m * Minutes;
+            std::cout << " (" << etl_d << "d " << etl_h << "h " << etl_m << "m " << std::floor(etl)
+                      << "s left)" << std::endl;
+        }
 
         current_gf = i + 1;
 
-        /* checkpoint */
-        MPI_Bcast(&solve_time, 1, MPI_DOUBLE, 0, comm);
-        if (solve_time / 60.0 > checkpoint_every_nmins_) {
-            CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
-            CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
-            write_discrete_greens_operator(mesh, current_gf, n_gf);
-            solve_time = 0.0;
+        if (checkpoint_enabled_) {
+            /* checkpoint */
+            MPI_Bcast(&solve_time, 1, MPI_DOUBLE, 0, comm);
+            if (solve_time / 60.0 > checkpoint_every_nmins_) {
+                CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
+                CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
+                write_discrete_greens_operator(mesh, current_gf, n_gf);
+                solve_time = 0.0;
+            }
         }
     }
 
@@ -624,18 +589,22 @@ void SeasQDDiscreteGreenOperator::get_discrete_greens_function(
         n_gf = create_discrete_greens_function();
     }
 
-    // If a checkpoint file is found, load it. Record the number of assembled GFs found in file.
-    CHKERRTHROW(PetscTestFile(gf_operator_filename_.c_str(), 'r', &found));
-    if (found) {
-        n_gfloaded = load_discrete_greens_operator(mesh, n_gf);
+    if (checkpoint_enabled_) {
+        // If a checkpoint file is found, load it. Record the number of assembled GFs found in file.
+        CHKERRTHROW(PetscTestFile(gf_operator_filename_.c_str(), 'r', &found));
+        if (found) {
+            n_gfloaded = load_discrete_greens_operator(mesh, n_gf);
+        }
     }
 
     // Assemble as many GFs as possible in the range [current_gf, n_gf)
     partial_assemble_discrete_greens_function(mesh, n_gfloaded, n_gf);
 
-    // Write out the operator whenever the fully assembled operator was not loaded from file
-    if (n_gfloaded != n_gf) {
-        write_discrete_greens_operator(mesh, n_gf, n_gf);
+    if (checkpoint_enabled_) {
+        // Write out the operator whenever the fully assembled operator was not loaded from file
+        if (n_gfloaded != n_gf) {
+            write_discrete_greens_operator(mesh, n_gf, n_gf);
+        }
     }
 }
 
