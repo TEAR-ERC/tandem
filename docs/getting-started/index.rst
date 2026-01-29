@@ -3,9 +3,10 @@ Getting started
 
 .. toctree::
    :hidden:
+   :maxdepth: 1
 
    quick-start
-   installation
+   installation/index
    examples
 
 Welcome to tandem!
@@ -16,6 +17,6 @@ to compiled from source.
 If you have Docker installed, you might want to try the
 :doc:`quick start <quick-start>` procedure.
 Here, all required dependencies are already contained in a Docker image.
-Otherwise, follow the :doc:`regular installation <installation>` procedure.
+Otherwise, follow the :doc:`regular installation <installation/index>` procedure.
 
 Once tandem is installed, try to run the :doc:`example problems <examples>`.
