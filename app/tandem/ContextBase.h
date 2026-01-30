@@ -28,7 +28,8 @@ public:
         : cl(std::make_shared<Curvilinear<DomainDimension>>(mesh, std::move(transform),
                                                             PolynomialDegree)),
           fault_map(std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD)),
-          topo(std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD)) {}
+          topo(std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD)),mesh(mesh)
+           {}
 
     virtual auto dg() -> std::unique_ptr<AbstractDGOperator<DomainDimension>> = 0;
     virtual auto friction() -> std::unique_ptr<AbstractFrictionOperator> = 0;
@@ -41,6 +42,9 @@ public:
     std::shared_ptr<Curvilinear<DomainDimension>> cl;
     std::shared_ptr<BoundaryMap> fault_map;
     std::shared_ptr<DGOperatorTopo> topo;
+
+
+    LocalSimplexMesh<DomainDimension> const& mesh;
 };
 
 } // namespace tndm::seas

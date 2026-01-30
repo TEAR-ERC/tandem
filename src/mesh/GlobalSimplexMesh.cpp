@@ -5,9 +5,19 @@
 
 namespace tndm {
 
-template <std::size_t D> void GlobalSimplexMesh<D>::repartition() {
-    auto distCSR = distributedCSR<idx_t>();
-    auto partition = MetisPartitioner::partition(distCSR, D, 1.05, comm);
+template <std::size_t D> void GlobalSimplexMesh<D>::repartition(long faultPartitionElementWeight) {
+    auto numElems = numElements();
+    DistributedCSR<idx_t> distCSR;
+    std::vector<idx_t> elementWeights(numElems, 1);
+    
+    if (faultPartitionElementWeight==1){
+        distCSR = distributedCSR<idx_t>();
+    }else{
+        distCSR = distributedCSR<idx_t>(elementWeights,faultPartitionElementWeight);
+    }
+    
+    
+    auto partition = MetisPartitioner::partition(distCSR, D,elementWeights, 1.05, comm);
 
     doPartition(partition);
     isPartitionedByHash = false;
@@ -28,6 +38,10 @@ template <std::size_t D> void GlobalSimplexMesh<D>::repartitionByHash() {
     isPartitionedByHash = true;
 }
 
+
+
+
+
 template <std::size_t D>
 void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     int procs, rank;
@@ -44,6 +58,7 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     std::vector<int> sendcounts(procs, 0);
     std::vector<simplex_t> elemsToSend;
     elemsToSend.reserve(numElements());
+    std::vector<globalBoundaryTag<D>> boundaryTagsToSend;
     auto eIt = enumeration.begin();
     for (int p = 0; p < procs; ++p) {
         while (eIt != enumeration.end() && partition[*eIt] <= p) {
@@ -61,6 +76,8 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     if (elementData) {
         elementData = elementData->redistributed(enumeration, a2a);
     }
+
+
 }
 
 template <std::size_t D>

@@ -12,9 +12,10 @@
 #include "parallel/SortedDistribution.h"
 #include "util/Range.h"
 #include "util/Utility.h"
-
+#include "mesh/MultiplyBoundaryTags.h"
 #include <metis.h>
 #include <mpi.h>
+#include <cstring> // For std::memcpy
 
 #include <algorithm>
 #include <array>
@@ -74,6 +75,10 @@ public:
         std::get<DD>(boundaryMeshes) = std::move(boundaryMesh);
     }
 
+    void setBoundaryTags(std::vector<globalBoundaryTag<D>> boundaryTagsSent){
+        boundaryTags=std::move(boundaryTagsSent);
+    }
+
     /**
      * @brief Mesh topology for partitioning.
      *
@@ -81,19 +86,22 @@ public:
      *
      * @return Returns mesh in distributed CSR format as required by ParMETIS.
      */
+
     template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR() const {
         DistributedCSR<OutIntT> csr;
 
         auto elmdist = makeSortedDistribution(numElements(), comm);
         csr.dist.resize(elmdist.size());
         std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
-
+        
         auto numElems = numElements();
         csr.rowPtr.resize(numElems + 1);
         csr.colInd.resize(numElems * (D + 1));
-
+        //std::vector<idx_t> elementWeights(numElems, 1);
+        
         OutIntT ind = 0;
         OutIntT ptr = 0;
+        std::size_t elementIndex=0;
         for (auto& e : elems_) {
             csr.rowPtr[ptr++] = ind;
             for (auto& p : e) {
@@ -105,10 +113,60 @@ public:
         return csr;
     }
 
+    template <typename OutIntT> DistributedCSR<OutIntT> distributedCSR(std::vector<idx_t>& elementWeights,long faultWeight) const {
+        DistributedCSR<OutIntT> csr;
+
+        auto elmdist = makeSortedDistribution(numElements(), comm);
+        csr.dist.resize(elmdist.size());
+        std::copy(elmdist.begin(), elmdist.end(), csr.dist.begin());
+        
+        auto numElems = numElements();
+        csr.rowPtr.resize(numElems + 1);
+        csr.colInd.resize(numElems * (D + 1));
+        //std::vector<idx_t> elementWeights(numElems, 1);
+        
+        OutIntT ind = 0;
+        OutIntT ptr = 0;
+        std::size_t elementIndex=0;
+        for (auto& e : elems_) {
+            csr.rowPtr[ptr++] = ind;
+            for (auto& p : e) {
+                csr.colInd[ind++] = p;
+            }
+
+            for (const auto& boundaryTag_i : boundaryTags){
+                if (boundaryTag_i.getBoundaryType() == BC::Fault ){
+                
+                    bool match_found = false;
+                    auto faultFaces=boundaryTag_i.getElementBoundary(); 
+                    auto elementFaces=e.downward();
+
+                    for (const auto& elementFace_i : elementFaces) {
+                        for (const auto& faultFace_i : faultFaces) {
+                    
+                            if (std::equal(elementFace_i.begin(), elementFace_i.end(), faultFace_i.begin())){
+                                elementWeights[elementIndex]=faultWeight;
+                                match_found = true;
+                                break;
+                            } 
+                        }
+                        if (match_found) {
+                            break; // Exit outer loop if a match is found
+                        }
+                    }
+                }
+            }
+            elementIndex=elementIndex+1;
+        }    
+        csr.rowPtr.back() = ind;
+
+        return csr;
+    }
+
     /**
      * @brief Use ParMETIS to optimise mesh partitioning.
      */
-    void repartition();
+    void repartition(long faultPartitionElementWeight=1);
 
     /**
      * @brief Partition elements by their hash value (SimplexHash).
@@ -127,10 +185,131 @@ public:
     std::unique_ptr<LocalSimplexMesh<D>> getLocalMesh(unsigned overlap = 0) const {
         auto localFaces = getAllLocalFaces(overlap, std::make_index_sequence<D>{});
 
-        return std::make_unique<LocalSimplexMesh<D>>(std::move(localFaces));
+
+        
+        auto mesh=std::make_unique<LocalSimplexMesh<D>>(std::move(localFaces));
+        auto tempMesh=mesh.get();
+        const auto& facets = tempMesh->facets();
+        //auto gl2=facets.g2l();
+        auto faultTags=returnFaultTypeBoundaries(boundaryTags);  //only treat faults - later can add direclhet 
+        auto faultsTagsInLocalMesh=getLocalBoundaryTagFromGlobal( faultTags , facets); // here is where I do the mapping between global and local
+        mesh->saveFaultTags(faultsTagsInLocalMesh);
+        return mesh;
     }
 
+
+
+void AllGatherBoundaryTags() {
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    // Serialize BoundaryTags
+    std::vector<char> serializedTags;
+    serializeBoundaryTags(boundaryTags, serializedTags);
+
+    // Determine the size of serialized data from each process
+    int localSize = serializedTags.size();
+    std::vector<int> allSizes(size);
+    MPI_Allgather(&localSize, 1, MPI_INT, allSizes.data(), 1, MPI_INT, comm);
+
+    // Determine the displacements for the gathered data
+    std::vector<int> displs(size, 0);
+    for (int i = 1; i < size; ++i) {
+        displs[i] = displs[i - 1] + allSizes[i - 1];
+    }
+
+    // Allocate buffer for all gathered data
+    std::vector<char> allSerializedTags(displs.back() + allSizes.back());
+    MPI_Allgatherv(serializedTags.data(), localSize, MPI_BYTE, allSerializedTags.data(),
+                   allSizes.data(), displs.data(), MPI_BYTE, comm);
+
+    // Deserialize gathered data
+    boundaryTags.clear();
+    deserializeBoundaryTags(allSerializedTags, boundaryTags);
+}
+
 private:
+
+
+
+void serializeBoundaryTags(const std::vector<globalBoundaryTag<D>>& tags, std::vector<char>& buffer) {
+    size_t totalSize = 0;
+    for (const auto& tag : tags) {
+        totalSize += sizeof(tag.tagID);
+        totalSize += sizeof(tag.dimension);
+        totalSize += sizeof(tag.boundaryType);
+        totalSize += sizeof(size_t) + tag.tagLabel.size();
+        totalSize += sizeof(size_t) + tag.elementBoundary.size() * sizeof(Simplex<D - 1>);
+    }
+    buffer.resize(totalSize);
+
+    char* ptr = buffer.data();
+    for (const auto& tag : tags) {
+        std::memcpy(ptr, &tag.tagID, sizeof(tag.tagID));
+        ptr += sizeof(tag.tagID);
+
+        std::memcpy(ptr, &tag.dimension, sizeof(tag.dimension));
+        ptr += sizeof(tag.dimension);
+
+        std::memcpy(ptr, &tag.boundaryType, sizeof(tag.boundaryType));
+        ptr += sizeof(tag.boundaryType);
+
+        size_t labelSize = tag.tagLabel.size();
+        std::memcpy(ptr, &labelSize, sizeof(size_t));
+        ptr += sizeof(size_t);
+        std::memcpy(ptr, tag.tagLabel.data(), labelSize);
+        ptr += labelSize;
+
+        size_t elementBoundarySize = tag.elementBoundary.size();
+        std::memcpy(ptr, &elementBoundarySize, sizeof(size_t));
+        ptr += sizeof(size_t);
+        std::memcpy(ptr, tag.elementBoundary.data(), elementBoundarySize * sizeof(Simplex<D - 1>));
+        ptr += elementBoundarySize * sizeof(Simplex<D - 1>);
+    }
+}
+
+
+
+void deserializeBoundaryTags(const std::vector<char>& buffer, std::vector<globalBoundaryTag<D>>& tags) {
+    const char* ptr = buffer.data();
+    while (ptr < buffer.data() + buffer.size()) {
+        std::string tagLabel;
+        long tagID;
+        int dimension;
+        BC boundaryType;
+
+        std::memcpy(&tagID, ptr, sizeof(tagID));
+        ptr += sizeof(tagID);
+
+        std::memcpy(&dimension, ptr, sizeof(dimension));
+        ptr += sizeof(dimension);
+
+        std::memcpy(&boundaryType, ptr, sizeof(boundaryType));
+        ptr += sizeof(boundaryType);
+
+        size_t labelSize;
+        std::memcpy(&labelSize, ptr, sizeof(size_t));
+        ptr += sizeof(size_t);
+        tagLabel.assign(ptr, labelSize);
+        ptr += labelSize;
+
+        size_t elementBoundarySize;
+        std::memcpy(&elementBoundarySize, ptr, sizeof(size_t));
+        ptr += sizeof(size_t);
+        std::vector<Simplex<D - 1>> elementBoundary(elementBoundarySize);
+        std::memcpy(elementBoundary.data(), ptr, elementBoundarySize * sizeof(Simplex<D - 1>));
+        ptr += elementBoundarySize * sizeof(Simplex<D - 1>);
+
+        globalBoundaryTag<D> tag(tagLabel, tagID, dimension, boundaryType);
+        tag.elementBoundary = std::move(elementBoundary);
+        tags.push_back(std::move(tag));
+    }
+}
+
+
+
+
     template <std::size_t DD> friend class GlobalSimplexMesh;
     using upward_map_t = std::unordered_multimap<Simplex<D - 1u>, std::size_t, SimplexHash<D - 1u>>;
     using facet_set_t = std::unordered_set<Simplex<D - 1u>, SimplexHash<D - 1u>>;
@@ -401,6 +580,12 @@ private:
         return std::make_pair(std::move(sharedRanks), std::move(sharedRanksDispls));
     }
 
+
+
+
+
+
+
     std::vector<simplex_t> elems_;
     std::unique_ptr<MeshData> vertexData;
     std::unique_ptr<MeshData> elementData;
@@ -408,6 +593,7 @@ private:
     bool isPartitionedByHash = false;
     std::vector<std::size_t> vtxdist;
     ntuple_t<global_mesh_ptr, D> boundaryMeshes;
+    std::vector<globalBoundaryTag<D>> boundaryTags;
 };
 } // namespace tndm
 
