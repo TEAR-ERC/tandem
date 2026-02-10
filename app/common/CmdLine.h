@@ -36,6 +36,11 @@ readFromConfigurationFileAndCmdLine(TableSchema<T> const& schema, argparse::Argu
                   << err << std::endl;
         return std::nullopt;
     }
+    if (!rawCfg.contains("ts_checkpoint")) {
+        // If it doesn't exist, add an empty "ts_checkpoint" section
+        // this allows using default checkpoint options in the tandem app
+        rawCfg.insert_or_assign("ts_checkpoint", toml::array{});
+    }
 
     T cfg;
     try {

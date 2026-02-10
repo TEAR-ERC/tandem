@@ -13,6 +13,7 @@
 #include "form/VolumeFunctionalFactory.h"
 #include "localoperator/Adapter.h"
 #include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -53,8 +54,7 @@ template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     return std::make_unique<seas::Context<Type>>(
         mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
-        std::make_unique<DieterichRuinaAgeingScenario>(cfg.lib, cfg.scenario), cfg.up,
-        cfg.ref_normal);
+        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up, cfg.ref_normal);
 }
 
 template <std::size_t N>
@@ -146,10 +146,21 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
 
     static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
                      seas::ContextBase& ctx) {
+        auto const& cfgcp = cfg.gf_checkpoint_config;
+
+        std::optional<std::string> prefix;
+        double freq_cputime;
+        if (!cfgcp) {
+            prefix = std::nullopt;
+            freq_cputime = 1e10;
+        } else {
+            prefix = cfgcp->prefix;
+            freq_cputime = cfgcp->frequency_cputime_minutes;
+        }
+
         auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
-            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh,
-            cfg.gf_checkpoint_prefix, cfg.gf_checkpoint_every_nmins, cfg.matrix_free,
-            MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh, prefix,
+            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
         ctx.setup_seasop(*seasop);
         seasop->warmup();
         return seasop;
@@ -191,9 +202,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                         seas::ContextBase& ctx) {
     auto seasop = operator_specifics<seas_t>::make(mesh, cfg, ctx);
 
-    auto ts =
-        PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
-                                                 seasop->num_local_elements(), seasop->comm()));
+    auto ts = PetscTimeSolver(
+        *seasop,
+        make_state_vecs(seasop->block_sizes(), seasop->num_local_elements(), seasop->comm()), cfg);
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
     if (cfl_time_step) {
@@ -235,6 +246,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     Stopwatch sw;
     sw.start();
     ts.solve(cfg.final_time);
+
     double solve_time = sw.stop();
 
     std::optional<double> L2_error_domain = std::nullopt;

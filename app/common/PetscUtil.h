@@ -18,7 +18,7 @@
         }                                                                                          \
     } while (false)
 
-#define HASH_DEF(def) ::tndm::fnv1a((def), sizeof(def)-1)
+#define HASH_DEF(def) ::tndm::fnv1a((def), sizeof(def) - 1)
 
 namespace tndm {
 

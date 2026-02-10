@@ -37,6 +37,9 @@ void Banner::print_centered(std::ostream& out, std::string_view str, std::size_t
 
 void Banner::print_version(std::ostream& out) {
     print_centered(out, "tandem version " + std::string(VersionString));
+    print_centered(out, "domain dimension " + std::to_string(DomainDimension));
+    print_centered(out, "polynomial degree " + std::to_string(PolynomialDegree));
+    print_centered(out, "minimum order of quadrature rule " + std::to_string(MinQuadOrder()));
 }
 
 void Banner::print_stack_limit(std::ostream& out) {
@@ -66,7 +69,9 @@ void Banner::print_stack_limit(std::ostream& out) {
     }
 }
 
-void Banner::print_affinity(std::ostream& out, Affinity const& affinity) {
+void Banner::print_affinity(std::ostream& out, Affinity const& affinity,
+                            std::string_view node_mask) {
+    // Print individual worker affinity
     print_centered(out, "Worker affinity");
     auto mask = affinity.to_string(affinity.worker_mask());
     auto mask_view = std::string_view(mask);
@@ -79,16 +84,22 @@ void Banner::print_affinity(std::ostream& out, Affinity const& affinity) {
     for (int i = 0; i < num_lines; ++i) {
         print_centered(out, mask_view.substr(i * line_width, line_width), line_width);
     }
+    // Print node-wide worker affinity
+    print_centered(out, "Worker affinity on node");
+    auto node_mask_view = std::string_view(node_mask);
+    for (int i = 0; i < num_lines; ++i) {
+        print_centered(out, node_mask_view.substr(i * line_width, line_width), line_width);
+    }
 }
 
-void Banner::standard(std::ostream& out, Affinity const& affinity) {
+void Banner::standard(std::ostream& out, Affinity const& affinity, std::string_view node_mask) {
     print_logo(out);
     out << std::endl;
     print_version(out);
     out << std::endl;
     print_stack_limit(out);
     out << std::endl;
-    print_affinity(out, affinity);
+    print_affinity(out, affinity, node_mask);
     out << std::endl << std::endl;
 }
 

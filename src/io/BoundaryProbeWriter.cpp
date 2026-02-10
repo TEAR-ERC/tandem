@@ -4,6 +4,7 @@
 #include "io/ProbeWriterUtil.h"
 #include "util/LinearAllocator.h"
 
+#include <filesystem>
 #include <mpi.h>
 #include <sstream>
 #include <unordered_map>
@@ -83,7 +84,12 @@ void BoundaryProbeWriter<D>::write(double time,
             out_->open(probe.file_name, false);
             write_header(probe, functions);
         } else {
-            out_->open(probe.file_name, true);
+            if (std::filesystem::exists(probe.file_name)) {
+                out_->open(probe.file_name, true);
+            } else {
+                out_->open(probe.file_name, false);
+                write_header(probe, functions);
+            }
         }
 
         *out_ << time;

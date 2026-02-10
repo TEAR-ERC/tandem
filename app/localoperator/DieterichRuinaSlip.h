@@ -1,5 +1,5 @@
-#ifndef DIETERICHRUINAAGEING_20241105_H
-#define DIETERICHRUINAAGEING_20241105_H
+#ifndef DIETERICHRUINASLIP_20240131_H
+#define DIETERICHRUINASLIP_20240131_H
 
 #include "config.h"
 
@@ -18,14 +18,14 @@
 
 namespace tndm {
 
-class DieterichRuinaAgeing : public DieterichRuinaBase {
+class DieterichRuinaSlip : public DieterichRuinaBase {
 public:
     double state_rhs(std::size_t index, double V, double psi) const override {
         double myL = p_[index].get<L>();
-        return cp_.b * cp_.V0 / myL * (exp((cp_.f0 - psi) / cp_.b) - V / cp_.V0);
+        return -cp_.b * V / myL * (log(V / cp_.V0) + (psi - cp_.f0) / cp_.b); // Slip law
     }
 };
 
 } // namespace tndm
 
-#endif // DIETERICHRUINAAGEING_20241105_H
+#endif // DIETERICHRUINASLIP_20240131_H
