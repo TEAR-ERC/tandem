@@ -47,13 +47,13 @@ void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<do
         Tensor(vol[elNo].template get<Coords>().data()->data(), cl_->mapResultInfo(volRule.size()));
     auto absDetJ =
         Tensor(vol[elNo].template get<AbsDetJ>().data(), cl_->detJResultInfo(volRule.size()));
-    auto volumeTag =
-        Tensor(vol[elNo].template get<physicalTag>().data(), cl_->tagsInfo(volRule.size()));
+    auto volTag = Tensor(vol[elNo].template get<volumeTag>().data(), cl_->tagsInfo(volRule.size()));
+
     cl_->jacobian(elNo, geoDxi_Q, J);
     cl_->absDetJ(elNo, J, absDetJ);
     cl_->jacobianInv(J, jInv);
     cl_->map(elNo, geoE_Q, coords);
-    cl_->setVolumeTags(elNo, volumeTag);
+    cl_->setVolumeTags(elNo, volTag);
 
     double volume = 0.0;
     for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
@@ -79,7 +79,7 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     auto coords = Tensor(fct[fctNo].template get<Coords>().data()->data(),
                          cl_->mapResultInfo(fctRule.size()));
     auto facetTags =
-        Tensor(fct[fctNo].template get<physicalTag>().data(), cl_->tagsInfo(fctRule.size()));
+        Tensor(fct[fctNo].template get<facetTag>().data(), cl_->tagsInfo(fctRule.size()));
 
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);

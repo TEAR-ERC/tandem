@@ -63,7 +63,7 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-            auto volumeTags = this->vol[elNo].template get<physicalTag>();
+            auto volumeTags = this->vol[elNo].template get<volumeTag>();
             for (std::size_t q = 0; q < F.shape(1); ++q) {
                 auto fx = fun(coords[q], volumeTags[q]);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
@@ -78,7 +78,7 @@ public:
         return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
-            auto facetTags = this->fct[fctNo].template get<physicalTag>();
+            auto facetTags = this->fct[fctNo].template get<facetTag>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
                 auto fx = fun(coords[q], facetTags[q]);
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
@@ -93,7 +93,7 @@ public:
         return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
-            auto facetTags = this->fct[fctNo].template get<physicalTag>();
+            auto facetTags = this->fct[fctNo].template get<facetTag>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
                 auto fx = fun(coords[q], facetTags[q]);
                 if (!is_boundary) {
@@ -159,10 +159,16 @@ protected:
     struct physicalTag {
         using type = long int;
     };
+    struct volumeTag {
+        using type = long int;
+    };
+    struct facetTag {
+        using type = long int;
+    };
 
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
-                                      NormalLength, Coords, physicalTag>;
-    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, physicalTag>;
+                                      NormalLength, Coords, facetTag>;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, volumeTag>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
