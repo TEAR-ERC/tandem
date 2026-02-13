@@ -189,6 +189,8 @@ set(APP_COMMON_SRCS
     localoperator/RateAndStateBase.cpp
     #pc/lspoly.c
     pc/register.cpp
+    common/ts_util.c
+    common/vecnest_util.c
 )
 if(${LAPACK_FOUND})
     list(APPEND APP_COMMON_SRCS

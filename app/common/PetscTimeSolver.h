@@ -3,7 +3,11 @@
 
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
-
+#include "tandem/SeasConfig.h"
+extern "C" {
+#include "ts_util.h"
+#include "vecnest_util.h"
+}
 #include <petscsystypes.h>
 #include <petscts.h>
 #include <petscvec.h>
@@ -17,7 +21,7 @@ namespace tndm {
 
 class PetscTimeSolverBase {
 public:
-    PetscTimeSolverBase(MPI_Comm comm);
+    PetscTimeSolverBase(MPI_Comm comm, Config const& cfg);
     ~PetscTimeSolverBase();
 
     std::size_t get_step_number() const;
@@ -33,8 +37,11 @@ protected:
 template <std::size_t NumStateVecs> class PetscTimeSolver : public PetscTimeSolverBase {
 public:
     template <typename TimeOp>
-    PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state)
-        : PetscTimeSolverBase(timeop.comm()), state_(std::move(state)) {
+    PetscTimeSolver(TimeOp& timeop, std::array<std::unique_ptr<PetscVector>, NumStateVecs> state,
+                    Config const& cfg)
+        : PetscTimeSolverBase(timeop.comm(), cfg), state_(std::move(state)),
+          ts_checkpoint_load_directory(std::move(cfg.ts_checkpoint_config.load_directory)),
+          comm(timeop.comm()) {
 
         Vec x[NumStateVecs];
         for (std::size_t n = 0; n < NumStateVecs; ++n) {
@@ -42,6 +49,7 @@ public:
         }
         MPI_Comm comm;
         CHKERRTHROW(VecCreateNest(timeop.comm(), NumStateVecs, nullptr, x, &ts_state_));
+        CHKERRTHROW(VecNestUpgradeOperations(ts_state_));
 
         std::apply([&timeop](auto&... x) { timeop.initial_condition((*x)...); }, state_);
 
@@ -51,6 +59,39 @@ public:
     ~PetscTimeSolver() { VecDestroy(&ts_state_); }
 
     void solve(double upcoming_time) {
+        CHKERRTHROW(TSSetUp(ts_));
+
+        if (ts_checkpoint_load_directory.has_value()) {
+            int rank;
+            MPI_Comm_rank(comm, &rank);
+            std::string sload;
+            if (rank == 0) {
+                sload = ts_checkpoint_load_directory.value();
+                if (std::filesystem::is_regular_file(sload)) {
+                    std::cout << "Retrieving the name of the last checkpoint from " << sload
+                              << std::endl;
+                    std::ifstream file(sload);
+                    if (file.is_open()) {
+                        if (std::getline(file, sload)) {
+                            if (not std::filesystem::is_directory(sload)) {
+                                throw std::runtime_error(
+                                    "The first line of the file does not point to an existing "
+                                    "directory.");
+                            }
+                        } else {
+                            throw std::runtime_error("The file is empty.");
+                        }
+                        file.close();
+                    } else {
+                        throw std::runtime_error("Failed to open the file.");
+                    }
+                }
+            } else {
+                MPI_Bcast(&sload[0], sload.size(), MPI_CHAR, 0, MPI_COMM_WORLD);
+            }
+            const char* loadDirectory = sload.c_str();
+            CHKERRTHROW(ts_checkpoint_restart(ts_, loadDirectory));
+        }
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
     }
@@ -108,6 +149,8 @@ private:
 
     std::array<std::unique_ptr<PetscVector>, NumStateVecs> state_;
     Vec ts_state_ = nullptr;
+    std::optional<std::string> ts_checkpoint_load_directory;
+    MPI_Comm comm;
 };
 
 } // namespace tndm
