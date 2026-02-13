@@ -90,7 +90,7 @@ public:
             V = Finv(index, snAbs, tauAbs, psi);
         } else {
             if (snAbs <= 0.0) { /* Implies the fault is experiencing tension / opening */
-                snAbs = 0.0; /* Just to illustrate what we are doing */
+                snAbs = 0.0;    /* Just to illustrate what we are doing */
                 /* Solve R(V) = T - sigma_n F(V,psi) - eta V with sigma_n = 0.0 */
                 V = tauAbs / eta;
             } else {

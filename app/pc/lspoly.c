@@ -1,8 +1,8 @@
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/pcimpl.h>
 #include <petscksp.h>
-#include <petscsys.h>
 #include <petscpc.h>
+#include <petscsys.h>
 
 typedef struct {
     PetscReal alpha, beta; /* Coefficients of w(x) = (1-x)^\alpha (1+x)^\beta */
