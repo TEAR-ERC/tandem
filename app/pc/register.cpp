@@ -21,7 +21,7 @@ PetscErrorCode register_PCs() {
 
 PetscErrorCode register_KSPs() {
     PetscFunctionBegin;
-    // CHKERRQ(KSPRegister("lspoly", KSPCreate_LSPoly));
+    CHKERRQ(KSPRegister("lspoly", KSPCreate_LSPoly));
     PetscFunctionReturn(0);
 }
 

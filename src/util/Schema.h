@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <toml.hpp>
 
+#include <algorithm>
 #include <charconv>
 #include <functional>
 #include <limits>

@@ -392,6 +392,7 @@ void GlobalSimplexMesh<D>::deleteDomainBoundaryFaces(facet_set_t& boundaryFaces)
     }
 }
 
+template class GlobalSimplexMesh<1u>;
 template class GlobalSimplexMesh<2u>;
 template class GlobalSimplexMesh<3u>;
 
