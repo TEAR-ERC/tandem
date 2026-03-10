@@ -52,9 +52,7 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency(
-    file_vmax, file_vmax_gf, tolerance, tolerance_event=TOLERANCE_EVENT_QD_VS_QDGreen
-):
+def check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances):
     window_size = 1e9  # seconds
     relative_error = 0.5  # the max in a window_size window has to be relatively 50% above the values at the two edges of the window to be considered an event
 
@@ -73,9 +71,11 @@ def check_SEAS_consistency(
     values1 = arr1[:, 1]
     values2 = arr2[:, 1]
 
-    assert np.allclose(times1, times2, rtol=tolerance), "Event times do not match"
     assert np.allclose(
-        values1, values2, rtol=tolerance_event
+        times1, times2, rtol=tolerances["seas"]
+    ), "Event times do not match"
+    assert np.allclose(
+        values1, values2, rtol=tolerances["seas_events"]
     ), "Event slip rate magnitudes do not match"
 
     event_time_interval_QD = [
@@ -87,7 +87,7 @@ def check_SEAS_consistency(
     assert np.allclose(
         event_time_interval_QD,
         event_time_intervals_QDGreen,
-        rtol=tolerance,
+        rtol=tolerances["seas"],
     ), "event time intervals do not match between files."
 
 

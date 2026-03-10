@@ -4,7 +4,7 @@ import os
 
 
 def test_static_solver_vtu_consistency(
-    request, reference_results_path, temp_results_path, tolerance
+    request, reference_results_path, temp_results_path, tolerances
 ):
     domain_dimension = request.config.getoption("domain_dimension")
     ref_path = reference_results_path / f"ref_regression_{domain_dimension}D_output.vtu"
@@ -23,4 +23,4 @@ def test_static_solver_vtu_consistency(
     ref_data = ref.point_data[field]
     out_data = out.point_data[field]
 
-    assert_allclose(out_data, ref_data, atol=tolerance)
+    assert_allclose(out_data, ref_data, atol=tolerances["static"])
