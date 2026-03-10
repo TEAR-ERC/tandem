@@ -2,11 +2,6 @@ import pandas as pd
 import numpy as np
 
 
-TOLERANCE_EVENT_QD_VS_QDGreen = (
-    1e-2  # Tolerance for QD vs QDGreen event slip rate magnitudes
-)
-
-
 def detect_events(file_name, window_size=1e9, relative_error=0.5):
     df = pd.read_csv(file_name, comment="#")
     time = df["Time"].values
@@ -91,19 +86,21 @@ def check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances):
     ), "event time intervals do not match between files."
 
 
-def test_SEAS_consistency_QD(temp_results_path, reference_results_path, tolerance):
+def test_SEAS_consistency_QD(temp_results_path, reference_results_path, tolerances):
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerance, tolerance)
+    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
 
 
-def test_SEAS_consistency_QDGreen(temp_results_path, reference_results_path, tolerance):
+def test_SEAS_consistency_QDGreen(
+    temp_results_path, reference_results_path, tolerances
+):
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerance, tolerance)
+    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
 
 
-def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerance):
+def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances):
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax, file_vmax_gf, tolerance)
+    check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances)
