@@ -124,7 +124,7 @@ def compare_one_vs_many_processor_outputs(
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
-    tolerance,
+    tolerances,
 ):
     def _compare(reference_file, file_prefix, number_of_configurations, field_name):
         ref_data = load_vtu_file(reference_file)
@@ -137,7 +137,7 @@ def compare_one_vs_many_processor_outputs(
             cmp_dict = get_cell_centroid_point_dofs(data, field_name)
             L2_norm = compute_l2_error_with_reference_data(ref_dict, cmp_dict)
             assert (
-                L2_norm < tolerance
+                L2_norm < tolerances["static"]
             ), f"Output for {output_procs[idx]} procs is inconsistent with output for 1 proc."
 
     return _compare
