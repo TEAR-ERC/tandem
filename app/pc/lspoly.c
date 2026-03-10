@@ -1,8 +1,8 @@
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/pcimpl.h>
 #include <petscksp.h>
-#include <petscsys.h>
 #include <petscpc.h>
+#include <petscsys.h>
 
 typedef struct {
     PetscReal alpha, beta; /* Coefficients of w(x) = (1-x)^\alpha (1+x)^\beta */
@@ -140,23 +140,19 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
             CHKERRQ(KSPGetIterationNumber(cheb->kspest, &its));
             if (ksp->normtype == KSP_NORM_NONE) {
                 PetscInt sendbuf, recvbuf;
-                CHKERRQ(PCGetFailedReasonRank(ksp->pc, &pcreason));
-                sendbuf = (PetscInt)pcreason;
-                CHKERRMPI(MPI_Allreduce(&sendbuf, &recvbuf, 1, MPIU_INT, MPI_MAX,
-                                        PetscObjectComm((PetscObject)ksp)));
-                CHKERRQ(PCSetFailedReason(ksp->pc, (PCFailedReason)recvbuf));
+                CHKERRQ(PCReduceFailedReason(ksp->pc));
             }
             CHKERRQ(PCGetFailedReason(ksp->pc, &pcreason));
             ksp->reason = KSP_DIVERGED_PC_FAILED;
-            CHKERRQ(PetscInfo3(ksp, "Eigen estimator failed: %s %s at iteration %D",
-                               KSPConvergedReasons[reason], PCFailedReasons[pcreason], its));
+            CHKERRQ(PetscInfo(ksp, "Eigen estimator failed: %s %s at iteration %" PetscInt_FMT "",
+                              KSPConvergedReasons[reason], PCFailedReasons[pcreason], its));
             PetscFunctionReturn(0);
         } else if (reason == KSP_CONVERGED_RTOL || reason == KSP_CONVERGED_ATOL) {
             CHKERRQ(PetscInfo(ksp, "Eigen estimator converged prematurely. Should not happen "
                                    "except for small or low rank problem\n"));
         } else if (reason < 0) {
-            CHKERRQ(PetscInfo1(ksp, "Eigen estimator failed %s, using estimates anyway\n",
-                               KSPConvergedReasons[reason]));
+            CHKERRQ(PetscInfo(ksp, "Eigen estimator failed %s, using estimates anyway\n",
+                              KSPConvergedReasons[reason]));
         }
 
         CHKERRQ(KSPLSPolyComputeExtremeEigenvalues_Private(cheb->kspest, &max));
@@ -167,11 +163,11 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
     PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPSetFromOptions_LSPoly(PetscOptionItems* PetscOptionsObject, KSP ksp) {
+static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems* PetscOptionsObject) {
     KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
 
     PetscFunctionBegin;
-    CHKERRQ(PetscOptionsHead(PetscOptionsObject, "KSP LSPoly Options"));
+    PetscOptionsHeadBegin(PetscOptionsObject, "KSP LSPoly Options");
     CHKERRQ(PetscOptionsInt("-ksp_lspoly_esteig_steps", "Number of est steps in LSPoly", "",
                             cheb->eststeps, &cheb->eststeps, NULL));
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_esteig_bias",
@@ -181,7 +177,7 @@ static PetscErrorCode KSPSetFromOptions_LSPoly(PetscOptionItems* PetscOptionsObj
                              &cheb->alpha, NULL));
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
-    PetscOptionsTail();
+    PetscOptionsHeadEnd();
     PetscFunctionReturn(0);
 }
 
@@ -197,9 +193,9 @@ static PetscErrorCode KSPSolve_LSPoly(KSP ksp) {
     PetscFunctionBegin;
     CHKERRQ(PCGetDiagonalScale(ksp->pc, &diagonalscale));
     if (diagonalscale)
-        SETERRQ1(PetscObjectComm((PetscObject)ksp), PETSC_ERR_SUP,
-                 "Krylov method %s does not support diagonal scaling",
-                 ((PetscObject)ksp)->type_name);
+        SETERRQ(PetscObjectComm((PetscObject)ksp), PETSC_ERR_SUP,
+                "Krylov method %s does not support diagonal scaling",
+                ((PetscObject)ksp)->type_name);
 
     CHKERRQ(PCGetOperators(ksp->pc, &Amat, &Pmat));
     CHKERRQ(PetscObjectSAWsTakeAccess((PetscObject)ksp));
@@ -354,7 +350,7 @@ PETSC_EXTERN PetscErrorCode KSPCreate_LSPoly(KSP ksp) {
     KSP_LSPoly* lspolyP;
 
     PetscFunctionBegin;
-    CHKERRQ(PetscNewLog(ksp, &lspolyP));
+    CHKERRQ(PetscNew(&lspolyP));
 
     ksp->data = (void*)lspolyP;
     CHKERRQ(KSPSetSupportedNorm(ksp, KSP_NORM_PRECONDITIONED, PC_LEFT, 3));

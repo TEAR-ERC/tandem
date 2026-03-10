@@ -17,6 +17,9 @@
     <a href="https://github.com/TEAR-ERC/tandem/network/members">
     	<img src="https://img.shields.io/github/forks/TEAR-ERC/tandem" alt="Forks"/>
     </a>
+  <a href='https://tandem.readthedocs.io/en/latest/?badge=latest'>
+    <img src='https://readthedocs.org/projects/tandem/badge/?version=latest' alt='Documentation Status' />
+  </a>
 </p>
 
 <p align="center">
