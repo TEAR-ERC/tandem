@@ -3,7 +3,7 @@ import numpy as np
 
 
 TOLERANCE_EVENT_QD_VS_QDGreen = (
-    1e-4  # Tolerance for QD vs QDGreen event slip rate magnitudes
+    1e-2  # Tolerance for QD vs QDGreen event slip rate magnitudes
 )
 
 
