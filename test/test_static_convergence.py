@@ -1,8 +1,10 @@
 import math
 import numpy as np
+from collections import namedtuple
 
 
 def parse_static_log(log_file):
+    LogEntry = namedtuple("LogEntry", ["h", "dofs", "residual", "l2_error", "h1_error"])
     data = []
     current_entry = {}
 
@@ -11,6 +13,7 @@ def parse_static_log(log_file):
             line = line.strip()
 
             if line.startswith("DOFs:"):
+                current_entry = {}  # reset at the start of each new entry
                 current_entry["dofs"] = int(line.split()[1])
             elif line.startswith("Mesh size:"):
                 current_entry["h"] = float(line.split()[2])
@@ -26,21 +29,22 @@ def parse_static_log(log_file):
                     for key in ["dofs", "h", "residual", "l2_error", "h1_error"]
                 ):
                     data.append(
-                        (
-                            current_entry["h"],
-                            current_entry["dofs"],
-                            current_entry["residual"],
-                            current_entry["l2_error"],
-                            current_entry["h1_error"],
+                        LogEntry(
+                            h=current_entry["h"],
+                            dofs=current_entry["dofs"],
+                            residual=current_entry["residual"],
+                            l2_error=current_entry["l2_error"],
+                            h1_error=current_entry["h1_error"],
                         )
                     )
                     current_entry = {}
 
-    data.sort(key=lambda x: x[0])  # sort by mesh size
+    data.sort(key=lambda x: x.h)  # sort by mesh size
     return data
 
 
 def compute_slope(x_vals, y_vals):
+    """Compute slope of a log-log fit between x_vals and y_vals (order of convergence)."""
     log_x = np.log(x_vals)
     log_y = np.log(y_vals)
     slope, _ = np.polyfit(log_x, log_y, 1)
@@ -48,32 +52,44 @@ def compute_slope(x_vals, y_vals):
 
 
 def compute_all_slopes(data):
-    mesh_size = np.array([entry[0] for entry in data])
-    l2_errors = np.array([entry[3] for entry in data])
-    h1_errors = np.array([entry[4] for entry in data])
+    """
+    Compute L2 and H1 convergence slopes from parsed log data.
+
+    Returns a tuple (slope_l2, slope_h1).
+    """
+    mesh_size = np.array([entry.h for entry in data])
+    l2_errors = np.array([entry.l2_error for entry in data])
+    h1_errors = np.array([entry.h1_error for entry in data])
 
     slope_l2 = compute_slope(mesh_size, l2_errors)
     slope_h1 = compute_slope(mesh_size, h1_errors)
 
-    # return slope_l2, slope_h1
+    return slope_l2, slope_h1
 
 
-def test_convergence(request, tolerances):
+def test_convergence(request):
+    """
+    Integration test that verifies the computed convergence orders against
+    precomputed expected values for the given domain dimension.
+    """
     domain_dimension = request.config.getoption("domain_dimension")
     log_file = f"test_data/temp_test_results/convergence_{domain_dimension}D.log"
     data = parse_static_log(log_file)
     l2_order, h1_order = compute_all_slopes(data)
 
-    # Precomputed orders of convergence for 2 and 3 dimensions
-    expected = {
-        "2": (1.5105428398689058, 1.4294570164157487),
-        "3": (2.6718624932533888, 2.606395508949031),
-    }
-    expected_l2, expected_h1 = expected[str(domain_dimension)]
+    # Expected order of convergence for order N is N+1 - for N=3, we expect 4th order convergence;
+    N = 3
+    L2_upper_bound = N + 1
+    L2_lower_bound = N
 
-    assert math.isclose(
-        l2_order, expected_l2, rel_tol=tolerances["convergence"]
-    ), f"Computed L2 order {l2_order} does not match expected {expected_l2}"
-    assert math.isclose(
-        h1_order, expected_h1, rel_tol=tolerances["convergence"]
-    ), f"Computed H1 order {h1_order} does not match expected {expected_h1}"
+    H1_upper_bound = N
+    H1_lower_bound = N - 1
+
+    assert l2_order > L2_lower_bound and l2_order < L2_upper_bound, (
+        f"Computed L2 order {l2_order:.4f} "
+        f"(rounded: {l2_order}) does not match expected order between {L2_lower_bound} and {L2_upper_bound}"
+    )
+    assert h1_order > H1_lower_bound and h1_order < H1_upper_bound, (
+        f"Computed H1 order {h1_order:.4f} "
+        f"(rounded: {h1_order}) does not match expected order between {H1_lower_bound} and {H1_upper_bound}"
+    )

@@ -6,6 +6,10 @@ import os
 def test_static_solver_vtu_consistency(
     request, reference_results_path, temp_results_path, tolerances
 ):
+    """
+    Regression test that verifies point-wise consistency of the 'u0' field
+    between a reference VTU file and the most recent test output.
+    """
     domain_dimension = request.config.getoption("domain_dimension")
     ref_path = reference_results_path / f"ref_regression_{domain_dimension}D_output.vtu"
     test_path = temp_results_path / f"output{domain_dimension}D_0.vtu"
