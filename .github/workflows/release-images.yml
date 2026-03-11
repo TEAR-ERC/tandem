@@ -53,7 +53,7 @@ jobs:
       - name: Build and push base image
         uses: docker/build-push-action@v5
         with:
-          context: docker/release
+          context: .
           file: docker/release/Dockerfile.base
           platforms: linux/amd64
           push: true
@@ -108,8 +108,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-          context: docker/release
-          file: docker/release/Dockerfile
+          context: .
+          file: docker/release/Dockerfile.release
           platforms: linux/amd64
           push: true
           build-args: |
@@ -159,7 +159,7 @@ jobs:
       - name: Build and push all-in-one image
         uses: docker/build-push-action@v5
         with:
-          context: docker/release
+          context: .
           file: docker/release/Dockerfile.all
           platforms: linux/amd64
           push: true
