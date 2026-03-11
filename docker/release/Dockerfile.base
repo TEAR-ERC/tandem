@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1
+# Build the base image once (PETSc + Eigen + runtime deps):
+#   docker buildx build --platform linux/amd64 -f Dockerfile.base -t tandem-base:latest --load .
+
+FROM --platform=linux/amd64 ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gfortran \
+    cmake \
+    git \
+    wget \
+    python3 \
+    libopenmpi-dev \
+    openmpi-bin \
+    libhdf5-openmpi-dev \
+    libnetcdf-dev \
+    pkg-config \
+    liblua5.4-dev \
+    libblas-dev \
+    liblapack-dev \
+    python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV ROOT_DIR=/opt
+ENV PETSC_SRC=${ROOT_DIR}/petsc/petsc-3.22.3
+ENV PETSC_ARCH=arch-linux-c-opt
+ENV PETSC_DIR=${PETSC_SRC}
+ENV PETSC_INSTALL=${ROOT_DIR}/petsc/build
+ENV EIGEN_INSTALL=${ROOT_DIR}/eigen/build
+
+# ── PETSc ─────────────────────────────────────────────────────────────────────
+RUN mkdir -p ${ROOT_DIR}/petsc && cd ${ROOT_DIR}/petsc \
+    && wget -q https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-3.22.3.tar.gz \
+    && tar -xf petsc-3.22.3.tar.gz \
+    && rm petsc-3.22.3.tar.gz
+
+RUN cd ${PETSC_SRC} && ./configure \
+    --with-fortran-bindings=0 \
+    --with-debugging=0 \
+    --with-memalign=32 \
+    --with-64-bit-indices \
+    CC=mpicc CXX=mpicxx FC=mpif90 \
+    COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" \
+    --download-mumps \
+    --download-scalapack \
+    --download-metis \
+    --download-parmetis \
+    --download-fblaslapack=1 \
+    --prefix=${PETSC_INSTALL}
+
+RUN cd ${PETSC_SRC} \
+    && make PETSC_DIR=${PETSC_SRC} PETSC_ARCH=${PETSC_ARCH} all \
+    && make PETSC_DIR=${PETSC_SRC} PETSC_ARCH=${PETSC_ARCH} install
+
+# ── Eigen ─────────────────────────────────────────────────────────────────────
+RUN mkdir -p ${ROOT_DIR}/eigen && cd ${ROOT_DIR}/eigen \
+    && wget -q https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz \
+    && tar -xf eigen-3.4.0.tar.gz \
+    && rm eigen-3.4.0.tar.gz \
+    && cd eigen-3.4.0 \
+    && mkdir build && cd build \
+    && cmake ../ -DCMAKE_INSTALL_PREFIX=${EIGEN_INSTALL} \
+    && make install
+
+# ── Clone Tandem (source needed by child builds) ──────────────────────────────
+RUN mkdir -p ${ROOT_DIR}/tandem && cd ${ROOT_DIR}/tandem \
+    && git clone https://github.com/TEAR-ERC/tandem.git \
+    && cd tandem \
+    && git checkout dmay/staging \
+    && git submodule update --init
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM --platform=linux/amd64 ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gfortran \
+    cmake \
+    python3 \
+    libopenmpi-dev \
+    openmpi-bin \
+    libhdf5-openmpi-dev \
+    libnetcdf-dev \
+    pkg-config \
+    liblua5.4-dev \
+    libblas-dev \
+    liblapack-dev \
+    python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy PETSc install and Eigen install and Tandem source from builder
+COPY --from=builder /opt/petsc/build /opt/petsc/build
+COPY --from=builder /opt/eigen/build /opt/eigen/build
+COPY --from=builder /opt/tandem/tandem /opt/tandem/tandem
+
+ENV PETSC_INSTALL=/opt/petsc/build
+ENV EIGEN_INSTALL=/opt/eigen/build
+ENV LD_LIBRARY_PATH=/opt/petsc/build/lib:${LD_LIBRARY_PATH}

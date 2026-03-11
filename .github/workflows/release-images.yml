@@ -1,0 +1,190 @@
+name: Build and Push Tandem Release Images
+
+on:
+  push:
+    branches:
+      - ymagen/docker-release-images    # your PR branch - builds for testing
+    paths:
+      - 'docker/release/**'      # trigger if Dockerfiles changed
+      - '.github/workflows/release-images.yml'  # trigger if workflow itself changed
+    tags:
+      - 'v*'                     # v1.2.0, v1.3.0 etc - full versioned release
+  workflow_dispatch:             # manual trigger from GitHub Actions UI
+
+env:
+  REGISTRY: ghcr.io
+  TANDEM_BASE: ghcr.io/${{ github.repository_owner }}/tandem-base
+  IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/tandem
+
+jobs:
+  # ── Job 1: Build and push base image ────────────────────────────────────────
+  build-base:
+    name: Build base image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    # Pass the exact base image tag to downstream jobs so they pull the right one
+    outputs:
+      base-tag: ${{ steps.base-tag.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Compute a unique tag for this run so downstream jobs know exactly what to pull.
+      # On branch: ghcr.io/tear-erc/tandem-base:ymagen-docker-release-images
+      # On tag:    ghcr.io/tear-erc/tandem-base:1.2.0
+      - name: Compute base image tag
+        id: base-tag
+        run: |
+          REF="${{ github.ref_name }}"
+          SAFE="${REF//\//-}"          # replace / with - for branch names
+          TAG="${{ env.TANDEM_BASE }}:${SAFE}"
+          echo "tag=${TAG,,}" >> $GITHUB_OUTPUT  # lowercase entire tag
+
+      - name: Extract metadata for base image
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.TANDEM_BASE }}
+          tags: |
+            # Always push the branch/tag name
+            type=ref,event=branch
+            type=ref,event=tag
+            # Version tags on release
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/release/Dockerfile.base
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 2: Build all 12 DIM+DEG images in parallel ──────────────────────────
+  build-images:
+    name: Build tandem:${{ matrix.dim }}d-${{ matrix.deg }}p
+    needs: build-base
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dim: [2, 3]
+        deg: [1, 2, 3, 4, 5, 6]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_BASE }}
+          tags: |
+            # PR branch → :2d-6p-ymagen-docker-release-images (for testing)
+            type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-${{ github.ref_name }},enable=${{ github.ref_type == 'branch' }}
+            # Version tag → :2d-6p-1.2.0, :2d-6p-1.2, :2d-6p-latest, :2d-6p
+            type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/release/Dockerfile.release
+          platforms: linux/amd64
+          push: true
+          # Use the exact base tag produced by job 1, not :latest
+          build-args: |
+            DIM=${{ matrix.dim }}
+            DEG=${{ matrix.deg }}
+            BASE_IMAGE=${{ needs.build-base.outputs.base-tag }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Job 3: Build all-in-one image ───────────────────────────────────────────
+  build-all:
+    name: Build tandem:all
+    needs: build-base
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract metadata for all-in-one image
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_BASE }}
+          tags: |
+            # PR branch → :all-ymagen-docker-release-images (for testing)
+            type=raw,value=all-${{ github.ref_name }},enable=${{ github.ref_type == 'branch' }}
+            # Version tag → :all-1.2.0, :all-latest, :all
+            type=raw,value=all-${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=all-latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=all,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push all-in-one image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/release/Dockerfile.all
+          platforms: linux/amd64
+          push: true
+          # Use the exact base tag produced by job 1, not :latest
+          build-args: |
+            BASE_IMAGE=${{ needs.build-base.outputs.base-tag }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
