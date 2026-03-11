@@ -1,0 +1,70 @@
+# syntax=docker/dockerfile:1
+# Build a specific tandem image from the base:
+#   docker buildx build --platform linux/amd64 \
+#     --build-arg DIM=2 --build-arg DEG=6 \
+#     -t tandem:2d-6p --load .
+
+ARG DIM=2
+ARG DEG=6
+
+FROM --platform=linux/amd64 tandem-base:latest AS builder
+
+ARG DIM
+ARG DEG
+
+# ── Build Tandem for this specific DIM + DEG ──────────────────────────────────
+RUN mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
+    && cd /opt/tandem/build_${DIM}d_${DEG}p \
+    && cmake /opt/tandem/tandem \
+        -DCMAKE_CXX_COMPILER=mpicxx \
+        -DCMAKE_C_COMPILER=mpicc \
+        -DCMAKE_PREFIX_PATH="${PETSC_INSTALL};${EIGEN_INSTALL}" \
+        -DDOMAIN_DIMENSION=${DIM} \
+        -DPOLYNOMIAL_DEGREE=${DEG} \
+    && make -j$(nproc)
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM --platform=linux/amd64 ubuntu:22.04
+
+ARG DIM
+ARG DEG
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    openmpi-bin \
+    libopenmpi3 \
+    libhdf5-openmpi-103 \
+    libnetcdf19 \
+    liblua5.4-0 \
+    libblas3 \
+    liblapack3 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy PETSc runtime libs
+COPY --from=builder /opt/petsc/build/lib /opt/petsc/build/lib
+
+# Copy this specific Tandem build's binaries
+COPY --from=builder /opt/tandem/build_${DIM}d_${DEG}p/app /opt/tandem/bin
+
+# Copy examples
+COPY --from=builder /opt/tandem/tandem/examples /work/examples
+
+ENV LD_LIBRARY_PATH=/opt/petsc/build/lib:${LD_LIBRARY_PATH}
+ENV PATH=/opt/tandem/bin:${PATH}
+ENV OMP_NUM_THREADS=1
+ENV OMP_PROC_BIND=close
+ENV OMPI_MCA_rmaps_base_oversubscribe=1
+
+# Create non-root user
+RUN useradd -m -s /bin/bash tandem \
+    && chown -R tandem:tandem /work
+
+USER tandem
+WORKDIR /work
+
+RUN echo "ulimit -Ss 65536" >> /home/tandem/.bashrc
+
+CMD ["/bin/bash"]
