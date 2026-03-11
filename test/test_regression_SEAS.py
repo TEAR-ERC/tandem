@@ -3,9 +3,18 @@ import numpy as np
 
 
 def detect_events(file_name, window_size=1e9, relative_error=0.5):
+    """
+    Detect events from a CSV file containing 'Time' and 'VMax' columns.
+
+    An event is defined as a local maximum that is significantly above the
+    values at the edges of a time window (controlled by relative_error).
+    Returns a list of (time, vmax) events.
+    """
     df = pd.read_csv(file_name, comment="#")
     time = df["Time"].values
     vmax = df["VMax"].values
+
+    assert np.all(np.diff(time) >= 0), "Time array must be sorted for event detection"
 
     events = []
     i = 0
@@ -15,20 +24,16 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
         window_start = time[i]
         window_end = window_start + window_size
 
-        # Find the indices within the window
-        window_mask = (time >= window_start) & (time <= window_end)
-        window_indices = np.where(window_mask)[0]
+        end_idx = np.searchsorted(time, window_end, side="right")
 
-        if len(window_indices) < 3:
-            i += 1
-            continue
+        v_window = vmax[i:end_idx]
+        t_window = time[i:end_idx]
 
-        v_window = vmax[window_indices]
-        t_window = time[window_indices]
+        if len(v_window) < 3:
+            break  # not enough points left, no more events possible
 
         v_max = np.max(v_window)
-        idx_max = np.argmax(v_window)
-        t_max = t_window[idx_max]
+        t_max = t_window[np.argmax(v_window)]
 
         v_left = v_window[0]
         v_right = v_window[-1]
@@ -39,54 +44,63 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
 
         if left_check and right_check:
             events.append((t_max, v_max))
-
-            # Move to end of window to avoid overlapping detections
-            i = window_indices[-1] + 1
+            i = end_idx
         else:
             i += 1
     return events
 
 
-def check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances):
+def check_SEAS_consistency(file_reference, file_tested, tolerances):
+    """
+    Compare event detections between a reference and tested CSV file.
+
+    Asserts that the number, times, and magnitudes of detected events match
+    within provided tolerances.
+    """
     window_size = 1e9  # seconds
     relative_error = 0.5  # the max in a window_size window has to be relatively 50% above the values at the two edges of the window to be considered an event
 
-    events = detect_events(file_vmax, window_size, relative_error)
-    events_gf = detect_events(file_vmax_gf, window_size, relative_error)
+    events_reference = detect_events(file_reference, window_size, relative_error)
+    events_tested = detect_events(file_tested, window_size, relative_error)
 
-    sorted_events = sorted(events)
-    sorted_events_gf = sorted(events_gf)
+    assert len(events_reference) == len(events_tested), (
+        f"Number of detected events does not match: "
+        f"{len(events_reference)} in reference vs {len(events_tested)} in tested"
+    )
 
-    arr1 = np.array(sorted_events)
-    arr2 = np.array(sorted_events_gf)
+    arr_ref = np.array(sorted(events_reference))
+    arr_tst = np.array(sorted(events_tested))
 
-    times1 = arr1[:, 0]
-    times2 = arr2[:, 0]
+    times_reference = arr_ref[:, 0]
+    times_tested = arr_tst[:, 0]
 
-    values1 = arr1[:, 1]
-    values2 = arr2[:, 1]
+    values_reference = arr_ref[:, 1]
+    values_tested = arr_tst[:, 1]
 
     assert np.allclose(
-        times1, times2, rtol=tolerances["seas"]
+        times_reference, times_tested, rtol=tolerances["seas"]
     ), "Event times do not match"
     assert np.allclose(
-        values1, values2, rtol=tolerances["seas_events"]
+        values_reference, values_tested, rtol=tolerances["seas_events"]
     ), "Event slip rate magnitudes do not match"
 
-    event_time_interval_QD = [
-        events[i + 1][0] - events[i][0] for i in range(len(events) - 1)
+    event_time_intervals_reference = [
+        events_reference[i + 1][0] - events_reference[i][0]
+        for i in range(len(events_reference) - 1)
     ]
-    event_time_intervals_QDGreen = [
-        events_gf[i + 1][0] - events_gf[i][0] for i in range(len(events_gf) - 1)
+    event_time_intervals_tested = [
+        events_tested[i + 1][0] - events_tested[i][0]
+        for i in range(len(events_tested) - 1)
     ]
     assert np.allclose(
-        event_time_interval_QD,
-        event_time_intervals_QDGreen,
+        event_time_intervals_reference,
+        event_time_intervals_tested,
         rtol=tolerances["seas"],
-    ), "event time intervals do not match between files."
+    ), "Event time intervals do not match between files."
 
 
 def test_SEAS_consistency_QD(temp_results_path, reference_results_path, tolerances):
+    """Regression test comparing QD reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
     check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
@@ -95,12 +109,17 @@ def test_SEAS_consistency_QD(temp_results_path, reference_results_path, toleranc
 def test_SEAS_consistency_QDGreen(
     temp_results_path, reference_results_path, tolerances
 ):
+    """Regression test comparing QDGreen reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
 
 
 def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances):
+    """
+    Compare QD and QDGreen outputs from the same run to ensure they
+    produce consistent event detection results.
+    """
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances)

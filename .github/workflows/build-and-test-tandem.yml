@@ -45,9 +45,6 @@ jobs:
             $IMAGE \
             bash -c "
               set -e
-              sudo update-alternatives --install /usr/bin/cc cc /usr/bin/\$CC 100
-              sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/\$CXX 100
-
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
               cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
@@ -63,6 +60,8 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/app \
             -w /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }} \
+            -e CC=${{ matrix.compiler.cc }} \
+            -e CXX=${{ matrix.compiler.cxx }} \
             --user tandem \
             $IMAGE \
             make test
