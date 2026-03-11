@@ -5,7 +5,8 @@ on:
     branches:
       - ymagen/docker-release-images    # your PR branch - builds for testing
     paths:
-      - 'docker/release/**'      # only trigger if Dockerfiles actually changed
+      - 'docker/release/**'      # trigger if Dockerfiles changed
+      - '.github/workflows/release-images.yml'  # trigger if workflow itself changed
     tags:
       - 'v*'                     # v1.2.0, v1.3.0 etc - full versioned release
   workflow_dispatch:             # manual trigger from GitHub Actions UI
