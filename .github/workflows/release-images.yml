@@ -50,8 +50,9 @@ jobs:
         id: base-tag
         run: |
           REF="${{ github.ref_name }}"
-          SAFE="${REF//\//-}"   # replace / with - for branch names
-          echo "tag=${{ env.TANDEM_BASE }}:${SAFE}" >> $GITHUB_OUTPUT
+          SAFE="${REF//\//-}"          # replace / with - for branch names
+          TAG="${{ env.TANDEM_BASE }}:${SAFE}"
+          echo "tag=${TAG,,}" >> $GITHUB_OUTPUT  # lowercase entire tag
 
       - name: Extract metadata for base image
         id: meta
