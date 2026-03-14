@@ -46,7 +46,8 @@ jobs:
             bash -c "
               set -e
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
-              cmake .. -DCMAKE_PREFIX_PATH="/opt/petsc;/opt/hdf5" \
+              cmake .. -DCMAKE_PREFIX_PATH=\"/opt/petsc;/opt/hdf5\" \
+              -DHDF5_ROOT=\"/opt/hdf5\" \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
