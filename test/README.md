@@ -14,7 +14,7 @@ make test
 
 - **Unit Tests**: Run locally by default
 - **Integration Tests**: Require compilation with `-DRUN_CI_TESTS=ON`
-- **Test Data**: All required test data is available in a separate repository, imported as a submodule : [tandem_test_data](https://github.com/piyushkarki/tandem_test_data/tree/master) (Note: Submodule updates are tied to commit hashes.)
+- **Test Data**: All required test data is available in a separate repository, clones from : [tandem_test_data](https://github.com/piyushkarki/tandem_test_data/tree/master) (Note: Submodule updates are tied to commit hashes.)
 
 ## Test Categories
 
@@ -50,7 +50,7 @@ Comprehensive tests that validate the overall functionality of tandem.
 All reference data is generated using:
 
 - **PETSc version**: 3.22.x
-- **gmsh version**: 4.12.1
+- **gmsh version**: 2.2
 
 Reference data is generated using the `generate_test_outputs.sh` script.
 
