@@ -1,12 +1,15 @@
 FROM ubuntu:24.04
 ARG PETSC_VERSION
+ARG HDF5_VERSION
 ARG CC
 ARG CXX
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PETSC_INSTALL_DIR=/opt/petsc/
+ENV HDF5_INSTALL_DIR=/opt/hdf5/
 RUN mkdir -p $PETSC_INSTALL_DIR
+RUN mkdir -p $HDF5_INSTALL_DIR
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -38,8 +41,21 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install && \
     rm -rf petsc-${PETSC_VERSION}.tar.gz petsc-${PETSC_VERSION}
 
+# Get and install HDF5 (using PETSc version)
+RUN wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.gz && \
+    tar -xvzf hdf5-${HDF5_VERSION}.tar.gz && \
+    cd hdf5-${HDF5_VERSION} && \
+    ./configure --prefix=$HDF5_INSTALL_DIR \
+    --enable-parallel \
+    --enable-shared \
+    CC=mpicc CXX=mpicxx && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && rm -rf hdf5-${HDF5_VERSION}*
+
 # Save PETSc version for reference
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
+RUN echo "$HDF5_VERSION" > /opt/hdf5/version.txt
 
 # Create a non-root user for MPI operations
 RUN useradd -m -s /bin/bash tandem && \

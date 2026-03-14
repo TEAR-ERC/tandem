@@ -53,5 +53,6 @@ jobs:
           platforms: linux/amd64
           build-args: |
             PETSC_VERSION=${{ inputs.petsc_version }}
+            HDF5_VERSION=1.12.3
             CC=gcc-13
             CXX=g++-13
