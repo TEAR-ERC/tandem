@@ -1,5 +1,7 @@
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
+#include "io/H5Parser.h"
+#include "io/meshParser.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "parallel/SimpleScatter.h"
 #include "util/Stopwatch.h"
@@ -57,10 +59,21 @@ template <std::size_t D> void test(std::string mesh_file, unsigned long overlap)
     bool ok = false;
     GlobalSimplexMeshBuilder<D> builder;
     if (rank == 0) {
-        GMSHParser parser(&builder);
-        ok = parser.parseFile(mesh_file);
+        std::unique_ptr<meshParser> parser; // Pointer to the base class
+        // H5Parser parser(&builder);
+        if (cfg->meshInGMSHFile()) {
+            // Use GMSHParser for .msh files
+            parser = std::make_unique<GMSHParser>(&builder);
+        } else if (cfg->meshInH5File()) {
+            // Use H5Parser for .h5 files
+            parser = std::make_unique<H5Parser>(&builder);
+        } else {
+            std::cerr << "Unsupported mesh file format: " << *cfg->mesh_file << std::endl;
+            return -1;
+        }
+        ok = parser->parseFile(mesh_file);
         if (!ok) {
-            std::cerr << mesh_file << std::endl << parser.getErrorMessage();
+            std::cerr << mesh_file << std::endl << parser->getErrorMessage();
         }
     }
     MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
