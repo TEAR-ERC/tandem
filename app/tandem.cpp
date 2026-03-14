@@ -89,13 +89,16 @@ int main(int argc, char** argv) {
         bool ok = false;
         GlobalSimplexMeshBuilder<DomainDimension> builder;
         if (rank == 0) {
-            std::unique_ptr<meshParser> parser; // Pointer to the base class
-            // H5Parser parser(&builder);
+            std::unique_ptr<meshParser> parser;
             if (cfg->meshInGMSHFile()) {
                 // Use GMSHParser for .msh files
                 parser = std::make_unique<GMSHParser>(&builder);
             } else if (cfg->meshInH5File()) {
-                // Use H5Parser for .h5 files
+                if constexpr (DomainDimension != 3) {
+                    std::cerr << "H5 mesh format is only supported for 3D problems." << std::endl;
+                    PetscFinalize();
+                    return -1;
+                }
                 parser = std::make_unique<H5Parser>(&builder);
             } else {
                 std::cerr << "Unsupported mesh file format: " << *cfg->mesh_file << std::endl;
