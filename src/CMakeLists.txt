@@ -64,9 +64,8 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
-// TODO: Change this path
-set(HDF5_LIBRARIES "/home/pkarki/hdf5/lib/libhdf5.a")  # The exact HDF5 library path
-set(HDF5_INCLUDE_DIRS "/home/pkarki/hdf5/include")  # HDF5 include directory
+find_package(HDF5 COMPONENTS C HL REQUIRED)
+message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
     ${HDF5_INCLUDE_DIRS}
@@ -75,7 +74,7 @@ target_include_directories(tandem-lib PUBLIC
     ${LUA_INCLUDE_DIR}
 )
 target_link_libraries(tandem-lib PUBLIC
-    ${HDF5_LIBRARIES}
+    ${HDF5_LIBRARIES}    
     tandem-fem-lib
     ${FILESYSTEM_LIBRARIES}
     ${LUA_LIBRARIES}
