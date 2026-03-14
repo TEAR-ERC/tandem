@@ -42,14 +42,14 @@ public:
     void addElement(long type, long tag, long* node, std::size_t numNodes) override {
         REQUIRE(elNo < expectedElements + 4); // Allow for boundary elements
 
-        if (type == 4) { // Tetrahedral element (higher order)
+        if (type == 4) { // Tetrahedral element (higher Dimensional)
             CHECK(numNodes == 4);
             // Verify node indices are valid
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
                 CHECK(node[i] < static_cast<long>(expectedVertices));
             }
-        } else if (type == 2) { // Triangular boundary element (lower order)
+        } else if (type == 2) { // Triangular boundary element (lower Dimensional)
             CHECK(numNodes == 3);
             CHECK(tag > 0); // Should have boundary tag
             // Verify node indices are valid
@@ -141,19 +141,19 @@ TEST_CASE("H5Parser - Basic Functionality") {
         CHECK(builder.getVertexCount() == 4);
         CHECK(builder.getExpectedElements() == 1); // One tetrahedron
 
-        // Check that higher order elements were parsed
-        CHECK(parser.higherOrderElements.size() == 1);
-        CHECK(parser.higherOrderElements[0][0] == 0);
-        CHECK(parser.higherOrderElements[0][1] == 1);
-        CHECK(parser.higherOrderElements[0][2] == 2);
-        CHECK(parser.higherOrderElements[0][3] == 3);
+        // Check that higher Dimensional elements were parsed
+        CHECK(parser.higherDimensionalElements.size() == 1);
+        CHECK(parser.higherDimensionalElements[0][0] == 0);
+        CHECK(parser.higherDimensionalElements[0][1] == 1);
+        CHECK(parser.higherDimensionalElements[0][2] == 2);
+        CHECK(parser.higherDimensionalElements[0][3] == 3);
 
         // Check boundary data
         CHECK(parser.boundaryData.size() == 1);
         CHECK(parser.boundaryData[0] == 0x03050301);
 
-        // Check lower order elements (boundary faces) - should have all 4 faces
-        CHECK(parser.lowerOrderElements.size() == 4);
+        // Check lower Dimensional elements (boundary faces) - should have all 4 faces
+        CHECK(parser.lowerDimensionalElements.size() == 4);
         CHECK(parser.boundary.size() == 4);
 
         // Verify all 4 boundary tags are present (1, 2, 3, 4)
@@ -207,11 +207,11 @@ TEST_CASE("H5Parser - Data Structure Validation") {
 
     REQUIRE(parser.parseFile(test_filename));
 
-    SUBCASE("Higher Order Elements Structure") {
-        REQUIRE(parser.higherOrderElements.size() > 0);
+    SUBCASE("Higher Dimensional Elements Structure") {
+        REQUIRE(parser.higherDimensionalElements.size() > 0);
 
-        // Each higher order element should have 4 nodes (tetrahedron)
-        for (const auto& element : parser.higherOrderElements) {
+        // Each higher Dimensional element should have 4 nodes (tetrahedron)
+        for (const auto& element : parser.higherDimensionalElements) {
             // Verify all node indices are valid
             for (int i = 0; i < 4; ++i) {
                 CHECK(element[i] >= 0);
@@ -220,13 +220,13 @@ TEST_CASE("H5Parser - Data Structure Validation") {
         }
     }
 
-    SUBCASE("Lower Order Elements Structure") {
+    SUBCASE("Lower Dimensional Elements Structure") {
         // Should have exactly 4 boundary faces (all faces of tetrahedron)
-        CHECK(parser.lowerOrderElements.size() == 4);
+        CHECK(parser.lowerDimensionalElements.size() == 4);
         CHECK(parser.boundary.size() == 4);
 
-        // Each lower order element should have 3 nodes (triangle)
-        for (const auto& element : parser.lowerOrderElements) {
+        // Each lower Dimensional element should have 3 nodes (triangle)
+        for (const auto& element : parser.lowerDimensionalElements) {
             for (int i = 0; i < 3; ++i) {
                 CHECK(element[i] >= 0);
                 CHECK(element[i] < 4); // We have 4 vertices
@@ -252,17 +252,17 @@ TEST_CASE("H5Parser - Data Structure Validation") {
         CHECK(parser.boundaryData[0] == 0x03050301);
 
         // Should have exactly 4 triangular boundary faces
-        CHECK(parser.lowerOrderElements.size() == 4);
+        CHECK(parser.lowerDimensionalElements.size() == 4);
 
         // Each face should correspond to the correct vertices of the tetrahedron
-        // Tetrahedron faces (using SEISSOL vertex ordering):
-        // Face 0: vertices {0,2,1} -> nodes {0,1,2} (reordered)
+        // Tetrahedron faces (using SEISSOL vertex Dimensionaling):
+        // Face 0: vertices {0,2,1} -> nodes {0,1,2} (reDimensionaled)
         // Face 1: vertices {0,1,3} -> nodes {0,1,3}
         // Face 2: vertices {1,2,3} -> nodes {1,2,3}
-        // Face 3: vertices {0,3,2} -> nodes {0,2,3} (reordered)
+        // Face 3: vertices {0,3,2} -> nodes {0,2,3} (reDimensionaled)
 
         // Verify that we have valid triangular faces
-        for (const auto& face : parser.lowerOrderElements) {
+        for (const auto& face : parser.lowerDimensionalElements) {
             // Each face should have 3 different vertices
             CHECK(face[0] != face[1]);
             CHECK(face[1] != face[2]);

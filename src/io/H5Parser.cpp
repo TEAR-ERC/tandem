@@ -37,8 +37,8 @@ bool H5Parser::readDataset(hid_t file, const char* name, std::vector<T>& data) {
             H5Sclose(dataspace);
             H5Dclose(dataset);
         }
-    } else if (name == "/connect") { // Nodes associated with each higher order
-                                     // element(higherOrderElements x 4 for 4 node element)
+    } else if (name == "/connect") { // Nodes associated with each higher Dimensional
+                                     // element(higherDimensionalElements x 4 for 4 node element)
         hsize_t dims[2];
         H5Sget_simple_extent_dims(dataspace, dims, nullptr);
         data.resize(dims[0] * dims[1]);
@@ -106,20 +106,20 @@ bool H5Parser::parseElements(hid_t file) {
         std::array<long, 4> nodes = {
             elementData[i * elementSides], elementData[i * elementSides + 1],
             elementData[i * elementSides + 2], elementData[i * elementSides + 3]};
-        higherOrderElements.push_back(nodes);
+        higherDimensionalElements.push_back(nodes);
     }
     return true;
 }
 
-// Function to check if a sorted version of faceNodes exists in lowerOrderElements
+// Function to check if a sorted version of faceNodes exists in lowerDimensionalElements
 template <size_t DomainDimension>
-bool isAlreadyPresent(const std::vector<std::array<long int, DomainDimension>>& lowerOrderElements,
+bool isAlreadyPresent(const std::vector<std::array<long int, DomainDimension>>& lowerDimensionalElements,
                       const std::array<long int, DomainDimension>& faceNodes) {
     std::array<long, DomainDimension> sortedFaceNodes =
         faceNodes; // Copy to avoid modifying original
     std::sort(sortedFaceNodes.begin(), sortedFaceNodes.end());
 
-    return std::any_of(lowerOrderElements.begin(), lowerOrderElements.end(),
+    return std::any_of(lowerDimensionalElements.begin(), lowerDimensionalElements.end(),
                        [&](const std::array<long, DomainDimension>& elem) {
                            std::array<long, DomainDimension> sortedElem = elem;
                            std::sort(sortedElem.begin(), sortedElem.end());
@@ -127,15 +127,15 @@ bool isAlreadyPresent(const std::vector<std::array<long int, DomainDimension>>& 
                        });
 }
 
-bool H5Parser::retrieveLowerOrderElements(hid_t file) {
+bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
     auto& encodedBoundaryData = boundaryData;
     std::vector<std::uint8_t> decodedBoundary;
     constexpr std::size_t DomainDimension = 3;
     const std::array<std::array<int, 3>, 4> sVertSeissol = {
         {{0, 2, 1}, {0, 1, 3}, {1, 2, 3}, {0, 3, 2}}};
     int x = 0;
-    for (size_t i = 0; i < higherOrderElements.size(); ++i) {
-        const auto& elementNodes = higherOrderElements[i];
+    for (size_t i = 0; i < higherDimensionalElements.size(); ++i) {
+        const auto& elementNodes = higherDimensionalElements[i];
         uint32_t boundaryCondition = encodedBoundaryData[i];
 
         for (int face = 0; face < 4; ++face) {
@@ -149,8 +149,8 @@ bool H5Parser::retrieveLowerOrderElements(hid_t file) {
                                                  elementNodes[indices[2]]};
 
                 // Check if the element already exists in the list for uniqueness
-                if (!isAlreadyPresent<DomainDimension>(lowerOrderElements, faceNodes)) {
-                    lowerOrderElements.push_back(faceNodes); // Store as is, without sorting
+                if (!isAlreadyPresent<DomainDimension>(lowerDimensionalElements, faceNodes)) {
+                    lowerDimensionalElements.push_back(faceNodes); // Store as is, without sorting
                     boundary.push_back(faceTag);
                 }
             }
@@ -160,20 +160,20 @@ bool H5Parser::retrieveLowerOrderElements(hid_t file) {
 }
 
 bool H5Parser::addAllElements(std::string const& fileName) {
-    for (size_t i = 0; i < lowerOrderElements.size(); ++i) {
-        // Assuming only 3 node triangular faces for lower order elements
+    for (size_t i = 0; i < lowerDimensionalElements.size(); ++i) {
+        // Assuming only 3 node triangular faces for lower Dimensional elements
         long type = 2;
-        builder->addElement(type, long(boundary[i]), lowerOrderElements[i].data(),
+        builder->addElement(type, long(boundary[i]), lowerDimensionalElements[i].data(),
                             NumNodes[type - 1]);
     }
 
-    for (auto& higherOrderElems : higherOrderElements) {
-        // Assuming only 4 node tetrahedral for higher order elements
+    for (auto& higherDimensionalElems : higherDimensionalElements) {
+        // Assuming only 4 node tetrahedral for higher Dimensional elements
         long type = 4;
         // Information not available in the HDF5 file from PUMGen  - but also not used by the
-        // builder for higher order simplices
+        // builder for higher Dimensional simplices
         long groupTage = 0;
-        builder->addElement(type, 0, higherOrderElems.data(), NumNodes[type - 1]);
+        builder->addElement(type, 0, higherDimensionalElems.data(), NumNodes[type - 1]);
     }
 
     return true;
@@ -188,7 +188,7 @@ bool H5Parser::parseFile(std::string const& fileName) {
     parseElements(file);
     parseNodes(file);
     parseBoundary(file);
-    retrieveLowerOrderElements(file);
+    retrieveLowerDimensionalElements(file);
     addAllElements(fileName);
 
     H5Fclose(file);
