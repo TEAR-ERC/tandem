@@ -6,6 +6,9 @@ on:
       petsc_version:
         required: true
         type: string
+      hdf5_version:
+        required: true
+        type: string
       dependencies_image:
         required: true
         type: string
@@ -31,11 +34,11 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull dependencies image
-        run: docker pull ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+        run: docker pull ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
 
       - name: Build Tandem
         run: |
-          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           docker run --rm \
             -v ${{ github.workspace }}:/app \
             -w /app \
@@ -57,7 +60,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           docker run --rm \
             -v ${{ github.workspace }}:/app \
             -w /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }} \

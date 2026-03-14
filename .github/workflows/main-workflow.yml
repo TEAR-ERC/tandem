@@ -25,6 +25,7 @@ jobs:
     uses: ./.github/workflows/build-dependencies.yml
     with:
       petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
+      hdf5_version: ${{ needs.check-petsc-version.outputs.hdf5_version }}
       dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
       tandem_image: ${{ needs.check-petsc-version.outputs.tandem_image }}
 
@@ -34,4 +35,5 @@ jobs:
     uses: ./.github/workflows/build-and-test-tandem.yml
     with:
       petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
+      hdf5_version: ${{ needs.check-petsc-version.outputs.hdf5_version }}
       dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
