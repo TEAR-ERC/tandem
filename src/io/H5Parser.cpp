@@ -1,6 +1,7 @@
 #include "H5Parser.h"
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <stdio.h>
 
