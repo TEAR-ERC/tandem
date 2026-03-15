@@ -1,6 +1,9 @@
 include(CTest)
 include(../cmake/doctest.cmake)
 
+option(RUN_CI_TESTS "Enable CI integration tests" OFF)
+set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
+
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
 target_include_directories(test-runner PUBLIC
@@ -54,3 +57,91 @@ doctest_discover_tests(test-tensor)
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
+
+if(RUN_CI_TESTS)
+    find_package(Python COMPONENTS Interpreter Development REQUIRED)
+    find_package(Git REQUIRED)
+
+    # Fetch test data only when needed
+    set(TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test_data")
+    if(NOT EXISTS "${TEST_DATA_DIR}/.git")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} clone
+            --depth 1
+            --branch ${TEST_DATA_BRANCH}
+            https://github.com/piyushkarki/tandem_test_data.git
+            ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CLONE_RESULT
+        )
+        if(NOT GIT_CLONE_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to clone test data repository")
+        endif()
+    else()
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} fetch origin
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+        )
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} origin/${TEST_DATA_BRANCH}
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CHECKOUT_RESULT
+        )
+
+        if(NOT GIT_CHECKOUT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to checkout branch ${TEST_DATA_BRANCH}")
+        endif()
+    endif()
+
+    # Pre-clean to remove stale outputs from any previous test run
+    add_test(NAME pre-clean-test-outputs
+        COMMAND bash -c
+        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
+    )
+    set_tests_properties(pre-clean-test-outputs PROPERTIES
+        FIXTURES_SETUP PreClean
+    )
+
+    # Generate test outputs before any pytest test runs
+    add_test(NAME generate-test-outputs
+        COMMAND bash -c
+        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/generate_test_outputs.sh ${DOMAIN_DIMENSION} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}"
+    )
+    set_tests_properties(generate-test-outputs PROPERTIES
+        FIXTURES_REQUIRED PreClean
+        FIXTURES_SETUP TestData
+    )
+
+    # Helper macro for adding Python pytest-based tests
+    macro(add_pytest_test test_name file_name)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${file_name}")
+            add_test(
+                NAME ${test_name}
+                COMMAND ${Python_EXECUTABLE} -m pytest ${file_name} --domain_dimension=${DOMAIN_DIMENSION}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            )
+            set_tests_properties(${test_name} PROPERTIES
+                FIXTURES_REQUIRED TestData
+            )
+        else()
+            message(WARNING "Python test file ${file_name} not found. Skipping test ${test_name}.")
+        endif()
+    endmacro()
+
+    add_pytest_test("static-regression-test-${DOMAIN_DIMENSION}D" "test_regression_static.py")
+    add_pytest_test("parallel-consistency-test-${DOMAIN_DIMENSION}D" "test_parallel_consistency.py")
+    add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_static_convergence.py")
+    if(DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
+    endif()
+
+    # Remove test outputs after all pytest tests finish
+    add_test(NAME cleanup-test-outputs
+        COMMAND bash -c
+        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
+    )
+    set_tests_properties(cleanup-test-outputs PROPERTIES
+        FIXTURES_CLEANUP TestData
+    )
+
+endif()
