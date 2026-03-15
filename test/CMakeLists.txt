@@ -136,7 +136,7 @@ if(RUN_CI_TESTS)
     add_pytest_test("parallel-consistency-test-${DOMAIN_DIMENSION}D" "test_parallel_consistency.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_static_convergence.py")
     if(DOMAIN_DIMENSION EQUAL 2)
-        add_pytest_test("parallel-consistency-test-volume-tagging-${DOMAIN_DIMENSION}D" "test_parallel_consistency.py")
+        add_pytest_test("parallel-consistency-test-volume-tagging-${DOMAIN_DIMENSION}D" "test_parallel_consistency_volume_tagging.py")
         add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
     endif()
 
