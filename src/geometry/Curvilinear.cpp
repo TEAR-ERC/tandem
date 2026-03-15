@@ -42,7 +42,13 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
         throw std::runtime_error("Expected vertex data");
     }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
-    volumeTags = volumeData->getVolumeTags();
+    if (volumeData) {
+        volumeTags = volumeData->getVolumeTags();
+    } else {
+        std::cerr << "Warning: Volume tags are not set in the mesh. Setting to a default of -1"
+                  << std::endl;
+        volumeTags.resize(mesh.numElements(), -1);
+    }
     auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
     Managed<Matrix<double>> eval_basis;
     if (elementData) {
