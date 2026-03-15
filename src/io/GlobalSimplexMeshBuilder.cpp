@@ -51,6 +51,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
               << ". (Mixed meshes are not supported.)";
             throw std::runtime_error(s.str());
         }
+        volume_tags.push_back(tag);
         assert(numNodes >= NumVerts);
         std::array<uint64_t, NumVerts> elem;
         std::copy(node, node + NumVerts, elem.begin());
@@ -125,6 +126,7 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
     auto high_order_shape = high_order_nodes.shape();
     MPI_Allreduce(MPI_IN_PLACE, &high_order_shape, 2,
                   mpi_type_t<std::decay_t<decltype(high_order_shape[0])>>(), MPI_MAX, comm);
+    auto volumeData = std::make_unique<VolumeData>(std::move(volume_tags));
     if (high_order_shape[1] > 0) {
         std::size_t num_nodes = high_order_shape[0];
         std::size_t num_elements = elements.size();
@@ -169,17 +171,18 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
         auto elementData =
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      std::move(elementData), comm);
+                                                      std::move(elementData), std::move(volumeData),
+                                                      comm);
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      nullptr, comm);
+                                                      nullptr, std::move(volumeData), comm);
     }
 
     // boundary mesh
     auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs));
     auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets), nullptr,
-                                                                    std::move(boundaryData), comm);
+                                                                    std::move(boundaryData), nullptr, comm);
 
     mesh->setBoundaryMesh(std::move(boundaryMesh));
     return mesh;
