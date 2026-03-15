@@ -2,6 +2,7 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
+set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
 
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
@@ -67,18 +68,32 @@ if(RUN_CI_TESTS)
 
     # Fetch test data only when needed
     set(TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test_data")
-    if(NOT EXISTS "${TEST_DATA_DIR}/reference_results")
-        message(STATUS "Fetching test data...")
+    if(NOT EXISTS "${TEST_DATA_DIR}/.git")
         execute_process(
             COMMAND ${GIT_EXECUTABLE} clone
             --depth 1
-            --branch master
+            --branch ${TEST_DATA_BRANCH}
             https://github.com/piyushkarki/tandem_test_data.git
             ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_CLONE_RESULT
         )
         if(NOT GIT_CLONE_RESULT EQUAL 0)
             message(FATAL_ERROR "Failed to clone test data repository")
+        endif()
+    else()
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} fetch origin
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+        )
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} origin/${TEST_DATA_BRANCH}
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CHECKOUT_RESULT
+        )
+
+        if(NOT GIT_CHECKOUT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to checkout branch ${TEST_DATA_BRANCH}")
         endif()
     endif()
 
@@ -121,6 +136,7 @@ if(RUN_CI_TESTS)
     add_pytest_test("parallel-consistency-test-${DOMAIN_DIMENSION}D" "test_parallel_consistency.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_static_convergence.py")
     if(DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("parallel-consistency-test-volume-tagging-${DOMAIN_DIMENSION}D" "test_parallel_consistency.py")
         add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
     endif()
 
