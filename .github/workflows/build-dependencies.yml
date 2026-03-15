@@ -6,6 +6,9 @@ on:
       petsc_version:
         required: true
         type: string
+      hdf5_version:
+        required: true
+        type: string
       dependencies_image:
         required: true
         type: string
@@ -27,7 +30,7 @@ jobs:
       - name: Check image
         id: check-image
         run: |
-          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "image_exists=true" >> $GITHUB_OUTPUT
           else
             echo "image_exists=false" >> $GITHUB_OUTPUT
@@ -49,9 +52,10 @@ jobs:
           context: .
           file: docker/test/Dockerfile
           push: true
-          tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           platforms: linux/amd64
           build-args: |
             PETSC_VERSION=${{ inputs.petsc_version }}
+            HDF5_VERSION=${{ inputs.hdf5_version }}
             CC=gcc-13
             CXX=g++-13

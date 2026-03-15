@@ -37,6 +37,7 @@ add_library(tandem-lib
     io/GlobalSimplexMeshBuilder.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
+    io/H5Parser.cpp
     io/PVDWriter.cpp
     io/VTUWriter.cpp
     io/VTUWriter.cpp
@@ -63,13 +64,17 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
+find_package(HDF5 COMPONENTS C HL REQUIRED)
+message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
+    ${HDF5_INCLUDE_DIRS}
     ../submodules/
     ../submodules/mneme/include/
     ${LUA_INCLUDE_DIR}
 )
 target_link_libraries(tandem-lib PUBLIC
+    ${HDF5_LIBRARIES}    
     tandem-fem-lib
     ${FILESYSTEM_LIBRARIES}
     ${LUA_LIBRARIES}

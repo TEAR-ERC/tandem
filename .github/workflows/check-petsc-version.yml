@@ -6,6 +6,9 @@ on:
       petsc_version:
         description: "Latest PETSc version"
         value: ${{ jobs.check-petsc-version.outputs.petsc_version }}
+      hdf5_version:
+        description: "HDF5 version used to build dependencies"
+        value: ${{ jobs.check-petsc-version.outputs.hdf5_version }}
       needs_rebuild:
         description: "Whether a rebuild is needed"
         value: ${{ jobs.check-petsc-version.outputs.needs_rebuild }}
@@ -19,6 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       petsc_version: ${{ steps.get-petsc-version.outputs.version }}
+      hdf5_version: ${{ steps.get-petsc-version.outputs.hdf5_version }}
       needs_rebuild: ${{ steps.check-version.outputs.rebuild }}
       dependencies_image: ${{ steps.check-version.outputs.dependencies_image }}
       tandem_image: ${{ steps.check-version.outputs.tandem_image }}
@@ -34,6 +38,8 @@ jobs:
             | sort -V \
             | tail -n 1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Set default HDF5 version used for dependency images; can be parameterized later
+          echo "hdf5_version=1.12.3" >> $GITHUB_OUTPUT
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -41,7 +47,8 @@ jobs:
       - name: Check if versioned image exists
         id: check-version
         run: |
-          IMAGE_TAG=${{ steps.get-petsc-version.outputs.version }}
+          # Build image tag combining PETSc and HDF5 versions
+          IMAGE_TAG="${{ steps.get-petsc-version.outputs.version }}-hdf5${{ steps.get-petsc-version.outputs.hdf5_version }}"
           # Convert repository to lowercase
           REPO_NAME=${{ github.repository }}
           REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
@@ -50,6 +57,7 @@ jobs:
           DEPENDENCIES_IMAGE_GHCR_NAME="${REPO_NAME_LOWER}/tandem-dependencies"
           echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
           echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
+          echo "hdf5_version=${{ steps.get-petsc-version.outputs.hdf5_version }}" >> $GITHUB_OUTPUT
           # Check if the image exists using GHCR API
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
