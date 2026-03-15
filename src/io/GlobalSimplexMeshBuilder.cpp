@@ -181,8 +181,8 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
 
     // boundary mesh
     auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs));
-    auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(std::move(facets), nullptr,
-                                                                    std::move(boundaryData), nullptr, comm);
+    auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(
+        std::move(facets), nullptr, std::move(boundaryData), nullptr, comm);
 
     mesh->setBoundaryMesh(std::move(boundaryMesh));
     return mesh;
