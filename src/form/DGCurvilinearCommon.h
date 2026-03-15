@@ -30,7 +30,7 @@ public:
     using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
     template <std::size_t Q>
     using functional_t_region =
-        std::function<std::array<double, Q>(std::array<double, D> const&, long int&)>;
+        std::function<std::array<double, Q>(std::array<double, D> const&, long int)>;
     using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
@@ -79,7 +79,7 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-            auto volumeTags = this->vol[elNo].template get<physicalTag>();
+            auto volumeTags = this->vol[elNo].template get<VolumeTag>();
             for (std::size_t q = 0; q < F.shape(1); ++q) {
                 auto fx = fun(coords[q], volumeTags[q]);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
@@ -170,13 +170,13 @@ protected:
     struct Coords {
         using type = std::array<double, D>;
     };
-    struct physicalTag {
+    struct VolumeTag {
         using type = long int;
     };
 
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
                                       NormalLength, Coords>;
-    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, physicalTag>;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, VolumeTag>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;

@@ -95,9 +95,9 @@ protected:
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
     functional_t_region mu_ = [](std::array<double, DomainDimension> const& v,
-                                 long int&) -> std::array<double, 1> { return {1.0}; };
+                                 long int) -> std::array<double, 1> { return {1.0}; };
     functional_t_region lam_ = [](std::array<double, DomainDimension> const& v,
-                                  long int&) -> std::array<double, 1> { return {0.0}; };
+                                  long int) -> std::array<double, 1> { return {0.0}; };
     std::optional<functional_t_region> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;

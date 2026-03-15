@@ -35,7 +35,7 @@ public:
 
 private:
     functional_t_region<1> coefficient_ = [](std::array<double, DomainDimension> const& v,
-                                             long int& tag) -> std::array<double, 1> {
+                                             long int tag) -> std::array<double, 1> {
         return {1.0};
     };
 };
