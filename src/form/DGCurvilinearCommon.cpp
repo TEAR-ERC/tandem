@@ -47,10 +47,13 @@ void DGCurvilinearCommon<D>::prepare_volume(std::size_t elNo, LinearAllocator<do
         Tensor(vol[elNo].template get<Coords>().data()->data(), cl_->mapResultInfo(volRule.size()));
     auto absDetJ =
         Tensor(vol[elNo].template get<AbsDetJ>().data(), cl_->detJResultInfo(volRule.size()));
+    auto volumeTag =
+        Tensor(vol[elNo].template get<physicalTag>().data(), cl_->volumeTagsInfo(volRule.size()));
     cl_->jacobian(elNo, geoDxi_Q, J);
     cl_->absDetJ(elNo, J, absDetJ);
     cl_->jacobianInv(J, jInv);
     cl_->map(elNo, geoE_Q, coords);
+    cl_->setVolumeTags(elNo, volumeTag);
 
     double volume = 0.0;
     for (std::ptrdiff_t i = 0; i < volRule.size(); ++i) {
