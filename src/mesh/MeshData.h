@@ -139,6 +139,39 @@ private:
     NumberingConvention convention_;
 };
 
+class VolumeData : public MeshData {
+public:
+    VolumeData(std::vector<long int>&& tags) : volumeTags_(std::move(tags)) {}
+    virtual ~VolumeData() {}
+
+    std::size_t size() const override { return volumeTags_.size(); }
+
+    std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
+                                            AllToAllV const& a2a) const override {
+        std::vector<long int> requestedTags;
+        requestedTags.reserve(lids.size());
+        for (auto& lid : lids) {
+            if (lid == std::numeric_limits<std::size_t>::max()) {
+                requestedTags.emplace_back(-1);
+            } else {
+                requestedTags.emplace_back(volumeTags_[lid]);
+            }
+        }
+
+        auto newTags = a2a.exchange(requestedTags, mpi_type_t<long>());
+        return std::make_unique<VolumeData>(std::move(newTags));
+    }
+
+    void permute(std::vector<std::size_t> const& permutation) override {
+        apply_permutation(volumeTags_, permutation);
+    }
+
+    std::vector<long int> const& getVolumeTags() const { return volumeTags_; }
+
+private:
+    std::vector<long int> volumeTags_;
+};
+
 } // namespace tndm
 
 #endif // MESHDATA_H

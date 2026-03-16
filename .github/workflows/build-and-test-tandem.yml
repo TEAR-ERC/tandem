@@ -51,7 +51,8 @@ jobs:
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
                       -DCMAKE_CXX_COMPILER=\$CXX \
-                      -DRUN_CI_TESTS=ON
+                      -DRUN_CI_TESTS=ON \
+                      -DTEST_DATA_BRANCH=volume-tagging-test
               make -j$(nproc)"
 
       - name: Run Tests

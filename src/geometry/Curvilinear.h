@@ -62,7 +62,8 @@ public:
                     Tensor<double, 3u>& result) const;
     void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
                                     Matrix<double> const& normal, Tensor<double, 3u>& result) const;
-
+    TensorBase<Vector<long int>> volumeTagsInfo(std::size_t numPoints) const;
+    void setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const;
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;
 
@@ -96,6 +97,7 @@ private:
     std::array<Eigen::Matrix<double, D, 1>, D + 1> refNormals;
 
     double local_mesh_size_;
+    std::vector<long int> volumeTags;
 };
 
 } // namespace tndm

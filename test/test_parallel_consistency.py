@@ -28,26 +28,23 @@ def compare_one_vs_many(
         ), f"L2 error too large for {output_procs[idx]} procs."
 
 
-def test_parallel_consistency(
-    request,
+def _run_parallel_consistency(
+    domain_dimension,
+    output_prefix_name,
     temp_results_path,
     load_vtu_file,
     get_cell_centroid_point_dofs,
     compute_l2_error_with_reference_data,
     tolerances,
 ):
-    """
-    Test that VTU outputs produced by multiple processor decompositions are consistent with the single-processor output for all available fields.
-    """
-    domain_dimension = request.config.getoption("domain_dimension")
-    reference_file = temp_results_path / f"parallel_output{domain_dimension}D_1_0.vtu"
-    output_prefix = temp_results_path / f"parallel_output{domain_dimension}D_"
-
+    reference_file = (
+        temp_results_path / f"{output_prefix_name}{domain_dimension}D_1_0.vtu"
+    )
+    output_prefix = temp_results_path / f"{output_prefix_name}{domain_dimension}D_"
     files = glob.glob(f"{output_prefix}*.vtu")
     number_of_configs = len(files)
     assert number_of_configs > 1
 
-    # Get all available fields from reference file
     ref_data = load_vtu_file(reference_file)
     point_data = ref_data.GetPointData()
     field_names = [
@@ -66,3 +63,23 @@ def test_parallel_consistency(
             compute_l2_error_with_reference_data,
             tolerances,
         )
+
+
+def test_parallel_consistency(
+    request,
+    temp_results_path,
+    load_vtu_file,
+    get_cell_centroid_point_dofs,
+    compute_l2_error_with_reference_data,
+    tolerances,
+):
+    """Test parallel consistency for standard static output."""
+    _run_parallel_consistency(
+        request.config.getoption("domain_dimension"),
+        "parallel_output",
+        temp_results_path,
+        load_vtu_file,
+        get_cell_centroid_point_dofs,
+        compute_l2_error_with_reference_data,
+        tolerances,
+    )
