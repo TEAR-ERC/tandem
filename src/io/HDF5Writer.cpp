@@ -30,9 +30,6 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
     if (rank_ == 0) {
         std::cout << "Creating dataset: " << name << std::endl;
     }
-    if (std::any_of(dims.begin(), dims.end(), [](hsize_t dim) { return dim == 0; })) {
-        std::cerr << "Error: Attempting create a dataset with zero chunk size." << std::endl;
-    }
     // Compute total number of faults and rank offsets
     auto [totalDataPoints, _] = calculateOffsets(dims[glueDimension]);
     dims[glueDimension] = isDistributed
@@ -66,9 +63,6 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
                                 std::vector<hsize_t> dims, int glueDimension,
                                 int extensibleDimension, bool isDistributed) {
 
-    if (std::any_of(dims.begin(), dims.end(), [](hsize_t dim) { return dim == 0; })) {
-        std::cerr << "Error: Attempting to write to dataset with zero chunk size." << std::endl;
-    }
     hid_t filespace = H5Dget_space(dset);
     int ndims = H5Sget_simple_extent_ndims(filespace);
     std::vector<hsize_t> current_dims(ndims);
