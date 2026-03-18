@@ -22,8 +22,6 @@ HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm) : comm_(comm) {
     }
 }
 
-HDF5Writer::~HDF5Writer() {}
-
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t type,
                                           std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
                                           int glueDimension, bool isDistributed) {
