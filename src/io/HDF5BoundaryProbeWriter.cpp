@@ -58,50 +58,48 @@ HDF5BoundaryProbeWriter<D>::HDF5BoundaryProbeWriter(std::string_view prefix,
 template <std::size_t D>
 void HDF5BoundaryProbeWriter<D>::initialize_datasets(
     mneme::span<FiniteElementFunction<D - 1>> functions) {
-
-    // Create time dataset
-    std::vector<hsize_t> time_dims = {1};
-    std::vector<hsize_t> time_max_dims = {H5S_UNLIMITED};
-    int extensibleDimensionTimeStep = 0;
-    int glueDimensionTimeStep = 0;
-    if (timeStepDataset_ == -1) {
-        timeStepDataset_ = hdf5_writer_->createExtendibleDataset(
-            "time", H5T_NATIVE_DOUBLE, time_dims, time_max_dims, glueDimensionTimeStep, false);
-    }
-
     // Create probe metadata
+    std::vector<char> probe_names;
     std::vector<double> probe_coords;
-    std::vector<const char*> probe_names;
+    int max_length_local = 1;
+    for (const auto& probe : probes_) {
+        max_length_local = std::max(int(probe.name.length()), max_length_local);
+    }
+    int max_length_global;
+    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     probe_coords.reserve(probes_.size() * D);
-    probe_names.reserve(probes_.size());
-    int total_length = 0;
     for (const auto& probe : probes_) {
         probe_coords.insert(probe_coords.end(), probe.x.begin(), probe.x.end());
-        probe_names.push_back(probe.name.c_str());
-        total_length += probe.name.length();
+        std::string padded_name = probe.name;
+        padded_name.resize(max_length_local, ' ');
+        probe_names.insert(probe_names.end(), padded_name.begin(), padded_name.end());
     }
+    hsize_t numProbes = probes_.size();
+
     // Write probe metadata
-    hsize_t numElements = probe_coords.size() / D;
+    // Write probe vertices
     hsize_t glueDimension = 0;
     hsize_t extensibleDimension = 0;
+    std::vector<hsize_t> probe_vertices_dims = {numProbes, 1, D};
+    std::vector<hsize_t> probe_vertices_max_dims = {numProbes, 1, D};
     hsize_t verticesDataset_ = hdf5_writer_->createExtendibleDataset(
-        "probes", H5T_IEEE_F64LE, {numElements, 1, D}, {numElements, 1, D}, glueDimension);
-    hdf5_writer_->writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, probe_coords.data(),
-                                 {numElements, 1, D}, glueDimension, extensibleDimension);
+        "probes", H5T_NATIVE_DOUBLE, probe_vertices_dims, probe_vertices_max_dims, glueDimension);
+    hdf5_writer_->writeToDataset(verticesDataset_, H5T_NATIVE_DOUBLE, 0, probe_coords.data(),
+                                 probe_vertices_dims, glueDimension, extensibleDimension);
     hdf5_writer_->closeDataset(verticesDataset_);
-    // TODO: Write probe names
-   
-    hsize_t numQuantities = functions[0].numQuantities() + 2 * (D - 2);
-    // Create extendible dataset (time is extensible dimension)
-    std::vector<hsize_t> dims = {
-        probes_.size(),
-        1,
-        numQuantities,
-    };
-    std::vector<hsize_t> max_dims = {probes_.size(), H5S_UNLIMITED, numQuantities};
+    // Write probe names
+    auto strtype = H5Tcopy(H5T_C_S1);
+    std::vector<hsize_t> probe_names_dims = {numProbes};
+    std::vector<hsize_t> probe_names_max_dims = {numProbes};
+    H5Tset_size(strtype, max_length_global);  // Set to maximum string length
+    H5Tset_strpad(strtype, H5T_STR_NULLTERM); // Pad with spaces
+    hsize_t probeNameDataset_ = hdf5_writer_->createExtendibleDataset(
+        "probeNames", strtype, probe_names_dims, probe_names_max_dims, glueDimension);
 
-    probe_dataset_ =
-        hdf5_writer_->createExtendibleDataset("data", H5T_NATIVE_DOUBLE, dims, max_dims, 0);
+    hdf5_writer_->writeToDataset(probeNameDataset_, strtype, 0, probe_names.data(),
+                                 probe_names_dims, glueDimension, extensibleDimension);
+    hdf5_writer_->closeDataset(probeNameDataset_);
+    H5Tclose(strtype); // Clean up type
 }
 
 template <std::size_t D> HDF5BoundaryProbeWriter<D>::~HDF5BoundaryProbeWriter() {
@@ -120,12 +118,64 @@ void HDF5BoundaryProbeWriter<D>::write(double time,
                                        mneme::span<FiniteElementFunction<D - 1>> functions,
                                        hsize_t time_step) {
 
+    if (timeStepDataset_ == -1) {
+        // Create time dataset
+        std::vector<hsize_t> time_dims = {1};
+        std::vector<hsize_t> time_max_dims = {H5S_UNLIMITED};
+        int extensibleDimensionTimeStep = 0;
+        int glueDimensionTimeStep = 0;
+        bool isDistributed = false;
+        timeStepDataset_ = hdf5_writer_->createExtendibleDataset(
+            "time", H5T_NATIVE_DOUBLE, time_dims, time_max_dims, glueDimensionTimeStep,
+            isDistributed);
+    }
     hdf5_writer_->writeToDataset(timeStepDataset_, H5T_NATIVE_DOUBLE, time_step, &time,
                                  {time_step + 1}, 0, 0, false);
-    auto numQuantities = functions[0].numQuantities();
-    std::vector<double> values;
-    values.reserve(probes_.size() * numQuantities);
 
+    // Write probe data
+    auto numQuantities = functions[0].numQuantities();
+    auto numProbes = probes_.size();
+    std::vector<std::string> probeFields(numQuantities);
+    std::vector<char> probe_field_names;
+    for (std::size_t q = 0; q < numQuantities; ++q) {
+        probeFields[q] = functions[0].name(q);
+    }
+    int max_length_local = 1;
+    for (const auto& field : probeFields) {
+        max_length_local = std::max(int(field.length()), max_length_local);
+    }
+    for (auto& field : probeFields) {
+        std::string padded_name = field;
+        padded_name.resize(max_length_local, ' ');
+        probe_field_names.insert(probe_field_names.end(), padded_name.begin(), padded_name.end());
+    }
+    int max_length_global = 0;
+    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    // Write time step
+    auto strtype = H5Tcopy(H5T_C_S1);
+    H5Tset_size(strtype, max_length_global);
+    H5Tset_strpad(strtype, H5T_STR_NULLTERM);
+    if (!initialized_) {
+        // Create time dataset
+        probeFieldsDataset_ = hdf5_writer_->createExtendibleDataset(
+            "probeFields", strtype, {numQuantities}, {numQuantities}, 0, false);
+        hdf5_writer_->writeToDataset(probeFieldsDataset_, strtype, 0, probe_field_names.data(),
+                                     {numQuantities}, 0, 0, false);
+        hdf5_writer_->closeDataset(probeFieldsDataset_);
+        initialized_ = true;
+    }
+
+    if (probe_dataset_ == -1) {
+        // Create probe dataset
+        std::vector<hsize_t> probe_dims = {numProbes, 1, numQuantities};
+        std::vector<hsize_t> probe_max_dims = {numProbes, H5S_UNLIMITED, numQuantities};
+        int extensibleDimensionProbe = 1;
+        int glueDimensionProbe = 0;
+        probe_dataset_ = hdf5_writer_->createExtendibleDataset(
+            "probeData", H5T_NATIVE_DOUBLE, probe_dims, probe_max_dims, glueDimensionProbe);
+    }
+    std::vector<double> values;
+    values.reserve(numProbes * numQuantities);
     for (const auto& function : functions) {
         for (const auto& probe : probes_) {
             for (std::size_t q = 0; q < function.numQuantities(); ++q) {
@@ -137,7 +187,7 @@ void HDF5BoundaryProbeWriter<D>::write(double time,
         }
     }
     hdf5_writer_->writeToDataset(probe_dataset_, H5T_NATIVE_DOUBLE, time_step, values.data(),
-                                 {probes_.size(), time_step + 1, numQuantities}, 0, 1);
+                                 {numProbes, time_step + 1, numQuantities}, 0, 1);
 }
 
 template class HDF5BoundaryProbeWriter<2u>;
