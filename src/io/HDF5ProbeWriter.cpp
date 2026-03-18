@@ -91,7 +91,7 @@ void HDF5ProbeWriter<D, isBoundary>::initialize_datasets(mneme::span<ElementFunc
         max_length_local = std::max(int(probe.name.length()), max_length_local);
     }
     int max_length_global;
-    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, hdf5_writer_->comm());
     probe_coords.reserve(probes_.size() * D);
     for (const auto& probe : probes_) {
         probe_coords.insert(probe_coords.end(), probe.x.begin(), probe.x.end());
