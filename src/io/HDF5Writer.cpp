@@ -60,39 +60,35 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 
 void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const void* data,
                                 std::vector<hsize_t> dims, int extensibleIndex) {
-    // dims should be {1, num_local_faults, 3} for one timestep
 
-    // Get current dataset dimensions
     hid_t filespace = H5Dget_space(dset);
-    hsize_t current_dims[3];
-    H5Sget_simple_extent_dims(filespace, current_dims, NULL);
-    hsize_t timeStepDim = dims[0];
-    hsize_t nDataPointsPerRank = dims[1];
-    hsize_t dataDimension = dims[2];
+    int ndims = H5Sget_simple_extent_ndims(filespace);
+    std::vector<hsize_t> current_dims(ndims);
+    H5Sget_simple_extent_dims(filespace, current_dims.data(), NULL);
 
     // Make sure dataset is extended before writing
-    hsize_t count[3];
-    count[0] = dims[0];
-    count[1] = dims[1];
-    count[2] = dims[2];
+    std::vector<hsize_t> count = dims;
     // Calculate fault offsets for parallel writes
     auto [totalFaults, offset] = calculateOffsets(dims[extensibleIndex]);
     // Select hyperslab
-    hsize_t start[3] = {0, 0, 0};
+
+    std::vector<hsize_t> start(ndims, 0);
     start[extensibleIndex] = offset; // Start at the beginning of the selected dimension
-    if (timestep >= current_dims[0] || dims.size() == 1) {
+    if (timestep >= current_dims[0]) {
         // Extend the dataset if the timestep exceeds current dimensions
         count[0] = 1; // Only extend the first dimension
         start[0] = timestep;
-        hsize_t new_dims[3] = {timestep + 1, current_dims[1], current_dims[2]};
-        herr_t status = H5Dset_extent(dset, new_dims);
+        std::vector<hsize_t> new_dims(ndims);
+        new_dims = current_dims;
+        new_dims[0] = timestep + 1;
+        herr_t status = H5Dset_extent(dset, new_dims.data());
         if (status < 0) {
             std::cerr << "Error extending dataset at timestep " << timestep << std::endl;
             return;
         }
         H5Sclose(filespace);
         filespace = H5Dget_space(dset); // Refresh dataset space after extension
-        H5Sget_simple_extent_dims(filespace, current_dims, NULL);
+        H5Sget_simple_extent_dims(filespace, current_dims.data(), NULL);
     }
 
     // Check for out-of-bounds errors
@@ -104,14 +100,15 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     }
 
     count[extensibleIndex] = dims[extensibleIndex]; // Number of faults
-    herr_t select_status = H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start, NULL, count, NULL);
+    herr_t select_status =
+        H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start.data(), NULL, count.data(), NULL);
     if (select_status < 0) {
         std::cerr << "Error selecting hyperslab for timestep " << timestep << std::endl;
         return;
     }
 
     // Create memory space matching the data layout
-    hid_t memspace = H5Screate_simple(dims.size(), count, NULL);
+    hid_t memspace = H5Screate_simple(dims.size(), count.data(), NULL);
 
     // Collective write
     hid_t plist = H5Pcreate(H5P_DATASET_XFER);
