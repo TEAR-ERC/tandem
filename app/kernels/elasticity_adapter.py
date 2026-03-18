@@ -25,3 +25,15 @@ def add(generator, dim, nbf_fault, nq):
     traction = Tensor('traction', (nbf_fault, dim))
     generator.add('evaluate_traction', traction['kp'] <= minv['lk'] * e_q_T['ql'] * w['q'] * \
                                           nl_q['q'] * traction_q['oq'] * fault_basis_q['opq'])
+    
+    slip_rate = Tensor('slip_rate', (nbf_fault, dim))
+    slip_rate_q = Tensor('slip_rate_q', (dim, nq))
+    moment_rate = Tensor('moment_rate', (dim,))
+
+    generator.add(
+        'evaluate_slip_rate', slip_rate_q['pq'] <=
+            e_q['lq'] * slip_rate['lp']) 
+    # TODO: Add lame parameter mu during moment rate calculation
+    generator.add(
+        'evaluate_moment_rate', moment_rate['p'] <=
+            w['q'] * slip_rate_q['pq'] * nl_q['q']) 
