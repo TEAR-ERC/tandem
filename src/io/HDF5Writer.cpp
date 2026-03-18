@@ -26,18 +26,19 @@ HDF5Writer::~HDF5Writer() {}
 
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t type,
                                           std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
-                                          int extensibleIndex) {
+                                          int extensibleIndex, bool isStatic = false) {
     if (rank_ == 0) {
         std::cout << "Creating dataset: " << name << std::endl;
     }
 
     // Compute total number of faults and rank offsets
     auto [totalDataPoints, _] = calculateOffsets(dims[extensibleIndex]);
-    dims[extensibleIndex] = dims.size() > 1
+    dims[extensibleIndex] = (dims.size() > 1 || isStatic)
                                 ? totalDataPoints
                                 : dims[extensibleIndex]; // Update the dimension for the dataset
     // Set initial and max dimensions
-    max_dims[extensibleIndex] = dims.size() > 1 ? totalDataPoints : max_dims[extensibleIndex];
+    max_dims[extensibleIndex] =
+        (dims.size() > 1 || isStatic) ? totalDataPoints : max_dims[extensibleIndex];
 
     // Define chunking for efficient access
     std::vector<hsize_t> chunk_dims = dims;
@@ -61,7 +62,8 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 }
 
 void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const void* data,
-                                std::vector<hsize_t> dims, int extensibleIndex) {
+                                std::vector<hsize_t> dims, int extensibleIndex,
+                                bool isStatic = false) {
 
     hid_t filespace = H5Dget_space(dset);
     int ndims = H5Sget_simple_extent_ndims(filespace);
@@ -75,7 +77,7 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     // Select hyperslab
 
     std::vector<hsize_t> start(ndims, 0);
-    start[extensibleIndex] = dims.size() > 1 ? offset : start[extensibleIndex];
+    start[extensibleIndex] = (dims.size() > 1 || isStatic) ? offset : start[extensibleIndex];
     if (timestep >= current_dims[0]) {
         // Extend the dataset if the timestep exceeds current dimensions
         count[0] = 1; // Only extend the first dimension
@@ -94,7 +96,7 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     }
 
     count[extensibleIndex] =
-        dims.size() > 1 ? dims[extensibleIndex] : count[extensibleIndex]; // Number of faults
+        (dims.size() > 1 || isStatic) ? dims[extensibleIndex] : count[extensibleIndex];
     herr_t select_status =
         H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start.data(), NULL, count.data(), NULL);
     if (select_status < 0) {
