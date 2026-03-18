@@ -97,4 +97,3 @@ TEST_CASE("HDF5Writer - dataset extends correctly") {
     H5Dclose(read_dset);
     H5Fclose(file);
 }
-
