@@ -123,7 +123,8 @@ public:
             alignas(ALIGNMENT) double moment_rate_q_raw[DomainDimension];
             auto moment_rate_q = Matrix<double>(moment_rate_q_raw, 1, DomainDimension);
             auto fctNo = fault_map_->fctNo(faultNo);
-            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, topo_->info(fctNo));
+            auto info = topo_->info(fctNo);
+            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, fctNo, info);
             for (int i = 0; i < DomainDimension - 1; i++) {
                 moment_rate_.push_back(moment_rate_q(0, i));
             }

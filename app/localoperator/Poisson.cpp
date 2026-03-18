@@ -720,8 +720,14 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     krnl.u(0) = u0.data();
     krnl.execute();
 }
-double* Poisson::get_mu_field(FacetInfo const& info) const {
-    double* a;
-    return a;
+void Poisson::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
+    assert(result.size() == tensor::mu_avg_q::size());
+
+    kernel::mu_avg krnl;
+    krnl.mu_q(0) = material[info.up[0]].get<K>().data();
+    krnl.mu_q(1) = material[info.up[1]].get<K>().data();
+    krnl.mu_avg_q = result.data();
+    krnl.execute();
 }
+
 } // namespace tndm
