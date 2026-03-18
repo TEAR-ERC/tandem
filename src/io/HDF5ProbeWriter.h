@@ -2,18 +2,13 @@
 #define HDF5_BOUNDARYPROBEWRITER_H
 
 #include "HDF5Writer.h"
-#include "form/BoundaryMap.h"
-#include "form/FiniteElementFunction.h"
 #include "geometry/Curvilinear.h"
-#include "io/Probe.h"
 #include "mesh/LocalSimplexMesh.h"
 
 #include "form/BoundaryMap.h"
 #include "form/FiniteElementFunction.h"
-#include "geometry/Curvilinear.h"
 #include "io/Probe.h"
 #include "io/TableWriter.h"
-#include "mesh/LocalSimplexMesh.h"
 #include <mneme/span.hpp>
 #include <mpi.h>
 
@@ -25,14 +20,15 @@
 
 namespace tndm {
 
-template <std::size_t D> class HDF5BoundaryProbeWriter {
+template <std::size_t D, bool isBoundary> class HDF5ProbeWriter {
 public:
-    HDF5BoundaryProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
-                            std::vector<Probe<D>> const& probes, LocalSimplexMesh<D> const& mesh,
-                            std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map,
-                            MPI_Comm comm);
-    ~HDF5BoundaryProbeWriter();
-    void write(double time, mneme::span<FiniteElementFunction<D - 1>> functions, hsize_t timestep);
+    HDF5ProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+                    std::vector<Probe<D>> const& probes, LocalSimplexMesh<D> const& mesh,
+                    std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map, MPI_Comm comm);
+    ~HDF5ProbeWriter();
+    using ElementFunction = tndm::FiniteElementFunction<isBoundary ? D - 1 : D>;
+
+    void write(double time, mneme::span<ElementFunction> functions, hsize_t timestep);
 
     auto begin() const { return bndNos_.begin(); }
     auto end() const { return bndNos_.end(); }
@@ -40,13 +36,13 @@ public:
     std::vector<std::size_t> const& bndNos() const { return bndNos_; }
 
     struct ProbeData {
-        std::size_t no;                // Local facet number
-        std::array<double, D - 1> chi; // Reference coordinates
-        std::array<double, D> x;       // Physical coordinates
-        std::string name;              // Probe name
+        std::size_t no;                                 // Local facet number
+        std::array<double, isBoundary ? D - 1 : D> chi; // Reference coordinates
+        std::array<double, D> x;                        // Physical coordinates
+        std::string name;                               // Probe name
     };
 
-    void initialize_datasets(mneme::span<FiniteElementFunction<D - 1>> functions);
+    void initialize_datasets(mneme::span<ElementFunction> functions);
     void write_probe_metadata();
 
 private:
