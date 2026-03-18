@@ -110,7 +110,7 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     break;
                 }
                 case DataLevel::Heirarchical: {
-                    writer->write_static();
+                    writer->write(time, moment_rate);
                     break;
                 }
                 };
