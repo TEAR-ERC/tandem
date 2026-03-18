@@ -23,6 +23,11 @@ public:
     virtual auto slip_bc(BlockView const& state)
         -> std::function<void(std::size_t, Matrix<double>&, bool)> = 0;
     virtual void traction(BlockView const& displacement, BlockVector& result) = 0;
+    virtual void slip_rate(std::size_t faultNo, Vector<double const>& slip_rate,
+                           Matrix<double>& slip_rate_q) = 0;
+
+    virtual void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
+                             Matrix<double>& slip_rate_q) = 0;
 };
 
 } // namespace tndm
