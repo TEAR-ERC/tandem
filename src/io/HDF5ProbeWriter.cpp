@@ -70,10 +70,10 @@ HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
             }
         }();
         probes_.push_back({
-            entityNo2OutNo[result.no],    // Local facet number
-            refCoord,               // Reference coordinates
-            result.x,               // Physical coordinates
-            probes[p].name          // Probe name
+            entityNo2OutNo[result.no], // Local facet number
+            refCoord,                  // Reference coordinates
+            result.x,                  // Physical coordinates
+            probes[p].name             // Probe name
         });
     }
 }
