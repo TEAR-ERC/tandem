@@ -25,6 +25,7 @@ jobs:
             cxx: clang++-18
         dimension: [2, 3]
         degree: [3]
+        enable_hdf5: ["ON", "OFF"]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,11 +49,12 @@ jobs:
             $IMAGE \
             bash -c "
               set -e
-              mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
+              mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}
               cmake .. -DCMAKE_PREFIX_PATH=\"/opt/petsc;/opt/hdf5\" \
               -DHDF5_ROOT=\"/opt/hdf5\" \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
+                      -DENABLE_HDF5=${{ matrix.enable_hdf5 }} \
                       -DCMAKE_C_COMPILER=\$CC \
                       -DCMAKE_CXX_COMPILER=\$CXX \
                       -DRUN_CI_TESTS=ON
@@ -63,7 +65,7 @@ jobs:
           IMAGE=${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           docker run --rm \
             -v ${{ github.workspace }}:/app \
-            -w /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }} \
+            -w /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }} \
             -e CC=${{ matrix.compiler.cc }} \
             -e CXX=${{ matrix.compiler.cxx }} \
             --user tandem \
@@ -73,13 +75,13 @@ jobs:
       - name: Rename doctest log
         if: always()
         run: |
-          mv "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log" \
-            "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log"
+          mv "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}/Testing/Temporary/LastTest.log" \
+            "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}_${{ matrix.compiler.cc }}.log"
 
       - name: Upload test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-${{ matrix.compiler.cc }}
+          name: logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-hdf5-${{ matrix.enable_hdf5 }}-${{ matrix.compiler.cc }}
           path: |
-            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log
+            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}_${{ matrix.compiler.cc }}.log
