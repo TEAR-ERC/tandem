@@ -77,6 +77,16 @@ public:
         result.end_access(result_handle);
     }
 
+    void slip_rate(std::size_t faultNo, Vector<double const>& slip_rate,
+                   Matrix<double>& slip_rate_q) override {
+        lop_->slip_rate(faultNo, slip_rate, slip_rate_q);
+    }
+
+    void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
+                     Matrix<double>& slip_rate_q) override {
+        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate_q);
+    }
+
 private:
     std::shared_ptr<LocalOperator> adapted_lop_;
     std::unique_ptr<Adapter<LocalOperator>> lop_;
