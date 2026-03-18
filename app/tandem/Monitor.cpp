@@ -48,9 +48,6 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     break;
                 }
                 case DataLevel::Hierarchical: {
-                    if (time == 0.0) {
-                        continue;
-                    }
                     writer->write(time, moment_rate);
                     break;
                 }
