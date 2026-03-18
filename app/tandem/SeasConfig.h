@@ -107,6 +107,7 @@ struct Config {
     bool meshInH5File() {
         return mesh_file->size() >= 3 && mesh_file->substr(mesh_file->size() - 3) == ".h5";
     }
+    std::optional<OutputConfig> moment_rate_output;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,
