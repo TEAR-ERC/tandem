@@ -33,9 +33,11 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 
     // Compute total number of faults and rank offsets
     auto [totalDataPoints, _] = calculateOffsets(dims[extensibleIndex]);
-    dims[extensibleIndex] = totalDataPoints; // Update the dimension for the dataset
+    dims[extensibleIndex] = dims.size() > 1
+                                ? totalDataPoints
+                                : dims[extensibleIndex]; // Update the dimension for the dataset
     // Set initial and max dimensions
-    max_dims[extensibleIndex] = totalDataPoints; // Time is unlimited
+    max_dims[extensibleIndex] = dims.size() > 1 ? totalDataPoints : max_dims[extensibleIndex];
 
     // Define chunking for efficient access
     std::vector<hsize_t> chunk_dims = dims;
@@ -73,7 +75,7 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     // Select hyperslab
 
     std::vector<hsize_t> start(ndims, 0);
-    start[extensibleIndex] = offset; // Start at the beginning of the selected dimension
+    start[extensibleIndex] = dims.size() > 1 ? offset : start[extensibleIndex];
     if (timestep >= current_dims[0]) {
         // Extend the dataset if the timestep exceeds current dimensions
         count[0] = 1; // Only extend the first dimension
@@ -91,15 +93,8 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
         H5Sget_simple_extent_dims(filespace, current_dims.data(), NULL);
     }
 
-    // Check for out-of-bounds errors
-    if (offset + dims[extensibleIndex] > current_dims[extensibleIndex]) {
-        std::cerr << "Rank " << rank_ << " writing out of bounds! Offset: " << offset
-                  << " Faults: " << dims[extensibleIndex]
-                  << " Dataset Size: " << current_dims[extensibleIndex] << std::endl;
-        return;
-    }
-
-    count[extensibleIndex] = dims[extensibleIndex]; // Number of faults
+    count[extensibleIndex] =
+        dims.size() > 1 ? dims[extensibleIndex] : count[extensibleIndex]; // Number of faults
     herr_t select_status =
         H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start.data(), NULL, count.data(), NULL);
     if (select_status < 0) {
