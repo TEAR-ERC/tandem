@@ -127,7 +127,6 @@ private:
     std::size_t numBasisNodes_ = 0;
     std::vector<Managed<Matrix<double>>> E_;
     std::vector<std::array<double, D - 1u>> refNodes_;
-    std::vector<std::array<double, D>> refNodes3D_;
     std::vector<std::pair<std::size_t, int>> bnds_;
     std::vector<double> faultVertices;
     std::vector<size_t> globalFctNos;
