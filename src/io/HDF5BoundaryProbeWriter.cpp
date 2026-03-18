@@ -83,7 +83,7 @@ void HDF5BoundaryProbeWriter<D>::initialize_datasets(
     std::vector<hsize_t> probe_vertices_dims = {numProbes, 1, D};
     std::vector<hsize_t> probe_vertices_max_dims = {numProbes, 1, D};
     hsize_t verticesDataset_ = hdf5_writer_->createExtendibleDataset(
-        "probes", H5T_NATIVE_DOUBLE, probe_vertices_dims, probe_vertices_max_dims, glueDimension);
+        "probePositions", H5T_NATIVE_DOUBLE, probe_vertices_dims, probe_vertices_max_dims, glueDimension);
     hdf5_writer_->writeToDataset(verticesDataset_, H5T_NATIVE_DOUBLE, 0, probe_coords.data(),
                                  probe_vertices_dims, glueDimension, extensibleDimension);
     hdf5_writer_->closeDataset(verticesDataset_);
