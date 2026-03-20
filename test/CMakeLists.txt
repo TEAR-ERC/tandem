@@ -154,7 +154,9 @@ if(RUN_CI_TESTS)
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_static_convergence.py")
     if(DOMAIN_DIMENSION EQUAL 2)
         add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
-        add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D" "test_probe_writer_consistency.py")
+        if(ENABLE_HDF5)
+            add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D" "test_probe_writer_consistency.py")
+        endif()
     endif()
 
     # Remove test outputs after all pytest tests finish
