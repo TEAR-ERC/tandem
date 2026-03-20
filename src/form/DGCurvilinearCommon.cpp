@@ -67,27 +67,29 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
                                             LinearAllocator<double>& scratch) {
     double* Jmem = scratch.allocate(fctRule.size() * D * D);
     double* detJmem = scratch.allocate(fctRule.size());
+    // Memory view for mneme member variables
+    auto& facet_data = fct[fctNo];
+    auto& normal_data = facet_data.template get<Normal>();
+    auto& length_data = facet_data.template get<NormalLength>();
+
     auto J = Tensor(Jmem, cl_->jacobianResultInfo(fctRule.size()));
     auto detJ = Tensor(detJmem, cl_->detJResultInfo(fctRule.size()));
 
-    auto jInv0 = Tensor(fct[fctNo].template get<JInv0>().data()->data(),
+    auto jInv0 = Tensor(facet_data.template get<JInv0>().data()->data(),
                         cl_->jacobianResultInfo(fctRule.size()));
-    auto normal = Tensor(fct[fctNo].template get<Normal>().data()->data(),
-                         cl_->normalResultInfo(fctRule.size()));
-    auto unit_normal = Tensor(fct[fctNo].template get<UnitNormal>().data()->data(),
+    auto normal = Tensor(normal_data.data()->data(), cl_->normalResultInfo(fctRule.size()));
+    auto unit_normal = Tensor(facet_data.template get<UnitNormal>().data()->data(),
                               cl_->normalResultInfo(fctRule.size()));
-    auto coords = Tensor(fct[fctNo].template get<Coords>().data()->data(),
+    auto coords = Tensor(facet_data.template get<Coords>().data()->data(),
                          cl_->mapResultInfo(fctRule.size()));
     auto facetTags =
-        Tensor(fct[fctNo].template get<facetTag>().data(), cl_->tagsInfo(fctRule.size()));
-
+        Tensor(facet_data.template get<facetTag>().data(), cl_->tagsInfo(fctRule.size()));
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, jInv0);
     cl_->normal(info.localNo[0], detJ, jInv0, normal);
-    auto& length = fct[fctNo].template get<NormalLength>();
-    for (std::size_t i = 0; i < length.size(); ++i) {
-        length[i] = norm(fct[fctNo].template get<Normal>()[i]);
+    for (std::size_t i = 0; i < length_data.size(); ++i) {
+        length_data[i] = norm(normal_data[i]);
     }
     cl_->normal(info.localNo[0], detJ, jInv0, unit_normal);
     cl_->normalize(unit_normal);
@@ -95,12 +97,12 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     cl_->setFacetTags(info, facetTags);
 
     double area = 0.0;
-    for (std::ptrdiff_t i = 0; i < length.size(); ++i) {
-        area += fctRule.weights()[i] * length[i];
+    for (std::ptrdiff_t i = 0; i < length_data.size(); ++i) {
+        area += fctRule.weights()[i] * length_data[i];
     }
     area_[fctNo] = area;
 
-    auto jInv1 = Tensor(fct[fctNo].template get<JInv1>().data()->data(),
+    auto jInv1 = Tensor(facet_data.template get<JInv1>().data()->data(),
                         cl_->jacobianResultInfo(fctRule.size()));
 
     cl_->jacobian(info.up[1], geoDxi_q[info.localNo[1]], J);
