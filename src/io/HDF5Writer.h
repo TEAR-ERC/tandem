@@ -40,7 +40,7 @@ private:
     hid_t file_;
     MPI_Comm comm_;
     int rank_, size_;
-    bool is_open_ = true;
+    bool is_open_ = false;
     // Helper to calculate offsets and total elements
     std::tuple<hsize_t, hsize_t> calculateOffsets(hsize_t localElements);
 };
