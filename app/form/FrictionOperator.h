@@ -43,7 +43,7 @@ public:
     std::size_t slip_block_size() const override { return lop_->slip_block_size(); }
     std::size_t num_local_elements() const override { return fault_map_->local_size(); }
     double VMax_local() const override { return VMax_; }
-    std::vector<double> moment_rate_local() const override { return moment_rate_; }
+    std::vector<double> const& moment_rate_local() const override { return moment_rate_; }
     std::size_t num_elements() const { return fault_map_->size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& fault_map() const { return *fault_map_; }
