@@ -25,7 +25,7 @@ template <typename LocalOperator> class FrictionOperator : public AbstractFricti
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
                      std::shared_ptr<BoundaryMap> fault_map, std::size_t quadRuleSize,
-                     std::unique_ptr<AbstractAdapterOperator> adapter)
+                     std::unique_ptr<AbstractAdapterOperator> adapter = nullptr)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
           quadRuleSize_(quadRuleSize), adapter_(std::move(adapter)),
           scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
@@ -112,21 +112,22 @@ public:
 
             // Interpolate slip rate values at Basis function nodes to quadrature
             // nodes
-            alignas(ALIGNMENT) double slip_rate_q_raw[LocalOperator::NumQuantities * nq];
-            auto slip_rate_q = Matrix<double>(slip_rate_q_raw, LocalOperator::NumQuantities, nq);
-            auto slip_rate_reshaped =
-                tndm::Vector<const double>(result_block.data(), result_block.shape());
-            adapter_->slip_rate(slip_rate_reshaped, slip_rate_q);
+            if (adapter_) {
+                std::vector<double> slip_rate_q_raw(LocalOperator::NumQuantities * quadRuleSize_);
+                auto slip_rate_q = Matrix<double>(slip_rate_q_raw.data(),
+                                                  LocalOperator::NumQuantities, quadRuleSize_);
+                auto slip_rate_reshaped =
+                    tndm::Vector<const double>(result_block.data(), result_block.shape());
+                adapter_->slip_rate(slip_rate_reshaped, slip_rate_q);
 
-            // Compute moment rate using slip rate values at quadrature nodes and
-            // quadrature weights and normal vectors - see moment_rate kernel for more
-            alignas(ALIGNMENT) double moment_rate_q_raw[DomainDimension];
-            auto moment_rate_q = Matrix<double>(moment_rate_q_raw, 1, DomainDimension);
-            auto fctNo = fault_map_->fctNo(faultNo);
-            auto info = topo_->info(fctNo);
-            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, fctNo, info);
-            for (std::size_t i = 0; i < static_cast<std::size_t>(DomainDimension - 1); ++i) {
-                moment_rate_[mr_idx++] = moment_rate_q(0, i);
+                std::vector<double> moment_rate_q_raw(DomainDimension);
+                auto moment_rate_q = Matrix<double>(moment_rate_q_raw.data(), 1, DomainDimension);
+                auto fctNo = fault_map_->fctNo(faultNo);
+                auto info = topo_->info(fctNo);
+                adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, fctNo, info);
+                for (std::size_t i = 0; i < static_cast<std::size_t>(DomainDimension - 1); ++i) {
+                    moment_rate_[mr_idx++] = moment_rate_q(0, i);
+                }
             }
         }
 
