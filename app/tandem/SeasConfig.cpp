@@ -233,6 +233,9 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto& faultProbeOutputSchema =
         schema.add_table("fault_probe_output", &Config::fault_probe_output);
     detail::setProbeOutputConfigSchema(faultProbeOutputSchema);
+    auto& domainProbeOutputSchema =
+        schema.add_table("domain_probe_output", &Config::domain_probe_output);
+    detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
     auto& momentRateOutputSchema =
         schema.add_table("HDF5_moment_rate_output", &Config::HDF5_moment_rate_output);
     detail::setOutputConfigSchema(momentRateOutputSchema);
