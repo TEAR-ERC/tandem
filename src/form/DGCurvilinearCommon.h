@@ -159,15 +159,12 @@ protected:
     struct VolumeTag {
         using type = long int;
     };
-    struct volumeTag {
-        using type = long int;
-    };
     struct facetTag {
         using type = long int;
     };
 
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
-                                      NormalLength, Coords>;
+                                      NormalLength, Coords, facetTag>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, VolumeTag>;
 
     mneme::StridedView<fct_t> fct;
