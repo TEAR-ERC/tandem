@@ -1,6 +1,7 @@
 #ifndef HDF5_WRITER_H
 #define HDF5_WRITER_H
 
+#include <cstdint>
 #include <mpi.h>
 #include <string>
 #include <string_view>
