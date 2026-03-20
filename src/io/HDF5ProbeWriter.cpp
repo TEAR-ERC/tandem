@@ -5,6 +5,7 @@
 
 namespace tndm {
 
+#ifdef ENABLE_HDF5
 template <std::size_t D, bool isBoundary>
 auto makeLocator(std::shared_ptr<Curvilinear<D>> cl, LocalSimplexMesh<D> const& mesh,
                  BoundaryMap const& bnd_map) {
@@ -219,5 +220,5 @@ template class HDF5ProbeWriter<2u, true>;
 template class HDF5ProbeWriter<3u, true>;
 template class HDF5ProbeWriter<2u, false>;
 template class HDF5ProbeWriter<3u, false>;
-
+#endif // ENABLE_HDF5
 } // namespace tndm

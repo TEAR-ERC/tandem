@@ -97,8 +97,6 @@ struct Config {
     std::optional<TabularOutputConfig> fault_scalar_output;
     std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
-    std::optional<ProbeOutputConfig> HDF5_fault_probe_output;
-    std::optional<ProbeOutputConfig> HDF5_domain_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
     TsCheckpointConfig ts_checkpoint_config;
@@ -109,7 +107,9 @@ struct Config {
     bool meshInH5File() {
         return mesh_file->size() >= 3 && mesh_file->substr(mesh_file->size() - 3) == ".h5";
     }
-    std::optional<OutputConfig> moment_rate_output;
+    std::optional<OutputConfig> HDF5_moment_rate_output;
+    std::optional<ProbeOutputConfig> HDF5_fault_probe_output;
+    std::optional<ProbeOutputConfig> HDF5_domain_probe_output;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,

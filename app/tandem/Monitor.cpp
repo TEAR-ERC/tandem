@@ -20,7 +20,6 @@ void Monitor::update_dt_limits(double time) {
 void MonitorQD::monitor(double time, BlockVector const& state) {
     if (!writers_.empty()) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
-        auto moment_rate = seasop_->friction().moment_rate_local();
         bool require_traction = false;
         bool require_displacement = false;
         for (auto const& writer : writers_) {
@@ -47,10 +46,13 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }
+#ifdef ENABLE_HDF5
                 case DataLevel::Hierarchical: {
+                    auto moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
                     break;
                 }
+#endif
                 };
                 writer->increase_step(time, VMax);
             }
@@ -75,10 +77,12 @@ void MonitorQD::write_static() {
             writer->write_static(mneme::span(&data, 1));
             break;
         }
+#ifdef ENABLE_HDF5
         case DataLevel::Hierarchical: {
             writer->write_static();
             break;
         }
+#endif
         };
     }
 }
@@ -87,7 +91,6 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                         BlockVector const& s) {
     if (!writers_.empty()) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
-        std::vector<double> moment_rate = seasop_->friction().moment_rate_local();
 
         for (auto const& writer : writers_) {
             if (writer->is_write_required(time, VMax)) {
@@ -106,10 +109,13 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     writer->write(time, mneme::span(data.data(), 2));
                     break;
                 }
+#ifdef ENABLE_HDF5
                 case DataLevel::Hierarchical: {
+                    std::vector<double> moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
                     break;
                 }
+#endif
                 };
                 writer->increase_step(time, VMax);
             }

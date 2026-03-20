@@ -67,7 +67,7 @@ target_link_libraries(test-HDF5Writer test-runner-mpi)
 doctest_discover_tests(test-HDF5Writer)
 
 
-if(DEFINED RUN_CI_TESTS)
+if(RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
     find_package(Git REQUIRED)
 
