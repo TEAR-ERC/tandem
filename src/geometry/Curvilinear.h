@@ -2,6 +2,7 @@
 #define CURVILINEAR_20200609_H
 
 #include "basis/WarpAndBlend.h"
+#include "form/FacetInfo.h"
 #include "form/RefElement.h"
 #include "mesh/Simplex.h"
 #include "tensor/Tensor.h"
@@ -62,8 +63,9 @@ public:
                     Tensor<double, 3u>& result) const;
     void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
                                     Matrix<double> const& normal, Tensor<double, 3u>& result) const;
-    TensorBase<Vector<long int>> volumeTagsInfo(std::size_t numPoints) const;
+    TensorBase<Vector<long int>> tagsInfo(std::size_t numPoints) const;
     void setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const;
+    void setFacetTags(FacetInfo const& info, Tensor<long int, 1u>& result) const;
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;
 
@@ -98,6 +100,7 @@ private:
 
     double local_mesh_size_;
     std::vector<long int> volumeTags;
+    std::vector<long int> facetTags;
 };
 
 } // namespace tndm
