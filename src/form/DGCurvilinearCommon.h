@@ -63,20 +63,6 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-            for (std::size_t q = 0; q < F.shape(1); ++q) {
-                auto fx = fun(coords[q]);
-                for (std::size_t p = 0; p < F.shape(0); ++p) {
-                    F(p, q) = fx[p];
-                }
-            }
-        };
-    }
-
-    template <std::size_t Q>
-    auto make_volume_functional(functional_t_region<Q> fun) const -> volume_functional_t {
-        return [fun, this](std::size_t elNo, Matrix<double>& F) {
-            assert(Q == F.shape(0));
-            auto coords = this->vol[elNo].template get<Coords>();
             auto volumeTags = this->vol[elNo].template get<VolumeTag>();
             for (std::size_t q = 0; q < F.shape(1); ++q) {
                 auto fx = fun(coords[q], volumeTags[q]);
@@ -92,7 +78,7 @@ public:
         return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
-            auto facetTags = this->fct[fctNo].template get<physicalTag>();
+            auto facetTags = this->fct[fctNo].template get<facetTag>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
                 auto fx = fun(coords[q], facetTags[q]);
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
@@ -107,7 +93,7 @@ public:
         return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
-            auto facetTags = this->fct[fctNo].template get<physicalTag>();
+            auto facetTags = this->fct[fctNo].template get<facetTag>();
             for (std::size_t q = 0; q < f.shape(1); ++q) {
                 auto fx = fun(coords[q], facetTags[q]);
                 if (!is_boundary) {
@@ -171,6 +157,12 @@ protected:
         using type = std::array<double, D>;
     };
     struct VolumeTag {
+        using type = long int;
+    };
+    struct volumeTag {
+        using type = long int;
+    };
+    struct facetTag {
         using type = long int;
     };
 

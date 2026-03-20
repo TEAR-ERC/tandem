@@ -79,7 +79,7 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     auto coords = Tensor(fct[fctNo].template get<Coords>().data()->data(),
                          cl_->mapResultInfo(fctRule.size()));
     auto facetTags =
-        Tensor(fct[fctNo].template get<physicalTag>().data(), cl_->tagsInfo(fctRule.size()));
+        Tensor(fct[fctNo].template get<facetTag>().data(), cl_->tagsInfo(fctRule.size()));
 
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
