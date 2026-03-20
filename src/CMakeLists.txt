@@ -40,7 +40,8 @@ add_library(tandem-lib
     io/H5Parser.cpp
     io/PVDWriter.cpp
     io/VTUWriter.cpp
-    io/VTUWriter.cpp
+    io/HDF5Writer.cpp
+    io/HDF5ProbeWriter.cpp
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
@@ -64,7 +65,7 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
-option(ENABLE_HDF5 "Enable HDF5 mesh support" ON)
+option(ENABLE_HDF5 "Enable HDF5 support" ON)
 
 if(ENABLE_HDF5)
     find_package(HDF5 COMPONENTS C HL)
@@ -74,19 +75,17 @@ if(ENABLE_HDF5)
         target_include_directories(tandem-lib PUBLIC ${HDF5_INCLUDE_DIRS})
         target_link_libraries(tandem-lib PUBLIC ${HDF5_LIBRARIES})
     else()
-        message(STATUS "HDF5 not found — HDF5 mesh support disabled")
+        message(STATUS "HDF5 not found — HDF5 support disabled")
     endif()
 endif()
 
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
-target_include_directories(tandem-lib PUBLIC 
-    ${HDF5_INCLUDE_DIRS}
+target_include_directories(tandem-lib PUBLIC
     ../submodules/
     ../submodules/mneme/include/
     ${LUA_INCLUDE_DIR}
 )
 target_link_libraries(tandem-lib PUBLIC
-    ${HDF5_LIBRARIES}    
     tandem-fem-lib
     ${FILESYSTEM_LIBRARIES}
     ${LUA_LIBRARIES}

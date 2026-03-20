@@ -107,6 +107,7 @@ public:
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
 private:
     double penalty(std::size_t fctNo) const {

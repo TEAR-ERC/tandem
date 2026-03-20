@@ -105,6 +105,37 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
             comm));
     }
+#ifdef ENABLE_HDF5
+    if (cfg.HDF5_moment_rate_output) {
+        auto const& oc = *cfg.HDF5_moment_rate_output;
+        monitor.add_writer(std::make_unique<seas::MomentRateWriter<DomainDimension>>(
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+            comm));
+    }
+    if (cfg.HDF5_fault_probe_output) {
+        auto const& oc = *cfg.HDF5_fault_probe_output;
+        monitor.add_writer(std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
+            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            fault_map, comm));
+    }
+    if (cfg.HDF5_domain_probe_output) {
+        auto const& oc = *cfg.HDF5_domain_probe_output;
+        monitor.add_writer(std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
+            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            fault_map, comm));
+    }
+#else
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    if (rank == 0 && (cfg.HDF5_moment_rate_output || cfg.HDF5_fault_probe_output ||
+                      cfg.HDF5_domain_probe_output)) {
+        std::cerr << "Warning: one or more HDF5 output options were specified in the TOML config "
+                     "(HDF5_moment_rate_output, HDF5_fault_probe_output, HDF5_domain_probe_output) "
+                     "but this build of tandem was compiled without HDF5 support. "
+                     "These options will be ignored. "
+                     "Reconfigure with -DENABLE_HDF5=ON to enable HDF5 output.\n";
+    }
+#endif
 }
 
 template <typename seas_t> struct operator_specifics;

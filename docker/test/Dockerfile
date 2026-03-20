@@ -69,7 +69,7 @@ WORKDIR /home/tandem
 # Create the venv
 RUN python3 -m venv /home/tandem/venv && \
     /home/tandem/venv/bin/pip install --upgrade pip && \
-    /home/tandem/venv/bin/pip install meshio numpy matplotlib pytest pandas vtk
+    /home/tandem/venv/bin/pip install meshio numpy matplotlib pytest pandas vtk h5py
 
 # Set PATH to include venv binaries
 ENV PATH="/home/tandem/venv/bin:$PATH"

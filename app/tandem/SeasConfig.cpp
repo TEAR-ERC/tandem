@@ -236,6 +236,15 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto& domainProbeOutputSchema =
         schema.add_table("domain_probe_output", &Config::domain_probe_output);
     detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
+    auto& momentRateOutputSchema =
+        schema.add_table("HDF5_moment_rate_output", &Config::HDF5_moment_rate_output);
+    detail::setOutputConfigSchema(momentRateOutputSchema);
+    auto& HDF5faultProbeOutputSchema =
+        schema.add_table("HDF5_fault_probe_output", &Config::HDF5_fault_probe_output);
+    detail::setProbeOutputConfigSchema(HDF5faultProbeOutputSchema);
+    auto& HDF5DomainProbeOutputSchema =
+        schema.add_table("HDF5_domain_probe_output", &Config::HDF5_domain_probe_output);
+    detail::setProbeOutputConfigSchema(HDF5DomainProbeOutputSchema);
 
     auto& gfCheckpointSchema = schema.add_table("gf_checkpoint", &Config::gf_checkpoint_config);
     detail::setGfCheckpointConfigSchema(gfCheckpointSchema);

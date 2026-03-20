@@ -2,6 +2,7 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
+set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
 
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
@@ -61,24 +62,55 @@ add_executable(test-H5Parser H5Parser.cpp)
 target_link_libraries(test-H5Parser test-runner-mpi)
 doctest_discover_tests(test-H5Parser)
 
+add_executable(test-HDF5Writer HDF5Writer.cpp)
+target_link_libraries(test-HDF5Writer test-runner-mpi)
+doctest_discover_tests(test-HDF5Writer)
+
+
 if(RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
     find_package(Git REQUIRED)
 
     # Fetch test data only when needed
     set(TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test_data")
-    if(NOT EXISTS "${TEST_DATA_DIR}/reference_results")
-        message(STATUS "Fetching test data...")
+    if(NOT EXISTS "${TEST_DATA_DIR}/.git")
         execute_process(
             COMMAND ${GIT_EXECUTABLE} clone
             --depth 1
-            --branch master
+            --branch ${TEST_DATA_BRANCH}
             https://github.com/piyushkarki/tandem_test_data.git
             ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_CLONE_RESULT
         )
         if(NOT GIT_CLONE_RESULT EQUAL 0)
             message(FATAL_ERROR "Failed to clone test data repository")
+        endif()
+    else()
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} fetch --depth 1 origin ${TEST_DATA_BRANCH}
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_FETCH_RESULT
+        )
+        if(NOT GIT_FETCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to fetch branch ${TEST_DATA_BRANCH}")
+        endif()
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} FETCH_HEAD
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CHECKOUT_RESULT
+        )
+        if(NOT GIT_CHECKOUT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to checkout branch ${TEST_DATA_BRANCH}")
+        endif()
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} clean -fd
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CLEAN_RESULT
+        )
+        if(NOT GIT_CLEAN_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to clean working tree for branch ${TEST_DATA_BRANCH}")
         endif()
     endif()
 
@@ -122,6 +154,9 @@ if(RUN_CI_TESTS)
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_static_convergence.py")
     if(DOMAIN_DIMENSION EQUAL 2)
         add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
+        if(ENABLE_HDF5)
+            add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D" "test_probe_writer_consistency.py")
+        endif()
     endif()
 
     # Remove test outputs after all pytest tests finish
