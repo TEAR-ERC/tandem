@@ -104,7 +104,8 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
 
     const std::size_t numElements = elemsLocal.length();
     std::vector<simplex_t> elements(numElements);
-
+    std::vector<long int> volumeTags;
+    volumeTags.resize(numElements, -1);
     uint64_t ecubeFrom = elemsLocal.from / TessInfo<D>::NumSimplices;
     uint64_t ecubeTo = 1 + (static_cast<int64_t>(elemsLocal.to) - 1) / TessInfo<D>::NumSimplices;
     for (uint64_t ecube = ecubeFrom; ecube < ecubeTo; ++ecube) {
@@ -133,8 +134,9 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     }
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
+    auto volumeTagData = std::make_unique<volume_data_t>(std::move(volumeTags));
     auto mesh = std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr,
-                                         nullptr, comm_);
+                                         std::move(volumeTagData), comm_);
     auto boundaryMesh = extractBoundaryMesh(*mesh);
     mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
     return mesh;
@@ -145,6 +147,7 @@ std::unique_ptr<typename GenMesh<D>::boundary_mesh_t>
 GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     std::vector<boundary_simplex_t> boundaryElements;
     std::vector<BC> boundaryConditions;
+    std::vector<long int> facetTags;
     for (auto& elem : mesh.getElements()) {
         for (auto& face : elem.downward()) {
             auto v0 = unflatten(face[0], Np1);
@@ -180,7 +183,10 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
             }
         }
     }
-    auto boundaryData = std::make_unique<boundary_data_t>(std::move(boundaryConditions));
+    facetTags.resize(boundaryConditions.size(), -1);
+    auto boundaryData =
+        std::make_unique<boundary_data_t>(std::move(boundaryConditions), std::move(facetTags));
+
     return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
                                              std::move(boundaryData), nullptr, comm_);
 }

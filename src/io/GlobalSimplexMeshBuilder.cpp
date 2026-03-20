@@ -77,25 +77,14 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
         facets.emplace_back(Simplex<D - 1u>(elem));
-        BC bc = BC::None;
-        switch (tag) {
-        case static_cast<long>(BC::None):
-            bc = BC::None;
-            break;
-        case static_cast<long>(BC::Dirichlet):
-            bc = BC::Dirichlet;
-            break;
-        case static_cast<long>(BC::Fault):
-            bc = BC::Fault;
-            break;
-        case static_cast<long>(BC::Natural):
-            bc = BC::Natural;
-            break;
-        default:
+        long int facet_tag = tag;
+        BC bc = classifyBC(tag);
+        if (bc == BC::Unknown) {
+            facet_tag = -1;
             ++unknownBC;
-            break;
         }
         bcs.push_back(bc);
+        facet_tags.push_back(facet_tag);
     } else {
         if (is_lower_dimensional_gmsh_simplex_v<D - 1u>(type)) {
             ++ignoredElems;
@@ -180,7 +169,7 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
     }
 
     // boundary mesh
-    auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs));
+    auto boundaryData = std::make_unique<BoundaryData>(std::move(bcs), std::move(facet_tags));
     auto boundaryMesh = std::make_unique<GlobalSimplexMesh<D - 1u>>(
         std::move(facets), nullptr, std::move(boundaryData), nullptr, comm);
 
