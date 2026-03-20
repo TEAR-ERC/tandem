@@ -100,6 +100,10 @@ struct Config {
     std::optional<ProbeOutputConfig> domain_probe_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
     TsCheckpointConfig ts_checkpoint_config;
+    std::optional<OutputConfig> HDF5_moment_rate_output;
+    std::optional<ProbeOutputConfig> HDF5_fault_probe_output;
+    std::optional<ProbeOutputConfig> HDF5_domain_probe_output;
+    
     bool meshInGMSHFile() {
         return mesh_file->size() >= 5 && mesh_file->substr(mesh_file->size() - 4) == ".msh";
     }
@@ -107,9 +111,6 @@ struct Config {
     bool meshInH5File() {
         return mesh_file->size() >= 3 && mesh_file->substr(mesh_file->size() - 3) == ".h5";
     }
-    std::optional<OutputConfig> HDF5_moment_rate_output;
-    std::optional<ProbeOutputConfig> HDF5_fault_probe_output;
-    std::optional<ProbeOutputConfig> HDF5_domain_probe_output;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,
