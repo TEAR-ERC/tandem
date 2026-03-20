@@ -47,7 +47,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     } else {
         std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
                   << std::endl;
-        facetTags.resize(mesh.numElements(), -1);
+        facetTags.resize(mesh.facets().size(), -1);
     }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
     if (volumeData) {
