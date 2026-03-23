@@ -24,9 +24,6 @@ Prerequisites
 -------------
 
 - `Docker Desktop <https://docs.docker.com/get-docker/>`_ installed and running.
-- `Gmsh <https://gmsh.info/>`_ installed on your **host machine** for mesh generation.
-  The Docker image does not include Gmsh — meshes must be generated before
-  launching the container.
 
 Available Images
 ----------------
@@ -111,12 +108,12 @@ A typical workflow for running a bundled example:
       cp /work/examples/tandem/2d/bp1_sym.toml /host/
       cp /work/examples/tandem/2d/bp1_sym.geo  /host/
 
-2. **Generate the mesh on the host** (Gmsh is not inside the container):
+2. **Generate the mesh inside the container**:
 
    .. code-block:: sh
 
-      # On the host, outside the container:
-      gmsh -2 bp1_sym.geo
+      # Inside the container:
+      gmsh -2 /host/bp1_sym.geo
 
    This produces ``bp1_sym.msh`` in the same directory.
 
