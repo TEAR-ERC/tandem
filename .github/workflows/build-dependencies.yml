@@ -52,7 +52,9 @@ jobs:
           context: .
           file: docker/base/Dockerfile
           push: true
-          tags: ${{ inputs.base_image }}:${{ inputs.petsc_version }}
+          tags: |
+            ${{ inputs.base_image }}:${{ inputs.petsc_version }}
+            ${{ inputs.base_image }}:latest
           platforms: linux/amd64
           build-args: |
             PETSC_VERSION=${{ inputs.petsc_version }}
@@ -106,7 +108,9 @@ jobs:
           context: .
           file: docker/test/Dockerfile
           push: true
-          tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+          tags: |
+            ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+            ${{ inputs.dependencies_image }}:latest
           platforms: linux/amd64
           build-args: |
             BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}
