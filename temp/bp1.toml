@@ -1,0 +1,26 @@
+final_time = 94608000000
+mesh_file = "bp1.msh"
+mode = "QD"
+type = "poisson"
+lib = "bp1.lua"
+scenario = "bp1"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[fault_probe_output]
+prefix = "fltst_"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [0.0, 0.0] },
+    { name = "dp025", x = [0.0, -2.5] },
+    { name = "dp050", x = [0.0, -5.0] },
+    { name = "dp075", x = [0.0, -7.5] },
+    { name = "dp100", x = [0.0, -10.0] },
+    { name = "dp125", x = [0.0, -12.5] },
+    { name = "dp150", x = [0.0, -15.0] },
+    { name = "dp175", x = [0.0, -17.5] },
+    { name = "dp200", x = [0.0, -20.0] },
+    { name = "dp250", x = [0.0, -25.0] },
+    { name = "dp300", x = [0.0, -30.0] },
+    { name = "dp350", x = [0.0, -35.0] }
+]
