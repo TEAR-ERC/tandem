@@ -13,6 +13,8 @@ on:
         value: ${{ jobs.check-petsc-version.outputs.dependencies_image }}
       tandem_image:
         value: ${{ jobs.check-petsc-version.outputs.tandem_image }}
+      base_image:
+        value: ${{ jobs.check-petsc-version.outputs.base_image }}
 
 jobs:
   check-petsc-version:
@@ -22,6 +24,7 @@ jobs:
       needs_rebuild: ${{ steps.check-version.outputs.rebuild }}
       dependencies_image: ${{ steps.check-version.outputs.dependencies_image }}
       tandem_image: ${{ steps.check-version.outputs.tandem_image }}
+      base_image: ${{ steps.check-version.outputs.base_image }}
     steps:
       - name: Get the latest PETSc 3.22 patch version
         id: get-petsc-version
@@ -47,16 +50,17 @@ jobs:
           REPO_NAME_LOWER=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')
           TANDEM_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-build"
           DEPENDENCIES_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-dependencies"
+          BASE_IMAGE="ghcr.io/${REPO_NAME_LOWER}/tandem-base"
           DEPENDENCIES_IMAGE_GHCR_NAME="${REPO_NAME_LOWER}/tandem-dependencies"
           echo "dependencies_image=${DEPENDENCIES_IMAGE}" >> $GITHUB_OUTPUT
           echo "tandem_image=${TANDEM_IMAGE}" >> $GITHUB_OUTPUT
-          # Check if the image exists using GHCR API
+          echo "base_image=${BASE_IMAGE}" >> $GITHUB_OUTPUT 
+
           STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}")
-          echo "https://ghcr.io/v2/${DEPENDENCIES_IMAGE_GHCR_NAME}/manifests/${IMAGE_TAG}"
-          echo $STATUS_CODE
+
           if [ "$STATUS_CODE" -eq 200 ]; then
             echo "rebuild=false" >> $GITHUB_OUTPUT
           else

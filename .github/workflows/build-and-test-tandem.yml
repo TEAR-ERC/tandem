@@ -46,13 +46,14 @@ jobs:
             bash -c "
               set -e
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}
-              cmake .. -DCMAKE_PREFIX_PATH=/opt/petsc \
+              cmake .. -GNinja \
+                      -DCMAKE_PREFIX_PATH=/opt/petsc \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \
                       -DPOLYNOMIAL_DEGREE=${{ matrix.degree }} \
                       -DCMAKE_C_COMPILER=\$CC \
                       -DCMAKE_CXX_COMPILER=\$CXX \
                       -DRUN_CI_TESTS=ON
-              make -j$(nproc)"
+              ninja -j$(nproc)"
 
       - name: Run Tests
         run: |
@@ -64,13 +65,15 @@ jobs:
             -e CXX=${{ matrix.compiler.cxx }} \
             --user tandem \
             $IMAGE \
-            make test
+            ctest --output-on-failure
 
       - name: Rename doctest log
         if: always()
         run: |
-          mv "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest.log" \
-            "${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log"
+          LOG_DIR="${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary"
+          if [ -f "$LOG_DIR/LastTest.log" ]; then
+            mv "$LOG_DIR/LastTest.log" "$LOG_DIR/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log"
+          fi
 
       - name: Upload test logs
         if: always()
@@ -78,4 +81,4 @@ jobs:
         with:
           name: logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-${{ matrix.compiler.cc }}
           path: |
-            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/LastTest_${{ matrix.dimension }}d_p${{ matrix.degree }}_${{ matrix.compiler.cc }}.log
+            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}/Testing/Temporary/*.log

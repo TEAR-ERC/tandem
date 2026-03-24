@@ -21,12 +21,12 @@ jobs:
 
   build-dependencies-image:
     needs: check-petsc-version
-    if: needs.check-petsc-version.outputs.needs_rebuild == 'true'
     uses: ./.github/workflows/build-dependencies.yml
     with:
       petsc_version: ${{ needs.check-petsc-version.outputs.petsc_version }}
       dependencies_image: ${{ needs.check-petsc-version.outputs.dependencies_image }}
       tandem_image: ${{ needs.check-petsc-version.outputs.tandem_image }}
+      base_image: ${{ needs.check-petsc-version.outputs.base_image }}
 
   build-and-test-tandem:
     needs: [check-petsc-version, build-dependencies-image]
