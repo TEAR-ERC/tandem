@@ -8,7 +8,8 @@ FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
 
 RUN apt-get update && apt-get install -y ninja-build && rm -rf /var/lib/apt/lists/*
 
-RUN for DIM in 2 3; do \
+RUN mkdir -p /staging && \
+    for DIM in 2 3; do \
         for DEG in 1 2 3 4 5 6; do \
             echo "==> Building ${DIM}D degree ${DEG}..." \
             && mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
@@ -19,7 +20,9 @@ RUN for DIM in 2 3; do \
                 -DCMAKE_PREFIX_PATH="${PETSC_INSTALL};${EIGEN_INSTALL}" \
                 -DDOMAIN_DIMENSION=${DIM} \
                 -DPOLYNOMIAL_DEGREE=${DEG} \
-            && ninja; \
+            && ninja \
+            && cp app/tandem /staging/tandem_${DIM}d_${DEG}p \
+            && cp app/static /staging/static_${DIM}d_${DEG}p; \
         done; \
     done
 
@@ -43,35 +46,14 @@ RUN apt-get update && apt-get install -y \
 # Copy PETSc runtime libs
 COPY --from=builder /opt/petsc/build/lib /opt/petsc/build/lib
 
-# Copy all 12 Tandem builds into separate directories
-COPY --from=builder /opt/tandem/build_2d_1p/app /opt/tandem/builds/2d_1p
-COPY --from=builder /opt/tandem/build_2d_2p/app /opt/tandem/builds/2d_2p
-COPY --from=builder /opt/tandem/build_2d_3p/app /opt/tandem/builds/2d_3p
-COPY --from=builder /opt/tandem/build_2d_4p/app /opt/tandem/builds/2d_4p
-COPY --from=builder /opt/tandem/build_2d_5p/app /opt/tandem/builds/2d_5p
-COPY --from=builder /opt/tandem/build_2d_6p/app /opt/tandem/builds/2d_6p
-COPY --from=builder /opt/tandem/build_3d_1p/app /opt/tandem/builds/3d_1p
-COPY --from=builder /opt/tandem/build_3d_2p/app /opt/tandem/builds/3d_2p
-COPY --from=builder /opt/tandem/build_3d_3p/app /opt/tandem/builds/3d_3p
-COPY --from=builder /opt/tandem/build_3d_4p/app /opt/tandem/builds/3d_4p
-COPY --from=builder /opt/tandem/build_3d_5p/app /opt/tandem/builds/3d_5p
-COPY --from=builder /opt/tandem/build_3d_6p/app /opt/tandem/builds/3d_6p
+# Copy all 24 binaries (tandem_Xd_Yp and static_Xd_Yp for all 12 configs)
+COPY --from=builder /staging /opt/tandem/bin
 
 # Copy examples
 COPY --from=builder /opt/tandem/tandem/examples /work/examples
 
-# Create alias wrapper scripts for each build in /usr/local/bin
-RUN for DIM in 2 3; do \
-        for DEG in 1 2 3 4 5 6; do \
-            for BIN in tandem static; do \
-                echo "#!/bin/bash\nexec /opt/tandem/builds/${DIM}d_${DEG}p/${BIN} \"\$@\"" \
-                > /usr/local/bin/tandem_${DIM}d_${DEG}p_${BIN} \
-                && chmod +x /usr/local/bin/tandem_${DIM}d_${DEG}p_${BIN}; \
-            done; \
-        done; \
-    done
-
 ENV LD_LIBRARY_PATH=/opt/petsc/build/lib:${LD_LIBRARY_PATH}
+ENV PATH=/opt/tandem/bin:${PATH}
 ENV OMP_NUM_THREADS=1
 ENV OMP_PROC_BIND=close
 ENV OMPI_MCA_rmaps_base_oversubscribe=1
