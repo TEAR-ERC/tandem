@@ -7,7 +7,6 @@ RUN python3 -m venv /home/tandem/venv && \
     /home/tandem/venv/bin/pip install --upgrade pip && \
     /home/tandem/venv/bin/pip install \
     meshio \
-    mshio \
     numpy \
     matplotlib \
     pytest \
