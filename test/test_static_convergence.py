@@ -67,13 +67,13 @@ def compute_all_slopes(data):
     return slope_l2, slope_h1
 
 
-def test_convergence(request):
+def test_convergence(request, temp_results_path):
     """
     Integration test that verifies the computed convergence orders against
     precomputed expected values for the given domain dimension.
     """
     domain_dimension = request.config.getoption("domain_dimension")
-    log_file = f"test_data/temp_test_results/convergence_{domain_dimension}D.log"
+    log_file = temp_results_path / f"convergence_{domain_dimension}D.log"
     data = parse_static_log(log_file)
     l2_order, h1_order = compute_all_slopes(data)
 

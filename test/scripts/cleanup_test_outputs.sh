@@ -12,7 +12,7 @@ if [[ -z "$SOURCE_DIR" ]]; then
     exit 1
 fi
 
-TEMP_TEST_RESULTS=${SOURCE_DIR}/test_data/temp_test_results
+TEMP_TEST_RESULTS=${SOURCE_DIR}/test/temp_test_results
 
 if [[ -d "$TEMP_TEST_RESULTS" ]]; then
     rm -rf "$TEMP_TEST_RESULTS"

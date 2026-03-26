@@ -45,13 +45,13 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="module")
 def reference_results_path():
     """Path to the directory containing reference test outputs."""
-    return Path("test_data/reference_results")
+    return Path("./test_data/reference_results")
 
 
 @pytest.fixture(scope="module")
 def temp_results_path():
     """Path to the directory containing outputs produced by the current test run."""
-    return Path("test_data/temp_test_results")
+    return Path("./temp_test_results")
 
 
 @pytest.fixture(scope="module")

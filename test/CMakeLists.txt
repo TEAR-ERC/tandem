@@ -2,7 +2,7 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
-set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
+set(TEST_DATA_BRANCH "piyush/refactor-main" CACHE STRING "Branch of tandem_test_data to use")
 
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
@@ -96,7 +96,7 @@ if(RUN_CI_TESTS)
     # Pre-clean to remove stale outputs from any previous test run
     add_test(NAME pre-clean-test-outputs
         COMMAND bash -c
-        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
+        "source ${CMAKE_CURRENT_SOURCE_DIR}/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
     )
     set_tests_properties(pre-clean-test-outputs PROPERTIES
         FIXTURES_SETUP PreClean
@@ -104,8 +104,10 @@ if(RUN_CI_TESTS)
 
     # Generate test outputs before any pytest test runs
     add_test(NAME generate-test-outputs
-        COMMAND bash -c
-        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/generate_test_outputs.sh ${DOMAIN_DIMENSION} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}"
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_test_outputs.sh
+        ${CMAKE_BINARY_DIR}
+        ${CMAKE_SOURCE_DIR}/test/temp_test_results
+        ${DOMAIN_DIMENSION}
     )
     set_tests_properties(generate-test-outputs PROPERTIES
         FIXTURES_REQUIRED PreClean
@@ -138,7 +140,7 @@ if(RUN_CI_TESTS)
     # Remove test outputs after all pytest tests finish
     add_test(NAME cleanup-test-outputs
         COMMAND bash -c
-        "source ${CMAKE_CURRENT_SOURCE_DIR}/test_data/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
+        "source ${CMAKE_CURRENT_SOURCE_DIR}/scripts/cleanup_test_outputs.sh ${CMAKE_SOURCE_DIR}"
     )
     set_tests_properties(cleanup-test-outputs PROPERTIES
         FIXTURES_CLEANUP TestData
