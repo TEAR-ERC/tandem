@@ -12,6 +12,7 @@ docs/_build/
 
 # Mesh files
 examples/**/*.msh
+test/**/*.msh
 
 # Test output folders
 test/temp_test_results/

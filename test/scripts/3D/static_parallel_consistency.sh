@@ -19,6 +19,5 @@ for i in 1 2 4 8; do
     --matrix_free yes --mg_strategy twolevel \
     --mg_coarse_level 1 --output ${TEMP_TEST_RESULTS}/parallel_output3D_$i \
     --petsc -options_file mg_cheby.cfg
+    rm spherical_hole.msh
 done
-
-rm spherical_hole.msh
