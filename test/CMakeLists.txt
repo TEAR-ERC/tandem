@@ -2,7 +2,7 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
-set(TEST_DATA_BRANCH "piyush/refactor-main" CACHE STRING "Branch of tandem_test_data to use")
+set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
 
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
