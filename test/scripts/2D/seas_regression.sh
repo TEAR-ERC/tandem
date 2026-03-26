@@ -12,8 +12,8 @@ cd "$CONFIG_DIR"
 
 gmsh -2 bp1_ref.geo
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QD.toml \
---petsc -options_file solver.cfg
+--petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/seas_regression_QD.log
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen.toml \
---petsc -options_file solver.cfg
+--petsc -options_file solver.cfg>> ${TEMP_TEST_RESULTS}/seas_regression_QDGreen.log
 
 rm bp1_ref.msh
