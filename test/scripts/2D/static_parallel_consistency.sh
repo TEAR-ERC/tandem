@@ -10,11 +10,8 @@ CONFIG_DIR="${SCRIPT_DIR}/../../reference_configs/2D"
 
 cd "$CONFIG_DIR"
 
-if [[ ! -f "circular_hole.msh" ]]; then
-    gmsh -2 circular_hole.geo
-fi
-
 for i in 1 2 4 8; do
+    gmsh -2 circular_hole.geo
     mpirun --oversubscribe -n $i ${EXECUTABLE_DIR}/app/static circular_hole.toml \
     --matrix_free yes --mg_strategy twolevel \
     --mg_coarse_level 1 --output ${TEMP_TEST_RESULTS}/parallel_output2D_$i \
