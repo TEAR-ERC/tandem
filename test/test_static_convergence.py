@@ -67,29 +67,27 @@ def compute_all_slopes(data):
     return slope_l2, slope_h1
 
 
-def test_convergence(request, temp_results_path):
+def test_convergence(request, temp_results_path, convergence_config):
     """
     Integration test that verifies the computed convergence orders against
     precomputed expected values for the given domain dimension.
     """
     domain_dimension = request.config.getoption("domain_dimension")
     log_file = temp_results_path / f"convergence_{domain_dimension}D.log"
+
     data = parse_static_log(log_file)
     l2_order, h1_order = compute_all_slopes(data)
 
-    # Expected order of convergence for order N is N+1 - for N=3, we expect 4th order convergence;
-    N = 3
-    L2_upper_bound = N + 1
-    L2_lower_bound = N
+    conf = convergence_config
 
-    H1_upper_bound = N
-    H1_lower_bound = N - 1
-
-    assert l2_order > L2_lower_bound and l2_order < L2_upper_bound, (
-        f"Computed L2 order {l2_order:.4f} "
-        f"(rounded: {l2_order}) does not match expected order between {L2_lower_bound} and {L2_upper_bound}"
+    # Check L2 convergence
+    assert conf["l2"]["lower"] < l2_order < conf["l2"]["upper"], (
+        f"Computed L2 order {l2_order:.4f} is outside the expected "
+        f"range ({conf['l2']['lower']}, {conf['l2']['upper']})"
     )
-    assert h1_order > H1_lower_bound and h1_order < H1_upper_bound, (
-        f"Computed H1 order {h1_order:.4f} "
-        f"(rounded: {h1_order}) does not match expected order between {H1_lower_bound} and {H1_upper_bound}"
+
+    # Check H1 convergence
+    assert conf["h1"]["lower"] < h1_order < conf["h1"]["upper"], (
+        f"Computed H1 order {h1_order:.4f} is outside the expected "
+        f"range ({conf['h1']['lower']}, {conf['h1']['upper']})"
     )

@@ -8,15 +8,70 @@ from pathlib import Path
 @pytest.fixture(scope="module")
 def tolerances():
     """
-    Provide common numerical tolerances used across regression and
-    consistency tests.
+    Centralized numerical tolerances for pass/fail criteria.
 
-    Returns a dictionary with keys like 'static', 'seas', 'seas_events', and 'convergence'.
+    - 'static': Threshold for L2/H1 errors in steady-state problems.
+    - 'seas': Tolerance for time-stepping consistency in SEAS cycles.
+    - 'seas_events': Looser tolerance for peak slip rates (VMax) during events.
+    - 'spatial_match': Maximum distance allowed when identifying the same
+       physical point across different mesh partitions.
     """
     return {
         "static": 1e-8,
         "seas": 1e-8,
         "seas_events": 1e-2,
+        "spatial_match": 1e-8,
+    }
+
+
+@pytest.fixture(scope="module")
+def seas_config():
+    """
+    Parameters for the Sequence of Earthquake and Aseismic Slip (SEAS)
+    event detection algorithm.
+
+    - 'window_size': The temporal 'look-ahead' (in seconds) used to group
+       high slip-rate points into a single seismic event.
+    - 'relative_error': The required drop in slip-rate magnitude to
+       distinguish the end of one event from the start of another.
+    """
+    return {
+        "window_size": 1e9,
+        "relative_error": 0.5,
+    }
+
+
+@pytest.fixture(scope="module")
+def traction_bc_config():
+    """
+    Physical and geometric constraints for Traction Boundary Condition tests.
+
+    - 'x_target': The specific coordinate (the end of a rod) where
+       analytical solutions are verified.
+    - 'x_tol': Spatial window around x_target to account for mesh discretization.
+    - 'expected_u0': The theoretical displacement value at x_target.
+    """
+    return {
+        "x_target": 0.0001,
+        "x_tol": 1e-8,
+        "expected_u0": 5e-9,
+    }
+
+
+@pytest.fixture(scope="module")
+def convergence_config():
+    """
+    Theoretical convergence rates for DG verification.
+    For a polynomial basis of order N, we expect:
+    - L2 error to reduce at a rate of N+1 (e.g., N=3 -> 4th order).
+    - H1 error to reduce at a rate of N (e.g., N=3 -> 3rd order).
+
+    The 'lower' and 'upper' bounds provide a buffer for numerical noise.
+    """
+    n = 3
+    return {
+        "l2": {"lower": n, "upper": n + 1},
+        "h1": {"lower": n - 1, "upper": n},
     }
 
 

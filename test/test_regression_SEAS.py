@@ -50,18 +50,18 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency(file_reference, file_tested, tolerances):
+def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config):
     """
     Compare event detections between a reference and tested CSV file.
 
     Asserts that the number, times, and magnitudes of detected events match
     within provided tolerances.
     """
-    window_size = 1e9  # seconds
-    relative_error = 0.5  # the max in a window_size window has to be relatively 50% above the values at the two edges of the window to be considered an event
+    win = seas_config["window_size"]
+    rel = seas_config["relative_error"]
 
-    events_reference = detect_events(file_reference, window_size, relative_error)
-    events_tested = detect_events(file_tested, window_size, relative_error)
+    events_reference = detect_events(file_reference, win, rel)
+    events_tested = detect_events(file_tested, win, rel)
 
     assert len(events_reference) == len(events_tested), (
         f"Number of detected events does not match: "
@@ -99,27 +99,26 @@ def check_SEAS_consistency(file_reference, file_tested, tolerances):
     ), "Event time intervals do not match between files."
 
 
-def test_SEAS_consistency_QD(temp_results_path, reference_results_path, tolerances):
+def test_SEAS_consistency_QD(
+    temp_results_path, reference_results_path, tolerances, seas_config
+):
     """Regression test comparing QD reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
+    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances, seas_config)
 
 
 def test_SEAS_consistency_QDGreen(
-    temp_results_path, reference_results_path, tolerances
+    temp_results_path, reference_results_path, tolerances, seas_config
 ):
     """Regression test comparing QDGreen reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances)
+    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances, seas_config)
 
 
-def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances):
-    """
-    Compare QD and QDGreen outputs from the same run to ensure they
-    produce consistent event detection results.
-    """
+def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances, seas_config):
+    """Compare QD and QDGreen outputs from the same run."""
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances)
+    check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances, seas_config)
