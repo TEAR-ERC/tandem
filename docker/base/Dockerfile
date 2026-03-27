@@ -58,4 +58,3 @@ RUN useradd -m -s /bin/bash tandem && \
 # Create and activate a venv for the 'tandem' user
 USER tandem
 WORKDIR /home/tandem
-
