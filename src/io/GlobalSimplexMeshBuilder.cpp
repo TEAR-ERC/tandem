@@ -93,6 +93,9 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         case static_cast<long>(BC::Traction):
             bc = BC::Traction;
             break;
+        case static_cast<long>(BC::FreeSlip):
+            bc = BC::FreeSlip;
+            break;
         default:
             ++unknownBC;
             break;
