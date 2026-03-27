@@ -136,6 +136,9 @@ if(RUN_CI_TESTS)
     if(DOMAIN_DIMENSION EQUAL 2)
         add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
     endif()
+    if(DOMAIN_DIMENSION EQUAL 3)
+        add_pytest_test("traction-bc-test-${DOMAIN_DIMENSION}D" "test_traction_bc.py")
+    endif()
 
     # Remove test outputs after all pytest tests finish
     add_test(NAME cleanup-test-outputs
