@@ -34,6 +34,7 @@ public:
     using base = DGCurvilinearCommon<DomainDimension>;
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
+    constexpr static std::size_t ScalarQuantity = 1;
 
     Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
                functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
@@ -64,7 +65,8 @@ public:
                            LinearAllocator<double>& scratch) const;
     bool assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                            LinearAllocator<double>& scratch) const;
-
+    bool assemble_boundary_free_slip(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
+                                     LinearAllocator<double>& scratch) const;
     bool rhs_volume(std::size_t elNo, Vector<double>& B, LinearAllocator<double>& scratch) const;
     bool rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       Vector<double>& B1, LinearAllocator<double>& scratch) const;
@@ -72,6 +74,8 @@ public:
                       LinearAllocator<double>& scratch) const;
     bool rhs_traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                                LinearAllocator<double>& scratch) const;
+    bool rhs_free_slip_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                                LinearAllocator<double>& scratch) const;
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
     void wave_rhs(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
@@ -132,6 +136,17 @@ public:
     }
     void set_traction_boundary(facet_functional_t fun) { fun_traction = std::move(fun); }
 
+    void set_free_slip_boundary(functional_t<ScalarQuantity> fun) {
+        fun_free_slip = make_facet_functional(std::move(fun));
+    }
+
+    void set_free_slip_boundary(functional_t<ScalarQuantity> fun,
+                                std::array<double, DomainDimension> const& refNormal) {
+        fun_free_slip = make_facet_functional(std::move(fun), refNormal);
+    }
+
+    void set_free_slip_boundary(facet_functional_t fun) { fun_free_slip = std::move(fun); }
+
 private:
     template <bool WithRHS>
     void apply_(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
@@ -150,6 +165,7 @@ private:
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_traction(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+    bool bc_free_slip(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
     void transpose_JInv(std::size_t fctNo, int side);
 
@@ -184,6 +200,7 @@ private:
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
     std::optional<facet_functional_t> fun_slip = std::nullopt;
     std::optional<facet_functional_t> fun_traction = std::nullopt;
+    std::optional<facet_functional_t> fun_free_slip = std::nullopt;
 
     // Precomputed data
     struct lam {

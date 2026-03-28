@@ -75,6 +75,12 @@ void SeasFDOperator::rhs(double time, BlockVector const& v, BlockVector const& u
     if (fun_boundary_) {
         dgop_->set_dirichlet((*fun_boundary_)(time));
     }
+    if (fun_traction_boundary_) {
+        dgop_->set_traction_boundary((*fun_traction_boundary_)(time));
+    }
+    if (fun_free_slip_boundary_) {
+        dgop_->set_free_slip_boundary((*fun_free_slip_boundary_)(time));
+    }
 
     dgop_->wave_rhs(u, dv);
 
