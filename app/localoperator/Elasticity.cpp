@@ -447,7 +447,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 
 bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                    LinearAllocator<double>& scratch) const {
-    if (info.bc == BC::Natural || info.bc == BC::Traction) {
+    if (info.bc == BC::Natural || info.bc == BC::Traction || info.bc == BC::FreeSlip) {
         return false;
     }
 
@@ -517,6 +517,76 @@ bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Mat
     return true;
 }
 
+bool Elasticity::assemble_boundary_free_slip(std::size_t fctNo, FacetInfo const& info,
+                                             Matrix<double>& A00,
+                                             LinearAllocator<double>& scratch) const {
+    if (!(info.bc == BC::FreeSlip)) {
+        return false;
+    }
+
+    alignas(ALIGNMENT) double Dx_q0[tensor::Dx_q::size(0)];
+
+    kernel::Dx_q dxKrnl;
+    dxKrnl.Dx_q(0) = Dx_q0;
+    dxKrnl.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    dxKrnl.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    dxKrnl.execute(0);
+
+    alignas(ALIGNMENT) double traction_op_q0[tensor::traction_op_q::size(0)];
+
+    kernel::assembleTractionOp tOpKrnl;
+    tOpKrnl.delta = init::delta::Values;
+    tOpKrnl.Dx_q(0) = Dx_q0;
+    tOpKrnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    tOpKrnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    tOpKrnl.n_q = fct[fctNo].get<Normal>().data()->data();
+    tOpKrnl.traction_op_q(0) = traction_op_q0;
+    tOpKrnl.execute(0);
+
+    alignas(ALIGNMENT) double L_q0[tensor::L_q::size(0)];
+    if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double Lift0[tensor::Lift::size(0)];
+        alignas(ALIGNMENT) double Minv0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv0);
+
+        kernel::lift_boundary lift;
+        lift.delta = init::delta::Values;
+        lift.Lift(0) = Lift0;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.L_q(0) = L_q0;
+        lift.Minv(0) = Minv0;
+        lift.execute();
+    } else { // IP
+        kernel::lift_ip lift;
+        lift.delta = init::delta::Values;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.L_q(0) = L_q0;
+        lift.execute(0);
+    }
+
+    kernel::assembleSurfaceFreeSlip krnl;
+    krnl.Dx_q(0) = Dx_q0;
+    krnl.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+    krnl.nl_q = fct[fctNo].get<NormalLength>().data();
+    krnl.c00 = -1.0;
+    krnl.c10 = epsilon;
+    krnl.c20 = penalty(fctNo);
+    krnl.a(0, 0) = A00.data();
+    krnl.E_q(0) = E_q[info.localNo[0]].data();
+    krnl.L_q(0) = L_q0;
+    krnl.traction_op_q(0) = traction_op_q0;
+    krnl.w = fctRule.weights().data();
+    krnl.execute(0, 0);
+    return true;
+}
+
 bool Elasticity::rhs_volume(std::size_t elNo, Vector<double>& B,
                             LinearAllocator<double>& scratch) const {
     if (!fun_force) {
@@ -575,6 +645,15 @@ bool Elasticity::bc_traction(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
     if (bc == BC::Traction && fun_traction) {
         (*fun_traction)(fctNo, f_q, true);
+        return true;
+    }
+    return false;
+}
+
+bool Elasticity::bc_free_slip(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+    auto f_q = Matrix<double>(f_q_raw, 1, fctRule.size());
+    if (bc == BC::FreeSlip && fun_free_slip) {
+        (*fun_free_slip)(fctNo, f_q, true);
         return true;
     }
     return false;
@@ -717,6 +796,36 @@ bool Elasticity::rhs_traction_boundary(std::size_t fctNo, FacetInfo const& info,
     rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.traction_component = f_q_raw;
     rhs.E_q(0) = E_q[info.localNo[0]].data();
+    rhs.execute();
+
+    return true;
+}
+
+bool Elasticity::rhs_free_slip_boundary(std::size_t fctNo, FacetInfo const& info,
+                                        Vector<double>& B0,
+                                        LinearAllocator<double>& scratch) const {
+    alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
+    alignas(ALIGNMENT) double f_q_raw[tensor::g_q::size()];
+
+    // Check for boundary conditions
+    if (!bc_free_slip(fctNo, info.bc, f_q_raw)) {
+        return false;
+    }
+    kernel::rhsFreeSlip rhs;
+
+    rhs.b = B0.data();
+    rhs.c10 = epsilon;
+    rhs.c20 = penalty(fctNo);
+    rhs.n_unit_q = fct[fctNo].get<UnitNormal>().data()->data();
+    rhs.w = fctRule.weights().data();
+    rhs.g_q = f_q_raw;
+    rhs.Dx_q(0) = Dx_q;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
+    rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
     rhs.execute();
 
     return true;
