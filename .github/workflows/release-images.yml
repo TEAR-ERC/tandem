@@ -59,7 +59,6 @@ jobs:
           fi
 
       - name: Build and push base image (arm64)
-        id: build-base
         if: steps.check.outputs.exists == 'false'
         uses: docker/build-push-action@v6
         with:
@@ -74,15 +73,6 @@ jobs:
             CXX=g++-13
           cache-from: type=gha,scope=tandem-base-arm64
           cache-to: type=gha,mode=max,scope=tandem-base-arm64
-
-      - name: Merge arm64 into multi-arch base manifest
-        if: steps.check.outputs.exists == 'false'
-        run: |
-          docker buildx imagetools create \
-            --tag "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" \
-            --tag "${{ env.BASE_IMAGE }}:latest" \
-            "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" \
-            "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64"
 
   # ── Build amd64 release image ─────────────────────────────────────────────
   build-tandem-amd64:
@@ -188,6 +178,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64
           cache-from: type=gha,scope=tandem-arm64
           cache-to: type=gha,mode=max,scope=tandem-arm64
 
