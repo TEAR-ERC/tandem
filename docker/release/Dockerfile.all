@@ -4,7 +4,9 @@
 
 # ── Stage 1: Build all 12 Tandem configurations from base ────────────────────
 ARG BASE_IMAGE=ghcr.io/tear-erc/tandem/tandem-base:3.22.5
-FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
+FROM ${BASE_IMAGE} AS builder
+
+ARG TARGETARCH
 
 USER root
 
@@ -17,16 +19,18 @@ RUN mkdir -p /opt/tandem && cd /opt/tandem \
     && git checkout dmay/staging \
     && git submodule update --init
 
-RUN mkdir -p /staging && \
+RUN TANDEM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "noarch" || echo "hsw") && \
+    mkdir -p /staging && \
     for DIM in 2 3; do \
         for DEG in 1 2 3 4 5 6; do \
-            echo "==> Building ${DIM}D degree ${DEG}..." \
+            echo "==> Building ${DIM}D degree ${DEG} (ARCH=${TANDEM_ARCH})..." \
             && mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
             && cd /opt/tandem/build_${DIM}d_${DEG}p \
             && cmake -G Ninja /opt/tandem/tandem \
                 -DCMAKE_CXX_COMPILER=mpicxx \
                 -DCMAKE_C_COMPILER=mpicc \
                 -DCMAKE_PREFIX_PATH="${PETSC_INSTALL_DIR}" \
+                -DARCH="${TANDEM_ARCH}" \
                 -DDOMAIN_DIMENSION=${DIM} \
                 -DPOLYNOMIAL_DEGREE=${DEG} \
             && ninja \
@@ -36,7 +40,7 @@ RUN mkdir -p /staging && \
     done
 
 # ── Stage 2: Slim runtime image with all binaries ────────────────────────────
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -61,11 +65,13 @@ COPY --from=builder /staging /opt/tandem/bin
 # Copy examples
 COPY --from=builder /opt/tandem/tandem/examples /work/examples
 
-ENV LD_LIBRARY_PATH=/opt/petsc/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/opt/petsc/lib
 ENV PATH=/opt/tandem/bin:${PATH}
 ENV OMP_NUM_THREADS=1
 ENV OMP_PROC_BIND=close
 ENV OMPI_MCA_rmaps_base_oversubscribe=1
+ENV OMPI_MCA_rmaps_base_mapping_policy=core
+ENV OMPI_MCA_hwloc_base_binding_policy=core
 
 # Create non-root user
 RUN useradd -m -s /bin/bash tandem \

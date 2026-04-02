@@ -2,6 +2,7 @@ FROM ubuntu:24.04
 ARG PETSC_VERSION
 ARG CC
 ARG CXX
+ARG TARGETARCH
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -21,14 +22,18 @@ RUN apt-get update && apt-get install -y \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# libxsmm generator (needed at build time by Tandem)
-RUN git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git && \
-    cd libxsmm && make generator CC="$CC" CXX="$CXX" -j$(nproc) && \
-    cp bin/libxsmm_gemm_generator /usr/bin && \
-    cd .. && rm -rf libxsmm
+# libxsmm generator (needed at build time by Tandem on x86 only)
+# libxsmm 1.17 is Intel-only; on ARM yateto falls back to OpenBLAS kernels.
+RUN if [ "$TARGETARCH" != "arm64" ]; then \
+        git clone --depth 1 --branch 1.17 https://github.com/libxsmm/libxsmm.git && \
+        cd libxsmm && make generator CC="$CC" CXX="$CXX" -j$(nproc) && \
+        cp bin/libxsmm_gemm_generator /usr/bin && \
+        cd .. && rm -rf libxsmm; \
+    fi
 
 # Get and install PETSc (using build-args for compiler and PETSc version)
-RUN echo "Using PETSc version $PETSC_VERSION" && \
+RUN ARCH_FLAGS=$([ "$TARGETARCH" = "arm64" ] && echo "" || echo "-march=core-avx2") && \
+    echo "Using PETSc version $PETSC_VERSION, ARCH_FLAGS=$ARCH_FLAGS" && \
     wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && \
     rm -f petsc-${PETSC_VERSION}.tar.gz && \
@@ -39,7 +44,7 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     --with-memalign=32 \
     --with-64-bit-indices \
     CC=mpicc CXX=mpicxx FC=mpif90 \
-    COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" \
+    COPTFLAGS="-g -O3 $ARCH_FLAGS" CXXOPTFLAGS="-g -O3 $ARCH_FLAGS" \
     --download-mumps \
     --download-scalapack \
     --prefix=$PETSC_INSTALL_DIR && \
