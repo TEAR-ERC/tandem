@@ -6,6 +6,7 @@ on:
       - ymagen/docker-release-images    # your PR branch - builds for testing
     paths:
       - 'docker/release/**'      # trigger if Dockerfiles changed
+      - 'docker/base/Dockerfile' # trigger if base changed
       - '.github/workflows/release-images.yml'  # trigger if workflow itself changed
     tags:
       - 'v*'                     # v1.2.0, v1.3.0 etc - full versioned release
@@ -14,9 +15,71 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/tandem
+  BASE_IMAGE: ghcr.io/${{ github.repository_owner }}/tandem/tandem-base
+  PETSC_VERSION: "3.22.5"
 
 jobs:
-  # ── Build amd64 image ─────────────────────────────────────────────────────
+  # ── Build arm64 base image (needed before arm64 release build) ────────────
+  build-base-arm64:
+    name: Build base image (arm64)
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      arm64_base_digest: ${{ steps.build-base.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Check if arm64 base already exists
+        id: check
+        run: |
+          if docker manifest inspect "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" 2>/dev/null \
+              | grep -q '"architecture": "arm64"'; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push base image (arm64)
+        id: build-base
+        if: steps.check.outputs.exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/base/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64
+          build-args: |
+            PETSC_VERSION=${{ env.PETSC_VERSION }}
+            CC=gcc-13
+            CXX=g++-13
+          cache-from: type=gha,scope=tandem-base-arm64
+          cache-to: type=gha,mode=max,scope=tandem-base-arm64
+
+      - name: Merge arm64 into multi-arch base manifest
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" \
+            --tag "${{ env.BASE_IMAGE }}:latest" \
+            "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" \
+            "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64"
+
+  # ── Build amd64 release image ─────────────────────────────────────────────
   build-tandem-amd64:
     name: Build tandem image (amd64)
     runs-on: ubuntu-latest
@@ -64,10 +127,11 @@ jobs:
           cache-from: type=gha,scope=tandem-amd64
           cache-to: type=gha,mode=max,scope=tandem-amd64
 
-  # ── Build arm64 image ─────────────────────────────────────────────────────
+  # ── Build arm64 release image ─────────────────────────────────────────────
   build-tandem-arm64:
     name: Build tandem image (arm64)
     runs-on: ubuntu-24.04-arm
+    needs: [build-base-arm64]
     permissions:
       contents: read
       packages: write
