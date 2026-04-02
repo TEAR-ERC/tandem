@@ -17,10 +17,12 @@ on:
         type: string
 
 jobs:
+  # ── Build amd64 base image ────────────────────────────────────────────────
   build-base:
     runs-on: ubuntu-24.04
     outputs:
       base_rebuilt: ${{ steps.set-built.outputs.built }}
+      digest: ${{ steps.docker-build-base.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +46,10 @@ jobs:
         with:
           files: docker/base/Dockerfile
 
-      - name: Build and push base image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push base image (amd64)
         id: docker-build-base
         if: steps.check-base.outputs.exists == 'false' || steps.base-changed.outputs.any_changed == 'true'
         uses: docker/build-push-action@v4
@@ -64,13 +69,85 @@ jobs:
       - name: Set built output
         id: set-built
         run: |
-          # If the build step was skipped, it means we didn't rebuild.
           if [ "${{ steps.docker-build-base.outcome }}" == "success" ]; then
             echo "built=true" >> $GITHUB_OUTPUT
           else
             echo "built=false" >> $GITHUB_OUTPUT
           fi
 
+  # ── Build arm64 base image ────────────────────────────────────────────────
+  build-base-arm64:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      digest: ${{ steps.docker-build-base-arm64.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Check if arm64 base image exists
+        id: check-base-arm64
+        run: |
+          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+            # Check if arm64 variant is present in the manifest
+            if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}" 2>/dev/null | grep -q '"architecture": "arm64"'; then
+              echo "exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "exists=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if base Dockerfile changed
+        id: base-changed
+        uses: tj-actions/changed-files@v42
+        with:
+          files: docker/base/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push base image (arm64)
+        id: docker-build-base-arm64
+        if: steps.check-base-arm64.outputs.exists == 'false' || steps.base-changed.outputs.any_changed == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: docker/base/Dockerfile
+          push: true
+          tags: |
+            ${{ inputs.base_image }}:${{ inputs.petsc_version }}
+            ${{ inputs.base_image }}:latest
+          platforms: linux/arm64
+          build-args: |
+            PETSC_VERSION=${{ inputs.petsc_version }}
+            CC=gcc-13
+            CXX=g++-13
+
+  # ── Merge base into multi-arch manifest ───────────────────────────────────
+  merge-base-manifest:
+    runs-on: ubuntu-24.04
+    needs: [build-base, build-base-arm64]
+    if: needs.build-base.outputs.base_rebuilt == 'true' || needs.build-base-arm64.outputs.digest != ''
+    steps:
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create multi-arch base manifest
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ inputs.base_image }}:${{ inputs.petsc_version }}" \
+            --tag "${{ inputs.base_image }}:latest" \
+            "${{ inputs.base_image }}:${{ inputs.petsc_version }}"
+
+  # ── Build test image (amd64 only — used by test pipeline) ─────────────────
   build-test-image:
     runs-on: ubuntu-24.04
     needs: build-base
@@ -91,7 +168,6 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      # Using TJ Actions again for the test Dockerfile
       - name: Check if test Dockerfile changed
         id: test-changed
         uses: tj-actions/changed-files@v42
