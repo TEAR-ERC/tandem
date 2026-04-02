@@ -33,6 +33,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Lowercase image names
+        run: |
+          echo "IMAGE_BASE=${IMAGE_BASE,,}" >> $GITHUB_ENV
+          echo "BASE_IMAGE=${BASE_IMAGE,,}" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -93,6 +98,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Lowercase image names
+        run: |
+          echo "IMAGE_BASE=${IMAGE_BASE,,}" >> $GITHUB_ENV
+          echo "BASE_IMAGE=${BASE_IMAGE,,}" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -142,6 +152,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Lowercase image names
+        run: |
+          echo "IMAGE_BASE=${IMAGE_BASE,,}" >> $GITHUB_ENV
+          echo "BASE_IMAGE=${BASE_IMAGE,,}" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -186,6 +201,11 @@ jobs:
       packages: write
 
     steps:
+      - name: Lowercase image names
+        run: |
+          echo "IMAGE_BASE=${IMAGE_BASE,,}" >> $GITHUB_ENV
+          echo "BASE_IMAGE=${BASE_IMAGE,,}" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
