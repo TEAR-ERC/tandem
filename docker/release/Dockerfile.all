@@ -20,6 +20,7 @@ RUN mkdir -p /opt/tandem && cd /opt/tandem \
     && git submodule update --init
 
 RUN TANDEM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "noarch" || echo "hsw") && \
+    MARCH_FLAGS=$([ "$TARGETARCH" = "arm64" ] && echo "-march=armv8-a" || echo "") && \
     mkdir -p /staging && \
     for DIM in 2 3; do \
         for DEG in 1 2 3 4 5 6; do \
@@ -31,6 +32,8 @@ RUN TANDEM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "noarch" || echo "hsw") &&
                 -DCMAKE_C_COMPILER=mpicc \
                 -DCMAKE_PREFIX_PATH="${PETSC_INSTALL_DIR}" \
                 -DARCH="${TANDEM_ARCH}" \
+                -DCMAKE_CXX_FLAGS="${MARCH_FLAGS}" \
+                -DCMAKE_C_FLAGS="${MARCH_FLAGS}" \
                 -DDOMAIN_DIMENSION=${DIM} \
                 -DPOLYNOMIAL_DEGREE=${DEG} \
             && ninja \
