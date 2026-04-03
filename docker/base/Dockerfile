@@ -32,7 +32,11 @@ RUN if [ "$TARGETARCH" != "arm64" ]; then \
     fi
 
 # Get and install PETSc (using build-args for compiler and PETSc version)
-RUN ARCH_FLAGS=$([ "$TARGETARCH" = "arm64" ] && echo "" || echo "-march=core-avx2") && \
+# On ARM: -march=armv8-a ensures portable code that runs on M-chip Docker VMs.
+# FOPTFLAGS covers Fortran code in MUMPS/ScaLAPACK.
+# --download-fblaslapack on ARM avoids system BLAS compiled with Graviton-specific flags.
+RUN ARCH_FLAGS=$([ "$TARGETARCH" = "arm64" ] && echo "-march=armv8-a" || echo "-march=core-avx2") && \
+    BLAS_OPT=$([ "$TARGETARCH" = "arm64" ] && echo "--download-fblaslapack" || echo "") && \
     echo "Using PETSc version $PETSC_VERSION, ARCH_FLAGS=$ARCH_FLAGS" && \
     wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-${PETSC_VERSION}.tar.gz && \
     tar -xf petsc-${PETSC_VERSION}.tar.gz && \
@@ -44,9 +48,10 @@ RUN ARCH_FLAGS=$([ "$TARGETARCH" = "arm64" ] && echo "" || echo "-march=core-avx
     --with-memalign=32 \
     --with-64-bit-indices \
     CC=mpicc CXX=mpicxx FC=mpif90 \
-    COPTFLAGS="-g -O3 $ARCH_FLAGS" CXXOPTFLAGS="-g -O3 $ARCH_FLAGS" \
+    COPTFLAGS="-g -O3 $ARCH_FLAGS" CXXOPTFLAGS="-g -O3 $ARCH_FLAGS" FOPTFLAGS="-g -O3 $ARCH_FLAGS" \
     --download-mumps \
     --download-scalapack \
+    $BLAS_OPT \
     --prefix=$PETSC_INSTALL_DIR && \
     make PETSC_DIR=$(pwd) PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
     make PETSC_DIR=$(pwd) PETSC_ARCH=arch-linux-c-opt install && \

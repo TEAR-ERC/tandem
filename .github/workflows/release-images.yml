@@ -11,6 +11,13 @@ on:
     tags:
       - 'v*'                            # v1.2.0, v1.3.0 etc
   workflow_dispatch:
+    inputs:
+      force_rebuild_base:
+        description: 'Force rebuild base images (ignore existing tags)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
 
 env:
   REGISTRY: ghcr.io
@@ -48,7 +55,9 @@ jobs:
       - name: Check if amd64 base already exists
         id: check
         run: |
-          if docker manifest inspect "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-amd64" > /dev/null 2>&1; then
+          if [ "${{ inputs.force_rebuild_base }}" = "true" ]; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+          elif docker manifest inspect "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-amd64" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -106,7 +115,9 @@ jobs:
       - name: Check if arm64 base already exists
         id: check
         run: |
-          if docker manifest inspect "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64" > /dev/null 2>&1; then
+          if [ "${{ inputs.force_rebuild_base }}" = "true" ]; then
+            echo "exists=false" >> $GITHUB_OUTPUT
+          elif docker manifest inspect "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
