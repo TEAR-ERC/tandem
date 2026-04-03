@@ -67,8 +67,15 @@ jobs:
             PETSC_VERSION=${{ env.PETSC_VERSION }}
             CC=gcc-13
             CXX=g++-13
+          provenance: false
           cache-from: type=gha,scope=tandem-base-amd64
           cache-to: type=gha,mode=max,scope=tandem-base-amd64
+
+      - name: Restore tandem-base:${{ env.PETSC_VERSION }} to valid amd64 manifest
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}" \
+            "${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-amd64"
 
   # ── Build arm64 base (cached between runs by per-arch tag) ───────────────
   build-base-arm64:
@@ -118,6 +125,7 @@ jobs:
             PETSC_VERSION=${{ env.PETSC_VERSION }}
             CC=gcc-13
             CXX=g++-13
+          provenance: false
           cache-from: type=gha,scope=tandem-base-arm64
           cache-to: type=gha,mode=max,scope=tandem-base-arm64
 
@@ -173,8 +181,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-amd64
-          cache-from: type=gha,scope=tandem-amd64
-          cache-to: type=gha,mode=max,scope=tandem-amd64
+          provenance: false
+          cache-from: type=gha,scope=tandem-release-amd64
+          cache-to: type=gha,mode=max,scope=tandem-release-amd64
 
   # ── Build arm64 release image ─────────────────────────────────────────────
   build-tandem-arm64:
@@ -228,8 +237,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ env.PETSC_VERSION }}-arm64
-          cache-from: type=gha,scope=tandem-arm64
-          cache-to: type=gha,mode=max,scope=tandem-arm64
+          provenance: false
+          cache-from: type=gha,scope=tandem-release-arm64
+          cache-to: type=gha,mode=max,scope=tandem-release-arm64
 
   # ── Merge into multi-arch manifest ───────────────────────────────────────
   merge-manifest:
