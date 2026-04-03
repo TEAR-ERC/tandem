@@ -15,12 +15,20 @@ RUN apt-get update && apt-get install -y \
     openmpi-bin libopenmpi-dev \
     libmetis-dev libparmetis-dev \
     libeigen3-dev \
-    libopenblas-dev liblua5.3-dev \
+    liblua5.3-dev \
     libomp-dev libgomp1 wget git jq curl gmsh \
     python3 python3-dev python3-pip python3-setuptools \
     python3-venv \
     sudo \
     && rm -rf /var/lib/apt/lists/*
+
+# On ARM: use Netlib reference BLAS (no CPU-specific code) to avoid Graviton-specific
+# instructions that crash on M-chip Docker VMs. On x86: use OpenBLAS for performance.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get update && apt-get install -y libblas-dev liblapack-dev && rm -rf /var/lib/apt/lists/*; \
+    else \
+        apt-get update && apt-get install -y libopenblas-dev && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # libxsmm generator (needed at build time by Tandem on x86 only)
 # libxsmm 1.17 is Intel-only; on ARM yateto falls back to OpenBLAS kernels.

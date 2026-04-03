@@ -44,6 +44,7 @@ RUN TANDEM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "noarch" || echo "hsw") &&
 
 # ── Stage 2: Slim runtime image with all binaries ────────────────────────────
 FROM ubuntu:24.04
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -53,11 +54,16 @@ RUN apt-get update && apt-get install -y \
     liblua5.3-0 \
     libblas3 \
     liblapack3 \
-    libopenblas0-pthread \
     libparmetis4.0 \
     libgomp1 \
     gmsh \
     && rm -rf /var/lib/apt/lists/*
+
+# On x86 also install OpenBLAS for performance; on ARM keep only Netlib reference BLAS
+# to avoid Graviton-specific kernels that crash on M-chip Docker VMs.
+RUN if [ "$TARGETARCH" != "arm64" ]; then \
+        apt-get update && apt-get install -y libopenblas0-pthread && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Copy PETSc runtime libs
 COPY --from=builder /opt/petsc/lib /opt/petsc/lib
