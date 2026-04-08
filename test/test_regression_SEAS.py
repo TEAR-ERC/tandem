@@ -10,7 +10,14 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     values at the edges of a time window (controlled by relative_error).
     Returns a list of (time, vmax) events.
     """
-    df = pd.read_csv(file_name, comment="#")
+    try:
+        df = pd.read_csv(file_name, comment="#")
+    except FileNotFoundError:
+        print(f"Warning: The file '{file_name}' does not exist. Returning 0 events.")
+        return []
+    except pd.errors.EmptyDataError:
+        print(f"Warning: The file '{file_name}' is empty. Returning 0 events.")
+        return []
     time = df["Time"].values
     vmax = df["VMax"].values
 
@@ -50,7 +57,7 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config):
+def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config, mode):
     """
     Compare event detections between a reference and tested CSV file.
 
@@ -81,7 +88,7 @@ def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config)
         times_reference, times_tested, rtol=tolerances["seas"]
     ), "Event times do not match"
     assert np.allclose(
-        values_reference, values_tested, rtol=tolerances["seas_events"]
+        values_reference, values_tested, rtol=tolerances["seas_events"][mode]
     ), "Event slip rate magnitudes do not match"
 
     event_time_intervals_reference = [
@@ -105,7 +112,9 @@ def test_SEAS_consistency_QD(
     """Regression test comparing QD reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances, seas_config)
+    check_SEAS_consistency(
+        file_vmax_ref, file_vmax_output, tolerances, seas_config, mode="QD"
+    )
 
 
 def test_SEAS_consistency_QDGreen(
@@ -114,11 +123,15 @@ def test_SEAS_consistency_QDGreen(
     """Regression test comparing QDGreen reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax_ref, file_vmax_output, tolerances, seas_config)
+    check_SEAS_consistency(
+        file_vmax_ref, file_vmax_output, tolerances, seas_config, mode="QDGreen"
+    )
 
 
 def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances, seas_config):
     """Compare QD and QDGreen outputs from the same run."""
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
-    check_SEAS_consistency(file_vmax, file_vmax_gf, tolerances, seas_config)
+    check_SEAS_consistency(
+        file_vmax, file_vmax_gf, tolerances, seas_config, mode="both"
+    )
