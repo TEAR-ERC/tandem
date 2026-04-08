@@ -19,7 +19,7 @@ def tolerances():
     return {
         "static": 1e-8,
         "seas": 1e-8,
-        "seas_events": 1e-2,
+        "seas_events": 1e-8,
         "spatial_match": 1e-8,
     }
 
