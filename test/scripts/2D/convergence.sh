@@ -12,6 +12,6 @@ cd "$CONFIG_DIR"
 
 for h in 0.015625 0.03125 0.0625 0.125; do
     gmsh -2 circular_hole.geo -setnumber h $h -order 8 -o circular_hole.msh
-    ${EXECUTABLE_DIR}/app/static circular_hole.toml > ${TEMP_TEST_RESULTS}/convergence_2D.log
+    ${EXECUTABLE_DIR}/app/static circular_hole.toml >> ${TEMP_TEST_RESULTS}/convergence_2D.log
     rm circular_hole.msh
 done
