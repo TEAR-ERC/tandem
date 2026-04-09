@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 gfortran \
     cmake ninja-build \
     openmpi-bin libopenmpi-dev \
-    libmetis-dev libparmetis-dev \
     libeigen3-dev \
     libopenblas-dev liblua5.3-dev \
     libomp-dev libgomp1 wget git jq curl gmsh \
@@ -42,6 +41,8 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" \
     --download-mumps \
     --download-scalapack \
+    --download-metis \ 
+    --download-parmetis \
     --prefix=$PETSC_INSTALL_DIR && \
     make PETSC_DIR=$(pwd) PETSC_ARCH=arch-linux-c-opt -j$(nproc) && \
     make PETSC_DIR=$(pwd) PETSC_ARCH=arch-linux-c-opt install && \
