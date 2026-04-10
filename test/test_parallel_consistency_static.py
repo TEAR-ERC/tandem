@@ -21,8 +21,22 @@ def compare_one_vs_many(
     ref_dict = get_cell_centroid_point_dofs(ref_data, field_name)
     for idx, vtu_file in enumerate(vtu_files):
         data = load_vtu_file(vtu_file)
+
+        assert ref_data.GetNumberOfCells() == data.GetNumberOfCells(), (
+            f"Cell count mismatch for {output_procs[idx]} procs: "
+            f"reference has {ref_data.GetNumberOfCells()} cells, "
+            f"comparison has {data.GetNumberOfCells()} cells."
+        )
+        assert ref_data.GetNumberOfPoints() == data.GetNumberOfPoints(), (
+            f"Point count mismatch for {output_procs[idx]} procs: "
+            f"reference has {ref_data.GetNumberOfPoints()} points, "
+            f"comparison has {data.GetNumberOfPoints()} points."
+        )
+
         cmp_dict = get_cell_centroid_point_dofs(data, field_name)
-        L2_norm = compute_l2_error_with_reference_data(ref_dict, cmp_dict)
+        L2_norm = compute_l2_error_with_reference_data(
+            ref_dict, cmp_dict, spatial_tol=tolerances["spatial_match"]
+        )
         assert (
             L2_norm < tolerances["static"]
         ), f"L2 error too large for {output_procs[idx]} procs."
