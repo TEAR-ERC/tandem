@@ -14,7 +14,7 @@
 
 namespace tndm {
 
-class H5Parser : public MeshParser {
+class HDF5MeshParser : public MeshParser {
 private:
     MeshBuilder* builder;
     std::string errorMsg;
@@ -36,7 +36,7 @@ private:
 #endif
 
 public:
-    H5Parser(MeshBuilder* builder) : builder(builder) {}
+    HDF5MeshParser(MeshBuilder* builder) : builder(builder) {}
 
     bool parseFile(std::string const& fileName) override;
     std::string_view getErrorMessage() const override { return errorMsg; }
