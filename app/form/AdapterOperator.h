@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 
@@ -27,7 +28,8 @@ public:
                     std::unique_ptr<Adapter<LocalOperator>> lop,
                     std::shared_ptr<DGOperatorTopo> topo, std::shared_ptr<BoundaryMap> fault_map)
         : adapted_lop_(std::move(adapted_lop)), lop_(std::move(lop)), topo_(std::move(topo)),
-          fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
+          fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT),
+          mu_field_scratch_(lop_->num_quad_points()) {
 
         scratch_.reset();
         lop_->begin_preparation(num_elements());
@@ -80,9 +82,7 @@ public:
     void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
                      Vector<double const>& slip_rate, std::size_t fctNo,
                      FacetInfo const& info) override {
-        std::size_t nq = lop_->num_quad_points();
-        alignas(ALIGNMENT) double mu_field_raw[nq];
-        auto mu_field = Matrix<double>(mu_field_raw, 1, nq);
+        auto mu_field = Matrix<double>(mu_field_scratch_.data(), 1, mu_field_scratch_.size());
         adapted_lop_->mu_avg(fctNo, info, mu_field);
         lop_->moment_rate(faultNo, moment_rate_vector, slip_rate, mu_field);
     }
@@ -93,6 +93,7 @@ private:
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;
+    std::vector<double> mu_field_scratch_;
 };
 
 } // namespace tndm
