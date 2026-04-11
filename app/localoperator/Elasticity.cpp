@@ -1017,13 +1017,15 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
 }
 
 void Elasticity::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
-    assert(result.size() == tensor::mu_avg_q::size());
+    double const* mu0 = fctPre[fctNo].get<mu_q_0>().data();
+    double const* mu1 = fctPre[fctNo].get<mu_q_1>().data();
+    double* res = result.data();
+    std::size_t nq = result.size();
 
-    kernel::mu_avg krnl;
-    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
-    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
-    krnl.mu_avg_q = result.data();
-    krnl.execute();
+    #pragma omp simd
+    for (std::size_t q = 0; q < nq; ++q) {
+        res[q] = 0.5 * (mu0[q] + mu1[q]);
+    }
 }
 
 } // namespace tndm
