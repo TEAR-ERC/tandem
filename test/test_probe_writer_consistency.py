@@ -74,8 +74,8 @@ def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
 
             h5_time = h5["time"][:]
             h5_data = h5["probeData"][:]
-            h5_fields = list(h5["probeFields"].asstr()[:])
-            h5_names = list(h5["probeNames"].asstr()[:])
+            h5_fields = [f.strip() for f in h5["probeFields"].asstr()[:]]
+            h5_names = [n.strip() for n in h5["probeNames"].asstr()[:]]
     except OSError as e:
         raise AssertionError(
             f"[{prefix}] HDF5 file could not be opened — possibly corrupted or not "

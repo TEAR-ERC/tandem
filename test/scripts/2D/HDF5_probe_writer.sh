@@ -15,10 +15,10 @@ gmsh -2 bp1_ref.geo
 
 # Run CSV output simulation
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison_csv.toml \
---petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_csv.log
+--petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_csv.log 2>&1
 
 # Run HDF5 output simulation
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison_hdf5.toml \
---petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_hdf5.log
+--petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_hdf5.log 2>&1
 
 rm bp1_ref.msh
