@@ -151,11 +151,8 @@ bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 
         for (int face = 0; face < 4; ++face) {
 
-            // Extract the tag for this face. A tag of 0 means interior (skip).
+            // Extract the tag for this face
             const uint8_t faceTag = (boundaryCondition >> (8 * face)) & 0xFF;
-            if (faceTag == 0) {
-                continue;
-            }
 
             // Look up the 3 global node IDs for this face using the SeisSol table.
             const auto& localIndices = SVERT_SEISSOL[face];
