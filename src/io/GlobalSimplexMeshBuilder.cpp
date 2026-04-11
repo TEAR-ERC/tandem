@@ -40,7 +40,7 @@ void GlobalSimplexMeshBuilder<D>::preparePermutationTable(std::size_t numNodes) 
 template <std::size_t D>
 void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
                                              std::size_t numNodes) {
-    if (is_gmsh_simplex<D>(type)) {
+    if (is_gmsh_simplex<D>(type)) { // Higher order simplex parsing (tetrahedra for example)
         if (type_ == 0) {
             type_ = type;
         }
@@ -71,7 +71,7 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
                 high_order_nodes(i - NumVerts, elNo) = node[p_i];
             }
         }
-    } else if (is_gmsh_simplex<D - 1u>(type)) {
+    } else if (is_gmsh_simplex<D - 1u>(type)) { // Lower order simplex parsing (triangle for example)
         assert(numNodes >= D);
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
