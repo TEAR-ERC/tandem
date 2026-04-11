@@ -8,6 +8,7 @@
 #include <mpi.h>
 
 #include <functional>
+#include <vector>
 
 namespace tndm {
 
@@ -24,9 +25,8 @@ public:
         -> std::function<void(std::size_t, Matrix<double>&, bool)> = 0;
     virtual void traction(BlockView const& displacement, BlockVector& result) = 0;
 
-    virtual void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                             Vector<double const>& slip_rate, std::size_t fctNo,
-                             FacetInfo const& info) = 0;
+    virtual void compute_moment_rates(Matrix<const double> const& slip_rates,
+                                      std::vector<double>& result) = 0;
 };
 
 } // namespace tndm
