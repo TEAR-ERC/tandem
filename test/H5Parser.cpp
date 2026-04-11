@@ -196,7 +196,6 @@ bool createPartialBoundaryHDF5File(const std::string& filename) {
 }
 
 // Test cases for H5Parser
-
 TEST_CASE("H5Parser - Single tetrahedron, all faces tagged") {
     const std::string fname = "test_single_tet.h5";
     REQUIRE(createTestHDF5File(fname));
