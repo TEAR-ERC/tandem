@@ -11,7 +11,7 @@ boundary_linear = true
 storage_type="none"
 
 [gf_checkpoint]
-prefix = "../../test_data/reference_results/gf_ref/"
+prefix = "../../test_data/reference_results/pDEGREE/gf_ref/"
 
 [fault_scalar_output]
 t_max = 9460800
