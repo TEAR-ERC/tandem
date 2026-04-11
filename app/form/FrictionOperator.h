@@ -122,7 +122,8 @@ public:
             // quadrature weights and normal vectors - see moment_rate kernel for more
             alignas(ALIGNMENT) double moment_rate_q_raw[DomainDimension];
             auto moment_rate_q = Matrix<double>(moment_rate_q_raw, 1, DomainDimension);
-            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q);
+            auto fctNo = fault_map_->fctNo(faultNo);
+            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, topo_->info(fctNo));
             for (int i = 0; i < DomainDimension - 1; i++) {
                 moment_rate_.push_back(moment_rate_q(0, i));
             }

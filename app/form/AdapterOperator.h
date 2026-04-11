@@ -83,8 +83,9 @@ public:
     }
 
     void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                     Matrix<double>& slip_rate_q) override {
-        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate_q);
+                     Matrix<double>& slip_rate_q, FacetInfo const& info) override {
+        auto mu_field = adapted_lop_->get_mu_field(info);
+        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate_q, mu_field);
     }
 
 private:
