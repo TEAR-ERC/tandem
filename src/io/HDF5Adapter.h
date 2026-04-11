@@ -56,9 +56,10 @@ public:
     virtual std::vector<double> getVertices() = 0;
 
     /**
-     * @brief Get the face connectivity numbers (fctNos) of the mesh.
-     * @param fctNos Output vector to store the face connectivity numbers.
+     * @brief Get the number of fault basis nodes.
+     * @param numBsisNodes to store the basis nodes.
      */
+     virtual std::size_t getNumBasisNodes() = 0;
 };
 
 template <std::size_t D> class CurvilinearBoundaryHDF5Adapter : public HDF5Adapter<D> {
@@ -81,7 +82,7 @@ public:
             globalFctNos.push_back(mesh.facets().l2cg(fctNo));
         }
         setRefNodes(refNodes_);
-        numPoints_ = refNodes_.size();
+        numBasisNodes_ = refNodes_.size();
     }
 
     std::size_t numElements() const override { return bnds_.size(); }
@@ -94,24 +95,27 @@ public:
         cl_->map(bnd.first, E_[bnd.second], result);
     }
     void setRefNodes(std::vector<std::array<double, D - 1u>> const& points) override {
-        numPoints_ = points.size();
+        numBasisNodes_ = points.size();
         E_.clear();
         for (std::size_t f = 0; f < D + 1u; ++f) {
             auto facetParam = cl_->facetParam(f, points);
             E_.emplace_back(cl_->evaluateBasisAt(facetParam));
         }
     }
+    std::size_t getNumBasisNodes() override {
+        return numBasisNodes_;
+    }
     std::vector<double> getVertices() override {
-        const std::size_t totalValues = D * numElements() * numPoints_;
-        const std::size_t triangleVertices = 3;
+        const std::size_t totalValues = D * numElements() * numBasisNodes_;
+        const std::size_t elementVertices = D;
         faultVertices.resize(totalValues);
 
         for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
             // Get pointer to the position for this element's vertices
-            double* elementStart = &faultVertices[elNo * D * triangleVertices];
+            double* elementStart = &faultVertices[elNo * D * elementVertices];
 
             // Create matrix view of the storage location
-            auto result = Matrix<double>(elementStart, D, numPoints_);
+            auto result = Matrix<double>(elementStart, D, numBasisNodes_);
 
             // Map the vertices directly into the array
             map(elNo, result);
@@ -122,7 +126,7 @@ public:
 
 private:
     std::shared_ptr<Curvilinear<D>> cl_;
-    std::size_t numPoints_ = 0;
+    std::size_t numBasisNodes_ = 0;
     std::vector<Managed<Matrix<double>>> E_;
     std::vector<std::array<double, D - 1u>> refNodes_;
     std::vector<std::array<double, D>> refNodes3D_;
