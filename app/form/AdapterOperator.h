@@ -77,9 +77,8 @@ public:
         result.end_access(result_handle);
     }
 
-    void slip_rate(std::size_t faultNo, Vector<double const>& slip_rate,
-                   Matrix<double>& slip_rate_q) override {
-        lop_->slip_rate(faultNo, slip_rate, slip_rate_q);
+    void slip_rate(Vector<double const>& slip_rate_reshaped, Matrix<double>& slip_rate_q) override {
+        lop_->slip_rate(slip_rate_reshaped, slip_rate_q);
     }
     void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
                      Matrix<double>& slip_rate_q, std::size_t fctNo,

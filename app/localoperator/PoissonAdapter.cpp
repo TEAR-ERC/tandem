@@ -55,8 +55,7 @@ void Adapter<Poisson>::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 template <>
-void Adapter<Poisson>::slip_rate(std::size_t faultNo, Vector<double const>& state,
-                                 Matrix<double>& slip_rate_q) const {
+void Adapter<Poisson>::slip_rate(Vector<double const>& state, Matrix<double>& slip_rate_q) const {
     assert(slip_rate_q.shape(0) == DomainDimension);
     assert(slip_rate_q.shape(1) == poisson_adapter::tensor::slip_rate_q::Shape[1]);
     poisson_adapter::kernel::evaluate_slip_rate krnl;
