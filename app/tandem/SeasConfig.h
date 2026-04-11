@@ -113,6 +113,7 @@ struct Config {
     std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
+    std::optional<OutputConfig> moment_rate_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
     TsCheckpointConfig ts_checkpoint_config;
 };
