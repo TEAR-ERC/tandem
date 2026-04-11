@@ -1016,4 +1016,7 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
     krnl.execute();
 }
 
+double* Elasticity::get_mu_field(FacetInfo const& info) const {
+    return material[info.up[0]].get<mu>().data();
+}
 } // namespace tndm
