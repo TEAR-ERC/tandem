@@ -303,7 +303,7 @@ TEST_CASE("HDF5MeshParser - Partial boundary (only some faces tagged)") {
     CHECK(parser.getBoundary().size() == 2);
 
     // Tags should be exactly the two non-zero ones, in face order
-    CHECK(parser.getBoundary() == std::vector<uint8_tt>{1, 5});
+    CHECK(parser.getBoundary() == std::vector<uint8_t>{1, 5});
 
     std::remove(fname.c_str());
 }
