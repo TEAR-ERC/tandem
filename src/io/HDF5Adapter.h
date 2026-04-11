@@ -45,6 +45,11 @@ public:
     virtual void setRefNodes(std::vector<std::array<double, D - 1u>> const& refNodes) = 0;
 
     /**
+     * @brief Return the global facet Nos for all fault facets.
+     */
+    virtual std::vector<size_t> getGlobalFctNos() = 0;
+
+    /**
      * @brief Get the vertices of the mesh.
      * @param vertices Output vector to store the vertices.
      */
@@ -73,6 +78,7 @@ public:
             int localFaceNo = std::distance(dws.begin(), std::find(dws.begin(), dws.end(), fctNo));
             assert(localFaceNo < D + 1u);
             bnds_.emplace_back(std::make_pair(elNo, localFaceNo));
+            globalFctNos.push_back(mesh.facets().l2cg(fctNo));
         }
         setRefNodes(refNodes_);
         numPoints_ = refNodes_.size();
@@ -112,6 +118,7 @@ public:
         }
         return faultVertices;
     }
+    std::vector<size_t> getGlobalFctNos() override { return globalFctNos; }
 
 private:
     std::shared_ptr<Curvilinear<D>> cl_;
@@ -121,7 +128,7 @@ private:
     std::vector<std::array<double, D>> refNodes3D_;
     std::vector<std::pair<std::size_t, int>> bnds_;
     std::vector<double> faultVertices;
-    
+    std::vector<size_t> globalFctNos;
 };
 
 } // namespace tndm
