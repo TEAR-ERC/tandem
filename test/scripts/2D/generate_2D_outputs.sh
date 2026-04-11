@@ -38,4 +38,7 @@ bash "$SCRIPT_DIR/convergence.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 echo "SEAS regression (bp1_ref with tandem solver)..."
 bash "$SCRIPT_DIR/seas_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
 
+echo "HDF5 Probe writers (bp1_ref_QDGreen_probe_comparison with tandem solver)..."
+bash "$SCRIPT_DIR/HDF5_probe_writer.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
 echo "2D reference outputs generated successfully."
