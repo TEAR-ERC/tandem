@@ -224,10 +224,7 @@ void setConfigSchema(TableSchema<Config>& schema,
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
     auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
-    auto& momentRateOutputSchema =
-        schema.add_table("moment_rate_output", &Config::moment_rate_output);
     detail::setOutputConfigSchema(faultOutputSchema);
-    detail::setOutputConfigSchema(momentRateOutputSchema);
     auto& faultScalarOutputSchema =
         schema.add_table("fault_scalar_output", &Config::fault_scalar_output);
     detail::setTabularOutputConfigSchema(faultScalarOutputSchema);
@@ -236,15 +233,15 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto& faultProbeOutputSchema =
         schema.add_table("fault_probe_output", &Config::fault_probe_output);
     detail::setProbeOutputConfigSchema(faultProbeOutputSchema);
+    auto& momentRateOutputSchema =
+        schema.add_table("HDF5_moment_rate_output", &Config::HDF5_moment_rate_output);
+    detail::setOutputConfigSchema(momentRateOutputSchema);
     auto& HDF5faultProbeOutputSchema =
         schema.add_table("HDF5_fault_probe_output", &Config::HDF5_fault_probe_output);
     detail::setProbeOutputConfigSchema(HDF5faultProbeOutputSchema);
     auto& HDF5DomainProbeOutputSchema =
         schema.add_table("HDF5_domain_probe_output", &Config::HDF5_domain_probe_output);
     detail::setProbeOutputConfigSchema(HDF5DomainProbeOutputSchema);
-    auto& domainProbeOutputSchema =
-        schema.add_table("domain_probe_output", &Config::domain_probe_output);
-    detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
 
     auto& gfCheckpointSchema = schema.add_table("gf_checkpoint", &Config::gf_checkpoint_config);
     detail::setGfCheckpointConfigSchema(gfCheckpointSchema);

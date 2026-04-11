@@ -21,7 +21,6 @@
 #include <mpi.h>
 
 #include <cstddef>
-#include <hdf5.h>
 #include <limits>
 #include <memory>
 #include <string>
@@ -31,7 +30,15 @@
 
 namespace tndm::seas {
 
-enum class DataLevel { Scalar, Boundary, Volume, Hierarchical };
+enum class DataLevel {
+    Scalar,
+    Boundary,
+    Volume
+#ifdef ENABLE_HDF5
+    ,
+    Hierarchical
+#endif
+};
 
 class Writer {
 public:
@@ -235,6 +242,7 @@ private:
     bool jacobian_;
 };
 
+#ifdef ENABLE_HDF5
 template <std::size_t D> class MomentRateWriter : public Writer {
 public:
     MomentRateWriter(std::string_view prefix, AdaptiveOutputInterval oi,
@@ -328,6 +336,7 @@ private:
     hid_t momentRateDataset_ = -1;
     hid_t timeStepDataset_ = -1;
 };
+#endif
 
 template <std::size_t D, bool isBoundary> class HDF5CommonProbeWriter : public Writer {
 public:

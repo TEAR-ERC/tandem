@@ -8,6 +8,7 @@
 
 using namespace tndm;
 
+#ifdef ENABLE_HDF5
 TEST_CASE("HDF5Writer - basic functionality") {
     MPI_Comm comm = MPI_COMM_WORLD;
     int rank;
@@ -97,3 +98,8 @@ TEST_CASE("HDF5Writer - dataset extends correctly") {
     H5Dclose(read_dset);
     H5Fclose(file);
 }
+#else
+TEST_CASE("HDF5Writer - no HDF5 support") {
+    CHECK_THROWS_AS(tndm::HDF5Writer("any", MPI_COMM_WORLD), std::runtime_error);
+}
+#endif

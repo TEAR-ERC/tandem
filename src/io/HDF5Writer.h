@@ -1,21 +1,25 @@
 #ifndef HDF5_WRITER_H
 #define HDF5_WRITER_H
 
-#include <hdf5.h>
 #include <mpi.h>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+#ifdef ENABLE_HDF5
+#include <hdf5.h>
+#include <hdf5_hl.h>
+#else
+using hid_t = int64_t;
+using hsize_t = uint64_t;
+#endif
+
 namespace tndm {
 class HDF5Writer {
 public:
     HDF5Writer(std::string_view filename, MPI_Comm comm);
-    ~HDF5Writer() {
-        if (is_open_) {
-            H5Fclose(file_);
-        }
-    }
+    ~HDF5Writer();
     // Returns the dataset ID for later writing
     hid_t createExtendibleDataset(const std::string_view name, hid_t type,
                                   std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
