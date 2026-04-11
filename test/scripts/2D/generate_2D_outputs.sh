@@ -6,6 +6,7 @@ set -e
 EXECUTABLE_DIR=$1
 TEMP_TEST_RESULTS=$2
 POLYNOMIAL_DEGREE=$3
+ENABLE_HDF5=$4
 
 if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" || -z "$POLYNOMIAL_DEGREE" ]]; then
     echo "Usage: $0 <EXECUTABLE_DIR> <TEMP_TEST_RESULTS> <POLYNOMIAL_DEGREE>"
@@ -38,7 +39,11 @@ bash "$SCRIPT_DIR/convergence.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 echo "SEAS regression (bp1_ref with tandem solver)..."
 bash "$SCRIPT_DIR/seas_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
 
-echo "HDF5 Probe writers (bp1_ref_QDGreen_probe_comparison with tandem solver)..."
-bash "$SCRIPT_DIR/HDF5_probe_writer.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+if [[ "$ENABLE_HDF5" == "ON" ]]; then
+    echo "HDF5 Probe writers (bp1_ref_QDGreen_probe_comparison with tandem solver)..."
+    bash "$SCRIPT_DIR/HDF5_probe_writer.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+else
+    echo "Skipping data generation for HDF5 Probe writers (HDF5 not enabled in this build)."
+fi
 
 echo "2D reference outputs generated successfully."
