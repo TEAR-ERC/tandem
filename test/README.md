@@ -64,6 +64,7 @@ Fine-grained tests verifying specific codebase functionalities.
 | `tensor.cpp` | Validates tensor creation and value copying operations |
 | `util.cpp` | Tests utility functions (combinatorics, root finding, permutations) |
 | `HDF5MeshParser.cpp` | Basic parsing, Boundary tag decoding, Face deduplication, node validation, error handling, compilation fallback |
+| `HDF5Writer.cpp`| File creation, dataset extension, timestep writes, checkpointing (append/overwrite), data integrity, file closure, read-back validation, compilation fallback |
 
 
 
@@ -81,6 +82,7 @@ Comprehensive tests validating the physics, parallelism, and convergence of the 
 | `test_regression_SEAS.py` | **SEAS Regression:** Executes bp1 sym problem. Validates event occurrence intervals, peak timing, and slip rate magnitudes. |
 | `test_convergence_static.py` | **Convergence:** Runs hole examples with varying mesh sizes. Verifies the regression line slope (L2 vs mesh size log-log plot) matches precomputed values. |
 | `test_parallel_consistency_static.py` | **Parallel Consistency:** Executes static examples using 2^n processors (n ∈ [0,3]). Compares single vs multi-processor solutions to ensure MPI integrity. |
+| `test_probe_writer_consistency.py` | **HDF5 probe writer consistency:** Runs two bp1 simulations with the same probe locations but different probe writer formats (csv and h5) and compares that the two results are identical for moment rate, fault probes and domain probes. |
 
 ## Adding New Tests
 
