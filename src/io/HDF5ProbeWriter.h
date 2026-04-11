@@ -43,7 +43,6 @@ public:
     };
 
     void initialize_datasets(mneme::span<ElementFunction> functions);
-    void write_probe_metadata();
 
 private:
     std::unique_ptr<HDF5Writer> hdf5_writer_;
