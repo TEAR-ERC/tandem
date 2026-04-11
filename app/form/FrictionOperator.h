@@ -24,7 +24,7 @@ namespace tndm {
 template <typename LocalOperator> class FrictionOperator : public AbstractFrictionOperator {
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
-                     std::shared_ptr<BoundaryMap> fault_map, int quadRuleSize,
+                     std::shared_ptr<BoundaryMap> fault_map, std::size_t quadRuleSize,
                      std::unique_ptr<AbstractAdapterOperator> adapter)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
           quadRuleSize_(quadRuleSize), adapter_(std::move(adapter)),
@@ -250,7 +250,7 @@ private:
     Scratch<double> scratch_;
     double VMax_ = 0.0;
     std::vector<double> moment_rate_ = {};
-    int quadRuleSize_ = 0;
+    std::size_t quadRuleSize_ = 0;
 };
 
 } // namespace tndm
