@@ -2,7 +2,7 @@
 #define GMSHPARSER_20200901_H
 
 #include "GMSHLexer.h"
-#include "meshParser.h"
+#include "MeshParser.h"
 
 #include <array>
 #include <optional>
@@ -16,9 +16,9 @@ struct membuf : std::streambuf {
     membuf(char* b, char* e) { this->setg(b, b, e); }
 };
 
-class GMSHParser : public meshParser {
+class GMSHParser : public MeshParser {
 private:
-    meshBuilder* builder;
+    MeshBuilder* builder;
     GMSHToken curTok;
     GMSHSourceLocation curLoc;
     GMSHLexer lexer;
@@ -37,7 +37,7 @@ private:
     bool parse_();
 
 public:
-    GMSHParser(meshBuilder* builder) : builder(builder) {}
+    GMSHParser(MeshBuilder* builder) : builder(builder) {}
 
     bool parse(std::string& msh);
     bool parse(char* msh, std::size_t len);

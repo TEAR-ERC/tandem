@@ -9,10 +9,8 @@
 #include "tandem/SeasConfig.h"
 #include "tandem/SeasScenario.h"
 
-#include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
-#include "io/H5Parser.h"
-#include "io/meshParser.h"
+#include "io/MeshParser.h"
 #include "mesh/GenMesh.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "parallel/Affinity.h"
@@ -88,28 +86,39 @@ int main(int argc, char** argv) {
     if (cfg->mesh_file) {
         bool ok = false;
         GlobalSimplexMeshBuilder<DomainDimension> builder;
+        std::string meshError;
         if (rank == 0) {
-            std::unique_ptr<meshParser> parser;
-            if (cfg->meshInGMSHFile()) {
-                // Use GMSHParser for .msh files
-                parser = std::make_unique<GMSHParser>(&builder);
-            } else if (cfg->meshInH5File()) {
+            if (MeshParser::isH5Format(*cfg->mesh_file)) {
+#ifdef ENABLE_HDF5
                 if constexpr (DomainDimension != 3) {
-                    std::cerr << "H5 mesh format is only supported for 3D problems." << std::endl;
-                    PetscFinalize();
-                    return -1;
+                    meshError = "H5 mesh format is only supported for 3D problems.";
                 }
-                parser = std::make_unique<H5Parser>(&builder);
-            } else {
-                std::cerr << "Unsupported mesh file format: " << *cfg->mesh_file << std::endl;
-                return -1;
+#else
+                meshError = "HDF5 mesh support is not enabled.";
+#endif
             }
-            ok = parser->parseFile(*cfg->mesh_file);
-            if (!ok) {
-                std::cerr << *cfg->mesh_file << std::endl << parser->getErrorMessage();
+            if (meshError.empty()) {
+                auto parser = MeshParser::create(*cfg->mesh_file, &builder);
+                if (!parser) {
+                    meshError = "Unsupported mesh file format: " + *cfg->mesh_file;
+                } else {
+                    ok = parser->parseFile(*cfg->mesh_file);
+                    if (!ok) {
+                        meshError = *cfg->mesh_file + "\n" + std::string(parser->getErrorMessage());
+                    }
+                }
+            } else {
+                ok = false;
             }
         }
         MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
+        if (!ok) {
+            if (rank == 0) {
+                std::cerr << meshError << std::endl;
+            }
+            PetscFinalize();
+            return -1;
+        }
         if (ok) {
             globalMesh = builder.create(PETSC_COMM_WORLD);
         }

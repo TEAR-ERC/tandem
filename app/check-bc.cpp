@@ -1,10 +1,8 @@
 #include "form/BC.h"
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
-#include "io/H5Parser.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
-#include "io/meshParser.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/LocalSimplexMesh.h"
 
@@ -28,8 +26,7 @@ auto load_mesh(std::string const& mesh_file) -> std::unique_ptr<GlobalSimplexMes
     bool ok = false;
     GlobalSimplexMeshBuilder<D> builder;
     if (rank == 0) {
-        std::unique_ptr<meshParser> parser; // Pointer to the base class
-        parser = std::make_unique<GMSHParser>(&builder);
+        auto parser = std::make_unique<GMSHParser>(&builder);
         ok = parser->parseFile(mesh_file);
         if (!ok) {
             std::cerr << mesh_file << std::endl << parser->getErrorMessage();
