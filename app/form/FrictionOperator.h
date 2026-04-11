@@ -24,8 +24,10 @@ namespace tndm {
 template <typename LocalOperator> class FrictionOperator : public AbstractFrictionOperator {
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
-                     std::shared_ptr<BoundaryMap> fault_map)
+                     std::shared_ptr<BoundaryMap> fault_map, int quadRuleSize,
+                     std::unique_ptr<AbstractAdapterOperator> adapter = nullptr)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
+          quadRuleSize_(quadRuleSize), adapter_(std::move(adapter)),
           scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
         scratch_.reset();
         lop_->begin_preparation(num_local_elements());
@@ -34,12 +36,14 @@ public:
             lop_->prepare(faultNo, topo_->info(fctNo), scratch_);
         }
         lop_->end_preparation();
+        moment_rate_.resize(num_local_elements() * (DomainDimension - 1));
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
     std::size_t slip_block_size() const override { return lop_->slip_block_size(); }
     std::size_t num_local_elements() const override { return fault_map_->local_size(); }
     double VMax_local() const override { return VMax_; }
+    std::vector<double> moment_rate_local() const override { return moment_rate_; }
     std::size_t num_elements() const { return fault_map_->size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& fault_map() const { return *fault_map_; }
@@ -91,6 +95,8 @@ public:
         bool rhs_success = true;
         VMax_ = 0.0;
         scratch_.reset();
+        moment_rate_ = {};
+        auto nq = quadRuleSize_;
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
@@ -103,7 +109,25 @@ public:
             }
 
             VMax_ = std::max(VMax_, VMax);
+
+            // Interpolate slip rate values at Basis function nodes to quadrature
+            // nodes
+            alignas(ALIGNMENT) double slip_rate_q_raw[LocalOperator::NumQuantities * nq];
+            auto slip_rate_q = Matrix<double>(slip_rate_q_raw, LocalOperator::NumQuantities, nq);
+            auto slip_rate_reshaped =
+                tndm::Vector<const double>(result_block.data(), result_block.shape());
+            adapter_->slip_rate(faultNo, slip_rate_reshaped, slip_rate_q);
+
+            // Compute moment rate using slip rate values at quadrature nodes and
+            // quadrature weights and normal vectors - see moment_rate kernel for more
+            alignas(ALIGNMENT) double moment_rate_q_raw[DomainDimension];
+            auto moment_rate_q = Matrix<double>(moment_rate_q_raw, 1, DomainDimension);
+            adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q);
+            for (int i = 0; i < DomainDimension - 1; i++) {
+                moment_rate_.push_back(moment_rate_q(0, i));
+            }
         }
+
         result.end_access(result_handle);
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
@@ -218,10 +242,13 @@ public:
 
 private:
     std::unique_ptr<LocalOperator> lop_;
+    std::unique_ptr<AbstractAdapterOperator> adapter_;
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;
     double VMax_ = 0.0;
+    std::vector<double> moment_rate_ = {};
+    int quadRuleSize_ = 0;
 };
 
 } // namespace tndm
