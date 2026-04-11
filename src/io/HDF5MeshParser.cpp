@@ -144,6 +144,8 @@ bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 
         // The boundary condition for this tet is packed as four 8-bit tags,
         // one per face: bits [7:0]=face0, [15:8]=face1, [23:16]=face2, [31:24]=face3.
+        // Note: SeisSol supports multiple encodings. We stick with the most common
+        // one (https://github.com/SeisSol/SeisSol/blob/master/src/Geometry/PUMLReader.cpp)
         const uint32_t boundaryCondition = boundaryData_[i];
 
         for (int face = 0; face < 4; ++face) {
