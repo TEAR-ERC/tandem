@@ -1,0 +1,30 @@
+final_time = 400000000
+mesh_file = "bp1_ref.msh"
+mode = "QDGreen"
+type = "poisson"
+lib = "bp1_ref.lua"
+scenario = "bp1_ref"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[ts_checkpoint]
+storage_type="none"
+
+[gf_checkpoint]
+prefix = "../../temp_test_results/gf_bp1/"
+
+[fault_probe_output]
+prefix = "../../temp_test_results/fltst_"
+format = "CSV"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [0.0, 0.0] },
+]
+
+[domain_probe_output]
+prefix = "../../temp_test_results/blkst_"
+format = "CSV"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [5.0, -5.0] },
+]

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Generate test output for HDF5 probe writer test
 # Generates bp1_ref outputs with tandem (SEAS) solver
+# Runs two separate simulations: one for CSV output, one for HDF5 output
 set -e
 
 EXECUTABLE_DIR=$1
@@ -12,7 +13,12 @@ cd "$CONFIG_DIR"
 
 gmsh -2 bp1_ref.geo
 
-${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison.toml \
---petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison.log
+# Run CSV output simulation
+${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison_csv.toml \
+--petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_csv.log
+
+# Run HDF5 output simulation
+${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison_hdf5.toml \
+--petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison_hdf5.log
 
 rm bp1_ref.msh

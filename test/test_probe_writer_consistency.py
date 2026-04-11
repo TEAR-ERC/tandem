@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 
-def check_moment_rate_h5(temp_results_path, tolerances):
+def check_moment_rate_h5(temp_results_path, tolerances, expected_moment_rate_sum_t0):
     """
     Checks that the moment_rate.h5 file is valid and that the sum of moment
     rates over all fault elements at the first timestep (index 0)
@@ -44,14 +44,13 @@ def check_moment_rate_h5(temp_results_path, tolerances):
     # Sum over all fault elements at first time step
     moment_rate_sum = np.sum(moment_rate[:, 0, 0])
 
-    expected = 1.281524803579644e-06
     np.testing.assert_allclose(
         moment_rate_sum,
-        expected,
+        expected_moment_rate_sum_t0,
         rtol=tolerances["seas"],
         err_msg=(
             f"Sum of moment rates at first timestep "
-            f"(normalized) {moment_rate_sum} does not match expected {expected}"
+            f"(normalized) {moment_rate_sum} does not match expected {expected_moment_rate_sum_t0}"
         ),
     )
 
@@ -75,12 +74,8 @@ def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
 
             h5_time = h5["time"][:]
             h5_data = h5["probeData"][:]
-            h5_fields = [
-                f.decode("ascii").strip("\x00").strip() for f in h5["probeFields"][:]
-            ]
-            h5_names = [
-                n.decode("ascii").strip("\x00").strip() for n in h5["probeNames"][:]
-            ]
+            h5_fields = list(h5["probeFields"].asstr()[:])
+            h5_names = list(h5["probeNames"].asstr()[:])
     except OSError as e:
         raise AssertionError(
             f"[{prefix}] HDF5 file could not be opened — possibly corrupted or not "
@@ -143,8 +138,8 @@ def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
             )
 
 
-def test_moment_rate(temp_results_path, tolerances):
-    check_moment_rate_h5(temp_results_path, tolerances)
+def test_moment_rate(temp_results_path, tolerances, expected_moment_rate_sum_t0):
+    check_moment_rate_h5(temp_results_path, tolerances, expected_moment_rate_sum_t0)
 
 
 def test_blkst_csv_and_h5_match(temp_results_path, tolerances):
