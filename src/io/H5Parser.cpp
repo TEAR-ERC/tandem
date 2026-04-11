@@ -124,7 +124,7 @@ bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
     // FaceKey holds a sorted (canonical) face so that the same triangle
     // is recognised regardless of vertex winding order.
     struct FaceKey {
-        std::array<long, FaceSize> v;
+        std::array<long, DomainDimension> v;
         bool operator==(FaceKey const& o) const noexcept { return v == o.v; }
     };
     struct FaceHash {
@@ -157,12 +157,12 @@ bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
 
             // Look up the 3 global node IDs for this face using the SeisSol table.
             const auto& localIndices = sVertSeissol[face];
-            const std::array<long, FaceSize> faceNodes = {
+            const std::array<long, DomainDimension> faceNodes = {
                 tetNodes[localIndices[0]], tetNodes[localIndices[1]], tetNodes[localIndices[2]]};
 
             // Sort the nodes to get a key for duplicate detection.
             // The original (unsorted) winding order is preserved in faceNodes.
-            std::array<long, FaceSize> sortedNodes = faceNodes;
+            std::array<long, DomainDimension> sortedNodes = faceNodes;
             std::sort(sortedNodes.begin(), sortedNodes.end());
 
             // Only add if this face hasn't been seen before.
