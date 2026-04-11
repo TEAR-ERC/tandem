@@ -57,7 +57,9 @@ def detect_events(file_name, window_size=1e9, relative_error=0.5):
     return events
 
 
-def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config, mode):
+def check_SEAS_consistency(
+    file_reference, file_tested, tolerances, seas_config, polynomial_degree, mode
+):
     """
     Compare event detections between a reference and tested CSV file.
 
@@ -85,7 +87,7 @@ def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config,
     values_tested = arr_tst[:, 1]
 
     assert np.allclose(
-        times_reference, times_tested, rtol=tolerances["seas"]
+        times_reference, times_tested, rtol=tolerances["seas"][f"p{polynomial_degree}"]
     ), "Event times do not match"
     assert np.allclose(
         values_reference, values_tested, rtol=tolerances["seas_events"][mode]
@@ -102,36 +104,56 @@ def check_SEAS_consistency(file_reference, file_tested, tolerances, seas_config,
     assert np.allclose(
         event_time_intervals_reference,
         event_time_intervals_tested,
-        rtol=tolerances["seas"],
+        rtol=tolerances["seas"][f"p{polynomial_degree}"],
     ), "Event time intervals do not match between files."
 
 
 def test_SEAS_consistency_QD(
-    temp_results_path, reference_results_path, tolerances, seas_config
+    temp_results_path,
+    reference_results_path,
+    tolerances,
+    seas_config,
+    polynomial_degree,
 ):
     """Regression test comparing QD reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QD.csv"
     file_vmax_output = temp_results_path / "vmax_output_QD.csv"
     check_SEAS_consistency(
-        file_vmax_ref, file_vmax_output, tolerances, seas_config, mode="QD"
+        file_vmax_ref,
+        file_vmax_output,
+        tolerances,
+        seas_config,
+        polynomial_degree,
+        mode="QD",
     )
 
 
 def test_SEAS_consistency_QDGreen(
-    temp_results_path, reference_results_path, tolerances, seas_config
+    temp_results_path,
+    reference_results_path,
+    tolerances,
+    seas_config,
+    polynomial_degree,
 ):
     """Regression test comparing QDGreen reference and test VMax CSV outputs."""
     file_vmax_ref = reference_results_path / "vmax_ref_QDGreen.csv"
     file_vmax_output = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency(
-        file_vmax_ref, file_vmax_output, tolerances, seas_config, mode="QDGreen"
+        file_vmax_ref,
+        file_vmax_output,
+        tolerances,
+        seas_config,
+        polynomial_degree,
+        mode="QDGreen",
     )
 
 
-def test_SEAS_consistency_QD_vs_QDGreen(temp_results_path, tolerances, seas_config):
+def test_SEAS_consistency_QD_vs_QDGreen(
+    temp_results_path, tolerances, seas_config, polynomial_degree
+):
     """Compare QD and QDGreen outputs from the same run."""
     file_vmax = temp_results_path / "vmax_output_QD.csv"
     file_vmax_gf = temp_results_path / "vmax_output_QDGreen.csv"
     check_SEAS_consistency(
-        file_vmax, file_vmax_gf, tolerances, seas_config, mode="both"
+        file_vmax, file_vmax_gf, tolerances, seas_config, polynomial_degree, mode="both"
     )

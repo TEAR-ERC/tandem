@@ -3,6 +3,8 @@ include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
 set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
+# Define the list of polynomial degrees that have reference data
+set(ORDERS_WITH_REFERENCE_DATA "2;3") # Use a semicolon-separated list for multiple, e.g., "3;4;5"
 
 add_library(test-runner main.cpp)
 target_compile_options(test-runner PUBLIC ${CPU_ARCH_FLAGS})
@@ -108,6 +110,7 @@ if(RUN_CI_TESTS)
         ${CMAKE_BINARY_DIR}
         ${CMAKE_SOURCE_DIR}/test/temp_test_results
         ${DOMAIN_DIMENSION}
+        ${POLYNOMIAL_DEGREE}
     )
     set_tests_properties(generate-test-outputs PROPERTIES
         FIXTURES_REQUIRED PreClean
@@ -120,6 +123,7 @@ if(RUN_CI_TESTS)
             add_test(
                 NAME ${test_name}
                 COMMAND ${Python_EXECUTABLE} -m pytest ${file_name} --domain_dimension=${DOMAIN_DIMENSION}
+                --polynomial_degree=${POLYNOMIAL_DEGREE}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             )
             set_tests_properties(${test_name} PROPERTIES
@@ -130,11 +134,32 @@ if(RUN_CI_TESTS)
         endif()
     endmacro()
 
-    add_pytest_test("static-regression-test-${DOMAIN_DIMENSION}D" "test_regression_static.py")
-    add_pytest_test("parallel-consistency-test-${DOMAIN_DIMENSION}D" "test_parallel_consistency_static.py")
-    add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D" "test_convergence_static.py")
-    if(DOMAIN_DIMENSION EQUAL 2)
-        add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D" "test_regression_SEAS.py")
+    # Add tests that do not require reference data (they should run for any polynomial degree)
+    add_pytest_test("parallel-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+        "test_parallel_consistency_static.py")
+    add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+        "test_convergence_static.py")
+
+    list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
+
+    if(${has_reference_data} GREATER -1)
+        # Add tests that REQUIRE reference data for specific polynomial degree
+        add_pytest_test("static-regression-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_regression_static.py")
+
+        if(DOMAIN_DIMENSION EQUAL 2)
+            add_pytest_test("SEAS-regression-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_regression_SEAS.py")
+        endif()
+    else()
+        message(STATUS "Skipping regression tests for p=${POLYNOMIAL_DEGREE} (No baseline data available).")
+
+        add_test(NAME "regression-tests-skipped-p${POLYNOMIAL_DEGREE}"
+            COMMAND ${CMAKE_COMMAND} -E echo
+            "Regression tests skipped for p=${POLYNOMIAL_DEGREE}. No baseline data available. Baseline exists for orders: ${ORDERS_WITH_REFERENCE_DATA}."
+        )
+        set_tests_properties("regression-tests-skipped-p${POLYNOMIAL_DEGREE}" PROPERTIES
+            FIXTURES_REQUIRED TestData
+        )
     endif()
 
     # Remove test outputs after all pytest tests finish
