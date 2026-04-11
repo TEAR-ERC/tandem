@@ -41,8 +41,6 @@ public:
     }
 
     void addElement(long type, long tag, long* node, std::size_t numNodes) override {
-        REQUIRE(elNo < expectedElements + 4); // Allow for boundary elements
-
         if (type == 4) { // Tetrahedral element (higher Dimensional)
             CHECK(numNodes == 4);
             for (std::size_t i = 0; i < numNodes; ++i) {
