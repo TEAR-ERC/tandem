@@ -87,4 +87,4 @@ jobs:
         with:
           name: logs-${{ matrix.dimension }}d-p${{ matrix.degree }}-hdf5-${{ matrix.enable_hdf5 }}-${{ matrix.compiler.cc }}
           path: |
-            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}/Testing/Temporary/*
+            ${{ github.workspace }}/build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}/Testing/Temporary/*.log

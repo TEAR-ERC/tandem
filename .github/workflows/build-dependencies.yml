@@ -35,7 +35,6 @@ jobs:
       - name: Check if base image exists
         id: check-base
         run: |
-          # Added the HDF5 version to the tag check
           if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
@@ -67,7 +66,6 @@ jobs:
       - name: Set built output
         id: set-built
         run: |
-          # If the build step was skipped, it means we didn't rebuild.
           if [ "${{ steps.docker-build-base.outcome }}" == "success" ]; then
             echo "built=true" >> $GITHUB_OUTPUT
           else
@@ -94,7 +92,6 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      # Using TJ Actions again for the test Dockerfile
       - name: Check if test Dockerfile changed
         id: test-changed
         uses: tj-actions/changed-files@v42
