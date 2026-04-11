@@ -261,10 +261,18 @@ public:
         // Write the data
         writer_.writeToDataset(momentRateDataset_, H5T_IEEE_F64LE, output_step_, data.data(),
                                {output_step_ + 1, numElements, D - 1}, extensibleIndex);
-        // Close dataset when completely done (maybe in destructor)`
+        // Create a dataset for timestep
+        if (timeStepDataset_ == -1) {
+            timeStepDataset_ = writer_.createExtendibleDataset("time", H5T_IEEE_F64LE, {1},
+                                                               {H5S_UNLIMITED}, extensibleIndex);
+        }
+        // Write the data
+        writer_.writeToDataset(timeStepDataset_, H5T_IEEE_F64LE, output_step_, &time,
+                               {output_step_ + 1}, extensibleIndex);
     }
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
+        writer_.closeDataset(timeStepDataset_);
     }
     void write_static() override {
         // Get the vertex data from the adapter
@@ -293,6 +301,7 @@ private:
     MPI_Comm comm_;
     std::vector<std::array<std::array<double, D>, 3>> faultVertices;
     hid_t momentRateDataset_ = -1;
+    hid_t timeStepDataset_ = -1;
 };
 
 } // namespace tndm::seas
