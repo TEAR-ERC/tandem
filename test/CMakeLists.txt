@@ -165,7 +165,7 @@ if(RUN_CI_TESTS)
         "test_parallel_consistency_static.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
-    if(DOMAIN_DIMENSION EQUAL 2)
+    if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 2)
         add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_probe_writer_consistency.py")
     endif()
 
