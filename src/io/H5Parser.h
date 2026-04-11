@@ -1,10 +1,8 @@
 #ifndef H5PARSER_H
 #define H5PARSER_H
 
-#include "/home/pkarki/hdf5/include/hdf5.h"
+#include <hdf5.h>
 #include "meshParser.h"
-#include </home/pkarki/hdf5/include/H5FDmpi.h>
-#include </home/pkarki/hdf5/include/H5FDmpio.h>
 #include <array>
 #include <optional>
 #include <string>
