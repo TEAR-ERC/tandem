@@ -1,7 +1,6 @@
 #include "H5Parser.h"
 #include <algorithm>
 #include <array>
-#include <cstdint>
 #include <iostream>
 #include <stdio.h>
 
@@ -131,7 +130,7 @@ bool isAlreadyPresent(
 
 bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
     auto& encodedBoundaryData = boundaryData;
-    std::vector<std::uint8_t> decodedBoundary;
+    std::vector<uint8_t> decodedBoundary;
     constexpr std::size_t DomainDimension = 3;
     const std::array<std::array<int, 3>, 4> sVertSeissol = {
         {{0, 2, 1}, {0, 1, 3}, {1, 2, 3}, {0, 3, 2}}};
