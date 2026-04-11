@@ -72,7 +72,7 @@ public:
         auto fric = std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo,
                                                  fault_map, this->adapter());
 #else
-        // Moment rate not computed for HDF5 output, so no need to prepare adapter
+        // Adapter not needed without HDF5 support — moment rate output requires HDF5.
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
 #endif
