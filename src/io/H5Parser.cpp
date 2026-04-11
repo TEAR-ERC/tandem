@@ -2,10 +2,12 @@
 #include <algorithm>
 #include <array>
 #include <iostream>
-#include <stdio.h>
+#include <stdexcept>
 #include <unordered_set>
 
 namespace tndm {
+
+#ifdef ENABLE_HDF5
 
 template <typename T> T H5Parser::logError(std::string_view msg) {
     errorMsg += "H5 parser error:\n\t";
@@ -88,7 +90,7 @@ bool H5Parser::parseNodes(hid_t file) {
 
 bool H5Parser::parseBoundary(hid_t file) {
     if (!readDataset<uint32_t>(file, "/boundary", boundaryData)) {
-        return logErrorAnnotated<bool>("Failed to parse nodes");
+        return logErrorAnnotated<bool>("Failed to parse boundary");
     }
     return true;
 }
@@ -188,10 +190,9 @@ bool H5Parser::addAllElements(std::string const& fileName) {
         long type = 4;
         // Information not available in the HDF5 file from PUMGen  - but also not used by the
         // builder for higher Dimensional simplices
-        long groupTage = 0;
-        builder->addElement(type, 0, higherDimensionalElems.data(), NumNodes[type - 1]);
+        long groupTag = 0;
+        builder->addElement(type, groupTag, higherDimensionalElems.data(), NumNodes[type - 1]);
     }
-
     return true;
 }
 
@@ -210,5 +211,16 @@ bool H5Parser::parseFile(std::string const& fileName) {
     H5Fclose(file);
     return true;
 }
+
+#else  // ENABLE_HDF5 not defined — stub definition so the linker is satisfied
+
+bool H5Parser::parseFile(std::string const& fileName) {
+    throw std::runtime_error("H5Parser::parseFile: tandem was built without HDF5 support. "
+                             "Cannot parse '" +
+                             fileName +
+                             "'. "
+                             "Reconfigure with -DENABLE_HDF5=ON.");
+}
+#endif // ENABLE_HDF5
 
 } // namespace tndm
