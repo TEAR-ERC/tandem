@@ -9,7 +9,7 @@
 
 using namespace tndm;
 
-class MyTestBuilder : public GMSHMeshBuilder {
+class MyTestBuilder : public meshBuilder {
 private:
     std::size_t elNo = 0;
 
