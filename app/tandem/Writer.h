@@ -58,7 +58,7 @@ public:
     virtual void write(double time, mneme::span<FiniteElementFunction<1u>> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<2u>> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<3u>> data) {}
-    virtual void write(double time, std::vector<double> data) {}
+    virtual void write(double time, std::vector<double> const& data) {}
 
     virtual void increase_step(double time, double VMax) {
         ++output_step_;
@@ -254,7 +254,7 @@ public:
 
     DataLevel level() const override { return DataLevel::Hierarchical; }
     bool has_static_writer() const override { return true; }
-    void write(double time, std::vector<double> data) override {
+    void write(double time, std::vector<double> const& data) override {
         // Get the vertex data from the adapter
         auto numElements = data.size() / (D - 1);
 
