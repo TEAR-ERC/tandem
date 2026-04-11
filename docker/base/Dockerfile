@@ -1,12 +1,15 @@
 FROM ubuntu:24.04
 ARG PETSC_VERSION
+ARG HDF5_VERSION
 ARG CC
 ARG CXX
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PETSC_INSTALL_DIR=/opt/petsc/
+ENV HDF5_INSTALL_DIR=/opt/hdf5/
 RUN mkdir -p $PETSC_INSTALL_DIR
+RUN mkdir -p $HDF5_INSTALL_DIR
 
 RUN apt-get update && apt-get install -y \
     gcc-13 g++-13 clang-18 clang++-18 gfortran \
@@ -48,15 +51,28 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
     make PETSC_DIR=$(pwd) PETSC_ARCH=arch-linux-c-opt install && \
     cd .. && rm -rf petsc-${PETSC_VERSION}
 
-# Save PETSc version for reference
+# Get and install HDF5
+RUN echo "Using HDF5 version $HDF5_VERSION" && \
+    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.gz && \
+    tar -xvzf hdf5-${HDF5_VERSION}.tar.gz && \
+    cd hdf5-${HDF5_VERSION} && \
+    ./configure --prefix=$HDF5_INSTALL_DIR \
+    --enable-parallel \
+    --enable-shared \
+    CC=mpicc CXX=mpicxx && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && rm -rf hdf5-${HDF5_VERSION}*
+
+# Save versions for reference
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
+RUN echo "$HDF5_VERSION" > /opt/hdf5/version.txt
 
 # Create a non-root user for MPI operations
 RUN useradd -m -s /bin/bash tandem && \
-    chown -R tandem:tandem /opt/petsc && \
+    chown -R tandem:tandem /opt/petsc /opt/hdf5 && \
     echo "tandem ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Create and activate a venv for the 'tandem' user
 USER tandem
 WORKDIR /home/tandem
-
