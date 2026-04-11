@@ -23,45 +23,46 @@ template <typename T> T H5Parser::logErrorAnnotated(std::string_view msg) {
     return {};
 }
 
-template <typename T>
-bool H5Parser::readDataset(hid_t file, const char* name, std::vector<T>& data) {
+template <typename T> hid_t nativeH5Type();
+template <> hid_t nativeH5Type<double>() { return H5T_NATIVE_DOUBLE; }
+template <> hid_t nativeH5Type<long>() { return H5T_NATIVE_LONG; }
+template <> hid_t nativeH5Type<uint32_t>() { return H5T_NATIVE_UINT32; }
 
-    hid_t dataset = H5Dopen(file, name, H5P_DEFAULT);
+template <typename T>
+bool H5Parser::readDataset(hid_t file, std::string_view name, std::vector<T>& data) {
+    hid_t dataset = H5Dopen(file, std::string(name).c_str(), H5P_DEFAULT);
+    if (dataset < 0) {
+        return logError<bool>("Failed to open dataset: " + std::string(name));
+    }
+
     hid_t dataspace = H5Dget_space(dataset);
     if (dataspace < 0) {
         H5Dclose(dataset);
+        return logError<bool>("Failed to get dataset space: " + std::string(name));
     }
-    if (name == "/boundary") { // Boundary conditions in 32 bit encoding
-        hsize_t dims[1];
-        H5Sget_simple_extent_dims(dataspace, dims, nullptr);
-        data.resize(dims[0]);
 
-        if (H5Dread(dataset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data()) < 0) {
-            H5Sclose(dataspace);
-            H5Dclose(dataset);
-        }
-    } else if (name == "/connect") { // Nodes associated with each higher Dimensional
-                                     // element(higherDimensionalElements x 4 for 4 node element)
-        hsize_t dims[2];
-        H5Sget_simple_extent_dims(dataspace, dims, nullptr);
-        data.resize(dims[0] * dims[1]);
+    hsize_t dims[2];
+    int ndims = H5Sget_simple_extent_ndims(dataspace);
+    if (ndims < 0) {
+        H5Sclose(dataspace);
+        H5Dclose(dataset);
+        return logError<bool>("Unexpected dataset rank for: " + std::string(name));
+    }
+    if (H5Sget_simple_extent_dims(dataspace, dims, nullptr) < 0) {
+        H5Sclose(dataspace);
+        H5Dclose(dataset);
+        return logError<bool>("Failed to read dataset dimensions: " + std::string(name));
+    }
 
-        if (H5Dread(dataset, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data()) < 0) {
-            H5Sclose(dataspace);
-            H5Dclose(dataset);
-        }
-    } else if (name ==
-               "/geometry") { // Coordinates of the nodes in the mesh (number of Nodes x Dimensions)
-        hsize_t dims[2];
-        H5Sget_simple_extent_dims(dataspace, dims, nullptr);
-        data.resize(dims[0] * dims[1]);
+    std::size_t size = 1;
+    for (int i = 0; i < ndims; ++i)
+        size *= static_cast<std::size_t>(dims[i]);
+    data.resize(size);
 
-        if (H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data()) < 0) {
-            H5Sclose(dataspace);
-            H5Dclose(dataset);
-        }
-    } else {
-        std::cout << "Invalid dataset name" << std::endl;
+    if (H5Dread(dataset, nativeH5Type<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data()) < 0) {
+        H5Sclose(dataspace);
+        H5Dclose(dataset);
+        return logError<bool>("Failed to read dataset: " + std::string(name));
     }
 
     H5Sclose(dataspace);
@@ -74,21 +75,21 @@ bool H5Parser::parseNodes(hid_t file) {
     if (!readDataset<double>(file, "/geometry", nodeData)) {
         return logErrorAnnotated<bool>("Failed to parse nodes");
     }
-    constexpr std::size_t DomainDimension = 3;
-    std::size_t numVertices = nodeData.size() / DomainDimension;
+    constexpr std::size_t DOMAIN_DIMENSION = 3;
+    std::size_t numVertices = nodeData.size() / DOMAIN_DIMENSION;
     builder->setNumVertices(numVertices);
 
     for (std::size_t i = 0; i < numVertices; ++i) {
-        std::array<double, DomainDimension> x = {nodeData[i * DomainDimension],
-                                                 nodeData[i * DomainDimension + 1],
-                                                 nodeData[i * DomainDimension + 2]};
+        std::array<double, DOMAIN_DIMENSION> x = {nodeData[i * DOMAIN_DIMENSION],
+                                                  nodeData[i * DOMAIN_DIMENSION + 1],
+                                                  nodeData[i * DOMAIN_DIMENSION + 2]};
+        // H5/PUMGen vertex ids are already 0-based, and the builder expects 0-based ids too.
         builder->setVertex(i, x);
     }
-
     return true;
 }
 
-bool H5Parser::parseBoundary(hid_t file) {
+bool H5Parser::readBoundaryData(hid_t file) {
     if (!readDataset<uint32_t>(file, "/boundary", boundaryData)) {
         return logErrorAnnotated<bool>("Failed to parse boundary");
     }
@@ -100,33 +101,35 @@ bool H5Parser::parseElements(hid_t file) {
     if (!readDataset<long>(file, "/connect", elementData)) {
         return logErrorAnnotated<bool>("Failed to parse elements");
     }
+    if (!readDataset<uint32_t>(file, "/group", groupTags)) {
+        return logErrorAnnotated<bool>("Failed to parse group tags");
+    }
 
-    const size_t elementSides = 4;
-    std::size_t numElements = elementData.size() / elementSides;
+    constexpr std::size_t ELEMENT_SIDES = 4;
+    std::size_t numElements = elementData.size() / ELEMENT_SIDES;
     builder->setNumElements(numElements);
 
     for (std::size_t i = 0; i < numElements; ++i) {
+        // PUMGen connectivity is already 0-based, which matches the builder's expectations.
         std::array<long, 4> nodes = {
-            elementData[i * elementSides], elementData[i * elementSides + 1],
-            elementData[i * elementSides + 2], elementData[i * elementSides + 3]};
+            elementData[i * ELEMENT_SIDES], elementData[i * ELEMENT_SIDES + 1],
+            elementData[i * ELEMENT_SIDES + 2], elementData[i * ELEMENT_SIDES + 3]};
         higherDimensionalElements.push_back(nodes);
     }
     return true;
 }
 
 // Retrieve faces from tets and deduplicate them based on tags
-bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
+bool H5Parser::retrieveLowerDimensionalElements() {
 
     // Each tet has 4 faces. This table maps each face index (0-3) to the
     // 3 local vertex indices that make up that face, in SeisSol ordering.
-    constexpr std::size_t DomainDimension = 3;
-    const std::array<std::array<int, DomainDimension>, 4> sVertSeissol = {
+    constexpr std::size_t DOMAIN_DIMENSION = 3;
+    constexpr std::array<std::array<int, DOMAIN_DIMENSION>, 4> SVERT_SEISSOL = {
         {{0, 2, 1}, {0, 1, 3}, {1, 2, 3}, {0, 3, 2}}};
 
-    // FaceKey holds a sorted (canonical) face so that the same triangle
-    // is recognised regardless of vertex winding order.
     struct FaceKey {
-        std::array<long, DomainDimension> v;
+        std::array<long, DOMAIN_DIMENSION> v;
         bool operator==(FaceKey const& o) const noexcept { return v == o.v; }
     };
     struct FaceHash {
@@ -158,13 +161,13 @@ bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
             }
 
             // Look up the 3 global node IDs for this face using the SeisSol table.
-            const auto& localIndices = sVertSeissol[face];
-            const std::array<long, DomainDimension> faceNodes = {
+            const auto& localIndices = SVERT_SEISSOL[face];
+            const std::array<long, DOMAIN_DIMENSION> faceNodes = {
                 tetNodes[localIndices[0]], tetNodes[localIndices[1]], tetNodes[localIndices[2]]};
 
             // Sort the nodes to get a key for duplicate detection.
             // The original (unsorted) winding order is preserved in faceNodes.
-            std::array<long, DomainDimension> sortedNodes = faceNodes;
+            std::array<long, DOMAIN_DIMENSION> sortedNodes = faceNodes;
             std::sort(sortedNodes.begin(), sortedNodes.end());
 
             // Only add if this face hasn't been seen before.
@@ -177,39 +180,44 @@ bool H5Parser::retrieveLowerDimensionalElements(hid_t file) {
     return true;
 }
 
-bool H5Parser::addAllElements(std::string const& fileName) {
+bool H5Parser::addAllElements() {
     for (size_t i = 0; i < lowerDimensionalElements.size(); ++i) {
         // Assuming only 3 node triangular faces for lower Dimensional elements
-        long type = 2;
-        builder->addElement(type, long(boundary[i]), lowerDimensionalElements[i].data(),
-                            NumNodes[type - 1]);
+        constexpr long TRIANGLE_TYPE = 2;
+        builder->addElement(TRIANGLE_TYPE, long(boundary[i]), lowerDimensionalElements[i].data(),
+                            NumNodes[TRIANGLE_TYPE - 1]);
     }
-
-    for (auto& higherDimensionalElems : higherDimensionalElements) {
+    for (size_t i = 0; i < higherDimensionalElements.size(); ++i) {
         // Assuming only 4 node tetrahedral for higher Dimensional elements
-        long type = 4;
+        constexpr long TET_TYPE = 4;
         // Information not available in the HDF5 file from PUMGen  - but also not used by the
         // builder for higher Dimensional simplices
-        long groupTag = 0;
-        builder->addElement(type, groupTag, higherDimensionalElems.data(), NumNodes[type - 1]);
+        builder->addElement(TET_TYPE, static_cast<long>(groupTags[i]),
+                            higherDimensionalElements[i].data(), NumNodes[TET_TYPE - 1]);
     }
     return true;
 }
 
 bool H5Parser::parseFile(std::string const& fileName) {
-    hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
-    hid_t file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, plist_id);
+    errorMsg.clear();
+    higherDimensionalElements.clear();
+    lowerDimensionalElements.clear();
+    groupTags.clear();
+    boundaryData.clear();
+    boundary.clear();
+
+    hid_t file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file < 0) {
         return logError<bool>("Unable to open HDF5 file: " + fileName);
     }
-    parseElements(file);
-    parseNodes(file);
-    parseBoundary(file);
-    retrieveLowerDimensionalElements(file);
-    addAllElements(fileName);
+
+    bool ok = parseElements(file) && parseNodes(file) && readBoundaryData(file) &&
+              (boundaryData.size() == higherDimensionalElements.size() ||
+               logError<bool>("Boundary tag count does not match connectivity")) &&
+              retrieveLowerDimensionalElements() && addAllElements();
 
     H5Fclose(file);
-    return true;
+    return ok;
 }
 
 #else  // ENABLE_HDF5 not defined — stub definition so the linker is satisfied
