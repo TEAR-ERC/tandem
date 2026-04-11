@@ -5,19 +5,26 @@ set -e
 
 EXECUTABLE_DIR=$1
 TEMP_TEST_RESULTS=$2
+POLYNOMIAL_DEGREE=$3
 
-if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" ]]; then
-    echo "Usage: $0 <EXECUTABLE_DIR> <TEMP_TEST_RESULTS>"
+if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" || -z "$POLYNOMIAL_DEGREE" ]]; then
+    echo "Usage: $0 <EXECUTABLE_DIR> <TEMP_TEST_RESULTS> <POLYNOMIAL_DEGREE>"
     echo ""
     echo "Arguments:"
     echo "  EXECUTABLE_DIR    -  Path to tandem/static executable"
     echo "  TEMP_TEST_RESULTS - Path to temporary test output directory"
+    echo "  POLYNOMIAL_DEGREE - Polynomial degree used by the test build"
+    exit 1
+fi
+
+if [[ ! "$POLYNOMIAL_DEGREE" =~ ^[0-9]+$ || "$POLYNOMIAL_DEGREE" -le 0 ]]; then
+    echo "Error: POLYNOMIAL_DEGREE must be a positive integer. Got: '$POLYNOMIAL_DEGREE'"
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Generating 2D reference outputs..."
+echo "Generating 2D reference outputs for p${POLYNOMIAL_DEGREE}..."
 
 echo "Static regression (circular_hole)..."
 bash "$SCRIPT_DIR/static_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
@@ -29,6 +36,6 @@ echo "Convergence study (circular_hole, varying h)..."
 bash "$SCRIPT_DIR/convergence.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "SEAS regression (bp1_ref with tandem solver)..."
-bash "$SCRIPT_DIR/seas_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+bash "$SCRIPT_DIR/seas_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
 
 echo "2D reference outputs generated successfully."
