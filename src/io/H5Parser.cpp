@@ -28,7 +28,7 @@ bool H5Parser::readDataset(hid_t file, const char* name, std::vector<T>& data) {
     if (dataspace < 0) {
         H5Dclose(dataset);
     }
-    if (name == "/boundary") { // Boundary conditions in 32 bit encoding 
+    if (name == "/boundary") { // Boundary conditions in 32 bit encoding
         hsize_t dims[1];
         H5Sget_simple_extent_dims(dataspace, dims, nullptr);
         data.resize(dims[0]);
@@ -37,7 +37,8 @@ bool H5Parser::readDataset(hid_t file, const char* name, std::vector<T>& data) {
             H5Sclose(dataspace);
             H5Dclose(dataset);
         }
-    } else if (name == "/connect") { // Nodes associated with each higher order element(higherOrderElements x 4 for 4 node element)
+    } else if (name == "/connect") { // Nodes associated with each higher order
+                                     // element(higherOrderElements x 4 for 4 node element)
         hsize_t dims[2];
         H5Sget_simple_extent_dims(dataspace, dims, nullptr);
         data.resize(dims[0] * dims[1]);
@@ -46,7 +47,8 @@ bool H5Parser::readDataset(hid_t file, const char* name, std::vector<T>& data) {
             H5Sclose(dataspace);
             H5Dclose(dataset);
         }
-    } else if (name == "/geometry") { // Coordinates of the nodes in the mesh (number of Nodes x Dimensions)
+    } else if (name ==
+               "/geometry") { // Coordinates of the nodes in the mesh (number of Nodes x Dimensions)
         hsize_t dims[2];
         H5Sget_simple_extent_dims(dataspace, dims, nullptr);
         data.resize(dims[0] * dims[1]);
@@ -69,12 +71,14 @@ bool H5Parser::parseNodes(hid_t file) {
     if (!readDataset<double>(file, "/geometry", nodeData)) {
         return logErrorAnnotated<bool>("Failed to parse nodes");
     }
-    int DomainDimension = 3
+    constexpr std::size_t DomainDimension = 3;
     std::size_t numVertices = nodeData.size() / DomainDimension;
     builder->setNumVertices(numVertices);
 
     for (std::size_t i = 0; i < numVertices; ++i) {
-        std::array<double, DomainDimension> x = {nodeData[i * DomainDimension], nodeData[i * DomainDimension + 1], nodeData[i * DomainDimension + 2]};
+        std::array<double, DomainDimension> x = {nodeData[i * DomainDimension],
+                                                 nodeData[i * DomainDimension + 1],
+                                                 nodeData[i * DomainDimension + 2]};
         builder->setVertex(i, x);
     }
 
@@ -108,9 +112,11 @@ bool H5Parser::parseElements(hid_t file) {
 }
 
 // Function to check if a sorted version of faceNodes exists in lowerOrderElements
-bool isAlreadyPresent(const std::vector<std::array<long, DomainDimension>>& lowerOrderElements,
-                      const std::array<long, DomainDimension>& faceNodes) {
-    std::array<long, DomainDimension> sortedFaceNodes = faceNodes; // Copy to avoid modifying original
+template <size_t DomainDimension>
+bool isAlreadyPresent(const std::vector<std::array<long int, DomainDimension>>& lowerOrderElements,
+                      const std::array<long int, DomainDimension>& faceNodes) {
+    std::array<long, DomainDimension> sortedFaceNodes =
+        faceNodes; // Copy to avoid modifying original
     std::sort(sortedFaceNodes.begin(), sortedFaceNodes.end());
 
     return std::any_of(lowerOrderElements.begin(), lowerOrderElements.end(),
@@ -124,7 +130,7 @@ bool isAlreadyPresent(const std::vector<std::array<long, DomainDimension>>& lowe
 bool H5Parser::retrieveLowerOrderElements(hid_t file) {
     auto& encodedBoundaryData = boundaryData;
     std::vector<std::uint8_t> decodedBoundary;
-
+    constexpr std::size_t DomainDimension = 3;
     const std::array<std::array<int, 3>, 4> sVertSeissol = {
         {{0, 2, 1}, {0, 1, 3}, {1, 2, 3}, {0, 3, 2}}};
     int x = 0;
@@ -143,7 +149,7 @@ bool H5Parser::retrieveLowerOrderElements(hid_t file) {
                                                  elementNodes[indices[2]]};
 
                 // Check if the element already exists in the list for uniqueness
-                if (!isAlreadyPresent(lowerOrderElements, faceNodes)) {
+                if (!isAlreadyPresent<DomainDimension>(lowerOrderElements, faceNodes)) {
                     lowerOrderElements.push_back(faceNodes); // Store as is, without sorting
                     boundary.push_back(faceTag);
                 }
@@ -166,7 +172,8 @@ bool H5Parser::addAllElements(std::string const& fileName) {
     for (auto& higherOrderElems : higherOrderElements) {
         // Assuming only 4 node tetrahedral for higher order elements
         long type = 4;
-        // Information not available in the HDF5 file from PUMGen  - but also not used by the builder for higher order simplices
+        // Information not available in the HDF5 file from PUMGen  - but also not used by the
+        // builder for higher order simplices
         long groupTage = 0;
         builder->addElement(type, 0, higherOrderElems.data(), NumNodes[type - 1]);
     }
