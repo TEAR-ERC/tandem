@@ -1016,7 +1016,14 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
     krnl.execute();
 }
 
-double* Elasticity::get_mu_field(FacetInfo const& info) const {
-    return material[info.up[0]].get<mu>().data();
+void Elasticity::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
+    assert(result.size() == tensor::mu_avg_q::size());
+
+    kernel::mu_avg krnl;
+    krnl.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    krnl.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+    krnl.mu_avg_q = result.data();
+    krnl.execute();
 }
+
 } // namespace tndm
