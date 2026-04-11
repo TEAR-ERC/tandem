@@ -12,7 +12,7 @@ cd "$CONFIG_DIR"
 
 gmsh -2 bp1_ref.geo
 
-${EXECUTABLE_DIR}/tandem bp1_ref_QDGreen_probe_comparison.toml \
+${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen_probe_comparison.toml \
 --petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/bp1_ref_QDGreen_probe_comparison.log
 
 rm bp1_ref.msh
