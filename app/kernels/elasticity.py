@@ -91,9 +91,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
                 (Dx_q[x]['ljq'] * u[x]['lp'] * normal['jq'] + Dx_q[x]['lpq'] * u[x]['lj'] * normal['jq'])
     
     def normalStressTest(x):
-        return (lam_q[x]["q"] * Dx_q[x]["ksq"] * n_unit_q["sq"] * n_unit_q["pq"]
-            + mu_q[x]["q"] * (Dx_q[x]["kpq"] 
-            + Dx_q[x]["kjq"] * n_unit_q["jq"] * n_unit_q["pq"]))
+        return lam_q[x]["q"] * Dx_q[x]["kpq"] + 2.0 * mu_q[x]["q"] * n_unit_q[
+            "pq"
+        ] * (Dx_q[x]["kjq"] * n_unit_q["jq"])
     
     def tractionTest(x, utilde):
         return lam_q[x]['q'] * Dx_q[x]['kpq'] * utilde['iq'] * n_q['iq'] + mu_q[x]['q'] * \
