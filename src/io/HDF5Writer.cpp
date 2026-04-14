@@ -6,7 +6,7 @@ namespace tndm {
 
 #ifdef ENABLE_HDF5
 
-HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm, bool enable_checkpoint)
+HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm, bool checkpoint_enabled)
     : comm_(comm) {
     MPI_Comm_rank(comm_, &rank_);
     MPI_Comm_size(comm_, &size_);
@@ -18,7 +18,7 @@ HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm, bool enable_che
     H5Pset_fapl_mpio(plist_id, comm_, MPI_INFO_NULL);
 
     // Check if file exists and checkpointing is enabled
-    if (enable_checkpoint) {
+    if (checkpoint_enabled) {
         htri_t file_exists = H5Fis_hdf5(filepath.c_str());
         if (file_exists > 0) {
             // File exists - open for read/write to support checkpointing

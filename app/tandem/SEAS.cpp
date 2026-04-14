@@ -71,7 +71,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
 #ifdef ENABLE_HDF5
-    bool const enable_checkpoint =
+    bool const checkpoint_enabled =
         cfg.ts_checkpoint_config.storage_type != TsCheckpointStorageType::NONE;
 #endif
     if (cfg.fault_output && cfg.domain_output) {
@@ -87,7 +87,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         case TableWriterType::HDF5:
             monitor.add_writer(std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
                 oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
-                enable_checkpoint));
+                checkpoint_enabled));
             break;
 #endif
         default:
@@ -107,7 +107,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             monitor.add_writer(
                 std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
                     oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map,
-                    comm, enable_checkpoint));
+                    comm, checkpoint_enabled));
             break;
 #endif
         default:
@@ -141,7 +141,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         auto const& oc = *cfg.moment_rate_output;
         monitor.add_writer(std::make_unique<seas::MomentRateWriter<DomainDimension>>(
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
-            comm, enable_checkpoint));
+            comm, checkpoint_enabled));
     }
 #else
     if (cfg.moment_rate_output) {
