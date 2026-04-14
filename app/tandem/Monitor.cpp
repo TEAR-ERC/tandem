@@ -47,7 +47,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     break;
                 }
 #ifdef ENABLE_HDF5
-                case DataLevel::Area: {
+                case DataLevel::BoundaryForMomentRate: {
                     auto const& moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
                     break;
@@ -78,7 +78,7 @@ void MonitorQD::write_static() {
             break;
         }
 #ifdef ENABLE_HDF5
-        case DataLevel::Area: {
+        case DataLevel::BoundaryForMomentRate: {
             writer->write_static();
             break;
         }
@@ -110,7 +110,7 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     break;
                 }
 #ifdef ENABLE_HDF5
-                case DataLevel::Area: {
+                case DataLevel::BoundaryForMomentRate: {
                     auto const& moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
                     break;
