@@ -32,6 +32,7 @@ public:
     constexpr static char Lam[] = "lam";
     constexpr static char Rho[] = "rho";
     constexpr static char Boundary[] = "boundary";
+    constexpr static char TractionBoundary[] = "traction_boundary";
     constexpr static char Solution[] = "solution";
     constexpr static char InitialDisplacement[] = "initial_displacement";
     constexpr static char InitialVelocity[] = "initial_velocity";
@@ -56,6 +57,11 @@ public:
             boundary_ = std::make_optional(
                 lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Boundary));
         }
+        if (lib_.hasMember(scenario, TractionBoundary)) {
+            traction_boundary_ =
+                std::make_optional(lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(
+                    scenario, TractionBoundary));
+        }
 
         if (lib_.hasMember(scenario, Solution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
@@ -78,6 +84,7 @@ public:
     auto const& lam() const { return lam_; }
     auto const& rho() const { return rho_; }
     auto const& boundary() const { return boundary_; }
+    auto const& traction_boundary() const { return traction_boundary_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
             auto sol = *solution_;
@@ -100,6 +107,7 @@ protected:
     };
     std::optional<functional_t> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
+    std::optional<time_functional_t> traction_boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
     std::optional<vector_functional_t> u_ini_ = std::nullopt;
     std::optional<vector_functional_t> v_ini_ = std::nullopt;
