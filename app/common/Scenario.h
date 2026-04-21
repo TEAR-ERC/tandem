@@ -22,7 +22,7 @@ template <typename T>
 struct has_set_traction_boundary<
     T, std::void_t<decltype(std::declval<T>().set_traction_boundary(
            std::declval<typename T::template functional_t<T::NumQuantities>>(),
-           std::declval<std::array<double, 3>>()))>> : std::true_type {};
+           std::declval<std::array<double, DomainDimension>>()))>> : std::true_type {};
 
 template <class LocalOperator> class Scenario {
 public:
