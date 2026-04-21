@@ -45,7 +45,9 @@ public:
     template <class T> using rhs_skeleton_t = decltype(&T::rhs_skeleton);
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_traction_boundary_t = decltype(&T::rhs_traction_boundary);
-    template <class T> using has_set_traction_boundary_t = decltype(&T::set_traction_boundary);
+    template <class T>
+    using has_set_traction_boundary_t = decltype(std::declval<T&>().set_traction_boundary(
+        std::declval<typename base::facet_functional_t>()));
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
