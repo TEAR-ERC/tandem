@@ -176,7 +176,14 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
         b['kp'] <= b['kp'] + c1[0] * tractionTest(0, f_q) * w['q'] + \
             c2[0] * w['q'] * E_q[0]['kq'] * f_lifted_q['pq']
     ])
-
+    traction_component = Tensor("traction_component", (dim, nq))
+    generator.add(
+        "rhsTraction",
+        [
+            b["kp"]
+            <= b["kp"] + w["q"] * E_q[0]["kq"] * traction_component["pq"] * nl_q["q"]
+        ],
+    )
     # matrix-free
 
     U_ext = Tensor('U_ext', (Nbf, dim), alignStride=petsc_alignment)
