@@ -91,6 +91,9 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
         case static_cast<long>(BC::Natural):
             bc = BC::Natural;
             break;
+        case static_cast<long>(BC::Traction):
+            bc = BC::Traction;
+            break;
         default:
             ++unknownBC;
             break;

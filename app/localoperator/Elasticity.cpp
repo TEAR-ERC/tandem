@@ -447,7 +447,7 @@ bool Elasticity::assemble_skeleton(std::size_t fctNo, FacetInfo const& info, Mat
 
 bool Elasticity::assemble_boundary(std::size_t fctNo, FacetInfo const& info, Matrix<double>& A00,
                                    LinearAllocator<double>& scratch) const {
-    if (info.bc == BC::Natural) {
+    if (info.bc == BC::Natural || info.bc == BC::Traction) {
         return false;
     }
 
@@ -571,6 +571,15 @@ bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     return true;
 }
 
+bool Elasticity::bc_traction(std::size_t fctNo, BC bc, double f_q_raw[]) const {
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (bc == BC::Traction && fun_traction) {
+        (*fun_traction)(fctNo, f_q, true);
+        return true;
+    }
+    return false;
+}
+
 bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                               Vector<double>& B1, LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
@@ -689,6 +698,25 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
     rhs.n_q = fct[fctNo].get<Normal>().data()->data();
     rhs.w = fctRule.weights().data();
+    rhs.execute();
+
+    return true;
+}
+
+bool Elasticity::rhs_traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                                       LinearAllocator<double>& scratch) const {
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
+
+    if (!bc_traction(fctNo, info.bc, f_q_raw)) {
+        return false;
+    }
+
+    kernel::rhsTraction rhs;
+    rhs.b = B0.data();
+    rhs.w = fctRule.weights().data();
+    rhs.nl_q = fct[fctNo].get<NormalLength>().data();
+    rhs.traction_component = f_q_raw;
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
     rhs.execute();
 
     return true;

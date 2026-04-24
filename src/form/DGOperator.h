@@ -44,6 +44,10 @@ public:
     template <class T> using rhs_volume_t = decltype(&T::rhs_volume);
     template <class T> using rhs_skeleton_t = decltype(&T::rhs_skeleton);
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
+    template <class T> using rhs_traction_boundary_t = decltype(&T::rhs_traction_boundary);
+    template <class T>
+    using has_set_traction_boundary_t = decltype(std::declval<T&>().set_traction_boundary(
+        std::declval<typename base::facet_functional_t>()));
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
@@ -205,7 +209,8 @@ public:
             }
         }
         if constexpr (std::experimental::is_detected_v<rhs_skeleton_t, LocalOperator> ||
-                      std::experimental::is_detected_v<rhs_boundary_t, LocalOperator>) {
+                      std::experimental::is_detected_v<rhs_boundary_t, LocalOperator> ||
+                      std::experimental::is_detected_v<rhs_traction_boundary_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
                 a_scratch.reset();
@@ -222,6 +227,12 @@ public:
                     if (info.inside[0]) {
                         auto B0 = access_handle.subtensor(slice{}, ib0);
                         lop_->rhs_boundary(fctNo, info, B0, scratch_);
+
+                        if constexpr (std::experimental::is_detected_v<rhs_traction_boundary_t,
+                                                                       LocalOperator>) {
+
+                            lop_->rhs_traction_boundary(fctNo, info, B0, scratch_);
+                        }
                     }
                 }
             }
@@ -353,6 +364,12 @@ public:
     }
     void set_dirichlet(typename base::facet_functional_t fun) override {
         lop_->set_dirichlet(std::move(fun));
+    }
+    void set_traction_boundary(typename base::facet_functional_t fun) override {
+        if constexpr (std::experimental::is_detected_v<has_set_traction_boundary_t,
+                                                       LocalOperator>) {
+            lop_->set_traction_boundary(std::move(fun));
+        }
     }
 
 private:
