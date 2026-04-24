@@ -131,6 +131,7 @@ public:
         fun_traction = make_facet_functional(std::move(fun), refNormal);
     }
     void set_traction_boundary(facet_functional_t fun) { fun_traction = std::move(fun); }
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
 private:
     template <bool WithRHS>
