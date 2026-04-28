@@ -505,7 +505,7 @@ public:
         }
     }
 
-    void compute_deviatoric_strain(double time) override {
+    void compute_deviatoric_strain() override {
         if constexpr (std::experimental::is_detected_v<compute_deviatoric_strain_Q_t,
                                                        LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
@@ -518,7 +518,7 @@ public:
         }
     }
 
-    void compute_partial_strain(double time) override {
+    void compute_partial_strain() override {
         if constexpr (std::experimental::is_detected_v<compute_partial_strain_Q_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
                 lop_->compute_partial_strain_Q(elNo);
