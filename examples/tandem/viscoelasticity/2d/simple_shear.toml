@@ -8,10 +8,10 @@ mode = "QD"
 ref_normal = [1, 0]
 
 [domain_output]
-prefix = "/home/pkarki/develop/tandem/stress/domain_"
+prefix = "domain_"
 
 [stress_output]
-prefix = "/home/pkarki/develop/tandem/stress/stress_"
+prefix = "stress_"
 
 [domain_probe_output]
 prefix = "blkst_"
