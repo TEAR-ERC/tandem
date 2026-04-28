@@ -34,6 +34,7 @@ public:
     constexpr static char Rho[] = "rho";
     constexpr static char Boundary[] = "boundary";
     constexpr static char TractionBoundary[] = "traction_boundary";
+    constexpr static char FreeSlipBoundary[] = "free_slip_boundary";
     constexpr static char Solution[] = "solution";
     constexpr static char InitialDisplacement[] = "initial_displacement";
     constexpr static char InitialVelocity[] = "initial_velocity";
@@ -73,6 +74,12 @@ public:
                 lib_.getMemberFunction<DomainDimension + 1, NumQuantities>(scenario, Solution)));
         }
 
+        if (lib_.hasMember(scenario, FreeSlipBoundary)) {
+            // free slip is a scalar (1 quantity)
+            free_slip_boundary_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension + 1u, 1>(scenario, FreeSlipBoundary));
+        }
+
         if (lib_.hasMember(scenario, InitialDisplacement)) {
             u_ini_ = std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities>(
                 scenario, InitialDisplacement));
@@ -90,6 +97,7 @@ public:
     auto const& rho() const { return rho_; }
     auto const& boundary() const { return boundary_; }
     auto const& traction_boundary() const { return traction_boundary_; }
+    auto const& free_slip_boundary() const { return free_slip_boundary_; }
     std::unique_ptr<SolutionInterface> solution(double time) const {
         if (solution_) {
             auto sol = *solution_;
@@ -111,6 +119,8 @@ protected:
     std::optional<functional_t_region> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<time_functional_t> traction_boundary_ = std::nullopt;
+    using time_scalar_functional_t = LuaLib::functional_t<DomainDimension + 1, 1>;
+    std::optional<time_scalar_functional_t> free_slip_boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
     std::optional<vector_functional_t> u_ini_ = std::nullopt;
     std::optional<vector_functional_t> v_ini_ = std::nullopt;
