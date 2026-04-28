@@ -20,6 +20,12 @@ SeasQDOperator::SeasQDOperator(std::unique_ptr<dg_t> dgop,
 void SeasQDOperator::set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
     fun_boundary_ = std::move(fun);
 }
+void SeasQDOperator::set_free_slip_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+    fun_free_slip_boundary_ = std::move(fun);
+}
+void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+    fun_traction_boundary_ = std::move(fun);
+}
 
 void SeasQDOperator::initial_condition(BlockVector& state) {
     friction_->pre_init(state);
@@ -38,12 +44,7 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
 
     friction_->init(0.0, traction_, state);
 }
-void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
-    fun_traction_boundary_ = std::move(fun);
-}
-void SeasQDOperator::set_free_slip_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
-    fun_free_slip_boundary_ = std::move(fun);
-}
+
 void SeasQDOperator::rhs(double time, BlockVector const& state, BlockVector& result) {
     update_ghost_state(state);
     solve(time, make_state_view(state));
