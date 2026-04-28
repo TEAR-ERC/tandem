@@ -33,6 +33,9 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
 void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
     fun_traction_boundary_ = std::move(fun);
 }
+void SeasQDOperator::set_free_slip_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+    fun_free_slip_boundary_ = std::move(fun);
+}
 void SeasQDOperator::rhs(double time, BlockVector const& state, BlockVector& result) {
     update_ghost_state(state);
     solve(time, make_state_view(state));
@@ -63,6 +66,9 @@ void SeasQDOperator::solve(double time, BlockView const& state_view) {
     }
     if (fun_traction_boundary_) {
         dgop_->set_traction_boundary((*fun_traction_boundary_)(time));
+    }
+    if (fun_free_slip_boundary_) {
+        dgop_->set_free_slip_boundary((*fun_free_slip_boundary_)(time));
     }
     linear_solver_.update_rhs(*dgop_);
     linear_solver_.solve();
