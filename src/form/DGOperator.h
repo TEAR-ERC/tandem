@@ -49,9 +49,13 @@ public:
     template <class T> using rhs_skeleton_t = decltype(&T::rhs_skeleton);
     template <class T> using rhs_boundary_t = decltype(&T::rhs_boundary);
     template <class T> using rhs_traction_boundary_t = decltype(&T::rhs_traction_boundary);
-    template <class T> using has_set_traction_boundary_t = decltype(&T::set_traction_boundary);
+    template <class T>
+    using has_set_traction_boundary_t = decltype(std::declval<T&>().set_traction_boundary(
+        std::declval<typename base::facet_functional_t>()));
     template <class T> using rhs_free_slip_boundary_t = decltype(&T::rhs_free_slip_boundary);
-    template <class T> using has_set_free_slip_boundary_t = decltype(&T::set_free_slip_boundary);
+    template <class T>
+    using has_set_free_slip_boundary_t = decltype(std::declval<T&>().set_free_slip_boundary(
+        std::declval<typename base::facet_functional_t>()));
 
     // Viscoelastic operators may have additional methods related to the deviatoric strain, which
     // are detected via SFINAE and called from the time solver if they exist.
