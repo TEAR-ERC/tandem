@@ -16,6 +16,12 @@
 
 namespace tndm {
 
+template <typename T, typename = void> struct has_set_traction_boundary : std::false_type {};
+
+template <typename T>
+struct has_set_traction_boundary<T, std::void_t<decltype(&T::set_traction_boundary)>>
+    : std::true_type {};
+
 template <class LocalOperator> class Scenario {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
