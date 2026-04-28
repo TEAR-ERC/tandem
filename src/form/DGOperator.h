@@ -550,6 +550,46 @@ public:
         }
     }
 
+    void compute_stress_field() override {
+        if constexpr (std::experimental::is_detected_v<compute_stress_field_t, LocalOperator>) {
+            lop_->compute_stress_field(topo_->numLocalElements());
+        }
+    }
+
+    auto stress_solution(std::vector<std::size_t> const& subset)
+        -> std::optional<FiniteElementFunction<DomainDimension>> override {
+        if constexpr (std::experimental::is_detected_v<stress_prototype_t, LocalOperator>) {
+            auto fun = lop_->stress_prototype(subset.size());
+            auto& values = fun.values();
+            auto scratch = Scratch<double>(lop_->scratch_mem_size(), lop_->alignment());
+            for (std::size_t i = 0; i < subset.size(); ++i) {
+                scratch.reset();
+                auto s = values.subtensor(slice{}, slice{}, i);
+                lop_->stress_volume(subset[i], s, scratch);
+            }
+            return std::make_optional(std::move(fun));
+        }
+        return std::nullopt;
+    }
+
+    auto stress_solution(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> std::optional<FiniteElementFunction<DomainDimension>> override {
+        if constexpr (std::experimental::is_detected_v<stress_prototype_t, LocalOperator>) {
+            auto const local_range =
+                range.value_or(Range<std::size_t>(0, topo_->numLocalElements()));
+            auto fun = lop_->stress_prototype(local_range.to - local_range.from);
+            auto& values = fun.values();
+            auto scratch = Scratch<double>(lop_->scratch_mem_size(), lop_->alignment());
+            for (std::size_t elNo = local_range.from; elNo < local_range.to; ++elNo) {
+                scratch.reset();
+                auto s = values.subtensor(slice{}, slice{}, elNo - local_range.from);
+                lop_->stress_volume(elNo, s, scratch);
+            }
+            return std::make_optional(std::move(fun));
+        }
+        return std::nullopt;
+    }
+
 private:
     using apply_fun_ptr = void (LocalOperator::*)(
         std::size_t, mneme::span<SideInfo>, Vector<double const> const&,
