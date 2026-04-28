@@ -105,6 +105,15 @@ private:
             return seasop_->domain().params();
         }
     }
+    inline auto stress_data(std::vector<std::size_t> const* subset)
+        -> std::optional<FiniteElementFunction<DomainDimension>> {
+        seasop_->compute_stress_field();
+        if (subset) {
+            return seasop_->stress_solution(*subset);
+        } else {
+            return seasop_->stress_solution();
+        }
+    }
 
     std::shared_ptr<SeasQDOperator> seasop_;
 };
