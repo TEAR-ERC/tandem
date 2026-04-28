@@ -256,7 +256,7 @@ public:
 
     void post_step(double time, BlockVector const& state) {
         // Update viscoelastic strain history (no-op for non-VE operators)
-        seasop_->post_step_compute_strain_history(time);
+        seasop_->post_step_compute_strain_history(time, state);
     }
 
 private:

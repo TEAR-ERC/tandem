@@ -38,7 +38,7 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
 
     solve(0.0, make_state_view(state));
     update_traction(make_state_view(state));
-    post_step_compute_strain_history(0.0);
+    post_step_compute_strain_history(0.0, state);
     last_time_ = 0.0;
     friction_->init(0.0, traction_, state);
 }
@@ -84,7 +84,7 @@ void SeasQDOperator::pre_step_update_strain_history() {
     dgop_->update_partial_strain();
 }
 
-void SeasQDOperator::post_step_compute_strain_history(double time) {
+void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector const& state) {
     // Update viscoelastic strain history after an accepted timestep.
     // For non-VE operators, these are no-ops.
 
@@ -94,6 +94,11 @@ void SeasQDOperator::post_step_compute_strain_history(double time) {
     //   3. compute_deviatoric_strain: compute new deviatoric strain from displacement
     //   4. compute_partial_strain: integrate partial strain (VE memory variable)
     // Rotation old <= new is handled in pre_step_update_strain_history() before the next RHS call.
+
+    // Ensure displacement corresponds to the accepted TS solution at this time,
+    // independent of monitor output frequency.
+    update_ghost_state(state);
+    solve(time, make_state_view(state));
 
     // Calculate and set the actual dt for this timestep
     double dt = time - last_time_;

@@ -92,13 +92,14 @@ public:
      *
      * This must be called ONCE per accepted timestep (via TSSetPostStep callback),
      * not during individual RK stages. It performs:
-     *   1. store_displacement_field
-     *   2. compute_deviatoric_strain
-     *   3. compute_partial_strain
+     *   1. solve accepted state for current displacement
+     *   2. store_displacement_field
+     *   3. compute_deviatoric_strain
+     *   4. compute_partial_strain
      *
      * For non-viscoelastic operators, these are no-ops.
      */
-    void post_step_compute_strain_history(double time);
+    void post_step_compute_strain_history(double time, BlockVector const& state);
 
     inline auto displacement(std::vector<std::size_t> const& subset) const {
         return dgop_->solution(linear_solver_.x(), subset);
