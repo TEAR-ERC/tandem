@@ -42,6 +42,9 @@ public:
     inline void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
         fun_boundary_ = std::move(fun);
     }
+    inline void set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
+        fun_traction_boundary_ = std::move(fun);
+    }
     inline void set_initial_displacement(std::unique_ptr<AbstractVolumeFunctionalFactory> u_ini) {
         u_ini_ = std::move(u_ini);
     }
@@ -110,6 +113,7 @@ private:
     SparseBlockVector<double> state_ghost_;
 
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_boundary_ = nullptr;
+    std::unique_ptr<AbstractFacetFunctionalFactory> fun_traction_boundary_ = nullptr;
     std::unique_ptr<AbstractVolumeFunctionalFactory> u_ini_ = nullptr;
     std::unique_ptr<AbstractVolumeFunctionalFactory> v_ini_ = nullptr;
 
