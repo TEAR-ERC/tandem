@@ -1,0 +1,14 @@
+# Adapted from Marques, S.P.C. & Creus, G.J., 2012. Computational Viscoelasticity, Springer
+# and Gharti et. al. https://academic.oup.com/gji/article/216/2/1364/5199199
+
+final_time = 10000
+mesh_file = "cantilever_rod.msh"
+type = "viscoelasticity"
+lib = "cantilever_rod.lua"
+scenario = "cantilever_rod"
+
+[domain_output]
+prefix = "cantilever_rod_domain_"
+
+[stress_output]
+prefix = "cantilever_rod_stress_"
