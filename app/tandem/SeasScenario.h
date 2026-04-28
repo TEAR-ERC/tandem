@@ -7,6 +7,7 @@
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
 #include "script/LuaLib.h"
+#include "tandem/VEMaterialParams.h"
 #include "util/Schema.h"
 #include "util/SchemaHelper.h"
 
@@ -19,7 +20,8 @@
 
 namespace tndm {
 
-template <class LocalOperator> class SeasScenario {
+template <class LocalOperator>
+class SeasScenario : public VEMaterialParams<LocalOperator> {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
@@ -84,6 +86,8 @@ public:
             v_ini_ = std::make_optional(
                 lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, InitialVelocity));
         }
+
+        VEMaterialParams<LocalOperator>::load(lib_, scenario);
     }
 
     auto const& transform() const { return warp_; }
