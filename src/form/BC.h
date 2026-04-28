@@ -3,7 +3,7 @@
 
 namespace tndm {
 
-enum class BC : int { None = 0, Natural = 1, Fault = 3, Dirichlet = 5, Traction = 7 };
+enum class BC : int { None = 0, Natural = 1, Fault = 3, Dirichlet = 5, Traction = 7, FreeSlip = 9 };
 
 }
 
