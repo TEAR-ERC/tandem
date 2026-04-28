@@ -215,6 +215,64 @@ template <> struct operator_specifics<SeasFDOperator> {
     }
 };
 
+/**
+ * @brief Pre-step handler for rotating viscoelastic strain history buffers.
+ *
+ * This handler is registered with PETSc's TSSetPreStep and is called before
+ * each timestep. For QD operators, it rotates *_new -> *_old so RHS terms read
+ * a consistent old state. For FD operators, this is a no-op.
+ */
+template <typename seas_t> class PreStepHandler {
+public:
+    PreStepHandler(std::shared_ptr<seas_t> seasop) : seasop_(std::move(seasop)) {}
+
+    void pre_step(double time, BlockVector const&) { seasop_->pre_step_update_strain_history(); }
+
+private:
+    std::shared_ptr<seas_t> seasop_;
+};
+
+// Specialization for FD operator - no strain history updates needed
+template <> class PreStepHandler<SeasFDOperator> {
+public:
+    PreStepHandler(std::shared_ptr<SeasFDOperator>) {}
+
+    void pre_step(double, BlockVector const&, BlockVector const&, BlockVector const&) {
+        // FD operator has no viscoelastic strain history to update
+    }
+};
+
+/**
+ * @brief Post-step handler for computing viscoelastic strain history.
+ *
+ * This handler is registered with PETSc's TSSetPostStep and is called
+ * ONCE per accepted timestep, after all RK stages complete. For QD operators,
+ * it stores displacement and computes new strain history state. For FD
+ * operators, this is a no-op.
+ */
+template <typename seas_t> class PostStepHandler {
+public:
+    PostStepHandler(std::shared_ptr<seas_t> seasop) : seasop_(std::move(seasop)) {}
+
+    void post_step(double time, BlockVector const& state) {
+        // Update viscoelastic strain history (no-op for non-VE operators)
+        seasop_->post_step_compute_strain_history(time);
+    }
+
+private:
+    std::shared_ptr<seas_t> seasop_;
+};
+
+// Specialization for FD operator - no strain history updates needed
+template <> class PostStepHandler<SeasFDOperator> {
+public:
+    PostStepHandler(std::shared_ptr<SeasFDOperator>) {}
+
+    void post_step(double, BlockVector const&, BlockVector const&, BlockVector const&) {
+        // FD operator has no viscoelastic strain history to update
+    }
+};
+
 template <typename seas_t>
 void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
                         seas::ContextBase& ctx) {
@@ -250,6 +308,15 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     monitor->write_static();
 
     ts.set_monitor(*monitor);
+
+    // Register pre-step handler for history rotation (_new => _old)
+    auto pre_step_handler = PreStepHandler<seas_t>(seasop);
+    ts.set_pre_step(pre_step_handler);
+
+    // Register post-step handler for strain history updates
+    // This runs once per accepted timestep, after all RK stages complete
+    auto post_step_handler = PostStepHandler<seas_t>(seasop);
+    ts.set_post_step(post_step_handler);
 
     int rank;
     MPI_Comm comm = seasop->comm();
