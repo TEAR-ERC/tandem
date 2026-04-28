@@ -14,8 +14,10 @@ from yateto.gemm_configuration import GeneratorCollection, Eigen, LIBXSMM
 
 import poisson
 import elasticity
+import viscoelasticity
 import poisson_adapter
 import elasticity_adapter
+import viscoelasticity_adapter
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -45,6 +47,11 @@ elif cmdLineArgs.app == 'elasticity':
                    options['numElementBasisFunctions'],
                    options['numFacetQuadPoints'],
                    options['numElementQuadPoints'], petsc_alignment)
+elif cmdLineArgs.app == 'viscoelasticity':
+    viscoelasticity.add(g, options['dim'], options['numFacetBasisFunctions'],
+                        options['numElementBasisFunctions'],
+                        options['numFacetQuadPoints'],
+                        options['numElementQuadPoints'], petsc_alignment)
 elif cmdLineArgs.app == 'poisson_adapter':
     poisson_adapter.add(g, options['dim'], options['numFaultBasisFunctions'],
                         options['numFacetQuadPoints'])
@@ -52,6 +59,10 @@ elif cmdLineArgs.app == 'elasticity_adapter':
     elasticity_adapter.add(g, options['dim'],
                            options['numFaultBasisFunctions'],
                            options['numFacetQuadPoints'])
+elif cmdLineArgs.app == 'viscoelasticity_adapter':
+    viscoelasticity_adapter.add(g, options['dim'],
+                                options['numFaultBasisFunctions'],
+                                options['numFacetQuadPoints'])
 
 gemmgen_list = []
 if cmdLineArgs.with_libxsmm and cmdLineArgs.app == 'elasticity':

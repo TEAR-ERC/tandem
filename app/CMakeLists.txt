@@ -162,6 +162,8 @@ generate_code(poisson)
 generate_code(poisson_adapter)
 generate_code(elasticity)
 generate_code(elasticity_adapter)
+generate_code(viscoelasticity)
+generate_code(viscoelasticity_adapter)
 
 ## LAPACK interface
 include(CheckLanguage)
@@ -198,6 +200,8 @@ set(APP_COMMON_SRCS
     localoperator/ElasticityAdapter.cpp
     localoperator/Poisson.cpp
     localoperator/PoissonAdapter.cpp
+    localoperator/Viscoelasticity.cpp
+    localoperator/ViscoelasticityAdapter.cpp
     localoperator/RateAndStateBase.cpp
     pc/lspoly.c
     pc/register.cpp
@@ -218,6 +222,8 @@ target_link_libraries(app-common PUBLIC
     poisson_adapter-kernels-lib
     elasticity-kernels-lib
     elasticity_adapter-kernels-lib
+    viscoelasticity-kernels-lib
+    viscoelasticity_adapter-kernels-lib
     tandem-lib
     PETSc::PETSc)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
