@@ -131,9 +131,7 @@ void Viscoelasticity::prepare_volume_post_skeleton(std::size_t elNo,
         volPre[elNo].template get<negative_rhoInv_W_Jinv_Q>().data();
     krnl_pre.execute();
 
-    // Note: Time-dependent quantities (g_dt, ratio, A_dt, B_dt) are updated in
-    // update_time_dependent_precomputation_volume(), which is called from DGOperator
-    // after the viscoelastic time step is set.
+    update_time_dependent_precomputation_volume(elNo); // g_dt, ratio, A_dt, B_dt
 }
 
 // Precomputation — facets (skeleton and boundary)
@@ -176,6 +174,7 @@ void Viscoelasticity::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
                                        LinearAllocator<double>& scratch) {
     base::prepare_skeleton(fctNo, info, scratch);
     precompute_facet_material(fctNo, info, 2);
+    update_time_dependent_precomputation_skeleton(fctNo);
     transpose_JInv(fctNo, 0);
     transpose_JInv(fctNo, 1);
 }
@@ -184,6 +183,7 @@ void Viscoelasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
                                        LinearAllocator<double>& scratch) {
     base::prepare_boundary(fctNo, info, scratch);
     precompute_facet_material(fctNo, info, 1);
+    update_time_dependent_precomputation_boundary(fctNo); // g_dt, ratio, A_dt, B_dt
     transpose_JInv(fctNo, 0);
 }
 
@@ -196,13 +196,11 @@ void Viscoelasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t elNo) {
     auto g_dt_data = volPre[elNo].get<g_dt_Q>().data();
     auto ratio_data = volPre[elNo].get<ratio_Q>().data();
-    auto tau_field = volPre[elNo].get<relaxation_time_local>().data();
-
-    for (std::size_t q = 0; q < volRule.size(); ++q) {
-        const double tau_q = tau_field[q];
-        g_dt_data[q] = compute_g_dt(dt_viscoelastic_, tau_q, 200);
-        ratio_data[q] = (tau_q > 0.0) ? std::exp(-dt_viscoelastic_ / tau_q) : 0.0;
-    }
+    auto g_val =
+        compute_g_dt(dt_viscoelastic_, relaxation_time_global(), /*taylor expansion terms*/ 200);
+    auto ratio_val = std::exp(-theta());
+    std::fill(g_dt_data, g_dt_data + volRule.size(), g_val);
+    std::fill(ratio_data, ratio_data + volRule.size(), ratio_val);
 
     kernel::precomputeVolumeAB krnl_pre_ab;
     krnl_pre_ab.lam_W_J_Q = volPre[elNo].get<lam_W_J_Q>().data();
@@ -216,16 +214,13 @@ void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t el
 
 void Viscoelasticity::update_time_dependent_precomputation_surface(std::size_t fctNo,
                                                                    int numSides) {
-    auto g_dt_data = fctPre[fctNo].get<g_dt_q>().data();
-    auto ratio_data = fctPre[fctNo].get<ratio_q>().data();
-    auto mu1_q0 = fctPre[fctNo].get<mu1_q_0>().data();
-    auto viscosity_q0 = fctPre[fctNo].get<viscosity_q_0>().data();
-
-    for (std::size_t q = 0; q < fctRule.size(); ++q) {
-        const double tau_q = (mu1_q0[q] != 0.0) ? viscosity_q0[q] / mu1_q0[q] : 0.0;
-        g_dt_data[q] = compute_g_dt(dt_viscoelastic_, tau_q, 200);
-        ratio_data[q] = (tau_q > 0.0) ? std::exp(-dt_viscoelastic_ / tau_q) : 0.0;
-    }
+    auto g_dt_data = volPre[elNo].get<g_dt_Q>().data();
+    auto ratio_data = volPre[elNo].get<ratio_Q>().data();
+    auto g_val =
+        compute_g_dt(dt_viscoelastic_, relaxation_time_global(), /*taylor expansion terms*/ 200);
+    auto ratio_val = std::exp(-theta());
+    std::fill(g_dt_data, g_dt_data + volRule.size(), g_val);
+    std::fill(ratio_data, ratio_data + volRule.size(), ratio_val);
 
     kernel::precomputeSurfaceAB krnl_ab;
     krnl_ab.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
