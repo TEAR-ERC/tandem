@@ -27,7 +27,7 @@
 
 namespace tndm::seas {
 
-enum class DataLevel { Scalar, Boundary, Volume };
+enum class DataLevel { Scalar, Boundary, Volume, Stress };
 
 class Writer {
 public:
@@ -37,6 +37,7 @@ public:
     virtual DataLevel level() const = 0;
     virtual std::vector<std::size_t> const* subset() const { return nullptr; }
     virtual bool has_static_writer() const { return false; }
+    virtual bool include_stress() const { return false; }
 
     inline bool is_write_required(double time, double VMax) const {
         double delta_time = time - last_output_time_;
@@ -106,6 +107,7 @@ public:
 
     DataLevel level() const override { return DataLevel::Volume; }
     std::vector<std::size_t> const* subset() const override { return &writer_.elNos(); }
+    bool include_stress() const override { return true; }
     void write(double time, mneme::span<FiniteElementFunction<D>> data) override {
         if (writer_.num_probes() > 0) {
             writer_.write(time, std::move(data));
@@ -227,6 +229,41 @@ private:
     unsigned degree_;
     MPI_Comm comm_;
     bool jacobian_;
+};
+
+template <std::size_t D> class StressWriter : public Writer {
+public:
+    StressWriter(std::string_view prefix, AdaptiveOutputInterval oi,
+                 LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                 unsigned degree, MPI_Comm comm)
+        : Writer(prefix, oi), pvd_(prefix), adapter_(std::move(cl), mesh.elements().localSize()),
+          degree_(degree), comm_(std::move(comm)) {}
+
+    DataLevel level() const override { return DataLevel::Stress; }
+
+    void write(double time, mneme::span<FiniteElementFunction<D>> data) override {
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+
+        auto writer = VTUWriter<D>(degree_, true, comm_);
+        writer.addFieldData("time", &time, 1);
+        auto& piece = writer.addPiece(adapter_);
+        for (auto const& fun : data) {
+            piece.addPointData(fun);
+        }
+        auto base_step = this->name();
+        writer.write(base_step);
+        if (rank == 0) {
+            pvd_.addTimestep(time, writer.pvtuFileName(base_step));
+            pvd_.write();
+        }
+    }
+
+private:
+    PVDWriter pvd_;
+    CurvilinearVTUAdapter<D> adapter_;
+    unsigned degree_;
+    MPI_Comm comm_;
 };
 
 } // namespace tndm::seas

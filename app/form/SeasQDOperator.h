@@ -98,6 +98,13 @@ public:
         return friction_->state(time, traction_, state_vec);
     }
 
+    // Stress field output (viscoelasticity only)
+    inline void compute_stress_field() { dgop_->compute_stress_field(); }
+    inline auto stress_solution(std::vector<std::size_t> const& subset) const {
+        return dgop_->stress_solution(subset);
+    }
+    inline auto stress_solution() const { return dgop_->stress_solution(); }
+
 protected:
     inline auto invalid_slip_bc() {
         return [](std::size_t, Matrix<double>&, bool) {

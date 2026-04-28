@@ -105,6 +105,11 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
             comm));
     }
+    if (cfg.stress_output && cfg.type == LocalOpType::Viscoelasticity) {
+        auto const& oc = *cfg.stress_output;
+        monitor.add_writer(std::make_unique<seas::StressWriter<DomainDimension>>(
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, comm));
+    }
 }
 
 template <typename seas_t> struct operator_specifics;
