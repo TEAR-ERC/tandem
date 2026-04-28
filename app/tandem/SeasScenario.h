@@ -20,8 +20,7 @@
 
 namespace tndm {
 
-template <class LocalOperator>
-class SeasScenario : public VEMaterialParams<LocalOperator> {
+template <class LocalOperator> class SeasScenario : public VEMaterialParams<LocalOperator> {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using transform_t = Curvilinear<DomainDimension>::transform_t;

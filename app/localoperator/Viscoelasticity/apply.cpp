@@ -1,4 +1,4 @@
-// Matrix-free apply interface 
+// Matrix-free apply interface
 //
 // The adapter methods called by DGOperator.
 

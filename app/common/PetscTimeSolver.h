@@ -120,7 +120,8 @@ public:
         PetscContainer container;
         CHKERRTHROW(PetscContainerCreate(comm, &container));
         CHKERRTHROW(PetscContainerSetPointer(container, &handler));
-        CHKERRTHROW(PetscObjectCompose((PetscObject)ts_, "_PreStepHandler", (PetscObject)container));
+        CHKERRTHROW(
+            PetscObjectCompose((PetscObject)ts_, "_PreStepHandler", (PetscObject)container));
         CHKERRTHROW(PetscObjectDereference((PetscObject)container));
 
         CHKERRTHROW(TSSetPreStep(ts_, &PreStepFunction<PreStepHandler>));
@@ -185,8 +186,7 @@ private:
         return 0;
     }
 
-    template <class PreStepHandler>
-    static PetscErrorCode PreStepFunction(TS ts) {
+    template <class PreStepHandler> static PetscErrorCode PreStepFunction(TS ts) {
         // Retrieve handler from PETSc object composition
         PetscContainer container;
         CHKERRTHROW(PetscObjectQuery((PetscObject)ts, "_PreStepHandler", (PetscObject*)&container));
@@ -215,11 +215,11 @@ private:
         return 0;
     }
 
-    template <class PostStepHandler>
-    static PetscErrorCode PostStepFunction(TS ts) {
+    template <class PostStepHandler> static PetscErrorCode PostStepFunction(TS ts) {
         // Retrieve handler from PETSc object composition
         PetscContainer container;
-        CHKERRTHROW(PetscObjectQuery((PetscObject)ts, "_PostStepHandler", (PetscObject*)&container));
+        CHKERRTHROW(
+            PetscObjectQuery((PetscObject)ts, "_PostStepHandler", (PetscObject*)&container));
 
         PostStepHandler* handler;
         CHKERRTHROW(PetscContainerGetPointer(container, (void**)&handler));
