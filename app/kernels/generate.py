@@ -2,8 +2,12 @@
 
 import os
 import sys
+
+KERNELS_DIR = os.path.dirname(__file__)
 sys.path.append(
-    os.path.join(os.path.dirname(__file__), '../../submodules/yateto/'))
+    os.path.join(KERNELS_DIR, '../../submodules/yateto/'))
+sys.path.append(os.path.join(KERNELS_DIR, 'Poisson'))
+sys.path.append(os.path.join(KERNELS_DIR, 'Elasticity'))
 
 import argparse
 import json
@@ -13,11 +17,11 @@ from yateto.ast.visitor import PrettyPrinter
 from yateto.gemm_configuration import GeneratorCollection, Eigen, LIBXSMM
 
 import poisson
-import elasticity
-import viscoelasticity
 import poisson_adapter
+import elasticity
 import elasticity_adapter
-import viscoelasticity_adapter
+from Viscoelasticity import add as add_viscoelasticity
+from Viscoelasticity import viscoelasticity_adapter
 
 cmdLineParser = argparse.ArgumentParser()
 cmdLineParser.add_argument('--app', required=True)
@@ -48,7 +52,7 @@ elif cmdLineArgs.app == 'elasticity':
                    options['numFacetQuadPoints'],
                    options['numElementQuadPoints'], petsc_alignment)
 elif cmdLineArgs.app == 'viscoelasticity':
-    viscoelasticity.add(g, options['dim'], options['numFacetBasisFunctions'],
+    add_viscoelasticity(g, options['dim'], options['numFacetBasisFunctions'],
                         options['numElementBasisFunctions'],
                         options['numFacetQuadPoints'],
                         options['numElementQuadPoints'], petsc_alignment)

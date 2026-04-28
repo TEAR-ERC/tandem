@@ -98,6 +98,11 @@ function(generate_code APP)
     if(${LibxsmmGenerator_FOUND})
         set(WITH_LIBXSMM "\'${LibxsmmGeneratorExecutable}\'")
     endif()
+
+    file(GLOB APP_KERNEL_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/kernels/${APP}/*.py
+    )
+
     add_custom_command(
         COMMAND
             ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
@@ -110,8 +115,8 @@ function(generate_code APP)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kernels
         DEPENDS
             ${OPTIONS_FILE_NAME}
-            kernels/generate.py
-            kernels/${APP}.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/kernels/generate.py
+            ${APP_KERNEL_SOURCES}
         OUTPUT
             kernels/${APP}/init.h
             kernels/${APP}/init.cpp
@@ -122,7 +127,7 @@ function(generate_code APP)
             kernels/${APP}/subroutine.cpp
             kernels/${APP}/tensor.h
             kernels/${APP}/tensor.cpp
-        COMMENT "Kernel generation script.")
+        COMMENT "Generating kernels for ${APP}")
     add_library(${APP}-kernels-lib
         kernels/${APP}/init.cpp
         kernels/${APP}/kernel.cpp
