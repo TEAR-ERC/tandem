@@ -49,11 +49,14 @@ public:
     virtual void set_force(volume_functional_t fun) = 0;
     virtual void set_slip(facet_functional_t fun) = 0;
     virtual void set_dirichlet(facet_functional_t fun) = 0;
+    virtual void update_time_step(double) {}
+    virtual double relaxation_time_global() const { return 0.0; }
+    virtual void initialize_strain_tensor() {}
     virtual void update_deviatoric_strain() {}
     virtual void update_partial_strain() {}
     virtual void store_displacement_field(BlockVector const&) {}
-    virtual void compute_deviatoric_strain(double time) {}
-    virtual void compute_partial_strain(double time) {}
+    virtual void compute_deviatoric_strain() {}
+    virtual void compute_partial_strain() {}
     virtual void set_traction_boundary(facet_functional_t fun) {}
     virtual void set_free_slip_boundary(facet_functional_t fun) {}
 
