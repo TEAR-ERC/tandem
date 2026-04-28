@@ -22,11 +22,21 @@ template <typename T>
 struct has_set_traction_boundary<
     T, std::void_t<decltype(std::declval<T>().set_traction_boundary(
            std::declval<typename T::template functional_t<T::NumQuantities>>(),
-           std::declval<std::array<double, 3>>()))>> : std::true_type {};
+           std::declval<std::array<double, DomainDimension>>()))>> : std::true_type {};
+
+template <typename T, typename = void> struct has_set_free_slip_boundary : std::false_type {};
+
+template <typename T>
+struct has_set_free_slip_boundary<
+    T, std::void_t<decltype(std::declval<T>().set_free_slip_boundary(
+           std::declval<typename T::template functional_t<T::ScalarQuantity>>(),
+           std::declval<std::array<double, DomainDimension>>()))>> : std::true_type {};
 
 template <class LocalOperator> class Scenario {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
+    static constexpr std::size_t ScalarQuantity = 1;
+
     using solution_t = std::function<std::array<double, NumQuantities>(Vector<double> const&)>;
     using solution_jacobian_t =
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
@@ -37,6 +47,7 @@ public:
     constexpr static char Force[] = "force";
     constexpr static char Boundary[] = "boundary";
     constexpr static char TractionBoundary[] = "traction_boundary";
+    constexpr static char FreeSlipBoundary[] = "free_slip_boundary";
     constexpr static char Slip[] = "slip";
     constexpr static char Solution[] = "solution";
     constexpr static char SolutionJacobian[] = "solution_jacobian";
@@ -61,6 +72,12 @@ public:
         functional(Boundary, boundary_);
         functional(Slip, slip_);
         functional(TractionBoundary, traction_boundary_);
+        if (lib_.hasMember(scenario, FreeSlipBoundary)) {
+            // free slip is a scalar (1 quantity)
+            free_slip_boundary_ =
+                std::make_optional(lib_.getMemberFunction<DomainDimension, ScalarQuantity>(
+                    scenario, FreeSlipBoundary));
+        }
         if (lib_.hasMember(scenario, Solution)) {
             auto myF = lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, Solution);
             solution_ = [myF](Vector<double> const& v) -> std::array<double, NumQuantities> {
@@ -89,6 +106,7 @@ public:
     auto const& force() const { return force_; }
     auto const& boundary() const { return boundary_; }
     auto const& traction_boundary() const { return traction_boundary_; }
+    auto const& free_slip_boundary() const { return free_slip_boundary_; }
     auto const& slip() const { return slip_; }
     std::unique_ptr<SolutionInterface> solution() const {
         if (solution_) {
@@ -116,6 +134,11 @@ public:
                 lop.set_traction_boundary(*traction_boundary_, ref_normal_);
             }
         }
+        if constexpr (has_set_free_slip_boundary<LocalOperator>::value) {
+            if (free_slip_boundary_) {
+                lop.set_free_slip_boundary(*free_slip_boundary_, ref_normal_);
+            }
+        }
         if (slip_) {
             lop.set_slip(*slip_, ref_normal_);
         }
@@ -129,6 +152,7 @@ protected:
     std::optional<functional_t<NumQuantities>> boundary_ = std::nullopt;
     std::optional<functional_t<NumQuantities>> slip_ = std::nullopt;
     std::optional<functional_t<NumQuantities>> traction_boundary_ = std::nullopt;
+    std::optional<functional_t<ScalarQuantity>> free_slip_boundary_ = std::nullopt;
     std::optional<solution_t> solution_ = std::nullopt;
     std::optional<solution_jacobian_t> solution_jacobian_ = std::nullopt;
 };
