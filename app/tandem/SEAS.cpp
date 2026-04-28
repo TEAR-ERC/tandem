@@ -295,11 +295,10 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     } else if (cfl_time_step) {
         effective_max_dt = *cfl_time_step * cfg.cfl;
     } else if (ve_time_step) {
-
         effective_max_dt = *ve_time_step;
     }
 
-    if (effective_max_dt) {
+    if (cfg.type == LocalOpType::Viscoelasticity && effective_max_dt) {
         ts.set_max_time_step(*effective_max_dt);
     }
 
@@ -342,7 +341,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         if (cfl_time_step) {
             std::cout << "CFL time step: " << *cfl_time_step << std::endl;
         }
-        if (ve_time_step) {
+        if (cfg.type == LocalOpType::Viscoelasticity && ve_time_step) {
             std::cout << "Viscoelastic time step cap: " << *ve_time_step << std::endl;
         }
     }
