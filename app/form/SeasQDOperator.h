@@ -57,6 +57,11 @@ public:
         }
         return std::numeric_limits<double>::max();
     }
+    inline double viscoelastic_theta() const {
+        double theta = dgop_->viscoelastic_theta();
+
+        return theta;
+    }
 
     inline AbstractAdapterOperator& adapter() { return *adapter_; }
     inline AbstractAdapterOperator const& adapter() const { return *adapter_; }
@@ -151,6 +156,7 @@ private:
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;
 
     double last_time_ = 0.0;
+
 protected:
     PetscVector traction_;
 };

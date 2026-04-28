@@ -131,7 +131,7 @@ template <typename T> struct qd_operator_specifics {
     static std::optional<double> cfl_time_step(T const&) { return std::nullopt; }
 
     static std::optional<double> viscoelastic_time_step(T const& seasop) {
-        double ve_dt = seasop.viscoelastic_max_time_step();
+        double ve_dt = seasop.viscoelastic_max_time_step() * seasop.viscoelastic_theta();
         if (ve_dt < std::numeric_limits<double>::max()) {
             return std::make_optional(ve_dt);
         }
@@ -295,6 +295,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     } else if (cfl_time_step) {
         effective_max_dt = *cfl_time_step * cfg.cfl;
     } else if (ve_time_step) {
+
         effective_max_dt = *ve_time_step;
     }
 
