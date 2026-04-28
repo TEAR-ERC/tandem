@@ -99,6 +99,10 @@ public:
             seasop.set_traction_boundary(std::make_unique<FacetFunctionalFactory<Type>>(
                 dg_lop, *scenario->traction_boundary(), ref_normal));
         }
+        if (scenario->free_slip_boundary()) {
+            seasop.set_free_slip_boundary(std::make_unique<ScalarFacetFunctionalFactory<Type>>(
+                dg_lop, *scenario->free_slip_boundary(), ref_normal));
+        }
     }
     void setup_seasop(SeasFDOperator& seasop) override {
         if (scenario->boundary()) {
@@ -108,6 +112,10 @@ public:
         if (scenario->traction_boundary()) {
             seasop.set_traction_boundary(std::make_unique<FacetFunctionalFactory<Type>>(
                 dg_lop, *scenario->traction_boundary(), ref_normal));
+        }
+        if (scenario->free_slip_boundary()) {
+            seasop.set_free_slip_boundary(std::make_unique<ScalarFacetFunctionalFactory<Type>>(
+                dg_lop, *scenario->free_slip_boundary(), ref_normal));
         }
         if (scenario->initial_displacement()) {
             seasop.set_initial_displacement(std::make_unique<VolumeFunctionalFactory<Type>>(
