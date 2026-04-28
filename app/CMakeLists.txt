@@ -205,7 +205,14 @@ set(APP_COMMON_SRCS
     localoperator/ElasticityAdapter.cpp
     localoperator/Poisson.cpp
     localoperator/PoissonAdapter.cpp
-    localoperator/Viscoelasticity.cpp
+    localoperator/Viscoelasticity/init.cpp
+    localoperator/Viscoelasticity/precompute.cpp
+    localoperator/Viscoelasticity/assembly.cpp
+    localoperator/Viscoelasticity/rhs.cpp
+    localoperator/Viscoelasticity/strain.cpp
+    localoperator/Viscoelasticity/stress.cpp
+    localoperator/Viscoelasticity/traction.cpp
+    localoperator/Viscoelasticity/apply.cpp
     localoperator/ViscoelasticityAdapter.cpp
     localoperator/RateAndStateBase.cpp
     pc/lspoly.c
