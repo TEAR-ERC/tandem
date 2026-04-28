@@ -123,6 +123,7 @@ public:
             if constexpr (std::experimental::is_detected_v<theta_t, LocalOperator>) {
                 relaxation_time_global_ *= lop_->theta();
             }
+            lop_->set_viscoelastic_time_step(relaxation_time_global_);
         }
 
         if constexpr (std::experimental::is_detected_v<prepare_volume_t, LocalOperator>) {
@@ -168,6 +169,7 @@ public:
                 lop_->prepare_cfl(elNo, topo_->neighbours(elNo), scratch_);
             }
         }
+        update_time_dependent_precomputation();
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
@@ -187,10 +189,7 @@ public:
     void assemble(BlockMatrix& matrix) override {
         auto bs = lop_->block_size();
 
-        // Update time-dependent precomputation before assembly (viscoelastic only)
-        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
-            lop_->update_time_dependent_precomputation();
-        }
+        // update_time_dependent_precomputation();
 
         auto A_size = LinearAllocator<double>::allocation_size(bs * bs, lop_->alignment());
         auto a_scratch = Scratch<double>(4 * A_size, lop_->alignment());
@@ -473,7 +472,12 @@ public:
 
     void update_time_step(double dt) override {
         if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
-            lop_->set_viscoelastic_time_step(dt);
+            // TODO: Need to modify this to change the viscoelastic time step according to RSF
+            // solver time step.
+            lop_->set_viscoelastic_time_step(relaxation_time_global_);
+            // TODO: keeping this off for now - would need this once R&S friction time stepper is
+            // also needed. Currently only working with meshes without faults.
+            // update_time_dependent_precomputation();
         }
     }
 
@@ -591,6 +595,36 @@ public:
     }
 
 private:
+    void update_time_dependent_precomputation() {
+        if constexpr (std::experimental::is_detected_v<
+                          update_time_dependent_precomputation_volume_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->update_time_dependent_precomputation_volume(elNo);
+            }
+        }
+        if constexpr (std::experimental::is_detected_v<
+                          update_time_dependent_precomputation_skeleton_t, LocalOperator> ||
+                      std::experimental::is_detected_v<
+                          update_time_dependent_precomputation_boundary_t, LocalOperator>) {
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                auto const& info = topo_->info(fctNo);
+                if (info.up[0] != info.up[1]) {
+                    if constexpr (std::experimental::is_detected_v<
+                                      update_time_dependent_precomputation_skeleton_t,
+                                      LocalOperator>) {
+                        lop_->update_time_dependent_precomputation_skeleton(fctNo);
+                    }
+                } else {
+                    if constexpr (std::experimental::is_detected_v<
+                                      update_time_dependent_precomputation_boundary_t,
+                                      LocalOperator>) {
+                        lop_->update_time_dependent_precomputation_boundary(fctNo);
+                    }
+                }
+            }
+        }
+    }
+
     using apply_fun_ptr = void (LocalOperator::*)(
         std::size_t, mneme::span<SideInfo>, Vector<double const> const&,
         std::array<Vector<double const>, NumFacets> const&, Vector<double>&) const;
