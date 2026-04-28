@@ -119,6 +119,7 @@ public:
         if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
             double dt_local = std::numeric_limits<double>::max();
             for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
                 lop_->local_relaxation_time(elNo, dt_local, scratch_);
             }
             MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
