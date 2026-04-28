@@ -182,6 +182,7 @@ public:
                         }
                         if constexpr (std::experimental::is_detected_v<
                                           assemble_boundary_free_slip_t, LocalOperator>) {
+                            auto A00 = scratch_matrix(a_scratch);
                             if (lop_->assemble_boundary_free_slip(fctNo, info, A00, scratch_)) {
                                 matrix.add_block(ib0, ib0, A00);
                             }
