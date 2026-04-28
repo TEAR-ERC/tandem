@@ -13,6 +13,6 @@ cd "$CONFIG_DIR"
 gmsh -3 cantilever_rod.geo
 ${EXECUTABLE_DIR}/app/static cantilever_rod.toml \
 --output ${TEMP_TEST_RESULTS}/cantilever_rod \
---petsc -options_file mg_cheby.cfg
+--petsc -options_file mg_cheby.cfg >> ${TEMP_TEST_RESULTS}/traction_bc.log
 
 rm cantilever_rod.msh
