@@ -61,6 +61,30 @@ public:
                                        bool state_changed_since_last_rhs, bool require_traction,
                                        bool require_displacement);
 
+    /**
+     * @brief Rotate viscoelastic history buffers before a timestep.
+     *
+     * This is called via TSSetPreStep and performs:
+     *   1. update_deviatoric_strain (rotate _new -> _old)
+     *   2. update_partial_strain (rotate _new -> _old)
+     *
+     * For non-viscoelastic operators, these are no-ops.
+     */
+    void pre_step_update_strain_history();
+
+    /**
+     * @brief Compute viscoelastic strain history after an accepted timestep.
+     *
+     * This must be called ONCE per accepted timestep (via TSSetPostStep callback),
+     * not during individual RK stages. It performs:
+     *   1. store_displacement_field
+     *   2. compute_deviatoric_strain
+     *   3. compute_partial_strain
+     *
+     * For non-viscoelastic operators, these are no-ops.
+     */
+    void post_step_compute_strain_history(double time);
+
     inline auto displacement(std::vector<std::size_t> const& subset) const {
         return dgop_->solution(linear_solver_.x(), subset);
     }
@@ -109,6 +133,7 @@ private:
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_traction_boundary_ = nullptr;
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;
 
+    double last_time_ = 0.0;
 protected:
     PetscVector traction_;
 };
