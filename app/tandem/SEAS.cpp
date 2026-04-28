@@ -312,6 +312,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     case LocalOpType::Elasticity:
         ctx = detail::make_context<Elasticity>(mesh, cfg);
         break;
+    case LocalOpType::Viscoelasticity:
+        ctx = detail::make_context<Viscoelasticity>(mesh, cfg);
+        break;
     default:
         throw std::runtime_error("Unknown seas type");
         break;

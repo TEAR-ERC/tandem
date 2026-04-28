@@ -9,7 +9,7 @@ enum class SeasMode {
     QuasiDynamicDiscreteGreen = 2,
     FullyDynamic = 3
 };
-enum class LocalOpType { Unknown = 0, Poisson = 1, Elasticity = 2 };
+enum class LocalOpType { Unknown = 0, Poisson = 1, Elasticity = 2, Viscoelasticity = 3 };
 
 } // namespace tndm
 

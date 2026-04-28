@@ -173,6 +173,8 @@ void setConfigSchema(TableSchema<Config>& schema,
                 return LocalOpType::Poisson;
             } else if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
                 return LocalOpType::Elasticity;
+            } else if (iEquals(value, "viscoelastic") || iEquals(value, "viscoelasticity")) {
+                return LocalOpType::Viscoelasticity;
             } else {
                 return LocalOpType::Unknown;
             }
@@ -196,7 +198,8 @@ void setConfigSchema(TableSchema<Config>& schema,
         .help("Define reference normal vector.");
     schema.add_value("boundary_linear", &Config::boundary_linear)
         .default_value(false)
-        .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
+        .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) "
+              "t).");
 
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
