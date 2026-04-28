@@ -49,6 +49,7 @@ public:
     virtual void set_force(volume_functional_t fun) = 0;
     virtual void set_slip(facet_functional_t fun) = 0;
     virtual void set_dirichlet(facet_functional_t fun) = 0;
+    virtual void set_traction_boundary(facet_functional_t fun) {}
 };
 
 } // namespace tndm
