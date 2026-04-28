@@ -69,6 +69,9 @@ public:
     template <class T> using rhs_history_boundary_t = decltype(&T::rhs_history_boundary);
     template <class T>
     using rhs_history_boundary_free_slip_t = decltype(&T::rhs_history_boundary_for_free_slip);
+    template <class T>
+    using update_time_dependent_precomputation_t =
+        decltype(&T::update_time_dependent_precomputation);
 
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
