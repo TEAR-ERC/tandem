@@ -63,6 +63,7 @@ public:
     template <class T> using local_relaxation_time_t = decltype(&T::local_relaxation_time);
     template <class T>
     using set_relaxation_time_global_t = decltype(&T::set_relaxation_time_global);
+    template <class T> using has_theta_t = decltype(&T::viscoelastic_theta);
     template <class T> using update_strain_t = decltype(&T::update_deviatoric_strain_q);
     template <class T>
     using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
@@ -486,6 +487,14 @@ public:
     }
 
     double relaxation_time_global() const override { return relaxation_time_global_; }
+
+    double viscoelastic_theta() const override {
+        if constexpr (std::experimental::is_detected_v<has_theta_t, LocalOperator>) {
+            return lop_->viscoelastic_theta();
+        } else {
+            return 0.0;
+        }
+    }
 
     void update_deviatoric_strain() override {
         if constexpr (std::experimental::is_detected_v<update_strain_t, LocalOperator>) {

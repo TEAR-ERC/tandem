@@ -124,7 +124,6 @@ public:
                        LinearAllocator<double>& scratch) const;
 
     inline double cfl_time_step(std::size_t elNo) const { return cfl_dt_[elNo]; }
-    inline double theta() const { return theta_; }
 
     FiniteElementFunction<DomainDimension> solution_prototype(std::size_t numLocalElements) const {
         auto names = std::vector<std::string>(NumQuantities);
@@ -181,6 +180,7 @@ public:
     void set_free_slip_boundary(facet_functional_t fun) { fun_free_slip = std::move(fun); }
 
     inline double relaxation_time_global() const { return relaxation_time_global_; }
+    inline double viscoelastic_theta() const { return theta_; }
     void set_relaxation_time_global(double relaxation_time) {
         relaxation_time_global_ = relaxation_time;
     }

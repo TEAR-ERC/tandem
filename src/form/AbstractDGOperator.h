@@ -51,6 +51,7 @@ public:
     virtual void set_dirichlet(facet_functional_t fun) = 0;
     virtual void update_time_step(double) {}
     virtual double relaxation_time_global() const { return 0.0; }
+    virtual double viscoelastic_theta() const { return 0.0; }
     virtual void initialize_strain_tensor() {}
     virtual void update_deviatoric_strain() {}
     virtual void update_partial_strain() {}
@@ -62,7 +63,7 @@ public:
 
     // Stress field computation for VTU output (viscoelasticity only)
     virtual void compute_stress_field() {}
-    virtual auto stress_solution(std::vector<std::size_t> const& subset) 
+    virtual auto stress_solution(std::vector<std::size_t> const& subset)
         -> std::optional<FiniteElementFunction<D>> {
         return std::nullopt;
     }
