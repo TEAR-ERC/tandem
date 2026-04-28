@@ -94,7 +94,7 @@ g(Δt) = (τ/Δt)(1 − exp(−Δt/τ)) = (1 − exp(−r))/r,  r = Δt/τ
 
 Uses expm1 for stable evaluation when r is small.
 */
-double Viscoelasticity::compute_g_dt(double dt, double tau, int) const {
+double Viscoelasticity::compute_g_dt(double dt, double tau, int n) const {
     if (dt <= 0.0 || tau <= 0.0) {
         return 0.0;
     }
