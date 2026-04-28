@@ -31,17 +31,15 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
     friction_->pre_init(state);
 
     update_ghost_state(state);
+    // For viscoelastic operators, initialize time-dependent coefficients.
+    // We use a small initial dt to avoid divide-by-zero in g_dt computation.
+    dgop_->update_time_step(1e-12);
+    pre_step_update_strain_history();
+
     solve(0.0, make_state_view(state));
     update_traction(make_state_view(state));
-
-    // Update VE strain history (no-op for non-VE operators).
-    // Must happen after solve() and before the next rhs() call.
-    // TODO: Stress output must be triggered before this block.
-    dgop_->store_displacement_field(linear_solver_.x());
-    dgop_->compute_deviatoric_strain(0.0);
-    dgop_->compute_partial_strain(0.0);
-    dgop_->update_deviatoric_strain();
-
+    post_step_compute_strain_history(0.0);
+    last_time_ = 0.0;
     friction_->init(0.0, traction_, state);
 }
 
@@ -67,13 +65,48 @@ void SeasQDOperator::update_internal_state(double time, BlockVector const& state
         update_traction(make_state_view(state));
     }
 
-    // Update VE strain history (no-op for non-VE operators).
-    // Must happen after solve() and before the next rhs() call.
-    // TODO: Stress output must be triggered before this block.
-    dgop_->store_displacement_field(linear_solver_.x());
-    dgop_->compute_deviatoric_strain(time);
-    dgop_->compute_partial_strain(time);
+    // For stress output: store displacement and compute current strain state
+    // This is needed before stress_volume() can read the correct values.
+    // Note: The PostStep callback will also call update_strain_history() which
+    // does similar work, but the Monitor callback runs first.
+    if (require_displacement) {
+        // Update time-dependent coefficients (g_dt, ratio) for partial strain computation
+        double dt = time - last_time_;
+        if (dt > 0.0) {
+            dgop_->update_time_step(dt);
+        }
+    }
+}
+
+void SeasQDOperator::pre_step_update_strain_history() {
+    // Pre-step: rotate history buffers so RHS reads consistent "_old" values.
     dgop_->update_deviatoric_strain();
+    dgop_->update_partial_strain();
+}
+
+void SeasQDOperator::post_step_compute_strain_history(double time) {
+    // Update viscoelastic strain history after an accepted timestep.
+    // For non-VE operators, these are no-ops.
+
+    // The post-step sequence is:
+    //   1. Compute dt and update time-dependent coefficients (g_dt, ratio)
+    //   2. store_displacement_field: save current displacement for next compute
+    //   3. compute_deviatoric_strain: compute new deviatoric strain from displacement
+    //   4. compute_partial_strain: integrate partial strain (VE memory variable)
+    // Rotation old <= new is handled in pre_step_update_strain_history() before the next RHS call.
+
+    // Calculate and set the actual dt for this timestep
+    double dt = time - last_time_;
+    if (dt < 0.0)
+        dt = 0.0;
+    if (dt > 0.0) {
+        dgop_->update_time_step(dt);
+    }
+    last_time_ = time;
+
+    dgop_->store_displacement_field(linear_solver_.x());
+    dgop_->compute_deviatoric_strain();
+    dgop_->compute_partial_strain();
 }
 
 void SeasQDOperator::solve(double time, BlockView const& state_view) {

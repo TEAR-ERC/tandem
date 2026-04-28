@@ -109,6 +109,44 @@ public:
         CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, &monitor, nullptr));
     }
 
+    /**
+     * @brief Set a pre-step callback that runs before each timestep.
+     *
+     * The PreStepHandler must implement:
+     *   void pre_step(double time, PetscVectorView const& state0, ...);
+     */
+    template <class PreStepHandler> void set_pre_step(PreStepHandler& handler) {
+        // Store handler pointer via PETSc object composition
+        PetscContainer container;
+        CHKERRTHROW(PetscContainerCreate(comm, &container));
+        CHKERRTHROW(PetscContainerSetPointer(container, &handler));
+        CHKERRTHROW(PetscObjectCompose((PetscObject)ts_, "_PreStepHandler", (PetscObject)container));
+        CHKERRTHROW(PetscObjectDereference((PetscObject)container));
+
+        CHKERRTHROW(TSSetPreStep(ts_, &PreStepFunction<PreStepHandler>));
+    }
+
+    /**
+     * @brief Set a post-step callback that runs after each accepted timestep.
+     *
+     * The PostStepHandler must implement:
+     *   void post_step(double time, PetscVectorView const& state0, ...);
+     *
+     * This is called ONCE per accepted timestep, after all RK stages complete.
+     * Use this for updating internal state variables like strain history.
+     */
+    template <class PostStepHandler> void set_post_step(PostStepHandler& handler) {
+        // Store handler pointer via PETSc object composition
+        PetscContainer container;
+        CHKERRTHROW(PetscContainerCreate(comm, &container));
+        CHKERRTHROW(PetscContainerSetPointer(container, &handler));
+        CHKERRTHROW(
+            PetscObjectCompose((PetscObject)ts_, "_PostStepHandler", (PetscObject)container));
+        CHKERRTHROW(PetscObjectDereference((PetscObject)container));
+
+        CHKERRTHROW(TSSetPostStep(ts_, &PostStepFunction<PostStepHandler>));
+    }
+
 private:
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
@@ -144,6 +182,66 @@ private:
             x);
 
         std::apply([&self, &time](auto&... xv) { self->monitor(time, xv...); }, x_view);
+        return 0;
+    }
+
+    template <class PreStepHandler>
+    static PetscErrorCode PreStepFunction(TS ts) {
+        // Retrieve handler from PETSc object composition
+        PetscContainer container;
+        CHKERRTHROW(PetscObjectQuery((PetscObject)ts, "_PreStepHandler", (PetscObject*)&container));
+
+        PreStepHandler* handler;
+        CHKERRTHROW(PetscContainerGetPointer(container, (void**)&handler));
+
+        // Get current time and solution
+        PetscReal time;
+        Vec u;
+        CHKERRTHROW(TSGetTime(ts, &time));
+        CHKERRTHROW(TSGetSolution(ts, &u));
+
+        // Extract state vectors and invoke handler
+        std::array<Vec, NumStateVecs> x;
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
+        }
+        auto x_view = std::apply(
+            [](auto&... x) -> std::array<PetscVectorView, NumStateVecs> {
+                return {PetscVectorView(x)...};
+            },
+            x);
+
+        std::apply([&handler, &time](auto&... xv) { handler->pre_step(time, xv...); }, x_view);
+        return 0;
+    }
+
+    template <class PostStepHandler>
+    static PetscErrorCode PostStepFunction(TS ts) {
+        // Retrieve handler from PETSc object composition
+        PetscContainer container;
+        CHKERRTHROW(PetscObjectQuery((PetscObject)ts, "_PostStepHandler", (PetscObject*)&container));
+
+        PostStepHandler* handler;
+        CHKERRTHROW(PetscContainerGetPointer(container, (void**)&handler));
+
+        // Get current time and solution
+        PetscReal time;
+        Vec u;
+        CHKERRTHROW(TSGetTime(ts, &time));
+        CHKERRTHROW(TSGetSolution(ts, &u));
+
+        // Extract state vectors and invoke handler
+        std::array<Vec, NumStateVecs> x;
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
+        }
+        auto x_view = std::apply(
+            [](auto&... x) -> std::array<PetscVectorView, NumStateVecs> {
+                return {PetscVectorView(x)...};
+            },
+            x);
+
+        std::apply([&handler, &time](auto&... xv) { handler->post_step(time, xv...); }, x_view);
         return 0;
     }
 
