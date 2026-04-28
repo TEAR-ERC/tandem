@@ -89,7 +89,12 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     def traction(x, normal):
         return lam_q[x]['q'] * Dx_q[x]['lsq'] * u[x]['ls'] * normal['pq'] + mu_q[x]['q'] * \
                 (Dx_q[x]['ljq'] * u[x]['lp'] * normal['jq'] + Dx_q[x]['lpq'] * u[x]['lj'] * normal['jq'])
-
+    
+    def normalStressTest(x):
+        return (lam_q[x]["q"] * Dx_q[x]["ksq"] * n_unit_q["sq"] * n_unit_q["pq"]
+            + mu_q[x]["q"] * (Dx_q[x]["kpq"] 
+            + Dx_q[x]["kjq"] * n_unit_q["jq"] * n_unit_q["pq"]))
+    
     def tractionTest(x, utilde):
         return lam_q[x]['q'] * Dx_q[x]['kpq'] * utilde['iq'] * n_q['iq'] + mu_q[x]['q'] * \
                 (Dx_q[x]['kjq'] * utilde['pq'] * n_q['jq'] + Dx_q[x]['kiq'] * utilde['iq'] * n_q['pq'])
@@ -143,9 +148,44 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
             c0[x] * E_q[x]['kq'] * w['q'] * traction_op_q[y]['lupq'] + \
             c1[y] * E_q[y]['lq'] * w['q'] * traction_op_q[x]['kpuq'] + \
             c2[abs(y-x)] * w['q'] * E_q[x]['kq'] * L_q[y]['lpuq']
+    g_q = Tensor("g_q", (nq,))
 
+    def assembleSurfaceFreeSlip(x, y):
+        return a[x][y]["kplu"] <= (
+            # Consistency: - (v . n) * sigma_nn(u)
+            # traction_op_q is the Traction Vector (Force density = Stress * Area) because it uses n_q (scaled).
+            # We project it onto the UNIT normal to get Normal Force Density.
+            # v . n_unit is the normal component of displacement.
+            # Product: (v_n) * (sigma_nn * Area) 
+            c0[x]
+            * w["q"]
+            * (E_q[x]["kq"] * n_unit_q["pq"])
+            * (traction_op_q[y]["lusq"] * n_unit_q["sq"])
+            # Symmetry: - (u . n) * sigma_nn(v)
+            # u . n_unit -> u_n
+            # normalStressTest -> sigma_nn (Physical Stress, Scale 1)
+            # We need explicit Area scaling (nl_q) because normalStressTest is unscaled.
+            + c1[y]
+            * w["q"]
+            * normalStressTest(x)
+            * (E_q[y]["lq"] * n_unit_q["uq"])
+            * nl_q["q"]
+            # Penalty: + gamma * (u . n) * (v . n)
+            # We project both onto unit normals.
+            # L_q contains nl_q (Area scaling).
+            # L_q[y] = Basis * nl_q.
+            # Product: (v_unit) * (u_unit * nl_q) -> Correct Area scaling.
+            + c2[abs(y - x)]
+            * w["q"]
+            * (E_q[x]["kq"] * n_unit_q["pq"])  # v . n
+            * (L_q[y]["lsuq"] * n_unit_q["sq"])  # (Lift . n)
+        )
+    
     generator.addFamily('assembleTractionOp', simpleParameterSpace(2), assembleTractionOp)
     generator.addFamily('assembleSurface', simpleParameterSpace(2, 2), assembleSurface)
+    generator.addFamily(
+        "assembleSurfaceFreeSlip", simpleParameterSpace(2, 2), assembleSurfaceFreeSlip
+    )
 
     # Right-hand side
 
@@ -182,6 +222,28 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
         [
             b["kp"]
             <= b["kp"] + w["q"] * E_q[0]["kq"] * traction_component["pq"] * nl_q["q"]
+        ],
+    )
+
+    g_q = Tensor("g_q", (nq,))
+    generator.add(
+        "rhsFreeSlip",
+        [
+            # Compute derivatives needed for normalStressTest
+            Dx_q[0]["kiq"] <= g[0]["eiq"] * Dxi_q[0]["keq"],
+            b["kp"]
+            <= (
+                b["kp"]
+                # Symmetry term: g * sigma_nn(v) * Area
+                + c1[0] * w["q"] * g_q["q"] * normalStressTest(0) * nl_q["q"]
+                # Penalty term: g * (v . n) * Area (via Lift/Penalty param)
+                # n_unit for projection, nl_q for area.
+                + c2[0]
+                * w["q"]
+                * (E_q[0]["kq"] * n_unit_q["pq"])  # v . n_unit
+                * g_q["q"]  # g
+                * nl_q["q"]  # Area scaling
+            ),
         ],
     )
     # matrix-free
