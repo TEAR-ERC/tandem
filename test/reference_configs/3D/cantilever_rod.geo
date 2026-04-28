@@ -1,7 +1,7 @@
 // Cantilever rod example 
 // A 30mm x 30mm x 100mm rod
 
-h_min = 0.000001;   // 1.0 mm 
+h_min = 0.000008;   // 1.0 mm 
 h_max = 0.00001;     // 10.0 mm
 L = 0.0001;          // 100 mm 
 W = 0.00003;         // 30 mm 
