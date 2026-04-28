@@ -63,15 +63,25 @@ public:
     using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
     template <class T> using compute_partial_strain_Q_t = decltype(&T::compute_partial_strain_Q);
     template <class T> using store_displacement_field_t = decltype(&T::store_displacement_field);
-    template <class T> using compute_sigma_hat_n_t = decltype(&T::compute_sigma_hat_n_facets);
     template <class T> using rhs_history_volume_t = decltype(&T::rhs_history_volume);
     template <class T> using rhs_history_skeleton_t = decltype(&T::rhs_history_skeleton);
     template <class T> using rhs_history_boundary_t = decltype(&T::rhs_history_boundary);
     template <class T>
     using rhs_history_boundary_free_slip_t = decltype(&T::rhs_history_boundary_for_free_slip);
     template <class T>
-    using update_time_dependent_precomputation_t =
-        decltype(&T::update_time_dependent_precomputation);
+    using update_time_dependent_precomputation_volume_t =
+        decltype(&T::update_time_dependent_precomputation_volume);
+    template <class T>
+    using update_time_dependent_precomputation_skeleton_t =
+        decltype(&T::update_time_dependent_precomputation_skeleton);
+    template <class T>
+    using update_time_dependent_precomputation_boundary_t =
+        decltype(&T::update_time_dependent_precomputation_boundary);
+
+    // Stress output methods
+    template <class T> using compute_stress_field_t = decltype(&T::compute_stress_field);
+    template <class T> using stress_prototype_t = decltype(&T::stress_prototype);
+    template <class T> using stress_volume_t = decltype(&T::stress_volume);
 
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
