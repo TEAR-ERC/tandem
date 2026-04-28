@@ -28,6 +28,14 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
     solve(0.0, make_state_view(state));
     update_traction(make_state_view(state));
 
+    // Update VE strain history (no-op for non-VE operators).
+    // Must happen after solve() and before the next rhs() call.
+    // TODO: Stress output must be triggered before this block.
+    dgop_->store_displacement_field(linear_solver_.x());
+    dgop_->compute_deviatoric_strain(0.0);
+    dgop_->compute_partial_strain(0.0);
+    dgop_->update_deviatoric_strain();
+
     friction_->init(0.0, traction_, state);
 }
 void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
@@ -57,6 +65,14 @@ void SeasQDOperator::update_internal_state(double time, BlockVector const& state
     if (require_traction) {
         update_traction(make_state_view(state));
     }
+
+    // Update VE strain history (no-op for non-VE operators).
+    // Must happen after solve() and before the next rhs() call.
+    // TODO: Stress output must be triggered before this block.
+    dgop_->store_displacement_field(linear_solver_.x());
+    dgop_->compute_deviatoric_strain(time);
+    dgop_->compute_partial_strain(time);
+    dgop_->update_deviatoric_strain();
 }
 
 void SeasQDOperator::solve(double time, BlockView const& state_view) {
