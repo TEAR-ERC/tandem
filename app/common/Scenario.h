@@ -19,8 +19,10 @@ namespace tndm {
 template <typename T, typename = void> struct has_set_traction_boundary : std::false_type {};
 
 template <typename T>
-struct has_set_traction_boundary<T, std::void_t<decltype(&T::set_traction_boundary)>>
-    : std::true_type {};
+struct has_set_traction_boundary<
+    T, std::void_t<decltype(std::declval<T>().set_traction_boundary(
+           std::declval<typename T::template functional_t<T::NumQuantities>>(),
+           std::declval<std::array<double, 3>>()))>> : std::true_type {};
 
 template <class LocalOperator> class Scenario {
 public:
