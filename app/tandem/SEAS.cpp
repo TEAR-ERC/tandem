@@ -17,6 +17,7 @@
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
+#include "localoperator/Viscoelasticity/Viscoelasticity.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "tandem/Context.h"
 #include "tandem/ContextBase.h"
@@ -129,6 +130,14 @@ template <typename T> struct qd_operator_specifics {
 
     static std::optional<double> cfl_time_step(T const&) { return std::nullopt; }
 
+    static std::optional<double> viscoelastic_time_step(T const& seasop) {
+        double ve_dt = seasop.viscoelastic_max_time_step();
+        if (ve_dt < std::numeric_limits<double>::max()) {
+            return std::make_optional(ve_dt);
+        }
+        return std::nullopt;
+    }
+
     template <typename TimeSolver>
     static auto displacement(double time, TimeSolver const& ts, T& seasop) {
         seasop.update_internal_state(time, ts.state(0), true, false, true);
@@ -187,6 +196,10 @@ template <> struct operator_specifics<SeasFDOperator> {
         return std::make_optional(seasop.cfl_time_step());
     }
 
+    static std::optional<double> viscoelastic_time_step(SeasFDOperator const&) {
+        return std::nullopt;
+    }
+
     template <typename TimeSolver>
     static auto displacement(double, TimeSolver const& ts, SeasFDOperator& seasop) {
         return seasop.domain_function(ts.state(1));
@@ -212,8 +225,23 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         make_state_vecs(seasop->block_sizes(), seasop->num_local_elements(), seasop->comm()), cfg);
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
-    if (cfl_time_step) {
-        ts.set_max_time_step(*cfl_time_step * cfg.cfl);
+    auto ve_time_step = operator_specifics<seas_t>::viscoelastic_time_step(*seasop);
+
+    // Determine the effective maximum time step:
+    // - If both CFL and viscoelastic caps exist, take the minimum
+    // - If only one exists, use that
+    // - If neither exists, don't cap the time step
+    std::optional<double> effective_max_dt = std::nullopt;
+    if (cfl_time_step && ve_time_step) {
+        effective_max_dt = std::min(*cfl_time_step * cfg.cfl, *ve_time_step);
+    } else if (cfl_time_step) {
+        effective_max_dt = *cfl_time_step * cfg.cfl;
+    } else if (ve_time_step) {
+        effective_max_dt = *ve_time_step;
+    }
+
+    if (effective_max_dt) {
+        ts.set_max_time_step(*effective_max_dt);
     }
 
     auto monitor =
@@ -245,6 +273,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         std::cout << "Mesh size: " << mesh_size << std::endl;
         if (cfl_time_step) {
             std::cout << "CFL time step: " << *cfl_time_step << std::endl;
+        }
+        if (ve_time_step) {
+            std::cout << "Viscoelastic time step cap: " << *ve_time_step << std::endl;
         }
     }
 

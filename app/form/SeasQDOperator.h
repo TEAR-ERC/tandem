@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -47,6 +48,15 @@ public:
         return {friction_->num_local_elements()};
     }
     inline MPI_Comm comm() const { return dgop_->topo().comm(); }
+
+    inline double viscoelastic_max_time_step() const {
+        double tau = dgop_->relaxation_time_global();
+        if (tau > 0.0) {
+            // Cap time step at theta * tau_global (theta is built into the operator)
+            return tau;
+        }
+        return std::numeric_limits<double>::max();
+    }
 
     inline AbstractAdapterOperator& adapter() { return *adapter_; }
     inline AbstractAdapterOperator const& adapter() const { return *adapter_; }
