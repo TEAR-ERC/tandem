@@ -39,6 +39,14 @@ template <> struct make_lop<Elasticity> {
                                             scenario.rho(), DGMethod::IP);
     }
 };
+template <> struct make_lop<Viscoelasticity> {
+    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                   SeasScenario<Viscoelasticity> const& scenario) {
+        return std::make_shared<Viscoelasticity>(
+            std::move(cl), scenario.lam(), scenario.mu0(), scenario.mu1(), scenario.viscosity(),
+            scenario.relaxation_time(), scenario.theta(), scenario.rho(), DGMethod::IP);
+    }
+};
 
 } // namespace tndm::seas::detail
 
