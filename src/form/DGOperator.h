@@ -18,7 +18,9 @@
 
 #include <cassert>
 #include <experimental/type_traits>
+#include <limits>
 #include <memory>
+#include <mpi.h>
 #include <utility>
 
 namespace tndm {
@@ -124,6 +126,27 @@ public:
                 scratch_.reset();
                 lop_->prepare_cfl(elNo, topo_->neighbours(elNo), scratch_);
             }
+        }
+
+        if constexpr (std::experimental::is_detected_v<initialize_strain_tensor_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->initialize_strain_tensor_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                lop_->initialize_strain_tensor_q(fctNo);
+            }
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->initialize_displacement_field(elNo);
+            }
+        }
+        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
+            double dt_local = std::numeric_limits<double>::max();
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
+                lop_->local_relaxation_time(elNo, dt_local, scratch_);
+            }
+            MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
+                          MPI_COMM_WORLD);
         }
     }
 
@@ -237,12 +260,24 @@ public:
                 scratch_.reset();
                 auto B0 = access_handle.subtensor(slice{}, elNo);
                 lop_->rhs_volume(elNo, B0, scratch_);
+                if constexpr (std::experimental::is_detected_v<rhs_history_volume_t,
+                                                               LocalOperator>) {
+                    lop_->rhs_history_volume(elNo, B0, scratch_);
+                }
             }
         }
         if constexpr (std::experimental::is_detected_v<rhs_skeleton_t, LocalOperator> ||
                       std::experimental::is_detected_v<rhs_boundary_t, LocalOperator> ||
                       std::experimental::is_detected_v<rhs_traction_boundary_t, LocalOperator> ||
-                      std::experimental::is_detected_v<rhs_free_slip_boundary_t, LocalOperator>) {
+                      std::experimental::is_detected_v<rhs_free_slip_boundary_t, LocalOperator> ||
+                      std::experimental::is_detected_v<rhs_history_skeleton_t, LocalOperator> ||
+                      std::experimental::is_detected_v<rhs_history_boundary_t, LocalOperator> ||
+                      std::experimental::is_detected_v<rhs_history_boundary_free_slip_t,
+                                                       LocalOperator> ||
+                      std::experimental::is_detected_v<compute_sigma_hat_n_t, LocalOperator>) {
+            if constexpr (std::experimental::is_detected_v<compute_sigma_hat_n_t, LocalOperator>) {
+                lop_->compute_sigma_hat_n_facets();
+            }
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
                 a_scratch.reset();
@@ -255,10 +290,23 @@ public:
                     auto B1 =
                         info.inside[1] ? access_handle.subtensor(slice{}, ib1) : sv(a_scratch);
                     lop_->rhs_skeleton(fctNo, info, B0, B1, scratch_);
+                    if constexpr (std::experimental::is_detected_v<rhs_history_skeleton_t,
+                                                                   LocalOperator>) {
+                        lop_->rhs_history_skeleton(fctNo, info, B0, B1, scratch_);
+                    }
                 } else {
                     if (info.inside[0]) {
                         auto B0 = access_handle.subtensor(slice{}, ib0);
                         lop_->rhs_boundary(fctNo, info, B0, scratch_);
+
+                        if constexpr (std::experimental::is_detected_v<rhs_history_boundary_t,
+                                                                       LocalOperator>) {
+                            lop_->rhs_history_boundary(fctNo, info, B0, scratch_);
+                        }
+                        if constexpr (std::experimental::is_detected_v<
+                                          rhs_history_boundary_free_slip_t, LocalOperator>) {
+                            lop_->rhs_history_boundary_for_free_slip(fctNo, info, B0, scratch_);
+                        }
 
                         if constexpr (std::experimental::is_detected_v<rhs_traction_boundary_t,
                                                                        LocalOperator>) {
@@ -400,6 +448,65 @@ public:
     }
     void set_dirichlet(typename base::facet_functional_t fun) override {
         lop_->set_dirichlet(std::move(fun));
+    }
+
+    void update_deviatoric_strain() override {
+        if constexpr (std::experimental::is_detected_v<update_strain_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->update_deviatoric_strain_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                lop_->update_deviatoric_strain_q(fctNo);
+            }
+        }
+    }
+
+    void update_partial_strain() override {
+        if constexpr (std::experimental::is_detected_v<update_strain_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->update_partial_strain_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                lop_->update_partial_strain_q(fctNo);
+            }
+        }
+    }
+
+    void compute_deviatoric_strain(double time) override {
+        if constexpr (std::experimental::is_detected_v<compute_deviatoric_strain_Q_t,
+                                                       LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->compute_deviatoric_strain_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                auto const& info = topo_->info(fctNo);
+                lop_->compute_deviatoric_strain_q(fctNo, info);
+            }
+        }
+    }
+
+    void compute_partial_strain(double time) override {
+        if constexpr (std::experimental::is_detected_v<compute_partial_strain_Q_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->compute_partial_strain_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                auto const& info = topo_->info(fctNo);
+                lop_->compute_partial_strain_q(fctNo, info);
+            }
+        }
+    }
+
+    void store_displacement_field(BlockVector const& U) override {
+        if constexpr (std::experimental::is_detected_v<store_displacement_field_t, LocalOperator>) {
+            scatter_.begin_scatter(U, ghost_);
+            scatter_.wait_scatter();
+            auto block_view = LocalGhostCompositeView(U, ghost_);
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                auto u_block = block_view.get_block(elNo);
+                lop_->store_displacement_field(elNo, u_block.data());
+            }
+        }
     }
     void set_traction_boundary(typename base::facet_functional_t fun) override {
         if constexpr (std::experimental::is_detected_v<has_set_traction_boundary_t,
