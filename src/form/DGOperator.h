@@ -51,6 +51,22 @@ public:
     template <class T> using rhs_free_slip_boundary_t = decltype(&T::rhs_free_slip_boundary);
     template <class T> using has_set_free_slip_boundary_t = decltype(&T::set_free_slip_boundary);
 
+    // Viscoelastic operators may have additional methods related to the deviatoric strain, which
+    // are detected via SFINAE and called from the time solver if they exist.
+    template <class T> using initialize_strain_tensor_t = decltype(&T::initialize_strain_tensor_Q);
+    template <class T> using local_relaxation_time_t = decltype(&T::local_relaxation_time);
+    template <class T> using update_strain_t = decltype(&T::update_deviatoric_strain_q);
+    template <class T>
+    using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
+    template <class T> using compute_partial_strain_Q_t = decltype(&T::compute_partial_strain_Q);
+    template <class T> using store_displacement_field_t = decltype(&T::store_displacement_field);
+    template <class T> using compute_sigma_hat_n_t = decltype(&T::compute_sigma_hat_n_facets);
+    template <class T> using rhs_history_volume_t = decltype(&T::rhs_history_volume);
+    template <class T> using rhs_history_skeleton_t = decltype(&T::rhs_history_skeleton);
+    template <class T> using rhs_history_boundary_t = decltype(&T::rhs_history_boundary);
+    template <class T>
+    using rhs_history_boundary_free_slip_t = decltype(&T::rhs_history_boundary_for_free_slip);
+
     template <class T> using rhs_volume_post_skeleton_t = decltype(&T::rhs_volume_post_skeleton);
     template <class T> using apply_t = decltype(&T::apply);
     template <class T> using flops_apply_t = decltype(&T::flops_apply);
@@ -443,6 +459,7 @@ private:
     Scratch<double> scratch_;
     Scatter scatter_;
     SparseBlockVector<double> ghost_;
+    double relaxation_time_global_ = 0.0;
 };
 
 } // namespace tndm
