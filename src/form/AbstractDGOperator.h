@@ -56,6 +56,17 @@ public:
     virtual void compute_partial_strain(double time) {}
     virtual void set_traction_boundary(facet_functional_t fun) {}
     virtual void set_free_slip_boundary(facet_functional_t fun) {}
+
+    // Stress field computation for VTU output (viscoelasticity only)
+    virtual void compute_stress_field() {}
+    virtual auto stress_solution(std::vector<std::size_t> const& subset) 
+        -> std::optional<FiniteElementFunction<D>> {
+        return std::nullopt;
+    }
+    virtual auto stress_solution(std::optional<Range<std::size_t>> range = std::nullopt)
+        -> std::optional<FiniteElementFunction<D>> {
+        return std::nullopt;
+    }
 };
 
 } // namespace tndm

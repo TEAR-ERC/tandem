@@ -1,5 +1,7 @@
 #include "Monitor.h"
 
+#include <array>
+
 namespace tndm::seas {
 
 double Monitor::reduce_VMax(double VMax_local, MPI_Comm comm) {
@@ -22,12 +24,17 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
         bool require_traction = false;
         bool require_displacement = false;
+        bool require_stress = false;
         for (auto const& writer : writers_) {
             if (writer->is_write_required(time, VMax)) {
                 require_traction = require_traction || writer->level() == DataLevel::Boundary;
                 require_displacement = require_displacement || writer->level() == DataLevel::Volume;
+                require_stress = require_stress || writer->level() == DataLevel::Stress ||
+                                 writer->include_stress();
             }
         }
+        // Stress requires displacement to be updated first
+        require_displacement = require_displacement || require_stress;
         seasop_->update_internal_state(time, state, !fsal_, require_traction, require_displacement);
 
         for (auto const& writer : writers_) {
@@ -43,6 +50,17 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                 }
                 case DataLevel::Volume: {
                     auto data = volume_data(writer->subset());
+                    if (writer->include_stress()) {
+                        auto stressDataOpt = stress_data(writer->subset());
+                        if (stressDataOpt) {
+                            auto combinedData =
+                                std::array<FiniteElementFunction<DomainDimension>, 2>{
+                                    std::move(data), std::move(*stressDataOpt)};
+                            writer->write(time,
+                                          mneme::span(combinedData.data(), combinedData.size()));
+                            break;
+                        }
+                    }
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }
@@ -51,6 +69,17 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     auto const& moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
 #endif
+                    break;
+                }
+                case DataLevel::Stress: {
+                    auto data_opt = stress_data(writer->subset());
+                    if (data_opt) {
+                        auto& data = *data_opt;
+                        writer->write(time, mneme::span(&data, 1));
+                    } else {
+                        // Do nothing
+                        // TODO: Decide on a warning
+                    }
                     break;
                 }
                 };
@@ -83,6 +112,10 @@ void MonitorQD::write_static() {
 #endif
             break;
         }
+        case DataLevel::Stress:
+            // Do nothing
+            // TODO: Decide on a warning
+            break;
         };
     }
 }
@@ -116,6 +149,10 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
 #endif
                     break;
                 }
+                case DataLevel::Stress:
+                    // Stress output not supported for fully dynamic simulations
+                    // TODO: Decide on a warning
+                    break;
                 };
                 writer->increase_step(time, VMax);
             }
@@ -143,6 +180,10 @@ void MonitorFD::write_static() {
         case DataLevel::BoundaryForMomentRate: {
             break;
         }
+        case DataLevel::Stress:
+            // No static stress output
+            // TODO: Decide on a warning
+            break;
         };
     }
 }
