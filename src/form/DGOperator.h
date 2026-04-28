@@ -61,7 +61,8 @@ public:
     // are detected via SFINAE and called from the time solver if they exist.
     template <class T> using initialize_strain_tensor_t = decltype(&T::initialize_strain_tensor_Q);
     template <class T> using local_relaxation_time_t = decltype(&T::local_relaxation_time);
-    template <class T> using theta_t = decltype(&T::theta);
+    template <class T>
+    using set_relaxation_time_global_t = decltype(&T::set_relaxation_time_global);
     template <class T> using update_strain_t = decltype(&T::update_deviatoric_strain_q);
     template <class T>
     using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
@@ -123,9 +124,9 @@ public:
             }
             MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
                           MPI_COMM_WORLD);
-            // Apply theta factor for time step cap: Δt ≤ θ·τ_global
-            if constexpr (std::experimental::is_detected_v<theta_t, LocalOperator>) {
-                relaxation_time_global_ *= lop_->theta();
+            if constexpr (std::experimental::is_detected_v<set_relaxation_time_global_t,
+                                                           LocalOperator>) {
+                lop_->set_relaxation_time_global(relaxation_time_global_);
             }
             lop_->set_viscoelastic_time_step(relaxation_time_global_);
         }

@@ -180,7 +180,13 @@ public:
 
     void set_free_slip_boundary(facet_functional_t fun) { fun_free_slip = std::move(fun); }
 
-    void set_viscoelastic_time_step(double dt) { dt_viscoelastic_ = dt; }
+    inline double relaxation_time_global() const { return relaxation_time_global_; }
+    void set_relaxation_time_global(double relaxation_time) {
+        relaxation_time_global_ = relaxation_time;
+    }
+    void set_viscoelastic_time_step(double relaxation_time) {
+        dt_viscoelastic_ = theta_ * relaxation_time;
+    }
     inline double get_viscoelastic_time_step() const { return dt_viscoelastic_; }
     void update_time_dependent_precomputation_volume(std::size_t elNo);
     void update_time_dependent_precomputation_skeleton(std::size_t fctNo);
@@ -251,7 +257,8 @@ private:
     volume_functional_t fun_viscosity;
     volume_functional_t fun_relaxation_time;
     volume_functional_t fun_rho;
-    double theta_;
+    double theta_ = 0.0;
+    double relaxation_time_global_ = 0.0;
     double dt_viscoelastic_ = 0.0;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
