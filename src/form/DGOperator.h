@@ -298,11 +298,7 @@ public:
                       std::experimental::is_detected_v<rhs_history_skeleton_t, LocalOperator> ||
                       std::experimental::is_detected_v<rhs_history_boundary_t, LocalOperator> ||
                       std::experimental::is_detected_v<rhs_history_boundary_free_slip_t,
-                                                       LocalOperator> ||
-                      std::experimental::is_detected_v<compute_sigma_hat_n_t, LocalOperator>) {
-            if constexpr (std::experimental::is_detected_v<compute_sigma_hat_n_t, LocalOperator>) {
-                lop_->compute_sigma_hat_n_facets();
-            }
+                                                       LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 scratch_.reset();
                 a_scratch.reset();
