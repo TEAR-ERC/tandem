@@ -98,8 +98,16 @@ double Viscoelasticity::compute_g_dt(double dt, double tau, int n) const {
     if (dt <= 0.0 || tau <= 0.0) {
         return 0.0;
     }
-    const double ratio = dt / tau;
-    return -std::expm1(-ratio) / ratio;
+    double sum = 0.0;
+    double ratio = -dt / tau;
+    double factorial = 1.0;
+
+    for (int i = 1; i < n; ++i) {
+        factorial *= i; // compute i!
+        sum += (1.0 / factorial) * std::pow(ratio, i - 1);
+    }
+
+    return sum;
 }
 
 // Mass matrix utilities
