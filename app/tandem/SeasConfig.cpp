@@ -233,6 +233,8 @@ void setConfigSchema(TableSchema<Config>& schema,
     detail::setTabularOutputConfigSchema(faultScalarOutputSchema);
     auto& domainOutputSchema = schema.add_table("domain_output", &Config::domain_output);
     detail::setDomainOutputConfigSchema(domainOutputSchema);
+    auto& stressOutputSchema = schema.add_table("stress_output", &Config::stress_output);
+    detail::setOutputConfigSchema(stressOutputSchema);
     auto& faultProbeOutputSchema =
         schema.add_table("fault_probe_output", &Config::fault_probe_output);
     detail::setProbeOutputConfigSchema(faultProbeOutputSchema);

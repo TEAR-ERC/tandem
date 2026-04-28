@@ -96,6 +96,7 @@ struct Config {
     std::optional<OutputConfig> fault_output;
     std::optional<TabularOutputConfig> fault_scalar_output;
     std::optional<DomainOutputConfig> domain_output;
+    std::optional<OutputConfig> stress_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
