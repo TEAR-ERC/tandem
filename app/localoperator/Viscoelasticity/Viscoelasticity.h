@@ -117,7 +117,6 @@ public:
     void update_deviatoric_strain_q(std::size_t fctNo);
     void update_partial_strain_Q(std::size_t elNo);
     void update_partial_strain_q(std::size_t fctNo);
-    void compute_sigma_hat_n_facets();
 
     // Stress field computation for VTU output
     FiniteElementFunction<DomainDimension> stress_prototype(std::size_t numLocalElements) const;
