@@ -57,6 +57,7 @@ public:
     // are detected via SFINAE and called from the time solver if they exist.
     template <class T> using initialize_strain_tensor_t = decltype(&T::initialize_strain_tensor_Q);
     template <class T> using local_relaxation_time_t = decltype(&T::local_relaxation_time);
+    template <class T> using theta_t = decltype(&T::theta);
     template <class T> using update_strain_t = decltype(&T::update_deviatoric_strain_q);
     template <class T>
     using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
@@ -84,6 +85,33 @@ public:
 
         lop_->begin_preparation(topo_->numElements(), topo_->numLocalElements(),
                                 topo_->numLocalFacets());
+
+        if constexpr (std::experimental::is_detected_v<initialize_strain_tensor_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->initialize_strain_tensor_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                lop_->initialize_strain_tensor_q(fctNo);
+            }
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->initialize_displacement_field(elNo);
+            }
+        }
+
+        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
+            double dt_local = std::numeric_limits<double>::max();
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
+                lop_->local_relaxation_time(elNo, dt_local, scratch_);
+            }
+            MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
+                          MPI_COMM_WORLD);
+            // Apply theta factor for time step cap: Δt ≤ θ·τ_global
+            if constexpr (std::experimental::is_detected_v<theta_t, LocalOperator>) {
+                relaxation_time_global_ *= lop_->theta();
+            }
+        }
+
         if constexpr (std::experimental::is_detected_v<prepare_volume_t, LocalOperator>) {
             for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
                 scratch_.reset();
@@ -127,27 +155,6 @@ public:
                 lop_->prepare_cfl(elNo, topo_->neighbours(elNo), scratch_);
             }
         }
-
-        if constexpr (std::experimental::is_detected_v<initialize_strain_tensor_t, LocalOperator>) {
-            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
-                lop_->initialize_strain_tensor_Q(elNo);
-            }
-            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
-                lop_->initialize_strain_tensor_q(fctNo);
-            }
-            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
-                lop_->initialize_displacement_field(elNo);
-            }
-        }
-        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
-            double dt_local = std::numeric_limits<double>::max();
-            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
-                scratch_.reset();
-                lop_->local_relaxation_time(elNo, dt_local, scratch_);
-            }
-            MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
-                          MPI_COMM_WORLD);
-        }
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
@@ -166,6 +173,11 @@ public:
 
     void assemble(BlockMatrix& matrix) override {
         auto bs = lop_->block_size();
+
+        // Update time-dependent precomputation before assembly (viscoelastic only)
+        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
+            lop_->update_time_dependent_precomputation();
+        }
 
         auto A_size = LinearAllocator<double>::allocation_size(bs * bs, lop_->alignment());
         auto a_scratch = Scratch<double>(4 * A_size, lop_->alignment());
@@ -449,6 +461,14 @@ public:
     void set_dirichlet(typename base::facet_functional_t fun) override {
         lop_->set_dirichlet(std::move(fun));
     }
+
+    void update_time_step(double dt) override {
+        if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
+            lop_->set_viscoelastic_time_step(dt);
+        }
+    }
+
+    double relaxation_time_global() const override { return relaxation_time_global_; }
 
     void update_deviatoric_strain() override {
         if constexpr (std::experimental::is_detected_v<update_strain_t, LocalOperator>) {
