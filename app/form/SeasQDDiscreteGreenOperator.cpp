@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 namespace fs = std::filesystem;
 
 namespace tndm {
@@ -853,7 +854,106 @@ SeasQDDiscreteGreenOperator::validate_all() {
 
     return result;
 }
-#endif
+
+// Export leaf structure for visualization.
+// Requires PETSC_SRC_DIR at build time so we can include the private Mat_Htool definition.
+#ifdef HAVE_PETSC_HTOOL_PRIVATE
+#include <mat/impls/htool/htool.hpp>  // Mat_Htool — from PETSc source tree (PETSC_SRC_DIR/src)
+
+void SeasQDDiscreteGreenOperator::export_h_structure(const std::string& prefix) const {
+    if (!H_) {
+        return;
+    }
+
+    MPI_Comm comm = base::comm();
+    int rank, nranks;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &nranks);
+
+    // Access the underlying HTool HMatrix via PETSc's private Mat_Htool struct.
+    // Pinned to PETSc 3.22.3; revisit if PETSc is upgraded.
+    const auto* impl = static_cast<const Mat_Htool*>(H_->data);
+    const auto& hmat = impl->distributed_operator_holder->hmatrix;
+
+    // Print structural info (rank 0 only for the distributed version)
+    if (rank == 0) {
+        std::cout << "\n=== H-matrix structure ===" << std::endl;
+        htool::print_tree_parameters(hmat, std::cout);
+    }
+    htool::print_distributed_hmatrix_information(hmat, std::cout, comm);
+
+    // Per-rank CSV with local offsets (native HTool format)
+    htool::save_leaves_with_rank(hmat, prefix + "_rank" + std::to_string(rank));
+
+    // Gather leaves with GLOBAL offsets to rank 0 and write one merged CSV.
+    using HM = htool::HMatrix<PetscScalar, PetscReal>;
+    struct Leaf { int row0, nrows, col0, ncols, crank; };
+    std::vector<Leaf> local_leaves;
+
+    htool::preorder_tree_traversal(hmat, [&local_leaves](const HM& node) {
+        if (node.is_leaf()) {
+            local_leaves.push_back({
+                static_cast<int>(node.get_target_cluster().get_offset()),
+                static_cast<int>(node.get_target_cluster().get_size()),
+                static_cast<int>(node.get_source_cluster().get_offset()),
+                static_cast<int>(node.get_source_cluster().get_size()),
+                node.get_rank()
+            });
+        }
+    });
+
+    int local_count = static_cast<int>(local_leaves.size());
+    std::vector<int> counts(nranks);
+    MPI_Gather(&local_count, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, comm);
+
+    constexpr int FIELDS = 5;
+    std::vector<int> flat(local_count * FIELDS);
+    for (int i = 0; i < local_count; ++i) {
+        flat[i * FIELDS + 0] = local_leaves[i].row0;
+        flat[i * FIELDS + 1] = local_leaves[i].nrows;
+        flat[i * FIELDS + 2] = local_leaves[i].col0;
+        flat[i * FIELDS + 3] = local_leaves[i].ncols;
+        flat[i * FIELDS + 4] = local_leaves[i].crank;
+    }
+
+    std::vector<int> recv_counts(nranks), displs(nranks, 0);
+    for (int r = 0; r < nranks; ++r) recv_counts[r] = counts[r] * FIELDS;
+    for (int r = 1; r < nranks; ++r) displs[r] = displs[r - 1] + recv_counts[r - 1];
+    int total = displs[nranks - 1] + recv_counts[nranks - 1];
+
+    std::vector<int> all_leaves;
+    if (rank == 0) all_leaves.resize(total);
+    MPI_Gatherv(flat.data(), local_count * FIELDS, MPI_INT,
+                all_leaves.data(), recv_counts.data(), displs.data(), MPI_INT, 0, comm);
+
+    if (rank == 0) {
+        PetscInt M, N;
+        MatGetSize(H_, &M, &N);
+        std::ofstream out(prefix + ".csv");
+        out << M << "," << N << "\n";
+        int n_leaves = total / FIELDS;
+        for (int i = 0; i < n_leaves; ++i) {
+            out << all_leaves[i * FIELDS + 0] << ","
+                << all_leaves[i * FIELDS + 1] << ","
+                << all_leaves[i * FIELDS + 2] << ","
+                << all_leaves[i * FIELDS + 3] << ","
+                << all_leaves[i * FIELDS + 4] << "\n";
+        }
+        std::cout << "Wrote " << n_leaves << " leaves to " << prefix << ".csv\n";
+    }
+}
+#else
+void SeasQDDiscreteGreenOperator::export_h_structure(const std::string& prefix) const {
+    int rank;
+    MPI_Comm_rank(base::comm(), &rank);
+    if (rank == 0) {
+        std::cout << "export_h_structure: PETSC_SRC_DIR not set at build time; "
+                     "cannot access internal HTool HMatrix. Skipping." << std::endl;
+    }
+    (void)prefix;
+}
+#endif // HAVE_PETSC_HTOOL_PRIVATE
+#endif // PETSC_HAVE_HTOOL
 
 void SeasQDDiscreteGreenOperator::get_discrete_greens_function(
     LocalSimplexMesh<DomainDimension> const& mesh) {

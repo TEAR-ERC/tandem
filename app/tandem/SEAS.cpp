@@ -420,4 +420,39 @@ double validateGFHMatrix(LocalSimplexMesh<DomainDimension> const& mesh, Config c
 #endif
 }
 
+void dumpGFHMatrixStructure(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                            const std::string& output_prefix) {
+    if (cfg.mode != SeasMode::QuasiDynamicDiscreteGreen) {
+        throw std::runtime_error("dumpGFHMatrixStructure requires mode = QDGreen");
+    }
+
+    Config cfg_h = cfg;
+    cfg_h.hmatrix_config.use_hmatrix = true;
+
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg_h.type) {
+    case LocalOpType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg_h);
+        break;
+    case LocalOpType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg_h);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
+
+    auto seasop = detail::operator_specifics<SeasQDDiscreteGreenOperator>::make(mesh, cfg_h, *ctx);
+
+    int rank;
+    MPI_Comm_rank(seasop->comm(), &rank);
+
+#ifdef PETSC_HAVE_HTOOL
+    seasop->export_h_structure(output_prefix);
+#else
+    if (rank == 0) {
+        std::cout << "dumpGFHMatrixStructure: SKIP (PETSc built without HTool)" << std::endl;
+    }
+#endif
+}
+
 } // namespace tndm

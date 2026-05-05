@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -117,7 +118,7 @@ private:
 
 #ifdef PETSC_HAVE_HTOOL
     Mat H_ = nullptr;
-    PetscLogDouble mem_H_bytes_ = 0.0; // PETSc malloc delta measured during build_h_matrix()
+    PetscLogDouble mem_H_bytes_ = 0.0;
     void build_h_matrix();
 #endif
 
@@ -148,6 +149,13 @@ public:
     // Apply G_, H_, and the full PDE solver to the same random vector.
     // Returns all errors, timings, and memory stats.
     ValidationResult validate_all();
+
+    // Export H-matrix leaf structure for visualization.
+    // Writes <prefix>.csv (global, merged across all ranks) and
+    // <prefix>_rank<r>.csv (per-rank, local offsets, HTool native format).
+    // Also prints HTool tree parameters and compression info to stdout.
+    // Requires PETSC_SRC_DIR to be set at build time (see CMakeLists.txt).
+    void export_h_structure(const std::string& prefix) const;
 #endif
 };
 
