@@ -12,3 +12,6 @@ docs/_build/
 
 # Mesh files
 examples/**/*.msh
+
+# Planning/notes docs
+*.md
