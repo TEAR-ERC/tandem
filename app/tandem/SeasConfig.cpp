@@ -242,5 +242,34 @@ void setConfigSchema(TableSchema<Config>& schema,
 
     auto& tsCheckpointSchema = schema.add_table("ts_checkpoint", &Config::ts_checkpoint_config);
     detail::setTsCheckpointConfigSchema(tsCheckpointSchema);
+
+    auto& hmatrixSchema = schema.add_table("hmatrix", &Config::hmatrix_config);
+    hmatrixSchema.add_value("use_hmatrix", &HMatrixConfig::use_hmatrix)
+        .default_value(false)
+        .help("Use H-matrix for Green's function MatMult.");
+    hmatrixSchema.add_value("eta", &HMatrixConfig::eta)
+        .default_value(0.9)
+        .validator([](auto&& x) { return x > 0.0 && x <= 1.0; })
+        .help("Admissibility parameter (0 < eta <= 1).");
+    hmatrixSchema.add_value("leaf_size", &HMatrixConfig::leaf_size)
+        .default_value(32)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Cluster tree leaf size.");
+    hmatrixSchema.add_value("basis_order", &HMatrixConfig::basis_order)
+        .default_value(8)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Chebyshev basis polynomial order.");
+    hmatrixSchema.add_value("max_rank", &HMatrixConfig::max_rank)
+        .default_value(64)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Max rank per off-diagonal block (reserved for future from-mat path).");
+    hmatrixSchema.add_value("batch_size", &HMatrixConfig::batch_size)
+        .default_value(32)
+        .validator([](auto&& x) { return x > 0; })
+        .help("Assembly batch size (reserved).");
+    hmatrixSchema.add_value("rtol", &HMatrixConfig::rtol)
+        .default_value(1e-4)
+        .validator([](auto&& x) { return x > 0.0; })
+        .help("Relative compression tolerance (reserved).");
 }
 } // namespace tndm

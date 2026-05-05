@@ -1,6 +1,7 @@
 #ifndef SEASQDDISCRETEGREENOPERATOR_20210907_H
 #define SEASQDDISCRETEGREENOPERATOR_20210907_H
 
+#include "common/HMatrixConfig.h"
 #include "common/PetscVector.h"
 #include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
@@ -15,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 
@@ -44,7 +46,8 @@ public:
                                 std::unique_ptr<AbstractFrictionOperator> friction,
                                 LocalSimplexMesh<DomainDimension> const& mesh,
                                 std::optional<std::string> prefix, double gf_checkpoint_every_nmins,
-                                bool matrix_free = false, MGConfig const& mg_config = MGConfig());
+                                bool matrix_free = false, MGConfig const& mg_config = MGConfig(),
+                                HMatrixConfig const& hmatrix_config = HMatrixConfig());
     ~SeasQDDiscreteGreenOperator();
 
     void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
@@ -77,6 +80,7 @@ protected:
 
 private:
     void compute_boundary_traction();
+    void compute_fault_coordinates();
     PetscInt create_discrete_greens_function();
     void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh,
                                                    PetscInt current_gf_, PetscInt n_gf_);
@@ -102,6 +106,49 @@ private:
     std::unique_ptr<PetscVector> t_boundary_;
     bool repartition_gfs_ = false;
     IS is_perm_ = nullptr;
+
+    HMatrixConfig hmatrix_config_;
+
+    // Physical coordinates for H-matrix point clouds (built by compute_fault_coordinates).
+    // traction_coords_: one DomainDimension-vector per local traction DOF (size ind.m * D)
+    // slip_coords_:     one DomainDimension-vector per local slip DOF     (size ind.n * D)
+    std::vector<PetscReal> traction_coords_;
+    std::vector<PetscReal> slip_coords_;
+
+#ifdef PETSC_HAVE_HTOOL
+    Mat H_ = nullptr;
+    PetscLogDouble mem_H_bytes_ = 0.0; // PETSc malloc delta measured during build_h_matrix()
+    void build_h_matrix();
+#endif
+
+public:
+    Mat dense_gf() const { return G_; }
+
+#ifdef PETSC_HAVE_HTOOL
+    Mat h_matrix() const { return H_; }
+
+    struct ValidationResult {
+        // Relative errors (normalized by ||Gv||); -1 means unavailable
+        double err_H_vs_G      = -1.0;
+        double err_G_vs_solver = -1.0;
+        double err_H_vs_solver = -1.0;
+        // Wall-clock timings (seconds); Gv/Hv are averages over n_matvec_reps
+        double time_G_matvec   = -1.0;
+        double time_H_matvec   = -1.0;
+        double time_solver     = -1.0;
+        int    n_matvec_reps   =  0;
+        // Memory in bytes (global sum across all ranks)
+        double mem_G_bytes     = -1.0;
+        double mem_H_bytes     = -1.0;
+        // Global matrix dimensions and MPI info
+        PetscInt global_rows   =  0;
+        PetscInt global_cols   =  0;
+        int      n_ranks       =  1;
+    };
+    // Apply G_, H_, and the full PDE solver to the same random vector.
+    // Returns all errors, timings, and memory stats.
+    ValidationResult validate_all();
+#endif
 };
 
 } // namespace tndm

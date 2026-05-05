@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <vector>
 
 namespace tndm {
 
@@ -39,6 +40,14 @@ public:
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
     virtual auto params(std::optional<Range<std::size_t>> range = std::nullopt)
         -> FiniteElementFunction<DomainDimension - 1u> = 0;
+
+    /// Fill @p out with all locally owned fault node physical coordinates.
+    /// Layout: [faultNo * nbf * DomainDimension + node * DomainDimension + dim]
+    /// @p out is resized to num_local_elements() * nbf * DomainDimension.
+    virtual void fill_fault_node_coords(std::vector<double>& out) const = 0;
+
+    /// Returns the number of quadrature / basis nodes per fault element.
+    virtual std::size_t fault_num_basis_functions() const = 0;
 };
 
 } // namespace tndm

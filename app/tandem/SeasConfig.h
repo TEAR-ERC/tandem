@@ -1,6 +1,7 @@
 #ifndef CONFIG_20200825_H
 #define CONFIG_20200825_H
 
+#include "common/HMatrixConfig.h"
 #include "common/MGConfig.h"
 #include "common/MeshConfig.h"
 #include "common/Type.h"
@@ -100,6 +101,7 @@ struct Config {
     std::optional<ProbeOutputConfig> domain_probe_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
     TsCheckpointConfig ts_checkpoint_config;
+    HMatrixConfig hmatrix_config;
 };
 
 void setConfigSchema(TableSchema<Config>& schema,

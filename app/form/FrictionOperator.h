@@ -216,6 +216,14 @@ public:
         return params(range->begin(), range->end());
     }
 
+    void fill_fault_node_coords(std::vector<double>& out) const override {
+        lop_->fill_fault_node_coords(out);
+    }
+
+    std::size_t fault_num_basis_functions() const override {
+        return lop_->space().numBasisFunctions();
+    }
+
 private:
     std::unique_ptr<LocalOperator> lop_;
     std::shared_ptr<DGOperatorTopo> topo_;

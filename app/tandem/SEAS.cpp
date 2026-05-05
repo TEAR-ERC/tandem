@@ -33,6 +33,7 @@
 #include "tensor/Managed.h"
 #include "util/Stopwatch.h"
 
+#include <cstdio>
 #include <limits>
 #include <mpi.h>
 #include <petscsys.h>
@@ -160,7 +161,8 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
 
         auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
             std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh, prefix,
-            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy),
+            cfg.hmatrix_config);
         ctx.setup_seasop(*seasop);
         seasop->warmup();
         return seasop;
@@ -329,6 +331,93 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
     default:
         break;
     }
+}
+
+double validateGFHMatrix(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+    if (cfg.mode != SeasMode::QuasiDynamicDiscreteGreen) {
+        throw std::runtime_error("validateGFHMatrix requires mode = QDGreen");
+    }
+
+    Config cfg_h = cfg;
+    cfg_h.hmatrix_config.use_hmatrix = true;
+
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg_h.type) {
+    case LocalOpType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg_h);
+        break;
+    case LocalOpType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg_h);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
+
+    auto seasop = detail::operator_specifics<SeasQDDiscreteGreenOperator>::make(mesh, cfg_h, *ctx);
+
+    int rank;
+    MPI_Comm_rank(seasop->comm(), &rank);
+
+#ifdef PETSC_HAVE_HTOOL
+    auto vr = seasop->validate_all();
+    double rel_err = vr.err_H_vs_G;
+    if (rank == 0) {
+        if (rel_err < 0.0) {
+            std::cout << "RESULT: SKIP (matrices not available)" << std::endl;
+        } else {
+            auto fmt_bytes = [](double b) -> std::string {
+                char buf[64];
+                if (b >= 1e9)
+                    std::snprintf(buf, sizeof(buf), "%.2f GB", b / 1e9);
+                else
+                    std::snprintf(buf, sizeof(buf), "%.2f MB", b / 1e6);
+                return buf;
+            };
+
+            std::cout << "\n=== H-matrix Validation Report ===" << std::endl;
+            std::cout << "Matrix:    " << vr.global_rows << " x " << vr.global_cols
+                      << "  (rows x cols)" << std::endl;
+            std::cout << "MPI ranks: " << vr.n_ranks << std::endl;
+
+            std::cout << "\nMemory:" << std::endl;
+            std::cout << "  G_ (dense): " << fmt_bytes(vr.mem_G_bytes) << std::endl;
+            std::cout << "  H_ (htool): " << fmt_bytes(vr.mem_H_bytes) << std::endl;
+            if (vr.mem_H_bytes > 0.0) {
+                std::cout << "  Compression ratio: "
+                          << vr.mem_G_bytes / vr.mem_H_bytes << "x" << std::endl;
+            }
+
+            std::cout << "\nMatVec timing (avg over " << vr.n_matvec_reps << " reps):" << std::endl;
+            std::cout << "  Gv  (dense): " << vr.time_G_matvec << " s" << std::endl;
+            std::cout << "  Hv  (htool): " << vr.time_H_matvec << " s" << std::endl;
+            if (vr.time_H_matvec > 0.0) {
+                std::cout << "  Speedup H/G: "
+                          << vr.time_G_matvec / vr.time_H_matvec << "x" << std::endl;
+            }
+            std::cout << "\nFull solver: " << vr.time_solver << " s" << std::endl;
+
+            std::cout << "\nRelative errors (||.|| / ||Gv||):" << std::endl;
+            std::cout << "  ||Hv - Gv||:          " << vr.err_H_vs_G      << std::endl;
+            std::cout << "  ||Gv - solver(v)||:   " << vr.err_G_vs_solver << std::endl;
+            std::cout << "  ||Hv - solver(v)||:   " << vr.err_H_vs_solver << std::endl;
+
+            std::cout << std::endl;
+            if (rel_err < cfg_h.hmatrix_config.rtol) {
+                std::cout << "RESULT: PASS  (||Hv-Gv||/||Gv||=" << rel_err
+                          << " < rtol=" << cfg_h.hmatrix_config.rtol << ")" << std::endl;
+            } else {
+                std::cout << "RESULT: FAIL  (||Hv-Gv||/||Gv||=" << rel_err
+                          << " >= rtol=" << cfg_h.hmatrix_config.rtol << ")" << std::endl;
+            }
+        }
+    }
+    return rel_err;
+#else
+    if (rank == 0) {
+        std::cout << "RESULT: SKIP (PETSc built without HTools)" << std::endl;
+    }
+    return -1.0;
+#endif
 }
 
 } // namespace tndm

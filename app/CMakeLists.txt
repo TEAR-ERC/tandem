@@ -237,3 +237,11 @@ add_executable(tandem
     tandem.cpp)
 target_link_libraries(tandem PRIVATE app-common)
 target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(gf-hmatrix-validate
+    tandem/Monitor.cpp
+    tandem/SeasConfig.cpp
+    tandem/SEAS.cpp
+    gf-hmatrix-validate.cpp)
+target_link_libraries(gf-hmatrix-validate PRIVATE app-common)
+target_include_directories(gf-hmatrix-validate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

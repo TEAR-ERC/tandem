@@ -42,6 +42,32 @@ public:
     void end_preparation() {}
 
     auto const& space() const { return space_; }
+    auto const& cl() const { return cl_; }
+
+    /// Returns physical coordinates of node @p node on fault element @p faultNo.
+    std::array<double, DomainDimension> fault_node_coords(std::size_t faultNo,
+                                                          std::size_t node) const {
+        return fault_[faultNo].template get<Coords>()[node];
+    }
+
+    /// Fills @p out with all fault node physical coordinates, interleaved as
+    /// [faultNo0_node0_x, faultNo0_node0_y, ..., faultNo0_nodeN_x, faultNo0_nodeN_y, ...,
+    ///  faultNo1_node0_x, ...].
+    void fill_fault_node_coords(std::vector<double>& out) const {
+        auto const nbf = space_.numBasisFunctions();
+        auto const nfault = fault_.size();
+        out.resize(nfault * nbf * DomainDimension);
+        std::size_t offset = 0;
+        for (std::size_t faultNo = 0; faultNo < nfault; ++faultNo) {
+            auto coords = fault_[faultNo].template get<Coords>();
+            for (std::size_t n = 0; n < nbf; ++n) {
+                auto const& x = coords[n];
+                for (std::size_t d = 0; d < DomainDimension; ++d) {
+                    out[offset++] = x[d];
+                }
+            }
+        }
+    }
 
 protected:
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;

@@ -54,3 +54,20 @@ doctest_discover_tests(test-tensor)
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
+
+# H-matrix validation test: requires PETSc (H2Opus).
+# This test defines its own main() (with PetscInitialize/PetscFinalize) so it
+# does NOT link against test-runner or test-runner-mpi (both of which supply
+# their own main).  app-common is linked to pull in PETSc and app-layer objects;
+# tandem-lib (transitively included via app-common) supplies MPI/OpenMP etc.
+# app/CMakeLists.txt runs find_package(PETSc REQUIRED GLOBAL) before this
+# directory is processed, making PETSc::PETSc available here.
+add_executable(test-h-matrix h_matrix_validation.cpp)
+target_compile_options(test-h-matrix PRIVATE ${CPU_ARCH_FLAGS})
+target_include_directories(test-h-matrix PRIVATE
+    ../external
+    ${CMAKE_BINARY_DIR}/app   # for generated config.h
+    ${CMAKE_SOURCE_DIR}/app   # for app/ headers
+)
+target_link_libraries(test-h-matrix PRIVATE app-common)
+doctest_discover_tests(test-h-matrix)
