@@ -221,6 +221,16 @@ target_link_libraries(app-common PUBLIC
     tandem-lib
     PETSc::PETSc)
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+# When the PETSc source tree is available, expose Mat_Htool for H-matrix leaf export.
+# The private header is only used inside #ifdef HAVE_PETSC_HTOOL_PRIVATE guards.
+set(PETSC_SRC_DIR "" CACHE PATH "PETSc source tree root (needed by gf-hmatrix-visualize)")
+if(PETSC_SRC_DIR)
+    target_include_directories(app-common PRIVATE "${PETSC_SRC_DIR}/src")
+    target_compile_definitions(app-common PRIVATE HAVE_PETSC_HTOOL_PRIVATE)
+    message(STATUS "app-common: HTool leaf export enabled via ${PETSC_SRC_DIR}/src")
+else()
+    message(STATUS "app-common: PETSC_SRC_DIR not set; HTool leaf export will be a no-op")
+endif()
 
 ## Static solver
 
@@ -246,11 +256,6 @@ add_executable(gf-hmatrix-validate
 target_link_libraries(gf-hmatrix-validate PRIVATE app-common)
 target_include_directories(gf-hmatrix-validate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-# Path to PETSc SOURCE tree (not the install prefix) — needed to access the private
-# Mat_Htool struct definition in src/mat/impls/htool/htool.hpp.
-# Set with -DPETSC_SRC_DIR=/path/to/petsc-3.22.3 when configuring.
-set(PETSC_SRC_DIR "" CACHE PATH "PETSc source tree root (needed by gf-hmatrix-visualize)")
-
 add_executable(gf-hmatrix-visualize
     tandem/Monitor.cpp
     tandem/SeasConfig.cpp
@@ -258,10 +263,3 @@ add_executable(gf-hmatrix-visualize
     gf-hmatrix-visualize.cpp)
 target_link_libraries(gf-hmatrix-visualize PRIVATE app-common)
 target_include_directories(gf-hmatrix-visualize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-if(PETSC_SRC_DIR)
-    target_include_directories(gf-hmatrix-visualize PRIVATE "${PETSC_SRC_DIR}/src")
-    target_compile_definitions(gf-hmatrix-visualize PRIVATE HAVE_PETSC_HTOOL_PRIVATE)
-    message(STATUS "gf-hmatrix-visualize: using PETSc source at ${PETSC_SRC_DIR}/src")
-else()
-    message(STATUS "gf-hmatrix-visualize: PETSC_SRC_DIR not set; leaf export will be a no-op")
-endif()

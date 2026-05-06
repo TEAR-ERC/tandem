@@ -118,7 +118,7 @@ private:
 
 #ifdef PETSC_HAVE_HTOOL
     Mat H_ = nullptr;
-    PetscLogDouble mem_H_bytes_ = 0.0;
+    double mem_H_bytes_ = 0.0; // actual stored bytes from HTool compression_ratio
     void build_h_matrix();
 #endif
 

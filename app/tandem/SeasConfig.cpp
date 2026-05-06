@@ -249,8 +249,8 @@ void setConfigSchema(TableSchema<Config>& schema,
         .help("Use H-matrix for Green's function MatMult.");
     hmatrixSchema.add_value("eta", &HMatrixConfig::eta)
         .default_value(0.9)
-        .validator([](auto&& x) { return x > 0.0 && x <= 1.0; })
-        .help("Admissibility parameter (0 < eta <= 1).");
+        .validator([](auto&& x) { return x > 0.0; })
+        .help("Admissibility parameter (eta > 0; typical range 1.0–3.0).");
     hmatrixSchema.add_value("leaf_size", &HMatrixConfig::leaf_size)
         .default_value(32)
         .validator([](auto&& x) { return x > 0; })

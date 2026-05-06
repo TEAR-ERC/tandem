@@ -5,6 +5,12 @@
 #include <petscmathtool.h>
 #endif
 
+#ifdef HAVE_PETSC_HTOOL_PRIVATE
+// Must be included at file scope (outside any namespace) to avoid polluting
+// the tndm namespace with STL internals dragged in by htool headers.
+#include <mat/impls/htool/htool.hpp>
+#endif
+
 #include "form/RefElement.h"
 #include "parallel/LocalGhostCompositeView.h"
 #include "util/Stopwatch.h"
@@ -700,40 +706,36 @@ void SeasQDDiscreteGreenOperator::build_h_matrix() {
         NULL, "-mat_htool_min_cluster_size",
         std::to_string(hmatrix_config_.leaf_size).c_str()));
 
-    // HTools cluster tree requires at least n leaf clusters per process in each tree.
-    // With leaf_size clusters of size leaf_size, that means n²·leaf_size ≤ min(M,N).
-    // Violating this causes a parallel deadlock inside MatAssemblyEnd for n≥5.
+    // HTool cluster tree requires at least one leaf cluster per rank: n × leaf_size ≤ N.
+    // (The n² guard used previously was overly conservative — the true constraint is one
+    //  column-tree leaf per MPI rank, not n leaves per rank.)
     {
         int n_ranks;
         CHKERRTHROW(MPI_Comm_size(base::comm(), &n_ranks));
-        long long required = (long long)n_ranks * n_ranks * hmatrix_config_.leaf_size;
+        long long required = (long long)n_ranks * hmatrix_config_.leaf_size;
         long long n_cols   = (long long)N;
         if (required > n_cols) {
             CHKERRTHROW(PetscPrintf(base::comm(),
                 "\n"
                 "ERROR: H-matrix cannot be built with the current configuration:\n"
-                "  nranks=%d, leaf_size=%d  =>  nranks² × leaf_size = %lld\n"
+                "  nranks=%d, leaf_size=%d  =>  nranks × leaf_size = %lld\n"
                 "  global slip DOFs (N_cols) = %lld\n"
-                "  Requirement:  nranks² × leaf_size <= N_cols  is NOT satisfied.\n"
+                "  Requirement:  nranks × leaf_size <= N_cols  is NOT satisfied.\n"
                 "\n"
                 "Fixes (choose one):\n"
-                "  - Use <= %d MPI ranks with this mesh/degree (n_max = floor(sqrt(N_cols/leaf_size)))\n"
+                "  - Use <= %lld MPI ranks with this mesh/degree (n_max = floor(N_cols/leaf_size))\n"
                 "  - Reduce [hmatrix] leaf_size to <= %lld\n"
                 "  - Use a finer mesh or higher polynomial degree (more slip DOFs)\n"
                 "\n",
                 n_ranks, hmatrix_config_.leaf_size, required, n_cols,
-                (int)std::sqrt((double)n_cols / hmatrix_config_.leaf_size),
-                n_cols / ((long long)n_ranks * n_ranks)));
+                n_cols / hmatrix_config_.leaf_size,
+                n_cols / (long long)n_ranks));
             throw std::runtime_error("H-matrix parallel configuration invalid: "
-                                     "nranks² × leaf_size > N_cols");
+                                     "nranks × leaf_size > N_cols");
         }
     }
 
     // H_ is directly M×N (non-square, non-symmetric — no restrictions in HTools).
-    // Measure RSS before and after the full create+assemble sequence, matching the
-    // benchmark approach (PetscMemoryGetCurrentUsage = OS-level resident set size).
-    PetscLogDouble mem_before;
-    CHKERRTHROW(PetscMemoryGetCurrentUsage(&mem_before));
     CHKERRTHROW(MatCreateHtoolFromKernel(
         base::comm(),
         ind.m, ind.n,                    // local rows (traction DOFs), local cols (slip DOFs)
@@ -747,9 +749,36 @@ void SeasQDDiscreteGreenOperator::build_h_matrix() {
     CHKERRTHROW(MatSetFromOptions(H_));
     CHKERRTHROW(MatAssemblyBegin(H_, MAT_FINAL_ASSEMBLY));
     CHKERRTHROW(MatAssemblyEnd(H_, MAT_FINAL_ASSEMBLY));
-    PetscLogDouble mem_after;
-    CHKERRTHROW(PetscMemoryGetCurrentUsage(&mem_after));
-    mem_H_bytes_ = (mem_after > mem_before) ? (mem_after - mem_before) : 0.0;
+
+    // Compute H-matrix memory from HTool's own compression statistics.
+    // RSS delta (PetscMemoryGetCurrentUsage) is unreliable: temporary buffers
+    // freed during assembly make the net RSS increase far smaller than the
+    // actual stored coefficient count.
+    //   stored_bytes = (M * N * sizeof(scalar)) / compression_ratio
+    // where compression_ratio = full_size / generated_coefficients (HTool definition).
+#ifdef HAVE_PETSC_HTOOL_PRIVATE
+    {
+        Mat_Htool* impl = nullptr;
+        CHKERRTHROW(MatShellGetContext(H_, &impl));
+        auto info = htool::get_distributed_hmatrix_information(
+            impl->distributed_operator_holder->hmatrix, base::comm());
+        auto it = info.find("Compression_ratio");
+        if (it != info.end()) {
+            double cr = std::stod(it->second);
+            if (cr > 0.0) {
+                mem_H_bytes_ = static_cast<double>(M) * static_cast<double>(N)
+                               * sizeof(PetscScalar) / cr;
+            }
+        }
+    }
+#else
+    // Fallback: RSS delta (inaccurate but available without private headers).
+    {
+        PetscLogDouble rss;
+        CHKERRTHROW(PetscMemoryGetCurrentUsage(&rss));
+        mem_H_bytes_ = static_cast<double>(rss);
+    }
+#endif
 }
 
 SeasQDDiscreteGreenOperator::ValidationResult
@@ -856,10 +885,7 @@ SeasQDDiscreteGreenOperator::validate_all() {
 }
 
 // Export leaf structure for visualization.
-// Requires PETSC_SRC_DIR at build time so we can include the private Mat_Htool definition.
 #ifdef HAVE_PETSC_HTOOL_PRIVATE
-#include <mat/impls/htool/htool.hpp>  // Mat_Htool — from PETSc source tree (PETSC_SRC_DIR/src)
-
 void SeasQDDiscreteGreenOperator::export_h_structure(const std::string& prefix) const {
     if (!H_) {
         return;
@@ -870,9 +896,10 @@ void SeasQDDiscreteGreenOperator::export_h_structure(const std::string& prefix) 
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &nranks);
 
-    // Access the underlying HTool HMatrix via PETSc's private Mat_Htool struct.
-    // Pinned to PETSc 3.22.3; revisit if PETSc is upgraded.
-    const auto* impl = static_cast<const Mat_Htool*>(H_->data);
+    // MATHTOOL is implemented as a MATSHELL; Mat_Htool* is stored via
+    // MatShellSetContext, NOT in H_->data directly. Use MatShellGetContext.
+    Mat_Htool* impl = nullptr;
+    CHKERRTHROW(MatShellGetContext(H_, &impl));
     const auto& hmat = impl->distributed_operator_holder->hmatrix;
 
     // Print structural info (rank 0 only for the distributed version)
