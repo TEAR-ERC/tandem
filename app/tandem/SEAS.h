@@ -17,6 +17,19 @@ double validateGFHMatrix(LocalSimplexMesh<DomainDimension> const& mesh, Config c
 // and <output_prefix>_rank<r>.csv (per-rank, local offsets). Forces use_hmatrix = true.
 void dumpGFHMatrixStructure(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
                             const std::string& output_prefix);
+
+struct SolveBenchResult {
+    int    n_ranks    = 0;
+    int    n_reps     = 0;
+    double time_avg_s = -1.0;
+    double time_min_s = -1.0;
+    double time_max_s = -1.0;
+};
+// Sets up the KSP solver (mesh + DG operator only, no GF construction), then runs
+// nreps timed calls to solve(v)+update_traction with a fixed random rhs.
+// One warmup rep is performed before the timed loop.
+SolveBenchResult benchmarkSolve(LocalSimplexMesh<DomainDimension> const& mesh,
+                                Config const& cfg, int nreps);
 }
 
 #endif // SEAS_20200825_H

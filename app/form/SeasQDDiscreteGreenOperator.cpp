@@ -94,9 +94,11 @@ SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
     MatDestroy(&G_);
     ISDestroy(&is_perm_);
 #ifdef PETSC_HAVE_HTOOL
-    if (H_) {
-        MatDestroy(&H_);
-    }
+    MatDestroy(&H_);
+    VecDestroy(&slip_spatial_);
+    VecDestroy(&traction_spatial_);
+    VecScatterDestroy(&scatter_slip_to_spatial_);
+    VecScatterDestroy(&scatter_traction_to_orig_);
 #endif
 }
 
@@ -142,7 +144,18 @@ void SeasQDDiscreteGreenOperator::update_traction(double time, BlockVector const
 
 #ifdef PETSC_HAVE_HTOOL
     if (hmatrix_config_.use_hmatrix && H_) {
-        CHKERRTHROW(MatMult(H_, S_->vec(), base::traction_.vec()));
+        // Permute slip vector from original index order to spatial order
+        CHKERRTHROW(VecScatterBegin(scatter_slip_to_spatial_, S_->vec(), slip_spatial_,
+                                    INSERT_VALUES, SCATTER_FORWARD));
+        CHKERRTHROW(VecScatterEnd(scatter_slip_to_spatial_, S_->vec(), slip_spatial_,
+                                  INSERT_VALUES, SCATTER_FORWARD));
+        // H-matrix matvec in spatially permuted space
+        CHKERRTHROW(MatMult(H_, slip_spatial_, traction_spatial_));
+        // Unpermute traction result back to original index order
+        CHKERRTHROW(VecScatterBegin(scatter_traction_to_orig_, traction_spatial_,
+                                    base::traction_.vec(), INSERT_VALUES, SCATTER_FORWARD));
+        CHKERRTHROW(VecScatterEnd(scatter_traction_to_orig_, traction_spatial_,
+                                  base::traction_.vec(), INSERT_VALUES, SCATTER_FORWARD));
     } else {
 #endif
         CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
@@ -640,6 +653,40 @@ PetscErrorCode GFKernelHtool(PetscInt /*sdim*/, PetscInt M_block, PetscInt N_blo
 } // anonymous namespace
 #endif
 
+// Recursive bounding-box bisection: returns perm[] where perm[new_i] = old_i.
+// Mirrors HTool's default RegularSplitting strategy so the permutation aligns
+// with what HTool will build internally.
+static std::vector<PetscInt> spatial_permutation(const std::vector<PetscReal>& coords,
+                                                  int D, PetscInt N) {
+    std::vector<PetscInt> perm(N);
+    std::iota(perm.begin(), perm.end(), 0);
+
+    std::function<void(PetscInt, PetscInt)> bisect = [&](PetscInt lo, PetscInt hi) {
+        if (hi - lo <= 1) return;
+        // Longest-extent axis
+        int axis = 0;
+        PetscReal best = -1.0;
+        for (int d = 0; d < D; ++d) {
+            PetscReal mn = std::numeric_limits<PetscReal>::max();
+            PetscReal mx = std::numeric_limits<PetscReal>::lowest();
+            for (PetscInt i = lo; i < hi; ++i) {
+                mn = std::min(mn, coords[perm[i] * D + d]);
+                mx = std::max(mx, coords[perm[i] * D + d]);
+            }
+            if (mx - mn > best) { best = mx - mn; axis = d; }
+        }
+        PetscInt mid = (lo + hi) / 2;
+        std::nth_element(perm.begin() + lo, perm.begin() + mid, perm.begin() + hi,
+                         [&](PetscInt a, PetscInt b) {
+                             return coords[a * D + axis] < coords[b * D + axis];
+                         });
+        bisect(lo, mid);
+        bisect(mid, hi);
+    };
+    bisect(0, N);
+    return perm;
+}
+
 void SeasQDDiscreteGreenOperator::compute_fault_coordinates() {
     GreensFunctionIndices ind(*this);
     auto const& fault_op = base::friction();
@@ -683,72 +730,224 @@ void SeasQDDiscreteGreenOperator::compute_fault_coordinates() {
             }
         }
     }
+
+    // Compute spatial permutations for H-matrix clustering.
+    // Allgather all local coordinate arrays to get the global arrays, then run
+    // bounding-box bisection to produce a spatial ordering that aligns with HTool.
+    MPI_Comm comm = base::comm();
+    int n_ranks, my_rank;
+    MPI_Comm_size(comm, &n_ranks);
+    MPI_Comm_rank(comm, &my_rank);
+    PetscInt M_global, N_global;
+    CHKERRTHROW(MatGetSize(G_, &M_global, &N_global));
+
+    auto allgather_coords = [&](const std::vector<PetscReal>& local_coords,
+                                PetscInt local_n,
+                                PetscInt global_n) -> std::vector<PetscReal> {
+        std::vector<PetscInt> all_n(n_ranks);
+        CHKERRTHROW(MPI_Allgather(&local_n, 1, MPIU_INT, all_n.data(), 1, MPIU_INT, comm));
+        std::vector<int> rcounts(n_ranks), displs(n_ranks, 0);
+        for (int r = 0; r < n_ranks; ++r) rcounts[r] = static_cast<int>(all_n[r]) * DomainDimension;
+        for (int r = 1; r < n_ranks; ++r) displs[r] = displs[r - 1] + rcounts[r - 1];
+        std::vector<PetscReal> global(global_n * DomainDimension);
+        CHKERRTHROW(MPI_Allgatherv(local_coords.data(), rcounts[my_rank], MPIU_REAL,
+                                   global.data(), rcounts.data(), displs.data(), MPIU_REAL, comm));
+        return global;
+    };
+
+    auto global_traction = allgather_coords(traction_coords_, ind.m, M_global);
+    auto global_slip     = allgather_coords(slip_coords_,     ind.n, N_global);
+
+    row_perm_ = spatial_permutation(global_traction, DomainDimension, M_global);
+    col_perm_ = spatial_permutation(global_slip,     DomainDimension, N_global);
 }
 
 #ifdef PETSC_HAVE_HTOOL
 void SeasQDDiscreteGreenOperator::build_h_matrix() {
-    GreensFunctionIndices ind(*this);
+    MPI_Comm comm = base::comm();
+    int n_ranks, my_rank;
+    CHKERRTHROW(MPI_Comm_size(comm, &n_ranks));
+    CHKERRTHROW(MPI_Comm_rank(comm, &my_rank));
 
-    PetscInt M, N, rstart, rend;
+    PetscInt M, N, old_rstart, old_rend;
     CHKERRTHROW(MatGetSize(G_, &M, &N));
-    CHKERRTHROW(MatGetOwnershipRange(G_, &rstart, &rend));
+    CHKERRTHROW(MatGetOwnershipRange(G_, &old_rstart, &old_rend));
 
-    GFKernelCtxHtool kctx{G_, rstart, rend};
-
-    // Pass compression parameters via PETSc options (picked up by MatSetFromOptions).
-    CHKERRTHROW(PetscOptionsSetValue(
-        NULL, "-mat_htool_epsilon",
-        std::to_string(hmatrix_config_.rtol).c_str()));
-    CHKERRTHROW(PetscOptionsSetValue(
-        NULL, "-mat_htool_eta",
-        std::to_string(hmatrix_config_.eta).c_str()));
-    CHKERRTHROW(PetscOptionsSetValue(
-        NULL, "-mat_htool_min_cluster_size",
-        std::to_string(hmatrix_config_.leaf_size).c_str()));
-
-    // HTool cluster tree requires at least one leaf cluster per rank: n × leaf_size ≤ N.
-    // (The n² guard used previously was overly conservative — the true constraint is one
-    //  column-tree leaf per MPI rank, not n leaves per rank.)
+    // Minimum guard: each process must own at least leaf_size rows and columns
+    // so the cluster tree can form at least one leaf per process.
+    // Spatial reordering (below) gives a balanced distribution, so this is now
+    // the true necessary condition rather than the old empirical n² heuristic.
     {
-        int n_ranks;
-        CHKERRTHROW(MPI_Comm_size(base::comm(), &n_ranks));
+        long long min_dim = std::min((long long)M, (long long)N);
         long long required = (long long)n_ranks * hmatrix_config_.leaf_size;
-        long long n_cols   = (long long)N;
-        if (required > n_cols) {
-            CHKERRTHROW(PetscPrintf(base::comm(),
-                "\n"
-                "ERROR: H-matrix cannot be built with the current configuration:\n"
+        if (required > min_dim) {
+            CHKERRTHROW(PetscPrintf(comm,
+                "\nERROR: H-matrix parallel configuration invalid:\n"
                 "  nranks=%d, leaf_size=%d  =>  nranks × leaf_size = %lld\n"
-                "  global slip DOFs (N_cols) = %lld\n"
-                "  Requirement:  nranks × leaf_size <= N_cols  is NOT satisfied.\n"
-                "\n"
-                "Fixes (choose one):\n"
-                "  - Use <= %lld MPI ranks with this mesh/degree (n_max = floor(N_cols/leaf_size))\n"
-                "  - Reduce [hmatrix] leaf_size to <= %lld\n"
-                "  - Use a finer mesh or higher polynomial degree (more slip DOFs)\n"
-                "\n",
-                n_ranks, hmatrix_config_.leaf_size, required, n_cols,
-                n_cols / hmatrix_config_.leaf_size,
-                n_cols / (long long)n_ranks));
-            throw std::runtime_error("H-matrix parallel configuration invalid: "
-                                     "nranks × leaf_size > N_cols");
+                "  min(M,N) = %lld\n"
+                "  Requirement: nranks × leaf_size <= min(M,N)\n"
+                "  => use <= %lld MPI ranks or reduce leaf_size to <= %lld\n\n",
+                n_ranks, hmatrix_config_.leaf_size, required, min_dim,
+                min_dim / hmatrix_config_.leaf_size,
+                min_dim / (long long)n_ranks));
+            throw std::runtime_error("H-matrix: nranks × leaf_size > min(M,N)");
         }
     }
 
-    // H_ is directly M×N (non-square, non-symmetric — no restrictions in HTools).
+    // -----------------------------------------------------------------------
+    // Step 1: Build spatially permuted G_perm
+    //
+    // G_[old_i, old_j] → G_perm[new_i, new_j]
+    // where row_perm_[new_i] = old_i and col_perm_[new_j] = old_j.
+    // G_perm uses a balanced row distribution (PETSC_DECIDE) so HTool's
+    // process partitions are spatially contiguous and equal-sized.
+    // -----------------------------------------------------------------------
+
+    // Inverse permutations: inv[old] = new
+    std::vector<PetscInt> inv_row(M), inv_col(N);
+    for (PetscInt ni = 0; ni < M; ++ni) inv_row[row_perm_[ni]] = ni;
+    for (PetscInt nj = 0; nj < N; ++nj) inv_col[col_perm_[nj]] = nj;
+
+    Mat G_perm;
+    CHKERRTHROW(MatCreateDense(comm, PETSC_DECIDE, PETSC_DECIDE, M, N, nullptr, &G_perm));
+
+    // Build G_perm row by row: for each old row this process owns,
+    // compute its new index and insert with column permutation applied.
+    {
+        std::vector<PetscInt> all_old_cols(N), all_new_cols(N);
+        std::iota(all_old_cols.begin(), all_old_cols.end(), 0);
+        std::iota(all_new_cols.begin(), all_new_cols.end(), 0);
+        std::vector<PetscScalar> row_old(N), row_new(N);
+
+        for (PetscInt old_i = old_rstart; old_i < old_rend; ++old_i) {
+            CHKERRTHROW(MatGetValues(G_, 1, &old_i, N, all_old_cols.data(), row_old.data()));
+            const PetscInt new_i = inv_row[old_i];
+            for (PetscInt old_j = 0; old_j < N; ++old_j)
+                row_new[inv_col[old_j]] = row_old[old_j];
+            CHKERRTHROW(MatSetValues(G_perm, 1, &new_i, N,
+                                     all_new_cols.data(), row_new.data(), INSERT_VALUES));
+        }
+    }
+    CHKERRTHROW(MatAssemblyBegin(G_perm, MAT_FINAL_ASSEMBLY));
+    CHKERRTHROW(MatAssemblyEnd(G_perm, MAT_FINAL_ASSEMBLY));
+
+    // Balanced row/col ownership of G_perm (from PETSC_DECIDE)
+    PetscInt perm_rstart, perm_rend;
+    CHKERRTHROW(MatGetOwnershipRange(G_perm, &perm_rstart, &perm_rend));
+    const PetscInt local_m_perm = perm_rend - perm_rstart;
+
+    // Balanced column distribution: match PETSc PETSC_DECIDE formula
+    // rstart[r] = r*(N/n) + min(r, N%n)
+    const PetscInt col_base  = N / n_ranks;
+    const PetscInt col_extra = N % n_ranks;
+    const PetscInt perm_cstart = my_rank * col_base + std::min(my_rank, (int)col_extra);
+    const PetscInt perm_cend   = perm_cstart + col_base + (my_rank < (int)col_extra ? 1 : 0);
+    const PetscInt local_n_perm = perm_cend - perm_cstart;
+
+    // -----------------------------------------------------------------------
+    // Step 2: Extract spatially-ordered local coordinate arrays
+    //
+    // Each process provides the coordinates for its balanced slice of the
+    // permuted DOFs so that HTool's cluster tree matches G_perm's distribution.
+    // -----------------------------------------------------------------------
+    auto allgather_coords = [&](const std::vector<PetscReal>& local_coords,
+                                PetscInt local_n,
+                                PetscInt global_n) -> std::vector<PetscReal> {
+        std::vector<PetscInt> all_n(n_ranks);
+        CHKERRTHROW(MPI_Allgather(&local_n, 1, MPIU_INT, all_n.data(), 1, MPIU_INT, comm));
+        std::vector<int> rcounts(n_ranks), displs(n_ranks, 0);
+        for (int r = 0; r < n_ranks; ++r) rcounts[r] = static_cast<int>(all_n[r]) * DomainDimension;
+        for (int r = 1; r < n_ranks; ++r) displs[r] = displs[r - 1] + rcounts[r - 1];
+        std::vector<PetscReal> global(global_n * DomainDimension);
+        CHKERRTHROW(MPI_Allgatherv(local_coords.data(), rcounts[my_rank], MPIU_REAL,
+                                   global.data(), rcounts.data(), displs.data(), MPIU_REAL, comm));
+        return global;
+    };
+
+    auto global_traction = allgather_coords(traction_coords_, traction_coords_.size() / DomainDimension, M);
+    auto global_slip     = allgather_coords(slip_coords_,     slip_coords_.size()     / DomainDimension, N);
+
+    // Local target coords: coordinates for new rows [perm_rstart, perm_rend)
+    std::vector<PetscReal> local_target_coords(local_m_perm * DomainDimension);
+    for (PetscInt ni = perm_rstart; ni < perm_rend; ++ni) {
+        PetscInt old_i = row_perm_[ni];
+        for (int d = 0; d < DomainDimension; ++d)
+            local_target_coords[(ni - perm_rstart) * DomainDimension + d] =
+                global_traction[old_i * DomainDimension + d];
+    }
+
+    // Local source coords: coordinates for new cols [perm_cstart, perm_cend)
+    std::vector<PetscReal> local_source_coords(local_n_perm * DomainDimension);
+    for (PetscInt nj = perm_cstart; nj < perm_cend; ++nj) {
+        PetscInt old_j = col_perm_[nj];
+        for (int d = 0; d < DomainDimension; ++d)
+            local_source_coords[(nj - perm_cstart) * DomainDimension + d] =
+                global_slip[old_j * DomainDimension + d];
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 3: Assemble the H-matrix from the spatially permuted G_perm
+    // -----------------------------------------------------------------------
+
+    // Kernel reads from G_perm (already in spatial order).
+    // rstart/rend are G_perm's balanced ownership — matching HTool's partition.
+    GFKernelCtxHtool kctx{G_perm, perm_rstart, perm_rend};
+
+    CHKERRTHROW(PetscOptionsSetValue(NULL, "-mat_htool_epsilon",
+                                     std::to_string(hmatrix_config_.rtol).c_str()));
+    CHKERRTHROW(PetscOptionsSetValue(NULL, "-mat_htool_eta",
+                                     std::to_string(hmatrix_config_.eta).c_str()));
+    CHKERRTHROW(PetscOptionsSetValue(NULL, "-mat_htool_min_cluster_size",
+                                     std::to_string(hmatrix_config_.leaf_size).c_str()));
+
     CHKERRTHROW(MatCreateHtoolFromKernel(
-        base::comm(),
-        ind.m, ind.n,                    // local rows (traction DOFs), local cols (slip DOFs)
-        M, N,                            // global rows, global cols
+        comm,
+        local_m_perm, local_n_perm,      // balanced local rows/cols
+        M, N,                             // global sizes
         static_cast<PetscInt>(DomainDimension),
-        traction_coords_.data(),         // target point cloud (row clustering)
-        slip_coords_.data(),             // source point cloud (col clustering)
+        local_target_coords.data(),       // spatially ordered target point cloud
+        local_source_coords.data(),       // spatially ordered source point cloud
         GFKernelHtool, &kctx,
         &H_));
     CHKERRTHROW(MatSetOption(H_, MAT_SYMMETRIC, PETSC_FALSE));
     CHKERRTHROW(MatSetFromOptions(H_));
     CHKERRTHROW(MatAssemblyBegin(H_, MAT_FINAL_ASSEMBLY));
     CHKERRTHROW(MatAssemblyEnd(H_, MAT_FINAL_ASSEMBLY));
+
+    // G_perm is only needed during assembly; release it now.
+    CHKERRTHROW(MatDestroy(&G_perm));
+
+    // -----------------------------------------------------------------------
+    // Step 4: Build reusable scatter objects for update_traction
+    //
+    // Every time-step: s_spatial[new_j] = S_[col_perm_[new_j]]
+    //                  traction_[row_perm_[new_i]] = t_spatial[new_i]
+    // -----------------------------------------------------------------------
+    CHKERRTHROW(MatCreateVecs(H_, &slip_spatial_, &traction_spatial_));
+
+    // Column scatter: S_->vec() (old col order) → slip_spatial_ (spatial col order)
+    {
+        IS from_IS, to_IS;
+        CHKERRTHROW(ISCreateGeneral(comm, local_n_perm, col_perm_.data() + perm_cstart,
+                                    PETSC_COPY_VALUES, &from_IS));
+        CHKERRTHROW(ISCreateStride(comm, local_n_perm, perm_cstart, 1, &to_IS));
+        CHKERRTHROW(VecScatterCreate(S_->vec(), from_IS, slip_spatial_, to_IS,
+                                     &scatter_slip_to_spatial_));
+        CHKERRTHROW(ISDestroy(&from_IS));
+        CHKERRTHROW(ISDestroy(&to_IS));
+    }
+
+    // Row scatter: traction_spatial_ (spatial row order) → traction_.vec() (old row order)
+    {
+        IS from_IS, to_IS;
+        CHKERRTHROW(ISCreateStride(comm, local_m_perm, perm_rstart, 1, &from_IS));
+        CHKERRTHROW(ISCreateGeneral(comm, local_m_perm, row_perm_.data() + perm_rstart,
+                                    PETSC_COPY_VALUES, &to_IS));
+        CHKERRTHROW(VecScatterCreate(traction_spatial_, from_IS, base::traction_.vec(), to_IS,
+                                     &scatter_traction_to_orig_));
+        CHKERRTHROW(ISDestroy(&from_IS));
+        CHKERRTHROW(ISDestroy(&to_IS));
+    }
 
     // Compute H-matrix memory from HTool's own compression statistics.
     // RSS delta (PetscMemoryGetCurrentUsage) is unreliable: temporary buffers
@@ -828,12 +1027,21 @@ SeasQDDiscreteGreenOperator::validate_all() {
         result.time_G_matvec = (t1 - t0) / N_REPS;
     }
 
-    // Time H_ MatMult (N_REPS iterations; last result stays in y_H)
+    // Time H_ MatMult via the full permute→H×→unpermute pipeline.
+    // x is in original col order; y_H accumulates in original row order.
     {
         PetscLogDouble t0, t1;
         CHKERRTHROW(PetscTime(&t0));
         for (int r = 0; r < N_REPS; ++r) {
-            CHKERRTHROW(MatMult(H_, x, y_H));
+            CHKERRTHROW(VecScatterBegin(scatter_slip_to_spatial_, x, slip_spatial_,
+                                        INSERT_VALUES, SCATTER_FORWARD));
+            CHKERRTHROW(VecScatterEnd(scatter_slip_to_spatial_, x, slip_spatial_,
+                                      INSERT_VALUES, SCATTER_FORWARD));
+            CHKERRTHROW(MatMult(H_, slip_spatial_, traction_spatial_));
+            CHKERRTHROW(VecScatterBegin(scatter_traction_to_orig_, traction_spatial_, y_H,
+                                        INSERT_VALUES, SCATTER_FORWARD));
+            CHKERRTHROW(VecScatterEnd(scatter_traction_to_orig_, traction_spatial_, y_H,
+                                      INSERT_VALUES, SCATTER_FORWARD));
         }
         CHKERRTHROW(PetscTime(&t1));
         result.time_H_matvec = (t1 - t0) / N_REPS;

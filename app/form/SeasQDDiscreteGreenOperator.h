@@ -116,9 +116,22 @@ private:
     std::vector<PetscReal> traction_coords_;
     std::vector<PetscReal> slip_coords_;
 
+    // Spatial permutations for H-matrix clustering (global, replicated on all ranks).
+    // row_perm_[new_i] = old_i : new spatial row index -> original G_ row index
+    // col_perm_[new_j] = old_j : new spatial col index -> original G_ col index
+    std::vector<PetscInt> row_perm_;
+    std::vector<PetscInt> col_perm_;
+
 #ifdef PETSC_HAVE_HTOOL
     Mat H_ = nullptr;
-    double mem_H_bytes_ = 0.0; // actual stored bytes from HTool compression_ratio
+    double mem_H_bytes_ = 0.0;
+
+    // Reusable objects for permute → H×s → unpermute in update_traction.
+    Vec        slip_spatial_           = nullptr; // slip in spatial col order  (H input)
+    Vec        traction_spatial_       = nullptr; // traction in spatial row order (H output)
+    VecScatter scatter_slip_to_spatial_    = nullptr; // S_->vec() (old) → slip_spatial_
+    VecScatter scatter_traction_to_orig_   = nullptr; // traction_spatial_ → traction_.vec() (old)
+
     void build_h_matrix();
 #endif
 

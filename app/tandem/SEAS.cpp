@@ -455,4 +455,48 @@ void dumpGFHMatrixStructure(LocalSimplexMesh<DomainDimension> const& mesh, Confi
 #endif
 }
 
+SolveBenchResult benchmarkSolve(LocalSimplexMesh<DomainDimension> const& mesh,
+                                Config const& cfg, int nreps) {
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg.type) {
+    case LocalOpType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg);
+        break;
+    case LocalOpType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
+
+    // Build SeasQDOperator (KSP only, no GF).  Do NOT call warmup() here —
+    // for large problems the explicit KSPSetUp inside warmup() can take as
+    // long as several GF columns.  Instead we let the KSP set up lazily on
+    // the first solve call, which is our un-timed warmup rep in benchmark_solve.
+    auto seasop = std::make_shared<SeasQDOperator>(
+        std::move(ctx->dg()), std::move(ctx->adapter()), std::move(ctx->friction()),
+        cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+    ctx->setup_seasop(*seasop);
+
+    auto br = seasop->benchmark_solve(nreps);
+
+    SolveBenchResult result;
+    result.n_ranks    = br.n_ranks;
+    result.n_reps     = br.n_reps;
+    result.time_avg_s = br.time_avg_s;
+    result.time_min_s = br.time_min_s;
+    result.time_max_s = br.time_max_s;
+
+    int rank;
+    MPI_Comm_rank(seasop->comm(), &rank);
+    if (rank == 0) {
+        std::cout << "solve_bench_n_ranks="   << result.n_ranks    << "\n"
+                  << "solve_bench_n_reps="    << result.n_reps     << "\n"
+                  << "solve_bench_time_avg_s=" << result.time_avg_s << "\n"
+                  << "solve_bench_time_min_s=" << result.time_min_s << "\n"
+                  << "solve_bench_time_max_s=" << result.time_max_s << "\n";
+    }
+    return result;
+}
+
 } // namespace tndm

@@ -263,3 +263,11 @@ add_executable(gf-hmatrix-visualize
     gf-hmatrix-visualize.cpp)
 target_link_libraries(gf-hmatrix-visualize PRIVATE app-common)
 target_include_directories(gf-hmatrix-visualize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(gf-solve-bench
+    tandem/Monitor.cpp
+    tandem/SeasConfig.cpp
+    tandem/SEAS.cpp
+    gf-solve-bench.cpp)
+target_link_libraries(gf-solve-bench PRIVATE app-common)
+target_include_directories(gf-solve-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})

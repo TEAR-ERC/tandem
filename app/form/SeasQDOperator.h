@@ -55,6 +55,18 @@ public:
 
     void initial_condition(BlockVector& state);
     void rhs(double time, BlockVector const& state, BlockVector& result);
+
+    struct BenchResult {
+        int       n_ranks    = 0;
+        int       n_reps     = 0;
+        double    time_avg_s = -1.0;
+        double    time_min_s = -1.0;
+        double    time_max_s = -1.0;
+    };
+    // Run nreps calls to solve(v)+update_traction with a fixed random rhs.
+    // One warmup rep is always performed first.
+    // Wall-clock time is taken as MPI_MAX across ranks per repetition.
+    BenchResult benchmark_solve(int nreps);
     virtual void update_internal_state(double time, BlockVector const& state,
                                        bool state_changed_since_last_rhs, bool require_traction,
                                        bool require_displacement);
