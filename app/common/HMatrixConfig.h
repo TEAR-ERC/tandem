@@ -12,6 +12,11 @@ struct HMatrixConfig {
     int max_rank = 64;
     int batch_size = 32;
     double rtol = 1e-4;
+    // For planar faults in a homogeneous elastic medium, tangential slip produces
+    // zero normal traction on the fault plane (exact result from elastostatics).
+    // Set planar_fault = true to skip building H-matrices for those zero components,
+    // with validation that they are indeed negligible in the assembled dense GF.
+    bool planar_fault = false;
 };
 
 } // namespace tndm

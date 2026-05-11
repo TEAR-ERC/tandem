@@ -192,6 +192,7 @@ set(APP_COMMON_SRCS
     form/SeasFDOperator.cpp
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
+    form/HMatrixGreenFunction.cpp
     localoperator/AdapterBase.cpp
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
@@ -220,7 +221,10 @@ target_link_libraries(app-common PUBLIC
     elasticity_adapter-kernels-lib
     tandem-lib
     PETSc::PETSc)
-target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(app-common PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../external)
 # When the PETSc source tree is available, expose Mat_Htool for H-matrix leaf export.
 # The private header is only used inside #ifdef HAVE_PETSC_HTOOL_PRIVATE guards.
 set(PETSC_SRC_DIR "" CACHE PATH "PETSc source tree root (needed by gf-hmatrix-visualize)")

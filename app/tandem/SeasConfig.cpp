@@ -271,5 +271,11 @@ void setConfigSchema(TableSchema<Config>& schema,
         .default_value(1e-4)
         .validator([](auto&& x) { return x > 0.0; })
         .help("Relative compression tolerance (reserved).");
+    hmatrixSchema.add_value("planar_fault", &HMatrixConfig::planar_fault)
+        .default_value(false)
+        .help("Skip H-matrix compression for normal-traction components that are exactly zero "
+              "for planar faults in homogeneous media (tangential slip -> zero normal traction). "
+              "Validates that the assembled GF confirms near-zero normal coupling before skipping. "
+              "Leave false (default) unless you know your fault geometry satisfies this condition.");
 }
 } // namespace tndm
