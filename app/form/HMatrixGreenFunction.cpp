@@ -189,19 +189,96 @@ HMatrixGreenFunction::~HMatrixGreenFunction() {
 }
 
 // ---------------------------------------------------------------------------
-// build_spatial_permutation — Hilbert curve ordering on the N_el*nbf cloud
+// PCA eigensolvers — used by build_spatial_permutation to detect the fault's
+// intrinsic dimension and rotate coordinates to the fault's principal axes.
 //
-// Uses hilbert::v2::PositionToIndex (Skilling algorithm, template-unrolled).
-// Coordinates are normalized to uint16_t per axis (65 536 cells per axis),
-// giving 65 536³ ≈ 2.8×10¹⁴ cells for 3D — ample for any foreseeable Np.
+// Convention: eval[0] >= eval[1] >= ..., evec[k*D+d] = component d of the
+// k-th principal direction (row-major, one direction per row).
+// ---------------------------------------------------------------------------
+
+static void sym2_eigen(const double* A, double* eval, double* evec) {
+    // Closed-form solution for 2×2 symmetric [[a,b],[b,d]]
+    double a = A[0], b = A[1], d = A[3];
+    double tr   = a + d;
+    double disc = std::sqrt(std::max(0.0, 0.25*(a-d)*(a-d) + b*b));
+    eval[0] = 0.5*tr + disc;
+    eval[1] = 0.5*tr - disc;
+
+    if (std::abs(b) > 1e-14) {
+        double v0x = b, v0y = eval[0] - a;
+        double len = std::sqrt(v0x*v0x + v0y*v0y);
+        evec[0] =  v0x/len;  evec[1] = v0y/len;   // eigenvec 0 (row 0)
+        evec[2] = -v0y/len;  evec[3] = v0x/len;   // eigenvec 1 (row 1, perpendicular)
+    } else if (a >= d) {
+        evec[0]=1; evec[1]=0; evec[2]=0; evec[3]=1;
+    } else {
+        evec[0]=0; evec[1]=1; evec[2]=1; evec[3]=0;
+    }
+}
+
+static void sym3_eigen(const double* A, double* eval, double* evec) {
+    // Jacobi iteration for 3×3 symmetric matrix.
+    double M[3][3], V[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+    for (int i=0; i<3; ++i) for (int j=0; j<3; ++j) M[i][j] = A[i*3+j];
+
+    for (int iter = 0; iter < 100; ++iter) {
+        double maxv = 0.0; int p = 0, q = 1;
+        for (int i=0; i<3; ++i)
+            for (int j=i+1; j<3; ++j)
+                if (std::abs(M[i][j]) > maxv) { maxv=std::abs(M[i][j]); p=i; q=j; }
+        if (maxv < 1e-14) break;
+
+        double tau = (M[q][q]-M[p][p]) / (2.0*M[p][q]);
+        double t   = (tau >= 0 ? 1.0 : -1.0) / (std::abs(tau)+std::sqrt(1.0+tau*tau));
+        double c   = 1.0/std::sqrt(1.0+t*t), s = t*c;
+
+        double App=M[p][p], Aqq=M[q][q], Apq=M[p][q];
+        M[p][p] = App - t*Apq;  M[q][q] = Aqq + t*Apq;  M[p][q]=M[q][p]=0.0;
+        for (int r=0; r<3; ++r) {
+            if (r==p||r==q) continue;
+            double Mrp=M[r][p], Mrq=M[r][q];
+            M[r][p]=M[p][r]= c*Mrp - s*Mrq;
+            M[r][q]=M[q][r]= s*Mrp + c*Mrq;
+        }
+        for (int r=0; r<3; ++r) {
+            double Vrp=V[r][p], Vrq=V[r][q];
+            V[r][p]= c*Vrp - s*Vrq;
+            V[r][q]= s*Vrp + c*Vrq;
+        }
+    }
+
+    // Sort indices by descending diagonal (eigenvalue)
+    int idx[3]={0,1,2};
+    if (M[idx[0]][idx[0]]<M[idx[1]][idx[1]]) std::swap(idx[0],idx[1]);
+    if (M[idx[1]][idx[1]]<M[idx[2]][idx[2]]) std::swap(idx[1],idx[2]);
+    if (M[idx[0]][idx[0]]<M[idx[1]][idx[1]]) std::swap(idx[0],idx[1]);
+
+    for (int k=0; k<3; ++k) {
+        eval[k] = M[idx[k]][idx[k]];
+        for (int d=0; d<3; ++d) evec[k*3+d] = V[d][idx[k]];
+    }
+}
+
+// ---------------------------------------------------------------------------
+// build_spatial_permutation — PCA-based Hilbert ordering
 //
-// The bounding box is made cubic (equal side on all axes): a planar fault
-// (zero extent in the fault-normal direction) maps all normal-direction
-// coordinates to 0 and the 3D Hilbert curve degenerates gracefully to a
-// 2D curve in the fault plane — no special-casing needed.
+// Algorithm:
+//  1. PCA of the node coordinate cloud → eigenvalues λ₀ ≥ λ₁ ≥ λ₂ and
+//     the corresponding principal directions (eigenvectors).
+//  2. Effective dimension: keep directions where λₖ/λ₀ > leaf_size/Np.
+//     Single planar fault  → λ_normal≈0   → eff_dim=2 (2-D Hilbert)
+//     Single straight fault → λ_trans≈0   → eff_dim=1 (1-D sort)
+//     Multiple/curved faults → all λ large → eff_dim=3 (3-D Hilbert)
+//  3. Project coordinates onto the eff_dim principal directions.
+//  4. Isotropic (cubic) normalisation: scale all axes by the same factor
+//     (max extent across directions) → correct physical distance weighting.
+//  5. Apply Hilbert curve of dimension eff_dim from hilbert::v2.
 //
-// The returned std::array<uint16_t, N> from PositionToIndex is encoded in
-// lexicographic (big-endian) order, so std::array::operator< sorts correctly.
+// This avoids the start/end adjacency problem that arises when a 3-D Hilbert
+// curve is restricted to a flat 2-D surface (the start and end happen to be
+// physically adjacent on the flat surface), and naturally handles complex
+// fault geometries — multiple faults, curved surfaces, etc. — without any
+// hard-coded dimension assumption.
 // ---------------------------------------------------------------------------
 
 void HMatrixGreenFunction::build_spatial_permutation(
@@ -211,49 +288,140 @@ void HMatrixGreenFunction::build_spatial_permutation(
     perm_.resize(Np);
     std::iota(perm_.begin(), perm_.end(), 0);
 
-    // ---- 1. Cubic bounding box ----
-    std::vector<PetscReal> bbox_min(D_,  std::numeric_limits<PetscReal>::max());
-    std::vector<PetscReal> bbox_max(D_, -std::numeric_limits<PetscReal>::max());
+    // ---- 1. Centroid ----
+    std::vector<double> mean(D_, 0.0);
     for (PetscInt i = 0; i < Np; ++i)
-        for (int d = 0; d < D_; ++d) {
-            bbox_min[d] = std::min(bbox_min[d], global_coords[i * D_ + d]);
-            bbox_max[d] = std::max(bbox_max[d], global_coords[i * D_ + d]);
+        for (int d = 0; d < D_; ++d)
+            mean[d] += static_cast<double>(global_coords[i*D_+d]);
+    for (int d = 0; d < D_; ++d) mean[d] /= static_cast<double>(Np);
+
+    // ---- 2. Covariance matrix (D×D, symmetric) ----
+    std::vector<double> cov(D_*D_, 0.0);
+    for (PetscInt i = 0; i < Np; ++i)
+        for (int a = 0; a < D_; ++a) {
+            double va = static_cast<double>(global_coords[i*D_+a]) - mean[a];
+            for (int b = a; b < D_; ++b)
+                cov[a*D_+b] += va * (static_cast<double>(global_coords[i*D_+b]) - mean[b]);
         }
-    PetscReal L = 0.0;
-    for (int d = 0; d < D_; ++d) L = std::max(L, bbox_max[d] - bbox_min[d]);
-    if (L < static_cast<PetscReal>(1e-14)) L = 1.0;
+    for (int a = 0; a < D_; ++a)
+        for (int b = a+1; b < D_; ++b)
+            cov[b*D_+a] = cov[a*D_+b];
 
-    // ---- 2. Normalize and compute Hilbert indices ----
-    // uint16_t: 16 bits per axis, 65 535 max value.
-    constexpr double GRID_MAX = static_cast<double>(
-        std::numeric_limits<uint16_t>::max());
+    // ---- 3. Eigendecomposition ----
+    std::vector<double> eval(D_), evec(D_*D_);
+    if (D_ == 2) sym2_eigen(cov.data(), eval.data(), evec.data());
+    else         sym3_eigen(cov.data(), eval.data(), evec.data());
+    // eval[0] >= eval[1] >= eval[2]; evec[k*D_+d] = d-th component of k-th direction
 
-    auto norm = [&](PetscReal x, int d) -> uint16_t {
-        double t = static_cast<double>(x - bbox_min[d]) / static_cast<double>(L);
-        return static_cast<uint16_t>(std::min(t * GRID_MAX, GRID_MAX));
+    // ---- 4. Effective dimension ----
+    // A direction is degenerate when its variance is < (leaf_size/Np) × max_variance.
+    // leaf_size/Np ≈ (cluster_DOF_count / total_DOF_count) — the fraction of the
+    // total point spread occupied by one cluster.
+    const double thr = static_cast<double>(config_.leaf_size) / static_cast<double>(Np);
+    int eff_dim = 0;
+    for (int d = 0; d < D_; ++d)
+        if (eval[0] > 0.0 && eval[d] / eval[0] > thr) ++eff_dim;
+    if (eff_dim < 1) eff_dim = 1;  // safety fallback
+
+    // Print on rank 0 so the user can see which dimension was chosen
+    {
+        int rank; MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            std::cout << "  Hilbert ordering: eff_dim=" << eff_dim
+                      << "  eigenvalue ratios [";
+            for (int d = 0; d < D_; ++d) {
+                std::cout << (eval[0]>0.0 ? eval[d]/eval[0] : 0.0);
+                if (d < D_-1) std::cout << ", ";
+            }
+            std::cout << "]  threshold=" << thr << "\n";
+        }
+    }
+
+    // ---- 5. Project to eff_dim principal directions ----
+    std::vector<double> proj(Np * eff_dim);
+    for (PetscInt i = 0; i < Np; ++i)
+        for (int k = 0; k < eff_dim; ++k) {
+            double p = 0.0;
+            for (int d = 0; d < D_; ++d)
+                p += (static_cast<double>(global_coords[i*D_+d]) - mean[d]) * evec[k*D_+d];
+            proj[i*eff_dim+k] = p;
+        }
+
+    // ---- 6. Isotropic (cubic) normalisation to [0, UINT16_MAX] ----
+    // Use the same scale L for all dimensions so that physical distances are
+    // preserved — a cluster diameter of d physical units maps to the same
+    // number of grid cells regardless of which axis it is on.
+    std::vector<double> pmin(eff_dim,  std::numeric_limits<double>::max());
+    std::vector<double> pmax(eff_dim, -std::numeric_limits<double>::max());
+    for (PetscInt i = 0; i < Np; ++i)
+        for (int k = 0; k < eff_dim; ++k) {
+            pmin[k] = std::min(pmin[k], proj[i*eff_dim+k]);
+            pmax[k] = std::max(pmax[k], proj[i*eff_dim+k]);
+        }
+    double L = 0.0;
+    for (int k = 0; k < eff_dim; ++k) L = std::max(L, pmax[k]-pmin[k]);
+    if (L < 1e-14) L = 1.0;
+
+    constexpr double GMAX = static_cast<double>(std::numeric_limits<uint16_t>::max());
+    auto norm = [&](int i, int k) -> uint16_t {
+        double t = (proj[i*eff_dim+k] - pmin[k]) / L;
+        return static_cast<uint16_t>(std::min(t * GMAX, GMAX));
     };
 
-    // ---- 3. Sort permutation by Hilbert index ----
-    // Dispatch on D_ at runtime; both branches are compiled.
-    if (D_ == 3) {
-        using HIdx = std::array<uint16_t, 3>;
-        std::vector<HIdx> codes(Np);
-        for (PetscInt i = 0; i < Np; ++i)
-            codes[i] = hilbert::v2::PositionToIndex(HIdx{
-                norm(global_coords[i*3+0], 0),
-                norm(global_coords[i*3+1], 1),
-                norm(global_coords[i*3+2], 2)});
+    // ---- 7. Sort perm_ by Hilbert index of dimension eff_dim ----
+    if (eff_dim == 1) {
+        // 1-D: plain ascending sort by the projected coordinate
         std::sort(perm_.begin(), perm_.end(),
-                  [&codes](PetscInt a, PetscInt b){ return codes[a] < codes[b]; });
-    } else {
+                  [&](PetscInt a, PetscInt b){ return proj[a] < proj[b]; });
+    } else if (eff_dim == 2) {
         using HIdx = std::array<uint16_t, 2>;
         std::vector<HIdx> codes(Np);
         for (PetscInt i = 0; i < Np; ++i)
-            codes[i] = hilbert::v2::PositionToIndex(HIdx{
-                norm(global_coords[i*2+0], 0),
-                norm(global_coords[i*2+1], 1)});
+            codes[i] = hilbert::v2::PositionToIndex(HIdx{ norm(i,0), norm(i,1) });
         std::sort(perm_.begin(), perm_.end(),
                   [&codes](PetscInt a, PetscInt b){ return codes[a] < codes[b]; });
+    } else {
+        using HIdx = std::array<uint16_t, 3>;
+        std::vector<HIdx> codes(Np);
+        for (PetscInt i = 0; i < Np; ++i)
+            codes[i] = hilbert::v2::PositionToIndex(HIdx{ norm(i,0), norm(i,1), norm(i,2) });
+        std::sort(perm_.begin(), perm_.end(),
+                  [&codes](PetscInt a, PetscInt b){ return codes[a] < codes[b]; });
+    }
+
+    // Diagnostic: print physical coordinates of the first and last nodes so we can
+    // verify that the Hilbert ordering places maximally-separated nodes at the endpoints.
+    {
+        int rank; MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            auto print_node = [&](const char* label, PetscInt perm_pos) {
+                PetscInt node = perm_[perm_pos];
+                std::cout << "  Hilbert " << label << " (perm[" << perm_pos << "]=node "
+                          << node << "): (";
+                for (int d = 0; d < D_; ++d) {
+                    std::cout << global_coords[node * D_ + d];
+                    if (d < D_-1) std::cout << ", ";
+                }
+                // also print projected coords
+                std::cout << ")  proj=(";
+                for (int k = 0; k < eff_dim; ++k) {
+                    std::cout << proj[node * eff_dim + k];
+                    if (k < eff_dim-1) std::cout << ", ";
+                }
+                std::cout << ")\n";
+            };
+            print_node("first  ", 0);
+            print_node("last   ", Np - 1);
+            // Euclidean distance between first and last in 3D physical coords
+            double dist = 0.0;
+            for (int d = 0; d < D_; ++d) {
+                double dv = static_cast<double>(global_coords[perm_[0]*D_+d])
+                          - static_cast<double>(global_coords[perm_[Np-1]*D_+d]);
+                dist += dv*dv;
+            }
+            std::cout << "  Hilbert start→end physical dist = " << std::sqrt(dist)
+                      << "  (fault extent L=" << L << ")\n";
+        }
     }
 }
 
