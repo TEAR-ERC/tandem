@@ -1,4 +1,6 @@
 #include "SEAS.h"
+#include "form/StrumpackGFOperator.h"
+#include "form/StrumpackGFFullOperator.h"
 #include "common/PetscTimeSolver.h"
 #include "config.h"
 #include "form/AbstractDGOperator.h"
@@ -497,6 +499,325 @@ SolveBenchResult benchmarkSolve(LocalSimplexMesh<DomainDimension> const& mesh,
                   << "solve_bench_time_max_s=" << result.time_max_s << "\n";
     }
     return result;
+}
+
+// ---------------------------------------------------------------------------
+// validateGFStrumpack — build G_ from checkpoint, compress with STRUMPACK BUTTERFLY,
+// report MatVec counts and accuracy.
+// ---------------------------------------------------------------------------
+
+double validateGFStrumpack(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                           bool do_butterfly) {
+    if (cfg.mode != SeasMode::QuasiDynamicDiscreteGreen)
+        throw std::runtime_error("validateGFStrumpack requires mode = QDGreen");
+
+    // Load GF checkpoint through the normal SEAS path (no H-matrix build).
+    Config cfg_s = cfg;
+    cfg_s.hmatrix_config.use_hmatrix = false;
+
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg_s.type) {
+    case LocalOpType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg_s);
+        break;
+    case LocalOpType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg_s);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
+
+    auto seasop = detail::operator_specifics<SeasQDDiscreteGreenOperator>::make(mesh, cfg_s, *ctx);
+
+    int rank;
+    MPI_Comm_rank(seasop->comm(), &rank);
+
+    Mat G = seasop->dense_gf();
+    if (!G) {
+        if (rank == 0) std::cout << "RESULT: SKIP (dense GF not available)\n";
+        return -1.0;
+    }
+
+    auto local_coords = seasop->node_coords();
+    auto nbf          = seasop->fault_nbf();
+    auto s_proto      = seasop->slip_proto();
+    auto t_proto      = seasop->traction_proto();
+
+    GreensFunctionIndices ind(*seasop);
+    MPI_Comm comm = seasop->comm();
+
+    PetscInt M_gf, N_gf;
+    CHKERRQ(MatGetSize(G, &M_gf, &N_gf));
+    double mem_G = static_cast<double>(M_gf) * static_cast<double>(N_gf) * sizeof(PetscScalar);
+
+    if (rank == 0) {
+        std::cout << "\n=== STRUMPACK Structured-Matrix Bench ===\n"
+                  << "Matrix: " << M_gf << " x " << N_gf
+                  << "  D=" << DomainDimension
+                  << "  Np=" << N_gf / (DomainDimension - 1) << "\n"
+                  << "rtol=" << cfg_s.hmatrix_config.rtol
+                  << "  leaf_size=" << cfg_s.hmatrix_config.leaf_size
+                  << "  max_rank=" << cfg_s.hmatrix_config.max_rank
+                  << "  G_ (dense): ";
+        char buf[32];
+        if (mem_G >= 1e9) std::snprintf(buf, sizeof(buf), "%.2f GB", mem_G/1e9);
+        else              std::snprintf(buf, sizeof(buf), "%.2f MB", mem_G/1e6);
+        std::cout << buf << "\n\n";
+    }
+
+    // Fixed random vector for all comparisons
+    Vec x, y_G, y_S, diff;
+    CHKERRQ(VecCreateMPI(comm, ind.n, PETSC_DECIDE, &x));
+    CHKERRQ(VecDuplicate(t_proto, &y_G));
+    CHKERRQ(VecDuplicate(t_proto, &y_S));
+    CHKERRQ(VecDuplicate(t_proto, &diff));
+
+    PetscRandom rng;
+    CHKERRQ(PetscRandomCreate(comm, &rng));
+    CHKERRQ(PetscRandomSetType(rng, PETSCRAND48));
+    CHKERRQ(PetscRandomSetSeed(rng, 12345UL));
+    CHKERRQ(PetscRandomSeed(rng));
+    CHKERRQ(VecSetRandom(x, rng));
+    CHKERRQ(PetscRandomDestroy(&rng));
+
+    // Dense Gv timing (reference, done once)
+    constexpr int N_REPS = 5;
+    CHKERRQ(MatMult(G, x, y_G));  // warmup
+    PetscLogDouble t0, t1;
+    CHKERRQ(PetscTime(&t0));
+    for (int r = 0; r < N_REPS; ++r) CHKERRQ(MatMult(G, x, y_G));
+    CHKERRQ(PetscTime(&t1));
+    double time_G = (t1 - t0) / N_REPS;
+
+    PetscReal ref_norm;
+    CHKERRQ(VecNorm(y_G, NORM_2, &ref_norm));
+
+    // Helper: build one format, measure, report; returns rel_err.
+    using Type = strumpack::structured::Type;
+    auto bench_format = [&](Type fmt, const char* label) -> double {
+        if (rank == 0)
+            std::cout << "--- " << label << " ---\n";
+
+        StrumpackGFOperator op(G, local_coords, nbf, DomainDimension,
+                               s_proto, t_proto, comm, cfg_s.hmatrix_config, fmt);
+
+        // Accuracy
+        CHKERRQ(VecZeroEntries(y_S));
+        op.apply(x, y_S);  // warmup
+        CHKERRQ(VecZeroEntries(y_S));
+        op.apply(x, y_S);
+
+        PetscReal diff_norm;
+        CHKERRQ(VecCopy(y_S, diff));
+        CHKERRQ(VecAXPY(diff, -1.0, y_G));
+        CHKERRQ(VecNorm(diff, NORM_2, &diff_norm));
+        double rel_err = (ref_norm > 0.0) ? static_cast<double>(diff_norm / ref_norm) : -1.0;
+
+        // Apply timing
+        CHKERRQ(PetscTime(&t0));
+        for (int r = 0; r < N_REPS; ++r) {
+            CHKERRQ(VecZeroEntries(y_S));
+            op.apply(x, y_S);
+        }
+        CHKERRQ(PetscTime(&t1));
+        double time_S = (t1 - t0) / N_REPS;
+
+        if (rank == 0) {
+            double mem_S = op.total_mem_bytes();
+            char buf[32];
+            auto fmt_b = [&](double b) {
+                if (b >= 1e9) std::snprintf(buf, sizeof(buf), "%.2f GB", b/1e9);
+                else          std::snprintf(buf, sizeof(buf), "%.2f MB", b/1e6);
+                return std::string(buf);
+            };
+            const std::size_t fwd   = op.total_matvec_count();
+            const std::size_t adj   = op.total_adjoint_count();
+            const std::size_t total = fwd + adj;
+            const PetscInt    Np    = N_gf / (DomainDimension - 1);
+            std::cout
+                << "  Construction:  fwd=" << fwd << "  adj=" << adj
+                << "  total=" << total
+                << "  (vs Np=" << Np << " for full GF assembly"
+                << ", ratio=" << static_cast<double>(total)/Np << "x)\n"
+                << "  Memory:        " << fmt_b(mem_S)
+                << "  compression=" << mem_G / mem_S << "x\n"
+                << "  Apply timing:  Gv=" << time_G << "s"
+                << "  Sv=" << time_S << "s"
+                << "  speedup=" << time_G / time_S << "x\n"
+                << "  Accuracy:      ||Sv-Gv||/||Gv||=" << rel_err;
+            if (rel_err >= 0.0 && rel_err < cfg_s.hmatrix_config.rtol)
+                std::cout << "  PASS\n\n";
+            else
+                std::cout << "  FAIL (rtol=" << cfg_s.hmatrix_config.rtol << ")\n\n";
+        }
+        return rel_err;
+    };
+
+    double rel_err_hodlr     = bench_format(Type::HODLR,     "HODLR");
+    double rel_err_butterfly = -1.0;
+    if (do_butterfly)
+        rel_err_butterfly    = bench_format(Type::BUTTERFLY, "BUTTERFLY");
+
+    CHKERRQ(VecDestroy(&x));
+    CHKERRQ(VecDestroy(&y_G));
+    CHKERRQ(VecDestroy(&y_S));
+    CHKERRQ(VecDestroy(&diff));
+
+    double rel_err = (do_butterfly && rel_err_butterfly >= 0.0)
+                     ? std::max(rel_err_hodlr, rel_err_butterfly)
+                     : rel_err_hodlr;
+    return rel_err;
+}
+
+// ---------------------------------------------------------------------------
+// validateGFStrumpackFull — compress the full D*Np x slip_D*Np GF as one HODLR
+// matrix, report MatVec counts, compression ratio, and apply accuracy.
+// ---------------------------------------------------------------------------
+
+double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh,
+                               Config const& cfg) {
+    if (cfg.mode != SeasMode::QuasiDynamicDiscreteGreen)
+        throw std::runtime_error("validateGFStrumpackFull requires mode = QDGreen");
+
+    Config cfg_s = cfg;
+    cfg_s.hmatrix_config.use_hmatrix = false;
+
+    std::unique_ptr<seas::ContextBase> ctx = nullptr;
+    switch (cfg_s.type) {
+    case LocalOpType::Poisson:
+        ctx = detail::make_context<Poisson>(mesh, cfg_s);
+        break;
+    case LocalOpType::Elasticity:
+        ctx = detail::make_context<Elasticity>(mesh, cfg_s);
+        break;
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
+
+    auto seasop = detail::operator_specifics<SeasQDDiscreteGreenOperator>::make(mesh, cfg_s, *ctx);
+
+    int rank;
+    MPI_Comm_rank(seasop->comm(), &rank);
+
+    Mat G = seasop->dense_gf();
+    if (!G) {
+        if (rank == 0) std::cout << "RESULT: SKIP (dense GF not available)\n";
+        return -1.0;
+    }
+
+    auto local_coords = seasop->node_coords();
+    auto nbf          = seasop->fault_nbf();
+    auto s_proto      = seasop->slip_proto();
+    auto t_proto      = seasop->traction_proto();
+
+    GreensFunctionIndices ind(*seasop);
+    MPI_Comm comm = seasop->comm();
+
+    PetscInt M_gf, N_gf;
+    CHKERRQ(MatGetSize(G, &M_gf, &N_gf));
+    double mem_G = static_cast<double>(M_gf) * static_cast<double>(N_gf) * sizeof(PetscScalar);
+
+    if (rank == 0) {
+        std::cout << "\n=== STRUMPACK Full-Matrix Bench ===\n"
+                  << "Matrix: " << M_gf << " x " << N_gf
+                  << "  D=" << DomainDimension
+                  << "  Np=" << N_gf / (DomainDimension - 1) << "\n"
+                  << "rtol=" << cfg_s.hmatrix_config.rtol
+                  << "  leaf_size=" << cfg_s.hmatrix_config.leaf_size
+                  << "  max_rank=" << cfg_s.hmatrix_config.max_rank
+                  << "  G (dense): ";
+        char buf[32];
+        if (mem_G >= 1e9) std::snprintf(buf, sizeof(buf), "%.2f GB", mem_G/1e9);
+        else              std::snprintf(buf, sizeof(buf), "%.2f MB", mem_G/1e6);
+        std::cout << buf << "\n\n";
+    }
+
+    // Fixed random test vector (same seed as validateGFStrumpack for comparability)
+    Vec x, y_G, y_S, diff;
+    CHKERRQ(VecCreateMPI(comm, ind.n, PETSC_DECIDE, &x));
+    CHKERRQ(VecDuplicate(t_proto, &y_G));
+    CHKERRQ(VecDuplicate(t_proto, &y_S));
+    CHKERRQ(VecDuplicate(t_proto, &diff));
+
+    PetscRandom rng;
+    CHKERRQ(PetscRandomCreate(comm, &rng));
+    CHKERRQ(PetscRandomSetType(rng, PETSCRAND48));
+    CHKERRQ(PetscRandomSetSeed(rng, 12345UL));
+    CHKERRQ(PetscRandomSeed(rng));
+    CHKERRQ(VecSetRandom(x, rng));
+    CHKERRQ(PetscRandomDestroy(&rng));
+
+    // Dense reference Gv (warmup + timed)
+    constexpr int N_REPS = 5;
+    CHKERRQ(MatMult(G, x, y_G));
+    PetscLogDouble t0, t1;
+    CHKERRQ(PetscTime(&t0));
+    for (int r = 0; r < N_REPS; ++r) CHKERRQ(MatMult(G, x, y_G));
+    CHKERRQ(PetscTime(&t1));
+    double time_G = (t1 - t0) / N_REPS;
+
+    PetscReal ref_norm;
+    CHKERRQ(VecNorm(y_G, NORM_2, &ref_norm));
+
+    // Build full-matrix HODLR operator
+    StrumpackGFFullOperator op(G, local_coords, nbf, DomainDimension,
+                               s_proto, t_proto, comm, cfg_s.hmatrix_config);
+
+    // Accuracy check
+    CHKERRQ(VecZeroEntries(y_S));
+    op.apply(x, y_S);  // warmup
+    CHKERRQ(VecZeroEntries(y_S));
+    op.apply(x, y_S);
+
+    PetscReal diff_norm;
+    CHKERRQ(VecCopy(y_S, diff));
+    CHKERRQ(VecAXPY(diff, -1.0, y_G));
+    CHKERRQ(VecNorm(diff, NORM_2, &diff_norm));
+    double rel_err = (ref_norm > 0.0) ? static_cast<double>(diff_norm / ref_norm) : -1.0;
+
+    // Apply timing
+    CHKERRQ(PetscTime(&t0));
+    for (int r = 0; r < N_REPS; ++r) {
+        CHKERRQ(VecZeroEntries(y_S));
+        op.apply(x, y_S);
+    }
+    CHKERRQ(PetscTime(&t1));
+    double time_S = (t1 - t0) / N_REPS;
+
+    if (rank == 0) {
+        double mem_S = op.total_mem_bytes();
+        char buf[32];
+        auto fmt_b = [&](double b) {
+            if (b >= 1e9) std::snprintf(buf, sizeof(buf), "%.2f GB", b/1e9);
+            else          std::snprintf(buf, sizeof(buf), "%.2f MB", b/1e6);
+            return std::string(buf);
+        };
+        const std::size_t fwd = op.total_matvec_count();
+        const std::size_t adj = op.total_adjoint_count();
+        const PetscInt    Np  = N_gf / (DomainDimension - 1);
+        std::cout
+            << "  Construction:  fwd=" << fwd << "  adj=" << adj
+            << "  total=" << fwd+adj
+            << "  (vs Np=" << Np << " for full GF assembly"
+            << ", ratio=" << static_cast<double>(fwd+adj)/Np << "x)\n"
+            << "  Memory:        " << fmt_b(mem_S)
+            << "  compression=" << mem_G / mem_S << "x\n"
+            << "  Apply timing:  Gv=" << time_G << "s"
+            << "  Sv=" << time_S << "s"
+            << "  speedup=" << time_G / time_S << "x\n"
+            << "  Accuracy:      ||Sv-Gv||/||Gv||=" << rel_err;
+        if (rel_err >= 0.0 && rel_err < cfg_s.hmatrix_config.rtol)
+            std::cout << "  PASS\n\n";
+        else
+            std::cout << "  FAIL (rtol=" << cfg_s.hmatrix_config.rtol << ")\n\n";
+    }
+
+    CHKERRQ(VecDestroy(&x));
+    CHKERRQ(VecDestroy(&y_G));
+    CHKERRQ(VecDestroy(&y_S));
+    CHKERRQ(VecDestroy(&diff));
+
+    return rel_err;
 }
 
 } // namespace tndm

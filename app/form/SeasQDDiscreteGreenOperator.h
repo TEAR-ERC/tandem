@@ -115,6 +115,15 @@ private:
 public:
     Mat dense_gf() const { return G_; }
 
+    // Accessors for external operators (e.g. StrumpackGFOperator) that need
+    // the same inputs as HMatrixGreenFunction's constructor.
+    std::vector<PetscReal> node_coords() const { return collect_node_coords(); }
+    PetscInt fault_nbf() const {
+        return static_cast<PetscInt>(base::friction().fault_num_basis_functions());
+    }
+    Vec slip_proto()     const { return S_->vec(); }
+    Vec traction_proto() const { return base::traction_.vec(); }
+
 #ifdef PETSC_HAVE_HTOOL
     struct ValidationResult {
         double err_H_vs_G      = -1.0;

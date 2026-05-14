@@ -79,6 +79,9 @@ include(../cmake/doctest.cmake)
 
 find_package(PETSc REQUIRED)
 
+find_package(STRUMPACK REQUIRED
+    HINTS /home/ymagen/petsc/build/lib/cmake/STRUMPACK)
+
 if(PETSC_MEMALIGN LESS ALIGNMENT)
     message(SEND_ERROR "The memory alignment of PETSc is ${PETSC_MEMALIGN} bytes but an alignment of "
                        "at least ${ALIGNMENT} bytes is required for ARCH=${ARCH}. "
@@ -193,6 +196,8 @@ set(APP_COMMON_SRCS
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
     form/HMatrixGreenFunction.cpp
+    form/StrumpackGFOperator.cpp
+    form/StrumpackGFFullOperator.cpp
     localoperator/AdapterBase.cpp
     localoperator/NodalInterpolation.cpp
     localoperator/Elasticity.cpp
@@ -214,6 +219,7 @@ endif()
 add_library(app-common ${APP_COMMON_SRCS})
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
+    STRUMPACK::strumpack
     ${LAPACK_LIBRARIES}
     poisson-kernels-lib
     poisson_adapter-kernels-lib
@@ -275,3 +281,19 @@ add_executable(gf-solve-bench
     gf-solve-bench.cpp)
 target_link_libraries(gf-solve-bench PRIVATE app-common)
 target_include_directories(gf-solve-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(gf-strumpack-bench
+    tandem/Monitor.cpp
+    tandem/SeasConfig.cpp
+    tandem/SEAS.cpp
+    gf-strumpack-bench.cpp)
+target_link_libraries(gf-strumpack-bench PRIVATE app-common)
+target_include_directories(gf-strumpack-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(gf-strumpack-full-bench
+    tandem/Monitor.cpp
+    tandem/SeasConfig.cpp
+    tandem/SEAS.cpp
+    gf-strumpack-full-bench.cpp)
+target_link_libraries(gf-strumpack-full-bench PRIVATE app-common)
+target_include_directories(gf-strumpack-full-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
