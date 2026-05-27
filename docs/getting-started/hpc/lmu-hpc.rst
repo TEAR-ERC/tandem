@@ -170,9 +170,20 @@ Manually edit ``~/.spack/packages.yaml`` to register the cluster's Intel MPI, re
        buildable: false
 
 
-Finally, install tandem.
+Finally, install tandem:
 
 .. code-block:: bash
 
    spack install tandem@1.2.0-rc polynomial_degree=2 domain_dimension=3 +libxsmm %intel-oneapi-compilers
 
+Once installed, refresh the TCL module files to register the new installation:
+
+.. code-block:: bash
+
+   spack module tcl refresh -y $(spack find -d --format "{name}{/hash:5}" tandem)
+
+The module can then be discovered by adding the module path to your environment (e.g., in your ``~/.bashrc``):
+
+.. code-block:: bash
+
+   module use /DATA/<<your_user_name>>/spack_install/modules/linux-debian12-zen2
