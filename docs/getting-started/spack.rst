@@ -119,3 +119,43 @@ Then install using the build name after ``tandem@``:
 .. code-block:: bash
 
     spack install tandem@BUILD_NAME domain_dimension=2 polynomial_degree=6
+
+
+Installing a GPU Version
+------------------------
+
+First, configure your target GPU architecture in your ``~/.spack/packages.yaml`` file. This ensures that the architecture parameters are correctly propagated down to all underlying dependencies (like PETSc or Kokkos):
+
+.. code-block:: yaml
+
+   packages:
+     all:
+       # For NVIDIA GPUs, specify the CUDA architecture (e.g., 80 for A100, 86 for Ampere)
+       variants: [cuda_arch=86]
+       
+       # Alternatively, for AMD GPUs, use the amdgpu_target variant:
+       # variants: [amdgpu_target=gfx90a]
+
+Then, installing the GPU version of Tandem is as simple as adding the corresponding GPU variant (``+cuda`` for NVIDIA or ``+rocm`` for AMD):
+
+.. code-block:: bash
+
+   spack install -j 20 tandem@main polynomial_degree=4 domain_dimension=3 +cuda
+
+Running with GPU Acceleration
+-----------------------------
+
+To ensure that Tandem offloads computations to the GPUs, additional PETSc runtime arguments must be explicitly passed when executing the application.
+
+For **NVIDIA CUDA** environments, append the following flags to your execution command:
+
+.. code-block:: bash
+
+   tandem parameters.toml --petsc -vec_type cuda -mat_type aijcusparse
+
+For **AMD ROCm / HIP** environments, use these flags instead:
+
+.. code-block:: bash
+
+   tandem parameters.toml --petsc -vec_type hip -mat_type aijhipsparse
+
