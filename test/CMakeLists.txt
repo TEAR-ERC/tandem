@@ -71,7 +71,7 @@ if(RUN_CI_TESTS)
             COMMAND ${GIT_EXECUTABLE} clone
             --depth 1
             --branch ${TEST_DATA_BRANCH}
-            https://github.com/piyushkarki/tandem_test_data.git
+            https://github.com/TEAR-ERC/tandem_test_data
             ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_CLONE_RESULT
         )
