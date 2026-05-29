@@ -41,7 +41,8 @@ jobs:
             -w /app \
             -e CC=${{ matrix.compiler.cc }} \
             -e CXX=${{ matrix.compiler.cxx }} \
-            --user tandem \
+            -e HOME=/tmp \
+            --user $(id -u):$(id -g) \
             $IMAGE \
             bash -c "
               set -e
@@ -63,7 +64,8 @@ jobs:
             -w /app/build_${{ matrix.dimension }}d_p${{ matrix.degree }} \
             -e CC=${{ matrix.compiler.cc }} \
             -e CXX=${{ matrix.compiler.cxx }} \
-            --user tandem \
+            -e HOME=/tmp \
+            --user $(id -u):$(id -g) \
             $IMAGE \
             ctest --output-on-failure
 
