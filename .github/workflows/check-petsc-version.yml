@@ -36,7 +36,19 @@ jobs:
             | sed 's/[^0-9]*\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/' \
             | sort -V \
             | tail -n 1)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+            
+            if [[ -z "$VERSION" ]]; then
+              echo "Failed to resolve PETSc version (empty result)"
+              exit 1
+            fi
+            
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "PETSc version looks malformed: '$VERSION'"
+              exit 1
+            fi
+
+            echo "Resolved PETSc version: $VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
