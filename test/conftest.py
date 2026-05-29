@@ -130,14 +130,19 @@ def load_vtu_file():
     """
 
     def _load(file_path):
-        if not os.path.exists(file_path):
-            print(f"Error: File {file_path} does not exist")
-            return None
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"VTU file not found: {file_path}")
 
         reader = vtk.vtkXMLUnstructuredGridReader()
-        reader.SetFileName(file_path)
+        reader.SetFileName(str(file_path))
         reader.Update()
-        return reader.GetOutput()
+        output = reader.GetOutput()
+
+        if output is None or output.GetNumberOfPoints() == 0:
+            raise RuntimeError(f"VTU file loaded but contains no data: {file_path}")
+
+        return output
 
     return _load
 
