@@ -315,7 +315,6 @@ private:
     CurvilinearBoundaryHDF5Adapter<D> adapter_;
     unsigned degree_;
     MPI_Comm comm_;
-    std::vector<std::array<std::array<double, D>, 3>> faultVertices;
     hid_t momentRateDataset_ = -1;
     hid_t timeStepDataset_ = -1;
 };
