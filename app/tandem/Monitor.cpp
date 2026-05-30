@@ -47,7 +47,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }
-                case DataLevel::Heirarchical: {
+                case DataLevel::Hierarchical: {
                     if (time == 0.0) {
                         continue;
                     }
@@ -78,7 +78,7 @@ void MonitorQD::write_static() {
             writer->write_static(mneme::span(&data, 1));
             break;
         }
-        case DataLevel::Heirarchical: {
+        case DataLevel::Hierarchical: {
             writer->write_static();
             break;
         }
@@ -109,7 +109,7 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     writer->write(time, mneme::span(data.data(), 2));
                     break;
                 }
-                case DataLevel::Heirarchical: {
+                case DataLevel::Hierarchical: {
                     writer->write(time, moment_rate);
                     break;
                 }
