@@ -7,6 +7,7 @@ EXECUTABLE_DIR=$1
 TEMP_TEST_RESULTS=$2
 DOMAIN_DIMENSION=$3
 POLYNOMIAL_DEGREE=$4
+ENABLE_HDF5=$5
 
 # Check if any required arguments are missing
 if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" || -z "$DOMAIN_DIMENSION" ]]; then
@@ -39,7 +40,7 @@ echo ""
 
 
 echo "${DOMAIN_DIMENSION}D Reference Outputs"
-bash "$SCRIPT_DIR/${DOMAIN_DIMENSION}D/generate_${DOMAIN_DIMENSION}D_outputs.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
+bash "$SCRIPT_DIR/${DOMAIN_DIMENSION}D/generate_${DOMAIN_DIMENSION}D_outputs.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE" "$ENABLE_HDF5"
 echo ""
 
 echo "Reference outputs generated successfully!"
