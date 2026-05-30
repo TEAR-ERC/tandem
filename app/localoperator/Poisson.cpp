@@ -724,10 +724,15 @@ void Poisson::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& r
     assert(result.size() == tensor::mu_avg_q::size());
 
     kernel::mu_avg krnl;
-    krnl.mu_q(0) = material[info.up[0]].get<K>().data();
-    krnl.mu_q(1) = material[info.up[1]].get<K>().data();
-    krnl.mu_avg_q = result.data();
-    krnl.execute();
+    double const* K0 = material[info.up[0]].get<K>().data();
+    double const* K1 = material[info.up[1]].get<K>().data();
+    double* res = result.data();
+    std::size_t nq = result.size();
+    
+    #pragma omp simd
+    for (std::size_t q = 0; q < nq; ++q) {
+        res[q] = 0.5 * (K0[q] + K1[q]);
+    }
 }
 
 } // namespace tndm
