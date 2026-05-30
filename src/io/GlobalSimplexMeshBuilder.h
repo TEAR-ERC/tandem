@@ -2,6 +2,8 @@
 #define GLOBALSIMPLEXMESHBUILDER_20200901_H
 
 #include "io/GMSHParser.h"
+
+#include "io/meshParser.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/Simplex.h"
 
@@ -44,7 +46,7 @@ template <std::size_t D> inline bool is_lower_dimensional_gmsh_simplex_v(long ty
     return is_lower_dimensional_gmsh_simplex<D>::value(type);
 }
 
-template <std::size_t D> class GlobalSimplexMeshBuilder : public GMSHMeshBuilder {
+template <std::size_t D> class GlobalSimplexMeshBuilder : public meshBuilder {
 private:
     constexpr static std::size_t NumVerts = D + 1u;
 
