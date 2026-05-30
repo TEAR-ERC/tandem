@@ -53,7 +53,7 @@ public:
     virtual void write(double time, mneme::span<FiniteElementFunction<3u>> data) {}
     virtual void write(double time, std::vector<double> data) {}
 
-    inline void increase_step(double time, double VMax) {
+    virtual void increase_step(double time, double VMax) {
         ++output_step_;
         last_output_time_ = time;
         last_output_VMax_ = VMax;
@@ -312,6 +312,12 @@ public:
                                glueDimension, extensibleDimension);
 
         writer_.closeDataset(fctNoDataset_);
+    }
+    void increase_step(double time, double VMax) override {
+        if (time == 0.0) {
+            return;
+        }
+        Writer::increase_step(time, VMax);
     }
 
 private:
