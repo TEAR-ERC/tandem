@@ -36,9 +36,6 @@ public:
         }
         lop_->end_preparation();
         moment_rate_.resize(adapter_ ? num_local_elements() * (DomainDimension - 1) : 0);
-        if (adapter_) {
-            moment_rate_q_scratch_.resize(DomainDimension);
-        }
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
@@ -97,7 +94,6 @@ public:
         bool rhs_success = true;
         VMax_ = 0.0;
         scratch_.reset();
-        std::size_t mr_idx = 0;
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
@@ -110,23 +106,14 @@ public:
             }
 
             VMax_ = std::max(VMax_, VMax);
-
-            // Compute moment rate directly from slip rate at basis function nodes
-            if (adapter_) {
-                auto moment_rate_q =
-                    Matrix<double>(moment_rate_q_scratch_.data(), 1, DomainDimension);
-                auto slip_rate =
-                    tndm::Vector<const double>(result_block.data(), result_block.shape());
-                auto fctNo = fault_map_->fctNo(faultNo);
-                auto info = topo_->info(fctNo);
-                adapter_->moment_rate(faultNo, moment_rate_q, slip_rate, fctNo, info);
-                for (std::size_t i = 0; i < DomainDimension - 1; ++i) {
-                    moment_rate_[faultNo * (DomainDimension - 1) + i] = moment_rate_q(0, i);
-                }
-            }
         }
 
         result.end_access(result_handle);
+        if (adapter_) {
+            auto result_view = result.begin_access_readonly();
+            adapter_->compute_moment_rates(result_view, moment_rate_);
+            result.end_access_readonly(result_view);
+        }
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
         if (rhs_success == false) {
@@ -246,7 +233,6 @@ private:
     Scratch<double> scratch_;
     double VMax_ = 0.0;
     std::vector<double> moment_rate_;
-    std::vector<double> moment_rate_q_scratch_;
 };
 
 } // namespace tndm
