@@ -38,6 +38,7 @@ add_library(tandem-lib
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
     io/H5Parser.cpp
+    io/MeshParser.cpp
     io/PVDWriter.cpp
     io/VTUWriter.cpp
     io/VTUWriter.cpp
