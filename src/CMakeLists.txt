@@ -79,14 +79,12 @@ if(ENABLE_HDF5)
 endif()
 
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
-target_include_directories(tandem-lib PUBLIC 
-    ${HDF5_INCLUDE_DIRS}
+target_include_directories(tandem-lib PUBLIC
     ../submodules/
     ../submodules/mneme/include/
     ${LUA_INCLUDE_DIR}
 )
 target_link_libraries(tandem-lib PUBLIC
-    ${HDF5_LIBRARIES}    
     tandem-fem-lib
     ${FILESYSTEM_LIBRARIES}
     ${LUA_LIBRARIES}
