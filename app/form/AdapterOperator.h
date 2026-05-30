@@ -77,17 +77,14 @@ public:
         result.end_access(result_handle);
     }
 
-    void slip_rate(Vector<double const>& slip_rate_reshaped, Matrix<double>& slip_rate_q) override {
-        lop_->slip_rate(slip_rate_reshaped, slip_rate_q);
-    }
     void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                     Matrix<double>& slip_rate_q, std::size_t fctNo,
+                     Vector<double const>& slip_rate, std::size_t fctNo,
                      FacetInfo const& info) override {
-        std::size_t nq = slip_rate_q.shape(1);
+        std::size_t nq = lop_->num_quad_points();
         alignas(ALIGNMENT) double mu_field_raw[nq];
         auto mu_field = Matrix<double>(mu_field_raw, 1, nq);
         adapted_lop_->mu_avg(fctNo, info, mu_field);
-        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate_q, mu_field);
+        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate, mu_field);
     }
 
 private:
