@@ -33,3 +33,4 @@ def add(generator, dim, nbf_fault, nq):
     generator.add(
         'evaluate_moment_rate', moment_rate['p'] <=
             w['q'] * e_q['lq'] * slip_rate['lp'] * nl_q['q'] * mu['q'])
+
