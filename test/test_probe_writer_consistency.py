@@ -3,7 +3,60 @@ import pandas as pd
 import numpy as np
 
 
-def check_csv_and_h5_match(prefix, temp_results_path):
+def check_moment_rate_h5(temp_results_path, tolerances):
+    """
+    Checks that the moment_rate.h5 file is valid and that the sum of moment
+    rates over all fault elements at the first non-zero timestep (index 0),
+    matches the expected value.
+
+    Expected: 1.2815248035796437e-06
+    """
+    h5_file_path = temp_results_path / "moment_rate.h5"
+    assert h5_file_path.exists(), f"HDF5 file missing: {h5_file_path}"
+
+    try:
+        with h5py.File(h5_file_path, "r") as h5:
+            for key in ["time", "momentRate", "faultNo", "faultVertices"]:
+                assert key in h5, f"moment_rate.h5 missing dataset '{key}'"
+                assert h5[key].size > 0, f"moment_rate.h5 dataset '{key}' is empty"
+
+            time = h5["time"][:]
+            moment_rate = h5["momentRate"][:]
+    except OSError as e:
+        raise AssertionError(
+            f"moment_rate.h5 could not be opened — possibly corrupted or not "
+            f"properly closed (e.g. simulation crashed mid-write): {e}"
+        )
+
+    # Validate shape: (num_fault_elements, num_timesteps, 1)
+    assert moment_rate.ndim == 3, (
+        f"momentRate has unexpected shape {moment_rate.shape}, "
+        f"expected (fault_elements, timesteps, 1)"
+    )
+    assert (
+        moment_rate.shape[2] == 1
+    ), f"momentRate last dimension expected 1, got {moment_rate.shape[2]}"
+    assert moment_rate.shape[1] == len(time), (
+        f"momentRate timestep count {moment_rate.shape[1]} does not match "
+        f"time array length {len(time)}"
+    )
+
+    # Sum over all fault elements at first time step
+    moment_rate_sum = np.sum(moment_rate[:, 0, 0])
+
+    expected = 1.2815248035796437e-06
+    np.testing.assert_allclose(
+        moment_rate_sum,
+        expected,
+        rtol=tolerances["seas"],
+        err_msg=(
+            f"Sum of moment rates at first non-zero timestep "
+            f"(normalized) {moment_rate_sum} does not match expected {expected}"
+        ),
+    )
+
+
+def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
     """
     Checks that the data dumped into the CSV probe files exactly matches
     the data in the corresponding HDF5 probe files.
@@ -64,8 +117,8 @@ def check_csv_and_h5_match(prefix, temp_results_path):
         np.testing.assert_allclose(
             df["Time"].values,
             h5_time,
-            rtol=1e-12,
-            atol=1e-14,
+            rtol=tolerances["seas"],
+            atol=tolerances["seas"],
             err_msg=f"[{prefix}] Time arrays do not match for probe {probe_name}",
         )
 
@@ -84,15 +137,19 @@ def check_csv_and_h5_match(prefix, temp_results_path):
             np.testing.assert_allclose(
                 csv_field_data,
                 h5_field_data,
-                rtol=1e-12,
-                atol=1e-14,
+                rtol=tolerances["seas"],
+                atol=tolerances["seas"],
                 err_msg=f"[{prefix}] Data for field '{field_name}' does not match for probe {probe_name}",
             )
 
 
-def test_blkst_csv_and_h5_match(temp_results_path):
-    check_csv_and_h5_match("blkst", temp_results_path)
+def test_moment_rate(temp_results_path, tolerances):
+    check_moment_rate_h5(temp_results_path, tolerances)
 
 
-def test_fltst_csv_and_h5_match(temp_results_path):
-    check_csv_and_h5_match("fltst", temp_results_path)
+def test_blkst_csv_and_h5_match(temp_results_path, tolerances):
+    check_csv_and_h5_match("blkst", temp_results_path, tolerances)
+
+
+def test_fltst_csv_and_h5_match(temp_results_path, tolerances):
+    check_csv_and_h5_match("fltst", temp_results_path, tolerances)
