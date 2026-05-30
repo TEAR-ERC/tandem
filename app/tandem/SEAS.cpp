@@ -82,6 +82,12 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
             fault_map, comm));
     }
+    if (cfg.HDF5_fault_probe_output) {
+        auto const& oc = *cfg.HDF5_fault_probe_output;
+        monitor.add_writer(std::make_unique<seas::HDF5FaultProbeWriter<DomainDimension>>(
+            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+            fault_map, comm));
+    }
     if (cfg.domain_probe_output) {
         auto const& oc = *cfg.domain_probe_output;
         monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
