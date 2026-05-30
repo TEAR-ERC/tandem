@@ -113,8 +113,9 @@ bool H5Parser::parseElements(hid_t file) {
 
 // Function to check if a sorted version of faceNodes exists in lowerDimensionalElements
 template <size_t DomainDimension>
-bool isAlreadyPresent(const std::vector<std::array<long int, DomainDimension>>& lowerDimensionalElements,
-                      const std::array<long int, DomainDimension>& faceNodes) {
+bool isAlreadyPresent(
+    const std::vector<std::array<long int, DomainDimension>>& lowerDimensionalElements,
+    const std::array<long int, DomainDimension>& faceNodes) {
     std::array<long, DomainDimension> sortedFaceNodes =
         faceNodes; // Copy to avoid modifying original
     std::sort(sortedFaceNodes.begin(), sortedFaceNodes.end());
