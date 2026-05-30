@@ -60,6 +60,14 @@ add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
 
+if(ENABLE_HDF5)
+    find_package(HDF5 COMPONENTS C HL QUIET)
+endif()
+
+add_executable(test-HDF5MeshParser HDF5MeshParser.cpp)
+target_link_libraries(test-HDF5MeshParser test-runner-mpi)
+doctest_discover_tests(test-HDF5MeshParser)
+
 if(RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
     find_package(Git REQUIRED)
@@ -143,6 +151,25 @@ if(RUN_CI_TESTS)
         "test_parallel_consistency_static.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
+
+    # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=3
+    if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
+        set(MESH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data/reference_meshes/${DOMAIN_DIMENSION}D)
+
+        configure_file(
+            MeshParserIntegrationPaths.h.in
+            MeshParserIntegrationPaths.h
+        )
+
+        add_executable(test-mesh-parser-integration MeshParserIntegration.cpp)
+        target_link_libraries(test-mesh-parser-integration test-runner-mpi)
+        target_include_directories(test-mesh-parser-integration PRIVATE
+            ${CMAKE_CURRENT_BINARY_DIR}
+        )
+        doctest_discover_tests(test-mesh-parser-integration
+            PROPERTIES FIXTURES_REQUIRED TestData
+        )
+    endif()
 
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 

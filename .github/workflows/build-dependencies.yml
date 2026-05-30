@@ -6,6 +6,9 @@ on:
       petsc_version:
         required: true
         type: string
+      hdf5_version:
+        required: true
+        type: string
       dependencies_image:
         required: true
         type: string
@@ -32,7 +35,7 @@ jobs:
       - name: Check if base image exists
         id: check-base
         run: |
-          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -52,12 +55,11 @@ jobs:
           context: .
           file: docker/base/Dockerfile
           push: true
-          tags: |
-            ${{ inputs.base_image }}:${{ inputs.petsc_version }}
-            ${{ inputs.base_image }}:latest
+          tags: ${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           platforms: linux/amd64
           build-args: |
             PETSC_VERSION=${{ inputs.petsc_version }}
+            HDF5_VERSION=${{ inputs.hdf5_version }}
             CC=gcc-13
             CXX=g++-13
 
@@ -96,13 +98,12 @@ jobs:
       - name: Check if test image exists
         id: check-test
         run: |
-          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      # Using TJ Actions again for the test Dockerfile
       - name: Check if test Dockerfile changed
         id: test-changed
         uses: tj-actions/changed-files@v42
@@ -119,9 +120,11 @@ jobs:
           context: .
           file: docker/test/Dockerfile
           push: true
-          tags: |
-            ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
-            ${{ inputs.dependencies_image }}:latest
+          tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           platforms: linux/amd64
           build-args: |
-            BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}
+            BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
+            PETSC_VERSION=${{ inputs.petsc_version }}
+            HDF5_VERSION=${{ inputs.hdf5_version }}
+            CC=gcc-13
+            CXX=g++-13

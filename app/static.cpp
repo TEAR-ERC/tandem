@@ -15,8 +15,8 @@
 #include "form/DGOperator.h"
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
-#include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
+#include "io/MeshParser.h"
 #include "io/VTUAdapter.h"
 #include "io/VTUWriter.h"
 #include "mesh/GenMesh.h"
@@ -331,14 +331,27 @@ int main(int argc, char** argv) {
     if (cfg->mesh_file) {
         bool ok = false;
         GlobalSimplexMeshBuilder<DomainDimension> builder;
+        std::string meshError;
         if (rank == 0) {
-            GMSHParser parser(&builder);
-            ok = parser.parseFile(*cfg->mesh_file);
-            if (!ok) {
-                std::cerr << *cfg->mesh_file << std::endl << parser.getErrorMessage();
+            auto [parser, error] =
+                MeshParser::createWithValidation<DomainDimension>(*cfg->mesh_file, &builder);
+            if (!parser) {
+                meshError = error;
+            } else {
+                ok = parser->parseFile(*cfg->mesh_file);
+                if (!ok) {
+                    meshError = *cfg->mesh_file + "\n" + std::string(parser->getErrorMessage());
+                }
             }
         }
         MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
+        if (!ok) {
+            if (rank == 0) {
+                std::cerr << meshError << std::endl;
+            }
+            PetscFinalize();
+            return -1;
+        }
         if (ok) {
             globalMesh = builder.create(PETSC_COMM_WORLD);
         }
