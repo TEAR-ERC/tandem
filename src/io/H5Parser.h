@@ -22,7 +22,7 @@ private:
     bool parseNodes(hid_t file);
     bool parseElements(hid_t file);
     bool parseBoundary(hid_t file);
-    bool retrieveLowerOrderElements(hid_t file);
+    bool retrieveLowerDimensionalElements(hid_t file);
 
 public:
     H5Parser(meshBuilder* builder) : builder(builder) {}
@@ -32,8 +32,8 @@ public:
 
     std::string_view getErrorMessage() const override { return errorMsg; }
 
-    std::vector<std::array<long, 4>> higherOrderElements;
-    std::vector<std::array<long, 3>> lowerOrderElements;
+    std::vector<std::array<long, 4>> higherDimensionalElements;
+    std::vector<std::array<long, 3>> lowerDimensionalElements;
     std::vector<std::uint32_t> boundaryData;
     std::vector<std::uint8_t> boundary;
 };
