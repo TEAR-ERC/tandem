@@ -16,7 +16,7 @@ struct membuf : std::streambuf {
     membuf(char* b, char* e) { this->setg(b, b, e); }
 };
 
-class GMSHParser: public meshParser{
+class GMSHParser : public meshParser {
 private:
     meshBuilder* builder;
     GMSHToken curTok;
@@ -37,7 +37,6 @@ private:
     bool parse_();
 
 public:
-
     GMSHParser(meshBuilder* builder) : builder(builder) {}
 
     bool parse(std::string& msh);

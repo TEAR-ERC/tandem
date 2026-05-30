@@ -10,7 +10,6 @@
 
 namespace tndm {
 
-
 class meshBuilder {
 public:
     virtual ~meshBuilder() {}
