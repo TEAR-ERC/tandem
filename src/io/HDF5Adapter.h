@@ -59,7 +59,7 @@ public:
      * @brief Get the number of fault basis nodes.
      * @param numBsisNodes to store the basis nodes.
      */
-     virtual std::size_t getNumBasisNodes() = 0;
+    virtual std::size_t getNumBasisNodes() = 0;
 };
 
 template <std::size_t D> class CurvilinearBoundaryHDF5Adapter : public HDF5Adapter<D> {
@@ -102,9 +102,7 @@ public:
             E_.emplace_back(cl_->evaluateBasisAt(facetParam));
         }
     }
-    std::size_t getNumBasisNodes() override {
-        return numBasisNodes_;
-    }
+    std::size_t getNumBasisNodes() override { return numBasisNodes_; }
     std::vector<double> getVertices() override {
         const std::size_t totalValues = D * numElements() * numBasisNodes_;
         const std::size_t elementVertices = D;
