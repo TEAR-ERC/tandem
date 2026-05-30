@@ -1,12 +1,12 @@
-name: clang-format
+name: Clang Format Check
 on:
-  - push
+  workflow_call:
 
 jobs:
   clang-format:
     name: clang-format
     runs-on: ubuntu-22.04
-    steps:
+    steps: 
       - uses: actions/checkout@v4
 
       - name: apt-get

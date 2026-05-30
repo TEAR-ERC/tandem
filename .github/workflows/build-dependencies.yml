@@ -1,0 +1,127 @@
+name: Build Dependencies Image
+
+on:
+  workflow_call:
+    inputs:
+      petsc_version:
+        required: true
+        type: string
+      dependencies_image:
+        required: true
+        type: string
+      tandem_image:
+        required: true
+        type: string
+      base_image:
+        required: true
+        type: string
+
+jobs:
+  build-base:
+    runs-on: ubuntu-24.04
+    outputs:
+      base_rebuilt: ${{ steps.set-built.outputs.built }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Check if base image exists
+        id: check-base
+        run: |
+          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if base Dockerfile changed
+        id: base-changed
+        uses: tj-actions/changed-files@v42
+        with:
+          files: docker/base/Dockerfile
+
+      - name: Build and push base image
+        id: docker-build-base
+        if: steps.check-base.outputs.exists == 'false' || steps.base-changed.outputs.any_changed == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: docker/base/Dockerfile
+          push: true
+          tags: |
+            ${{ inputs.base_image }}:${{ inputs.petsc_version }}
+            ${{ inputs.base_image }}:latest
+          platforms: linux/amd64
+          build-args: |
+            PETSC_VERSION=${{ inputs.petsc_version }}
+            CC=gcc-13
+            CXX=g++-13
+
+      - name: Set built output
+        id: set-built
+        run: |
+          # If the build step was skipped, it means we didn't rebuild.
+          case "${{ steps.docker-build-base.outcome }}" in
+            success)
+              echo "built=true" >> $GITHUB_OUTPUT
+              ;;
+            skipped)
+              echo "built=false" >> $GITHUB_OUTPUT
+              ;;
+            failure|cancelled)
+              echo "Base image build failed — cannot continue"
+              exit 1
+              ;;
+            *)
+              echo "Unexpected outcome: ${{ steps.docker-build-base.outcome }}"
+              exit 1
+              ;;
+          esac
+
+  build-test-image:
+    runs-on: ubuntu-24.04
+    needs: build-base
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Check if test image exists
+        id: check-test
+        run: |
+          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Using TJ Actions again for the test Dockerfile
+      - name: Check if test Dockerfile changed
+        id: test-changed
+        uses: tj-actions/changed-files@v42
+        with:
+          files: docker/test/Dockerfile
+
+      - name: Build and push test image
+        if: |
+          steps.check-test.outputs.exists == 'false' ||
+          steps.test-changed.outputs.any_changed == 'true' ||
+          needs.build-base.outputs.base_rebuilt == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: docker/test/Dockerfile
+          push: true
+          tags: |
+            ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}
+            ${{ inputs.dependencies_image }}:latest
+          platforms: linux/amd64
+          build-args: |
+            BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}
