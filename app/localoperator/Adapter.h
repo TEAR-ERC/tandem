@@ -22,7 +22,7 @@ public:
     void slip_rate(std::size_t faultNo, Vector<double const>& state,
                    Matrix<double>& slip_rate_q) const;
     void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                     Matrix<double>& slip_rate_q, double* mu_field) const;
+                     Matrix<double>& slip_rate_q,  Matrix<double>& mu_field) const;
 };
 
 } // namespace tndm
