@@ -1,4 +1,4 @@
-#include "H5Parser.h"
+#include "HDF5MeshParser.h"
 #include <algorithm>
 #include <array>
 #include <iostream>
@@ -9,7 +9,7 @@ namespace tndm {
 
 #ifdef ENABLE_HDF5
 
-template <typename T> T H5Parser::logError(std::string_view msg) {
+template <typename T> T HDF5MeshParser::logError(std::string_view msg) {
     errorMsg += "H5 parser error:\n\t";
     errorMsg += msg;
     errorMsg += '\n';
@@ -22,7 +22,7 @@ template <> hid_t nativeH5Type<long>() { return H5T_NATIVE_LONG; }
 template <> hid_t nativeH5Type<uint32_t>() { return H5T_NATIVE_UINT32; }
 
 template <typename T>
-bool H5Parser::readDataset(hid_t file, std::string_view name, std::vector<T>& data) {
+bool HDF5MeshParser::readDataset(hid_t file, std::string_view name, std::vector<T>& data) {
     hid_t dataset = H5Dopen(file, std::string(name).c_str(), H5P_DEFAULT);
     if (dataset < 0) {
         return logError<bool>("Failed to open dataset: " + std::string(name));
@@ -63,7 +63,7 @@ bool H5Parser::readDataset(hid_t file, std::string_view name, std::vector<T>& da
     return true;
 }
 
-bool H5Parser::parseNodes(hid_t file) {
+bool HDF5MeshParser::parseNodes(hid_t file) {
     std::vector<double> nodeData;
     if (!readDataset<double>(file, "/geometry", nodeData)) {
         return logError<bool>("Failed to parse nodes");
@@ -82,14 +82,14 @@ bool H5Parser::parseNodes(hid_t file) {
     return true;
 }
 
-bool H5Parser::readBoundaryData(hid_t file) {
+bool HDF5MeshParser::readBoundaryData(hid_t file) {
     if (!readDataset<uint32_t>(file, "/boundary", boundaryData)) {
         return logError<bool>("Failed to parse boundary");
     }
     return true;
 }
 
-bool H5Parser::parseElements(hid_t file) {
+bool HDF5MeshParser::parseElements(hid_t file) {
     std::vector<long> elementData;
     if (!readDataset<long>(file, "/connect", elementData)) {
         return logError<bool>("Failed to parse elements");
@@ -114,7 +114,7 @@ bool H5Parser::parseElements(hid_t file) {
 }
 
 // Retrieve faces from tets and deduplicate them based on tags
-bool H5Parser::retrieveLowerDimensionalElements() {
+bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 
     // Each tet has 4 faces. This table maps each face index (0-3) to the
     // 3 local vertex indices that make up that face, in SeisSol ordering.
@@ -174,7 +174,7 @@ bool H5Parser::retrieveLowerDimensionalElements() {
     return true;
 }
 
-bool H5Parser::addAllElements() {
+bool HDF5MeshParser::addAllElements() {
     for (size_t i = 0; i < lowerDimensionalElements.size(); ++i) {
         // Assuming only 3 node triangular faces for lower Dimensional elements
         constexpr long TRIANGLE_TYPE = 2;
@@ -192,7 +192,7 @@ bool H5Parser::addAllElements() {
     return true;
 }
 
-bool H5Parser::parseFile(std::string const& fileName) {
+bool HDF5MeshParser::parseFile(std::string const& fileName) {
     errorMsg.clear();
     higherDimensionalElements.clear();
     lowerDimensionalElements.clear();
@@ -216,8 +216,8 @@ bool H5Parser::parseFile(std::string const& fileName) {
 
 #else  // ENABLE_HDF5 not defined — stub definition so the linker is satisfied
 
-bool H5Parser::parseFile(std::string const& fileName) {
-    throw std::runtime_error("H5Parser::parseFile: tandem was built without HDF5 support. "
+bool HDF5MeshParser::parseFile(std::string const& fileName) {
+    throw std::runtime_error("HDF5MeshParser::parseFile: tandem was built without HDF5 support. "
                              "Cannot parse '" +
                              fileName +
                              "'. "

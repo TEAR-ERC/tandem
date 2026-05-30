@@ -1,7 +1,7 @@
 #include "MeshParser.h"
 
 #include "GMSHParser.h"
-#include "H5Parser.h"
+#include "HDF5MeshParser.h"
 
 #include <filesystem>
 #include <utility>
@@ -22,7 +22,7 @@ std::unique_ptr<MeshParser> MeshParser::create(std::string const& fileName, Mesh
     }
     if (isH5Format(fileName)) {
 #ifdef ENABLE_HDF5
-        return std::make_unique<H5Parser>(builder);
+        return std::make_unique<HDF5MeshParser>(builder);
 #else
         return nullptr;
 #endif
