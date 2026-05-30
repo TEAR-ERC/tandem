@@ -247,8 +247,7 @@ public:
     bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> data) override {
         // Get the vertex data from the adapter
-        int rank;
-        MPI_Comm_rank(comm_, &rank);
+        bool isStatic = false;
         auto numElements = data.size() / (D - 1);
 
         // Create a dataset for the moment rate
@@ -256,26 +255,28 @@ public:
         if (momentRateDataset_ == -1) {
             momentRateDataset_ = writer_.createExtendibleDataset(
                 "Moment_rate", H5T_IEEE_F64LE, {1, numElements, D - 1},
-                {H5S_UNLIMITED, numElements, D - 1}, extensibleIndexMoment);
+                {H5S_UNLIMITED, numElements, D - 1}, extensibleIndexMoment, false);
         }
         // Write the data
         writer_.writeToDataset(momentRateDataset_, H5T_IEEE_F64LE, output_step_, data.data(),
-                               {output_step_ + 1, numElements, D - 1}, extensibleIndexMoment);
+                               {output_step_ + 1, numElements, D - 1}, extensibleIndexMoment,
+                               false);
         // Create a dataset for timestep
         int extensibleIndexTimeStep = 0;
         if (timeStepDataset_ == -1) {
             timeStepDataset_ = writer_.createExtendibleDataset(
-                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, extensibleIndexTimeStep);
+                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, extensibleIndexTimeStep, isStatic);
         }
         // Write the data
         writer_.writeToDataset(timeStepDataset_, H5T_IEEE_F64LE, output_step_, &time,
-                               {output_step_ + 1}, extensibleIndexTimeStep);
+                               {output_step_ + 1}, extensibleIndexTimeStep, isStatic);
     }
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
         writer_.closeDataset(timeStepDataset_);
     }
     void write_static() override {
+        bool isStatic = true;
         // Get the vertex data from the adapter
         auto faultVertices = adapter_.getVertices();
         auto numFaultBasis = (degree_ + 1) * (degree_ + 2) / 2;
@@ -287,12 +288,21 @@ public:
         int extensibleIndex = 0;
         hid_t verticesDataset_ =
             writer_.createExtendibleDataset("faultVertices", H5T_IEEE_F64LE, {numElements, 3, D},
-                                            {numElements, 3, D}, extensibleIndex);
+                                            {numElements, 3, D}, extensibleIndex, isStatic);
         // Write the data
         writer_.writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, faultVertices.data(),
-                               {numElements, 3, D}, extensibleIndex);
-        // Close dataset when completely done (maybe in destructor)`
+                               {numElements, 3, D}, extensibleIndex, isStatic);
         writer_.closeDataset(verticesDataset_);
+
+        auto globalFctNos = adapter_.getGlobalFctNos();
+        hsize_t numFcts = globalFctNos.size();
+        hid_t fctNoDataset_ = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
+                                                              {numFcts}, extensibleIndex, true);
+
+        writer_.writeToDataset(fctNoDataset_, H5T_NATIVE_LLONG, 0, globalFctNos.data(),
+                               {numFcts, 1, 1}, extensibleIndex, true);
+
+        writer_.closeDataset(fctNoDataset_);
     }
 
 private:
