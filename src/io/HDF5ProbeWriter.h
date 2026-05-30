@@ -52,6 +52,10 @@ private:
     hid_t timeStepDataset_ = -1;
     hid_t probe_dataset_ = -1;
     hid_t probeFieldsDataset_ = -1;
+
+    std::vector<std::string> cached_field_names_;
+    int cached_max_name_length_ = 0;
+    std::vector<Managed<Matrix<double>>> cached_eval_matrices_;
 };
 
 } // namespace tndm
