@@ -24,7 +24,7 @@ private:
     std::vector<uint32_t> boundaryData_;
     std::vector<uint8_t> boundary_;
 
-    template <typename T> T logError(std::string_view msg);
+    template <typename T> T logError(std::string_view prefix, std::string_view detail = {});
 
 #ifdef ENABLE_HDF5
     template <typename T> bool readDataset(hid_t file, std::string_view name, std::vector<T>& data);
