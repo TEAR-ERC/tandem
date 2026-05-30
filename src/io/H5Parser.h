@@ -3,6 +3,7 @@
 
 #include "meshParser.h"
 #include <array>
+#include <cstdint>
 #include <hdf5.h>
 #include <optional>
 #include <string>
@@ -34,8 +35,8 @@ public:
 
     std::vector<std::array<long, 4>> higherDimensionalElements;
     std::vector<std::array<long, 3>> lowerDimensionalElements;
-    std::vector<std::uint32_t> boundaryData;
-    std::vector<std::uint8_t> boundary;
+    std::vector<uint32_t> boundaryData;
+    std::vector<uint8_t> boundary;
 };
 
 } // namespace tndm
