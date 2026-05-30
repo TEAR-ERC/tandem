@@ -35,14 +35,19 @@ public:
             lop_->prepare(faultNo, topo_->info(fctNo), scratch_);
         }
         lop_->end_preparation();
-        moment_rate_.resize(num_local_elements() * (DomainDimension - 1));
+        moment_rate_.resize(num_local_elements());
+        if (adapter_) {
+            moment_rate_q_scratch_.resize(DomainDimension);
+        }
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
     std::size_t slip_block_size() const override { return lop_->slip_block_size(); }
     std::size_t num_local_elements() const override { return fault_map_->local_size(); }
     double VMax_local() const override { return VMax_; }
-    std::vector<double> const& moment_rate_local() const override { return moment_rate_; }
+    std::vector<std::array<double, DomainDimension - 1>> const& moment_rate_local() const override {
+        return moment_rate_;
+    }
     std::size_t num_elements() const { return fault_map_->size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& fault_map() const { return *fault_map_; }
@@ -110,15 +115,15 @@ public:
 
             // Compute moment rate directly from slip rate at basis function nodes
             if (adapter_) {
-                std::vector<double> moment_rate_q_raw(DomainDimension);
-                auto moment_rate_q = Matrix<double>(moment_rate_q_raw.data(), 1, DomainDimension);
+                auto moment_rate_q =
+                    Matrix<double>(moment_rate_q_scratch_.data(), 1, DomainDimension);
                 auto slip_rate =
                     tndm::Vector<const double>(result_block.data(), result_block.shape());
                 auto fctNo = fault_map_->fctNo(faultNo);
                 auto info = topo_->info(fctNo);
                 adapter_->moment_rate(faultNo, moment_rate_q, slip_rate, fctNo, info);
-                for (std::size_t i = 0; i < static_cast<std::size_t>(DomainDimension - 1); ++i) {
-                    moment_rate_[mr_idx++] = moment_rate_q(0, i);
+                for (std::size_t i = 0; i < DomainDimension - 1; ++i) {
+                    moment_rate_[faultNo][i] = moment_rate_q(0, i);
                 }
             }
         }
@@ -242,7 +247,8 @@ private:
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;
     double VMax_ = 0.0;
-    std::vector<double> moment_rate_ = {};
+    std::vector<std::array<double, DomainDimension - 1>> moment_rate_;
+    std::vector<double> moment_rate_q_scratch_;
 };
 
 } // namespace tndm
