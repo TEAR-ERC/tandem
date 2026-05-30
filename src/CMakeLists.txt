@@ -64,8 +64,20 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
-find_package(HDF5 COMPONENTS C HL REQUIRED)
-message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
+option(ENABLE_HDF5 "Enable HDF5 mesh support" ON)
+
+if(ENABLE_HDF5)
+    find_package(HDF5 COMPONENTS C HL)
+    if(HDF5_FOUND)
+        message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
+        target_compile_definitions(tandem-lib PUBLIC ENABLE_HDF5)
+        target_include_directories(tandem-lib PUBLIC ${HDF5_INCLUDE_DIRS})
+        target_link_libraries(tandem-lib PUBLIC ${HDF5_LIBRARIES})
+    else()
+        message(STATUS "HDF5 not found — HDF5 mesh support disabled")
+    endif()
+endif()
+
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
 target_include_directories(tandem-lib PUBLIC 
     ${HDF5_INCLUDE_DIRS}
