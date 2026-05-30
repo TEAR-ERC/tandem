@@ -66,6 +66,8 @@ public:
     std::size_t getExpectedElements() const { return expectedElements; }
 };
 
+#ifdef ENABLE_HDF5
+
 // Helper function to create a simple test HDF5 file
 bool createTestHDF5File(const std::string& filename) {
     hid_t file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -291,3 +293,21 @@ TEST_CASE("H5Parser - Error handling") {
         CHECK(parser.getErrorMessage().empty());
     }
 }
+
+#else
+
+TEST_CASE("H5Parser - no HDF5 support") {
+    // Verify the stub throws the right exception if HDF5 support is
+    // not enabled.
+    struct DummyBuilder : tndm::meshBuilder {
+        void setNumVertices(std::size_t) override {}
+        void setVertex(long, std::array<double, 3> const&) override {}
+        void setNumElements(std::size_t) override {}
+        void addElement(long, long, long*, std::size_t) override {}
+    };
+    DummyBuilder builder;
+    H5Parser parser(&builder);
+    CHECK_THROWS_AS(parser.parseFile("any.h5"), std::runtime_error);
+}
+
+#endif // ENABLE_HDF5
