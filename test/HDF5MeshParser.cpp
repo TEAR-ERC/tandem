@@ -12,14 +12,14 @@ using namespace tndm;
 
 class H5TestBuilder : public MeshBuilder {
 private:
-    std::size_t elNo = 0;
-    std::size_t vertexCount = 0;
-    std::size_t expectedVertices = 0;
-    std::size_t expectedElements = 0;
+    std::size_t elNo_ = 0;
+    std::size_t vertexCount_ = 0;
+    std::size_t expectedVertices_ = 0;
+    std::size_t expectedElements_ = 0;
 
 public:
     void setNumVertices(std::size_t numVertices) override {
-        expectedVertices = numVertices;
+        expectedVertices_ = numVertices;
         CHECK(numVertices > 0);
     }
 
@@ -27,17 +27,17 @@ public:
         // Test case: simple tetrahedron mesh with 4 vertices
         std::array<std::array<double, 3>, 4> reference = {
             {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}};
-        REQUIRE(id < (long)expectedVertices);
-        if (expectedVertices == 4 && id < 4) {
+        REQUIRE(id < (long)expectedVertices_);
+        if (expectedVertices_ == 4 && id < 4) {
             for (std::size_t i = 0; i < 3; ++i) {
                 CHECK(x[i] == doctest::Approx(reference[id][i]));
             }
         }
-        vertexCount++;
+        vertexCount_++;
     }
 
     void setNumElements(std::size_t numElements) override {
-        expectedElements = numElements;
+        expectedElements_ = numElements;
         CHECK(numElements > 0);
     }
 
@@ -46,7 +46,7 @@ public:
             CHECK(numNodes == 4);
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
-                CHECK(node[i] < (long)expectedVertices);
+                CHECK(node[i] < (long)expectedVertices_);
             }
         } else if (type == 2) { // Triangular boundary element (lower Dimensional)
             CHECK(numNodes == 3);
@@ -54,17 +54,17 @@ public:
             // Verify node indices are valid
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
-                CHECK(node[i] < (long)expectedVertices);
+                CHECK(node[i] < (long)expectedVertices_);
             }
         }
-        ++elNo;
+        ++elNo_;
     }
 
     // Test getters
-    std::size_t getVertexCount() const { return vertexCount; }
-    std::size_t getElementCount() const { return elNo; }
-    std::size_t getExpectedVertices() const { return expectedVertices; }
-    std::size_t getExpectedElements() const { return expectedElements; }
+    std::size_t getVertexCount() const { return vertexCount_; }
+    std::size_t getElementCount() const { return elNo_; }
+    std::size_t getExpectedVertices() const { return expectedVertices_; }
+    std::size_t getExpectedElements() const { return expectedElements_; }
 };
 
 #ifdef ENABLE_HDF5
