@@ -97,7 +97,7 @@ private:
     std::array<Eigen::Matrix<double, D, 1>, D + 1> refNormals;
 
     double local_mesh_size_;
-    std::vector<long int> volumeTags;
+    std::vector<long int> volumeTags_;
 };
 
 } // namespace tndm
