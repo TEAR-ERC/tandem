@@ -52,7 +52,7 @@ jobs:
             bash -c "
               set -e
               mkdir -p build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }} && cd build_${{ matrix.dimension }}d_p${{ matrix.degree }}_hdf5_${{ matrix.enable_hdf5 }}
-              cmake .. -GNinja\
+              cmake .. -GNinja \
                       -DCMAKE_PREFIX_PATH=\"/opt/petsc;/opt/hdf5\" \
                       -DHDF5_ROOT=\"/opt/hdf5\" \
                       -DDOMAIN_DIMENSION=${{ matrix.dimension }} \

@@ -76,6 +76,17 @@ def convergence_config(polynomial_degree):
 
 
 @pytest.fixture(scope="module")
+def expected_moment_rate_sum_t0():
+    """
+    Expected sum of per-element moment rates at first output timestep for bp1_ref 2D
+    reference mesh (bp1_ref.geo, degree=2).
+
+    Recompute from verified reference run if mesh/physics/quadrature changes.
+    """
+    return 1.281524803579644e-06
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.
