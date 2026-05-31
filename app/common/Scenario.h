@@ -24,6 +24,8 @@ public:
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
+    template <std::size_t Q>
+    using functional_t_region = typename LocalOperator::template functional_t_region<Q>;
 
     constexpr static char Warp[] = "warp";
     constexpr static char Force[] = "force";

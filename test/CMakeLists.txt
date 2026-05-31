@@ -32,6 +32,10 @@ add_executable(test-geometry geometry.cpp)
 target_link_libraries(test-geometry test-runner-mpi)
 doctest_discover_tests(test-geometry)
 
+add_executable(test-volume-tagging volume_tagging.cpp)
+target_link_libraries(test-volume-tagging test-runner-mpi)
+doctest_discover_tests(test-volume-tagging)
+
 add_executable(test-parallel parallel.cpp)
 target_link_libraries(test-parallel test-runner)
 doctest_discover_tests(test-parallel)
@@ -185,6 +189,12 @@ if(RUN_CI_TESTS)
         )
     endif()
 
+    if(DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("volume-tagging-correctness-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_correctness_volume_tagging.py")
+        add_pytest_test("volume-tagging-parallel-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_parallel_consistency_volume_tagging.py")
+    endif()
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 
     if(${has_reference_data} GREATER -1)
