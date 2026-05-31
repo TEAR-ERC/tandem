@@ -32,6 +32,10 @@ add_executable(test-geometry geometry.cpp)
 target_link_libraries(test-geometry test-runner-mpi)
 doctest_discover_tests(test-geometry)
 
+add_executable(test-volume-tagging volume_tagging.cpp)
+target_link_libraries(test-volume-tagging test-runner-mpi)
+doctest_discover_tests(test-volume-tagging)
+
 add_executable(test-parallel parallel.cpp)
 target_link_libraries(test-parallel test-runner)
 doctest_discover_tests(test-parallel)
