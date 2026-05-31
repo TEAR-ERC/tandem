@@ -127,7 +127,7 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
     auto high_order_shape = high_order_nodes.shape();
     MPI_Allreduce(MPI_IN_PLACE, &high_order_shape, 2,
                   mpi_type_t<std::decay_t<decltype(high_order_shape[0])>>(), MPI_MAX, comm);
-    auto volumeData = std::make_unique<VolumeData>(std::move(volume_tags));
+    auto volumeTagData = std::make_unique<VolumeTagData>(std::move(volume_tags));
     if (high_order_shape[1] > 0) {
         std::size_t num_nodes = high_order_shape[0];
         std::size_t num_elements = elements.size();
@@ -172,12 +172,12 @@ std::unique_ptr<GlobalSimplexMesh<D>> GlobalSimplexMeshBuilder<D>::create(MPI_Co
         auto elementData =
             std::make_unique<ElementData>(std::move(high_order_verts), NumberingConvention::GMSH);
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      std::move(elementData), std::move(volumeData),
-                                                      comm);
+                                                      std::move(elementData),
+                                                      std::move(volumeTagData), comm);
     } else {
         auto vertexData = std::make_unique<VertexData<D>>(std::move(vertices));
         mesh = std::make_unique<GlobalSimplexMesh<D>>(std::move(elements), std::move(vertexData),
-                                                      nullptr, std::move(volumeData), comm);
+                                                      nullptr, std::move(volumeTagData), comm);
     }
 
     // boundary mesh

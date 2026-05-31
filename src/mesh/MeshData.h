@@ -139,10 +139,10 @@ private:
     NumberingConvention convention_;
 };
 
-class VolumeData : public MeshData {
+class VolumeTagData : public MeshData {
 public:
-    VolumeData(std::vector<long int>&& tags) : volumeTags_(std::move(tags)) {}
-    virtual ~VolumeData() {}
+    VolumeTagData(std::vector<long int>&& tags) : volumeTags_(std::move(tags)) {}
+    virtual ~VolumeTagData() {}
 
     std::size_t size() const override { return volumeTags_.size(); }
 
@@ -159,7 +159,7 @@ public:
         }
 
         auto newTags = a2a.exchange(requestedTags, mpi_type_t<long>());
-        return std::make_unique<VolumeData>(std::move(newTags));
+        return std::make_unique<VolumeTagData>(std::move(newTags));
     }
 
     void permute(std::vector<std::size_t> const& permutation) override {

@@ -61,8 +61,8 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     if (elementData) {
         elementData = elementData->redistributed(enumeration, a2a);
     }
-    if (volumeData) {
-        volumeData = volumeData->redistributed(enumeration, a2a);
+    if (volumeTagData) {
+        volumeTagData = volumeTagData->redistributed(enumeration, a2a);
     }
 }
 
@@ -345,7 +345,7 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
         }
         elems.setMeshData(elementData->redistributed(lids, a2a));
     }
-    if (volumeData) {
+    if (volumeTagData) {
         auto map = makeG2LMap();
         std::vector<std::size_t> lids;
         lids.reserve(requestedElems.size());
@@ -354,7 +354,7 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
             assert(it != map.end());
             lids.emplace_back(it->second);
         }
-        elems.setVolumeData(volumeData->redistributed(lids, a2a));
+        elems.setVolumeTagData(volumeTagData->redistributed(lids, a2a));
     }
 }
 
