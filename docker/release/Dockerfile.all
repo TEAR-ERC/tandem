@@ -27,16 +27,14 @@ RUN mkdir -p /staging && \
     done
 
 # ── Stage 2: Slim runtime image with all binaries ────────────────────────────
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     openmpi-bin \
-    libopenmpi3 \
-    libhdf5-openmpi-103 \
-    libnetcdf19 \
-    liblua5.4-0 \
+    libopenmpi3t64 \
+    liblua5.3-0 \
     libblas3 \
     liblapack3 \
     libgomp1 \
