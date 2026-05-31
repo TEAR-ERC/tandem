@@ -127,7 +127,7 @@ public:
 
             // Get method from table
             lua_getfield(myL, -1, method_name); // push method
-            lua_insert(myL, -2); 
+            lua_insert(myL, -2);
 
             // Push spatial coordinates
             for (int d = 0; d < Din; ++d) {
