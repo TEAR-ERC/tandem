@@ -14,7 +14,9 @@
 namespace tndm {
 
 template <std::size_t D> struct GMSHSimplexType {};
-template <> struct GMSHSimplexType<0u> { static constexpr std::array<long, 1> types = {15}; };
+template <> struct GMSHSimplexType<0u> {
+    static constexpr std::array<long, 1> types = {15};
+};
 template <> struct GMSHSimplexType<1u> {
     static constexpr std::array<long, 10> types = {1, 8, 26, 27, 28, 62, 63, 64, 65, 66};
 };
@@ -51,7 +53,6 @@ private:
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
     std::vector<BC> bcs;
-    std::vector<long int> volume_tags;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
 
