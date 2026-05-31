@@ -77,6 +77,8 @@ public:
 
     void setMeshData(std::unique_ptr<MeshData> data) { meshData_ = std::move(data); }
     MeshData const* data() const { return meshData_.get(); }
+    void setVolumeData(std::unique_ptr<MeshData> data) { volumeData_ = std::move(data); }
+    MeshData const* getVolumeData() const { return volumeData_.get(); }
 
     void permute(std::vector<std::size_t> const& permutation) {
         assert(permutation.size() == faces_.size());
@@ -124,6 +126,7 @@ private:
     std::vector<int> sharedRanks_;
     Displacements<int> sharedRanksDispls_;
     std::unique_ptr<MeshData> meshData_;
+    std::unique_ptr<MeshData> volumeData_;
 };
 
 } // namespace tndm
