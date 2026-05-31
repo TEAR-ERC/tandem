@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y \
     libblas3 \
     liblapack3 \
     libopenblas0-pthread \
+    parmetis \
     libgomp1 \
     gmsh \
     && rm -rf /var/lib/apt/lists/*
