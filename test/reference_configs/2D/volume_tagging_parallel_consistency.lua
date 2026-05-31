@@ -24,7 +24,7 @@ function VolumeTagging:mu(x, y, tag)
     return _mu
 end
 
-function VolumeTagging:lam(x, y)
+function VolumeTagging:lam(x, y, tag)
     return 2.0
 end
 
@@ -35,12 +35,6 @@ end
 
 function VolumeTagging:solution(x, y)
     return math.cos(math.pi * x) * math.cos(math.pi * y), 0
-end
-
-function VolumeTagging:solution_jacobian(x, y)
-    return -math.pi * math.sin(math.pi * x) * math.cos(math.pi * y),
-           -math.pi * math.cos(math.pi * x) * math.sin(math.pi * y),
-            0, 0
 end
 
 function VolumeTagging:boundary(x, y)
