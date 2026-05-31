@@ -58,7 +58,7 @@ Clone the Tandem Repository
 .. code-block:: bash
 
    cd ~
-   mkdir tandem && cd tandem
+   mkdir tandem_rep && cd tandem_rep
    git clone https://github.com/TEAR-ERC/tandem.git
    cd tandem
    git submodule update --init
