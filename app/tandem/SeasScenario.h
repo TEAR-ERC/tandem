@@ -24,6 +24,7 @@ public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     using functional_t = LuaLib::functional_t<DomainDimension, 1>;
+    using functional_t_region = LuaLib::functional_t_region<DomainDimension, 1>;
     using time_functional_t = LuaLib::functional_t<DomainDimension + 1, NumQuantities>;
     using vector_functional_t = LuaLib::functional_t<DomainDimension, NumQuantities>;
 
@@ -43,13 +44,13 @@ public:
             warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
         if (lib_.hasMember(scenario, Mu)) {
-            mu_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Mu);
+            mu_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
-            lam_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, Lam);
+            lam_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Lam);
         }
         if (lib_.hasMember(scenario, Rho)) {
-            rho_ = std::make_optional(lib_.getMemberFunction<DomainDimension, 1>(scenario, Rho));
+            rho_ = std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Rho));
         }
 
         if (lib_.hasMember(scenario, Boundary)) {
@@ -92,13 +93,13 @@ public:
 protected:
     LuaLib lib_;
     transform_t warp_ = [](std::array<double, DomainDimension> const& v) { return v; };
-    functional_t mu_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
+    functional_t_region mu_ = [](std::array<double, DomainDimension> const& v, long int&) -> std::array<double, 1> {
         return {1.0};
     };
-    functional_t lam_ = [](std::array<double, DomainDimension> const& v) -> std::array<double, 1> {
+    functional_t_region lam_ = [](std::array<double, DomainDimension> const& v, long int&) -> std::array<double, 1> {
         return {0.0};
     };
-    std::optional<functional_t> rho_ = std::nullopt;
+    std::optional<functional_t_region> rho_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<SeasSolution<NumQuantities>> solution_ = std::nullopt;
     std::optional<vector_functional_t> u_ini_ = std::nullopt;
