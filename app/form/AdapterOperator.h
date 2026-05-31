@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace tndm {
 
@@ -27,7 +28,8 @@ public:
                     std::unique_ptr<Adapter<LocalOperator>> lop,
                     std::shared_ptr<DGOperatorTopo> topo, std::shared_ptr<BoundaryMap> fault_map)
         : adapted_lop_(std::move(adapted_lop)), lop_(std::move(lop)), topo_(std::move(topo)),
-          fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
+          fault_map_(std::move(fault_map)), scratch_(lop_->scratch_mem_size(), ALIGNMENT),
+          mu_field_scratch_(lop_->num_quad_points()) {
 
         scratch_.reset();
         lop_->begin_preparation(num_elements());
@@ -77,12 +79,31 @@ public:
         result.end_access(result_handle);
     }
 
+    void compute_moment_rates(Matrix<const double> const& slip_rates,
+                              std::vector<double>& result) override {
+        auto mu_field = Matrix<double>(mu_field_scratch_.data(), 1, mu_field_scratch_.size());
+        auto moment_rate_q = Managed<Matrix<double>>(1, DomainDimension);
+
+        result.resize(num_local_elements() * (DomainDimension - 1));
+        for (std::size_t faultNo = 0; faultNo < num_local_elements(); ++faultNo) {
+            auto fctNo = fault_map_->fctNo(faultNo);
+            auto const& info = topo_->info(fctNo);
+            adapted_lop_->mu_avg(fctNo, info, mu_field);
+            auto slip_rate = slip_rates.subtensor(slice{}, faultNo);
+            lop_->moment_rate(faultNo, moment_rate_q, slip_rate, mu_field);
+            for (std::size_t i = 0; i < DomainDimension - 1; ++i) {
+                result[faultNo * (DomainDimension - 1) + i] = moment_rate_q(0, i);
+            }
+        }
+    }
+
 private:
     std::shared_ptr<LocalOperator> adapted_lop_;
     std::unique_ptr<Adapter<LocalOperator>> lop_;
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;
+    std::vector<double> mu_field_scratch_;
 };
 
 } // namespace tndm

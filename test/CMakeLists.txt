@@ -60,13 +60,14 @@ add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
 
-if(ENABLE_HDF5)
-    find_package(HDF5 COMPONENTS C HL QUIET)
-endif()
-
 add_executable(test-HDF5MeshParser HDF5MeshParser.cpp)
 target_link_libraries(test-HDF5MeshParser test-runner-mpi)
 doctest_discover_tests(test-HDF5MeshParser)
+
+add_executable(test-HDF5Writer HDF5Writer.cpp)
+target_link_libraries(test-HDF5Writer test-runner-mpi)
+doctest_discover_tests(test-HDF5Writer)
+
 
 if(RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
@@ -88,7 +89,7 @@ if(RUN_CI_TESTS)
         endif()
     else()
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} fetch origin
+            COMMAND ${GIT_EXECUTABLE} fetch --depth 1 origin ${TEST_DATA_BRANCH}
             WORKING_DIRECTORY ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_FETCH_RESULT
         )
@@ -97,13 +98,21 @@ if(RUN_CI_TESTS)
         endif()
 
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} origin/${TEST_DATA_BRANCH}
+            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} FETCH_HEAD
             WORKING_DIRECTORY ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_CHECKOUT_RESULT
         )
-
         if(NOT GIT_CHECKOUT_RESULT EQUAL 0)
             message(FATAL_ERROR "Failed to checkout branch ${TEST_DATA_BRANCH}")
+        endif()
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} clean -fd
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CLEAN_RESULT
+        )
+        if(NOT GIT_CLEAN_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to clean working tree for branch ${TEST_DATA_BRANCH}")
         endif()
     endif()
 
@@ -123,6 +132,7 @@ if(RUN_CI_TESTS)
         ${CMAKE_SOURCE_DIR}/test/temp_test_results
         ${DOMAIN_DIMENSION}
         ${POLYNOMIAL_DEGREE}
+        ${ENABLE_HDF5}
     )
     set_tests_properties(generate-test-outputs PROPERTIES
         FIXTURES_REQUIRED PreClean
@@ -152,6 +162,10 @@ if(RUN_CI_TESTS)
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
 
+    # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=2
+    if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_probe_writer_consistency.py")
+    endif()
     # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=3
     if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
         set(MESH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data/reference_meshes/${DOMAIN_DIMENSION}D)

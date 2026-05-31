@@ -2,9 +2,11 @@ from yateto import *
 
 def add(generator, dim, nbf_fault, nq):
     e_q_T = Tensor('e_q_T', (nq, nbf_fault))
+    e_q = Tensor('e_q', (nbf_fault, nq))
     minv = Tensor('minv', (nbf_fault, nbf_fault))
     w = Tensor('w', (nq,))
-
+    mu = Tensor('mu', (nq,))
+    nl_q = Tensor('nl_q', (nq, ))
     slip = Tensor('slip', (nbf_fault,))
     slip_q = Tensor('slip_q', (nq,))
 
@@ -15,3 +17,9 @@ def add(generator, dim, nbf_fault, nq):
     traction = Tensor('traction', (nbf_fault,))
     generator.add('evaluate_traction', traction['p'] <= minv['rp'] * e_q_T['qr'] * w['q'] * \
                                                         grad_u['kq'] * n_q['kq'])
+    slip_rate = Tensor('slip_rate', (nbf_fault, dim))
+    moment_rate = Tensor('moment_rate', (dim,))
+
+    generator.add(
+        'evaluate_moment_rate', moment_rate['p'] <=
+            w['q'] * e_q['lq'] * slip_rate['lp'] * nl_q['q'] * mu['q'])

@@ -6,6 +6,9 @@
 #include "form/BoundaryMap.h"
 #include "geometry/Curvilinear.h"
 #include "io/BoundaryProbeWriter.h"
+#include "io/HDF5Adapter.h"
+#include "io/HDF5ProbeWriter.h"
+#include "io/HDF5Writer.h"
 #include "io/PVDWriter.h"
 #include "io/ProbeWriter.h"
 #include "io/ScalarWriter.h"
@@ -27,7 +30,15 @@
 
 namespace tndm::seas {
 
-enum class DataLevel { Scalar, Boundary, Volume };
+enum class DataLevel {
+    Scalar,
+    Boundary,
+    Volume
+#ifdef ENABLE_HDF5
+    ,
+    BoundaryForMomentRate // Fault surface data (moment rate) computed over fault area
+#endif
+};
 
 class Writer {
 public:
@@ -47,13 +58,15 @@ public:
     virtual void write(double time, mneme::span<FiniteElementFunction<1u>> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<2u>> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<3u>> data) {}
+    virtual void write(double time, std::vector<double> const& data) {}
 
-    inline void increase_step(double time, double VMax) {
+    virtual void increase_step(double time, double VMax) {
         ++output_step_;
         last_output_time_ = time;
         last_output_VMax_ = VMax;
     }
 
+    virtual void write_static() {}
     virtual void write_static(mneme::span<double> data) {}
     virtual void write_static(mneme::span<FiniteElementFunction<1u>> data) {}
     virtual void write_static(mneme::span<FiniteElementFunction<2u>> data) {}
@@ -227,6 +240,146 @@ private:
     unsigned degree_;
     MPI_Comm comm_;
     bool jacobian_;
+};
+
+#ifdef ENABLE_HDF5
+template <std::size_t D> class MomentRateWriter : public Writer {
+public:
+    MomentRateWriter(std::string_view prefix, AdaptiveOutputInterval oi,
+                     LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                     unsigned degree, BoundaryMap const& bnd_map, MPI_Comm comm,
+                     bool checkpoint_enabled)
+        : Writer(prefix, oi), writer_(prefix, comm, checkpoint_enabled),
+          adapter_(mesh, std::move(cl), bnd_map.localFctNos(), degree) {
+        // Check if time dataset exists from previous run (checkpoint restart)
+        htri_t dataset_exists = H5Lexists(writer_.file(), "time", H5P_DEFAULT);
+        if (dataset_exists > 0) {
+            // Open existing time dataset and get its extent
+            hid_t time_dset = H5Dopen(writer_.file(), "time", H5P_DEFAULT);
+            if (time_dset >= 0) {
+                hid_t space = H5Dget_space(time_dset);
+                hsize_t dims[1];
+                H5Sget_simple_extent_dims(space, dims, nullptr);
+                output_step_ = dims[0]; // Resume from where we left off
+                H5Sclose(space);
+                H5Dclose(time_dset);
+            }
+        }
+    }
+
+    DataLevel level() const override { return DataLevel::BoundaryForMomentRate; }
+    bool has_static_writer() const override { return true; }
+    void write(double time, std::vector<double> const& data) override {
+        // Get the vertex data from the adapter
+        auto numElements = data.size() / (D - 1);
+
+        // Create a dataset for the moment rate
+        int glueDimensionMoment = 0;
+        int extensibleDimensionMoment = 1;
+
+        if (momentRateDataset_ == -1) {
+            momentRateDataset_ = writer_.createExtendibleDataset(
+                "momentRate", H5T_IEEE_F64LE, {numElements, 1, D - 1},
+                {numElements, H5S_UNLIMITED, D - 1}, glueDimensionMoment);
+        }
+        // Write the data
+        writer_.writeToDataset(momentRateDataset_, H5T_IEEE_F64LE, output_step_, data.data(),
+                               {numElements, output_step_ + 1, D - 1}, glueDimensionMoment,
+                               extensibleDimensionMoment);
+        // Create a dataset for timestep
+        int glueDimensionTimeStep = 0;
+        int extensibleDimensionTimeStep = 0;
+        bool isDistributed = false;
+        if (timeStepDataset_ == -1) {
+            timeStepDataset_ = writer_.createExtendibleDataset(
+                "time", H5T_IEEE_F64LE, {1}, {H5S_UNLIMITED}, glueDimensionTimeStep, isDistributed);
+        }
+        // Write the data
+        writer_.writeToDataset(timeStepDataset_, H5T_IEEE_F64LE, output_step_, &time,
+                               {output_step_ + 1}, glueDimensionTimeStep,
+                               extensibleDimensionTimeStep, isDistributed);
+    }
+    ~MomentRateWriter() {
+        if (momentRateDataset_ != -1) {
+            writer_.closeDataset(momentRateDataset_);
+        }
+        if (timeStepDataset_ != -1) {
+            writer_.closeDataset(timeStepDataset_);
+        }
+    }
+    void write_static() override {
+        // Get the vertex data from the adapter
+        auto faultVertices = adapter_.getVertices();
+        auto numFaultBasis = adapter_.getNumBasisNodes();
+        // Calculate element count
+
+        hsize_t numElements = faultVertices.size() / (numFaultBasis * D);
+
+        // Create a dataset for the vertices
+        int glueDimension = 0;
+        int extensibleDimension = 0;
+        hid_t vertices_dset =
+            writer_.createExtendibleDataset("faultVertices", H5T_IEEE_F64LE, {numElements, D, D},
+                                            {numElements, D, D}, glueDimension);
+        // Write the data
+        writer_.writeToDataset(vertices_dset, H5T_IEEE_F64LE, 0, faultVertices.data(),
+                               {numElements, D, D}, glueDimension, extensibleDimension);
+        writer_.closeDataset(vertices_dset);
+
+        auto globalFctNos = adapter_.getGlobalFctNos();
+        hsize_t numFcts = globalFctNos.size();
+        hid_t fct_no_dset = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
+                                                            {numFcts}, extensibleDimension);
+
+        writer_.writeToDataset(fct_no_dset, H5T_NATIVE_LLONG, 0, globalFctNos.data(), {numFcts},
+                               glueDimension, extensibleDimension);
+
+        writer_.closeDataset(fct_no_dset);
+    }
+    void increase_step(double time, double VMax) override {
+        if (!received_first_step_) {
+            received_first_step_ = true;
+            return;
+        }
+        Writer::increase_step(time, VMax);
+    }
+
+private:
+    HDF5Writer writer_;
+    CurvilinearBoundaryHDF5Adapter<D> adapter_;
+    hid_t momentRateDataset_ = -1;
+    hid_t timeStepDataset_ = -1;
+    bool received_first_step_ = false;
+};
+#endif
+
+template <std::size_t D, bool isBoundary> class HDF5CommonProbeWriter : public Writer {
+public:
+    HDF5CommonProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
+                          AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
+                          std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map,
+                          MPI_Comm comm, bool checkpoint_enabled)
+        : Writer(prefix, oi),
+          writer_(prefix, probes, mesh, std::move(cl), bnd_map, comm, checkpoint_enabled) {}
+
+    DataLevel level() const override {
+        if constexpr (isBoundary) {
+            return DataLevel::Boundary;
+        } else {
+            return DataLevel::Volume;
+        }
+    }
+    void write_static(mneme::span<FiniteElementFunction<isBoundary ? D - 1u : D>> data) override {
+        writer_.initialize_datasets(data);
+    }
+    std::vector<std::size_t> const* subset() const override { return &writer_.bndNos(); }
+    void write(double time,
+               mneme::span<FiniteElementFunction<isBoundary ? D - 1u : D>> data) override {
+        writer_.write(time, std::move(data), output_step_);
+    }
+
+private:
+    HDF5ProbeWriter<D, isBoundary> writer_;
 };
 
 } // namespace tndm::seas
