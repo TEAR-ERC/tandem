@@ -158,6 +158,7 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
 }
 
 template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
+    assert(elNo < volumeTags_.size());
     return volumeTags_[elNo];
 }
 
