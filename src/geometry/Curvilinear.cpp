@@ -14,6 +14,8 @@
 #include <Eigen/Geometry>
 #include <Eigen/LU>
 
+#include <mpi.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -45,8 +47,13 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (volumeTagData) {
         volumeTags_ = volumeTagData->getVolumeTags();
     } else {
-        std::cerr << "Warning: Volume tags are not set in the mesh. Setting to a default of -1"
-                  << std::endl;
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: Volume tags are not set in the mesh. "
+                         "Defaulting to tag -1 for all elements."
+                      << std::endl;
+        }
         volumeTags_.resize(mesh.numElements(), -1);
     }
     auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
@@ -158,6 +165,8 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
 }
 
 template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
+    // volumeTags_ is sized to numElements() in constructor.
+    // In release builds, elNo must be a valid element index.
     assert(elNo < volumeTags_.size());
     return volumeTags_[elNo];
 }
