@@ -13,6 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  TANDEM_BASE: ghcr.io/${{ github.repository_owner }}/tandem-base
   IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/tandem
 
 jobs:
@@ -23,6 +24,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    # Pass the exact base image tag to downstream jobs so they pull the right one
+    outputs:
+      base-tag: ${{ steps.base-tag.outputs.tag }}
 
     steps:
       - name: Checkout repository
@@ -38,18 +43,28 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Compute a unique tag for this run so downstream jobs know exactly what to pull.
+      # On branch: ghcr.io/tear-erc/tandem-base:ymagen-docker-release-images
+      # On tag:    ghcr.io/tear-erc/tandem-base:1.2.0
+      - name: Compute base image tag
+        id: base-tag
+        run: |
+          REF="${{ github.ref_name }}"
+          SAFE="${REF//\//-}"   # replace / with - for branch names
+          echo "tag=${{ env.TANDEM_BASE }}:${SAFE}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata for base image
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.IMAGE_BASE }}-base
+          images: ${{ env.TANDEM_BASE }}
           tags: |
-            # PR branch → :branch-name, e.g. tandem-base:ymagen-docker-release-images
+            # Always push the branch/tag name
             type=ref,event=branch
-            # Version tag → :1.2.0, :1.2, :latest
+            type=ref,event=tag
+            # Version tags on release
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push base image
         uses: docker/build-push-action@v6
@@ -100,10 +115,9 @@ jobs:
           tags: |
             # PR branch → :2d-6p-ymagen-docker-release-images (for testing)
             type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-${{ github.ref_name }},enable=${{ github.ref_type == 'branch' }}
-            # Version tag → :2d-6p-1.2.0, :2d-6p-1.2, :2d-6p-latest
+            # Version tag → :2d-6p-1.2.0, :2d-6p-1.2, :2d-6p-latest, :2d-6p
             type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p-latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            # Bare tag only on release, e.g. :2d-6p
             type=raw,value=${{ matrix.dim }}d-${{ matrix.deg }}p,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push image
@@ -113,9 +127,11 @@ jobs:
           file: docker/release/Dockerfile.release
           platforms: linux/amd64
           push: true
+          # Use the exact base tag produced by job 1, not :latest
           build-args: |
             DIM=${{ matrix.dim }}
             DEG=${{ matrix.deg }}
+            BASE_IMAGE=${{ needs.build-base.outputs.base-tag }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -152,7 +168,7 @@ jobs:
           tags: |
             # PR branch → :all-ymagen-docker-release-images (for testing)
             type=raw,value=all-${{ github.ref_name }},enable=${{ github.ref_type == 'branch' }}
-            # Version tag → :all-1.2.0, :all-1.2, :all, :all-latest
+            # Version tag → :all-1.2.0, :all-latest, :all
             type=raw,value=all-${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=all-latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=all,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -164,6 +180,9 @@ jobs:
           file: docker/release/Dockerfile.all
           platforms: linux/amd64
           push: true
+          # Use the exact base tag produced by job 1, not :latest
+          build-args: |
+            BASE_IMAGE=${{ needs.build-base.outputs.base-tag }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

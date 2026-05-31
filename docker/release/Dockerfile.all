@@ -3,7 +3,8 @@
 #   docker buildx build --platform linux/amd64 -f Dockerfile.all -t tandem:all --load .
 
 # ── Stage 1: Build all 12 Tandem configurations from base ────────────────────
-FROM --platform=linux/amd64 ghcr.io/tear-erc/tandem-base:latest AS builder
+ARG BASE_IMAGE=ghcr.io/tear-erc/tandem-base:latest
+FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
 
 RUN for DIM in 2 3; do \
         for DEG in 1 2 3 4 5 6; do \
