@@ -44,12 +44,15 @@ public:
             warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
         if (lib_.hasMember(scenario, Mu)) {
+            // Lua function receives the volume tag as the last argument.
             mu_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
+            // Lua function receives the volume tag as the last argument.
             lam_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Lam);
         }
         if (lib_.hasMember(scenario, Rho)) {
+            // Lua function receives the volume tag as the last argument.
             rho_ =
                 std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Rho));
         }
