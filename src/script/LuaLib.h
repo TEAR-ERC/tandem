@@ -19,6 +19,9 @@ class LuaLib {
 public:
     template <std::size_t Din, std::size_t Dout>
     using functional_t = std::function<std::array<double, Dout>(std::array<double, Din> const& x)>;
+    template <std::size_t Din, std::size_t Dout>
+    using functional_t_region =
+        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int& tag)>;
 
     LuaLib();
     ~LuaLib();
@@ -101,6 +104,61 @@ public:
                 }
                 result[d] = lua_tonumber(myL, d - Dout);
             }
+            lua_pop(myL, Dout);
+            return result;
+        };
+    }
+
+    template <int Din, int Dout>
+    auto getMemberFunctionTagged(std::string const& table_name, char const* method_name) {
+
+        lua_State* myL = L;
+
+        return [myL, table_name, method_name](std::array<double, Din> const& x,
+                                              long int& tag) -> std::array<double, Dout> {
+            std::array<double, Dout> result;
+            result.fill(std::numeric_limits<double>::signaling_NaN());
+
+            // Get table from Lua
+            lua_getglobal(myL, table_name.c_str());
+            if (!lua_istable(myL, -1)) {
+                throw std::runtime_error(table_name + " " + method_name + " is not a table.");
+            }
+
+            // Get method from table
+            lua_getfield(myL, -1, method_name); // push method
+            lua_insert(myL, -2);                // swap: [method, self]
+
+            // Push spatial coordinates
+            for (int d = 0; d < Din; ++d) {
+                lua_pushnumber(myL, x[d]);
+            }
+
+            // Push physicalTag as integer (or double if needed)
+            lua_pushinteger(myL, tag); // 4th argument
+
+            // Call method: 1 (self) + Din (x,y,z) + 1 (tag) = 1+Din+1
+            int num_inputs = 1 + Din + 1;
+            int error = lua_pcall(myL, num_inputs, Dout, 0);
+            if (error) {
+                std::stringstream ss;
+                ss << "Error running '" << table_name << "." << method_name
+                   << "': " << lua_tostring(myL, -1);
+                throw std::runtime_error(ss.str());
+            }
+
+            // Retrieve outputs
+            for (int d = 0; d < Dout; ++d) {
+                if (!lua_isnumber(myL, d - Dout)) {
+                    std::stringstream ss;
+                    ss << "'" << table_name << "." << method_name
+                       << "' returned non-number at index " << d;
+                    throw std::runtime_error(ss.str());
+                }
+                result[d] = lua_tonumber(myL, d - Dout);
+            }
+
+            // Clean up stack
             lua_pop(myL, Dout);
             return result;
         };
