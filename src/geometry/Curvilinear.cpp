@@ -41,6 +41,8 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
     }
+    auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
+    volumeTags = volumeData->getVolumeTags();
     auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
     Managed<Matrix<double>> eval_basis;
     if (elementData) {
@@ -147,6 +149,18 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
 template <std::size_t D>
 TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) const {
     return TensorBase<Matrix<double>>(D, numPoints);
+}
+
+template <std::size_t D>
+TensorBase<Vector<long int>> Curvilinear<D>::volumeTagsInfo(std::size_t numPoints) const {
+    return TensorBase<Vector<long int>>(numPoints);
+}
+
+template <std::size_t D>
+void Curvilinear<D>::setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const {
+    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
+        result(i) = volumeTags[eleNo];
+    }
 }
 
 template <std::size_t D>
