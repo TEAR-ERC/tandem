@@ -20,6 +20,7 @@ public:
                     std::array<double, DomainDimension> const& ref_normal)
         : Scenario(lib, scenario, ref_normal) {
         if (lib_.hasMember(scenario, Mu)) {
+            // Lua function receives the volume tag as the last argument.
             coefficient_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu);
         }
     }
