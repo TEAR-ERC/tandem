@@ -79,9 +79,9 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-            auto volumeTags = this->vol[elNo].template get<VolumeTag>();
+            long int tag = cl_->getVolumeTag(elNo);
             for (std::size_t q = 0; q < F.shape(1); ++q) {
-                auto fx = fun(coords[q], volumeTags[q]);
+                auto fx = fun(coords[q], tag);
                 for (std::size_t p = 0; p < F.shape(0); ++p) {
                     F(p, q) = fx[p];
                 }
@@ -170,13 +170,10 @@ protected:
     struct Coords {
         using type = std::array<double, D>;
     };
-    struct VolumeTag {
-        using type = long int;
-    };
 
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
                                       NormalLength, Coords>;
-    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords, VolumeTag>;
+    using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
 
     mneme::StridedView<fct_t> fct;
     mneme::StridedView<vol_t> vol;
