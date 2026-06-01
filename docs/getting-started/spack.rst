@@ -33,6 +33,7 @@ You may want to update ``~/.spack/modules.yaml``, to specify the path where the 
       default:
         tcl:
           all:
+            autoload: none
             suffixes:
               domain_dimension=2: 'd2'
               domain_dimension=3: 'd3'
@@ -54,7 +55,7 @@ We can then generate a tandem module file with:
 
 .. code-block:: bash
 
-    spack module tcl refresh tandem
+    spack module tcl refresh -y $(spack find -d --format "{name}{/hash:5}" tandem)
 
 to access the module at start up, add to your ``~/.bashrc``:
 
@@ -68,11 +69,18 @@ e.g.:
 
     module use $HOME/spack/modules/x86_avx512/linux-sles15-skylake_avx512/
 
+.. _installing-branches-spack:
+
 Installing various branches using Spack
---------------------------------------
+---------------------------------------
 
 Spack installs the main branch by default. 
-Compiling tandem from other branches using Spack can be done by modifying the file :code:`package.py` under directory :code:`spack/var/spack/repos/builtin/packages/tandem` or :code:`seissol-spack-aid/spack/packages/tandem` in SuperMUC.
+Compiling tandem from other branches using Spack can be done by modifying the tandem spack recipe with:
+
+.. code-block:: bash
+
+    spack edit tandem
+
 The lines one may want to alter include:
 
 .. code-block:: python
@@ -97,3 +105,57 @@ If one aims to install their own fork of tandem, one may alter the git address, 
 .. code-block:: python
 
     git = "https://github.com/USER_REPO/fork_of_tandem.git"
+
+If your branch is stale, you may need to fix it by including a patch, e.g.:
+
+.. code-block:: python
+
+    patch("fix_v1.0_compilation.diff", when="@TScheckpoint")
+
+Note: only include this when your branch is STALE. Check if the modifications are already applied in ``app/CMakeLists.txt`` in your branch.
+
+Then install using the build name after ``tandem@``:
+
+.. code-block:: bash
+
+    spack install tandem@BUILD_NAME domain_dimension=2 polynomial_degree=6
+
+
+Installing a GPU Version
+------------------------
+
+First, configure your target GPU architecture in your ``~/.spack/packages.yaml`` file. This ensures that the architecture parameters are correctly propagated down to all underlying dependencies (like PETSc or Kokkos):
+
+.. code-block:: yaml
+
+   packages:
+     all:
+       # For NVIDIA GPUs, specify the CUDA architecture (e.g., 80 for A100, 86 for Ampere)
+       variants: [cuda_arch=86]
+       
+       # Alternatively, for AMD GPUs, use the amdgpu_target variant:
+       # variants: [amdgpu_target=gfx90a]
+
+Then, installing the GPU version of Tandem is as simple as adding the corresponding GPU variant (``+cuda`` for NVIDIA or ``+rocm`` for AMD):
+
+.. code-block:: bash
+
+   spack install -j 20 tandem@main polynomial_degree=4 domain_dimension=3 +cuda
+
+Running with GPU Acceleration
+-----------------------------
+
+To ensure that Tandem offloads computations to the GPUs, additional PETSc runtime arguments must be explicitly passed when executing the application.
+
+For **NVIDIA CUDA** environments, append the following flags to your execution command:
+
+.. code-block:: bash
+
+   tandem parameters.toml --petsc -vec_type cuda -mat_type aijcusparse
+
+For **AMD ROCm / HIP** environments, use these flags instead:
+
+.. code-block:: bash
+
+   tandem parameters.toml --petsc -vec_type hip -mat_type aijhipsparse
+

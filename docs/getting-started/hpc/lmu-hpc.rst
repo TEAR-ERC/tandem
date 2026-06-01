@@ -1,10 +1,17 @@
-LMU-HPC (Heisenbug and Kernelpanic)
-===================================
+LMU-HPC
+=======
 
-The LMU-HPC cluster consists of several nodes and used by the SIO-LMU Computational Earthquake group. Although the LMU-HPC cluster are not available to the public, the instructions provided here can be adapted for similar HPC environments.
+Here, information about installing and running tandem on the LMU High Performance Computing (HPC) Facilities are provided.
+`This internal wiki entry <https://wiki.geophysik.uni-muenchen.de/dokuwiki/doku.php?id=hpc>`__ provides more details on the available HPC systems. 
+Although these HPC infrastructures are not available to the public, the instructions provided here can be adapted for similar systems.
+
+LMU SMP clusters (e.g. Heisenbug and Kernelpanic)
+-------------------------------------------------
+
+The LMU-HPC platform consists of several Symmetric Multi Processor (SMP) clusters used by the SIO-LMU Computational Earthquake group. 
 
 Environment Setup
------------------
+^^^^^^^^^^^^^^^^^
 
 Add the following lines to your ``~/.bashrc`` file or equivalent to set up the compiler and MPI environment.
 
@@ -18,7 +25,7 @@ Add the following lines to your ``~/.bashrc`` file or equivalent to set up the c
 
 
 Installation
-------------
+^^^^^^^^^^^^
 
 1. **Clone the tandem Git repository:**
 
@@ -71,7 +78,7 @@ Use ``ldd`` to ensure the executable is linked to the correct libraries.
    ldd app/tandem
 
 Running Tandem
---------------
+^^^^^^^^^^^^^^
 
 Before running multiple processor jobs, check the number of free (idle) processors using ``top`` or ``htop``.
 
@@ -85,7 +92,98 @@ Before running multiple processor jobs, check the number of free (idle) processo
 
 .. code-block:: bash
 
-   mpiexec -bind-to core -n NCORES tparameters.toml --petsc -options_file petsc_options.cfg
+   mpiexec -bind-to core -n NCORES parameters.toml --petsc -options_file petsc_options.cfg
 
 .. tip::
    Use ``htop -u YOUR_USER_NAME`` to see only your running jobs.
+
+
+TETHYS-3G
+---------
+
+The compute nodes of tethys-3g reside in a network that is separated from the main network of Geophysics and can only be accessed from the cluster head.
+`This internal wiki entry <https://seissol.readthedocs.io/en/latest/behind-firewall.html>`__ gives more details on the cluster.
+
+
+Installation
+^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   module load spack/1.1
+   module load intel/2025 mpi.intel/2025
+   export OMP_NUM_THREADS=1
+
+
+Update ``~/.spack/modules.yaml`` to configure the module generation paths and naming conventions:
+
+.. code-block:: yaml
+
+   modules:
+     default:
+       roots:
+         tcl: /DATA/<<your_user_name>>/spack_install/modules
+       tcl:
+         all:
+           autoload: none
+           suffixes:
+             domain_dimension=2: 'd2'
+             domain_dimension=3: 'd3'
+             polynomial_degree=1: 'p1'
+             polynomial_degree=2: 'p2'
+             polynomial_degree=3: 'p3'
+             polynomial_degree=4: 'p4'
+             polynomial_degree=5: 'p5'
+             polynomial_degree=6: 'p6'
+
+And update ``~/.spack/config.yaml`` to move the installation tree outside your home directory:
+
+.. code-block:: yaml
+
+   config:
+     install_tree:
+       root: /DATA/<<your_user_name>>/spack_install
+     source_cache: /DATA/<<your_user_name>>/spack_install/source_cache
+
+
+Run the automatic detection tools:
+
+.. code-block:: bash
+
+   spack external find
+   spack compiler find
+
+
+Manually edit ``~/.spack/packages.yaml`` to register the cluster's Intel MPI, remove the `zlib` entry (the system library causing compilation failures), and enforce dependencies:
+
+.. code-block:: yaml
+
+   packages:
+     all:
+       providers:
+         mpi: [intel-oneapi-mpi]
+
+     intel-oneapi-mpi:
+       externals:
+       - spec: intel-oneapi-mpi@2021.16%intel-oneapi-compilers
+         prefix: /opt/software/intel/oneapi/2025.2
+       buildable: false
+
+
+Finally, install tandem:
+
+.. code-block:: bash
+
+   spack install tandem@1.2.0-rc polynomial_degree=2 domain_dimension=3 +libxsmm %intel-oneapi-compilers
+
+Once installed, refresh the TCL module files to register the new installation:
+
+.. code-block:: bash
+
+   spack module tcl refresh -y $(spack find -d --format "{name}{/hash:5}" tandem)
+
+The module can then be discovered by adding the module path to your environment (e.g., in your ``~/.bashrc``):
+
+.. code-block:: bash
+
+   module use /DATA/<<your_user_name>>/spack_install/modules/linux-debian12-zen2

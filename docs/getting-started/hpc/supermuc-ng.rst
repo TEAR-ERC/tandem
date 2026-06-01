@@ -1,7 +1,7 @@
 SuperMUC-NG
 ===========
 
-First, have a look at `this page <https://seissol.readthedocs.io/en/latest/behind-firewall.html>`_ to best configure git on SuperMUC-NG.
+First, have a look at `this page <https://seissol.readthedocs.io/en/latest/behind-firewall.html>`__ to best configure git on SuperMUC-NG.
 
 The software stack on SuperMUC-NG has been installed with spack.
 Yet, spack on SuperMUC-NG is not recent enough to natively know how to compile tandem. 
@@ -54,21 +54,7 @@ tandem can be then installed (e.g., 2d, polynomial degree 6) with:
 Note that it is important to specify the target as ``skylake_avx512``.
 
 The procedure to create an environment module is the same as detailed in :doc:`Spack installation <../spack>`.
-
-Using other branches
-~~~~~~~~~~~~~~~~~~~~
-
-If you want to install a branch other than ``main``, you need to modify the ``seissol-spack-aid/spack/package/tandem/package.py`` file:
-
-* **git**: If you want to use your own fork, update the ``git`` URL (Line 17).
-* **version**: Specify the name of the branch and the name for this build (Line 21). E.g., ``version("TScheckpoint", branch="dmay/seas-checkpoint", submodules=True)``.
-* **patch**: If your branch is stale, you may need to include a patch (Line 22). E.g., ``patch("fix_v1.0_compilation.diff", when="@TScheckpoint")``. (Note: only include this when your branch is STALE. Check if the modifications are already applied in ``app/CMakeLists.txt`` in your branch).
-
-Then install using the build name after ``tandem@``:
-
-.. code-block:: bash
-
-    spack install tandem@BUILD_NAME domain_dimension=2 polynomial_degree=6 target=skylake_avx512
+For advanced configurations (e.g. compiling your own branch), see :ref:`installing-branches-spack`.
 
 Running Tandem
 --------------
@@ -129,4 +115,4 @@ Submit the script using ``sbatch``:
 
     sbatch run_Tandem_supermuc.sh
 
-More information about the job submission process on SuperMUC-NG can be found on `this page <https://doku.lrz.de/job-processing-with-slurm-on-supermuc-ng-10746568.html>`_.
+More information about the job submission process on SuperMUC-NG can be found on `this page <https://doku.lrz.de/job-processing-with-slurm-on-supermuc-ng-10746568.html>`__.
