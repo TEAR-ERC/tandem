@@ -19,7 +19,7 @@ The following dependencies likely need to be installed manually:
 - `METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`_ (≥ 5.1) and `ParMETIS <http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview>`_ (≥ 4.0)
 - `PETSc <https://www.mcs.anl.gov/petsc/>`_ (≥ 3.13)
 - (Optional) `libxsmm <https://github.com/hfp/libxsmm>`_ (= 1.16.1)
-
+- (Optional) `HDF5 <https://www.hdfgroup.org/solutions/hdf5/>`_ (= 1.12.3)
 
 Dependencies via package manager
 --------------------------------
@@ -72,6 +72,25 @@ Build and install:
     $ cp bin/libxsmm_gemm_generator /usr/local/bin/
     $ cd ..
 
+(Optional) Install HDF5
+--------------------------
+
+.. code:: console
+
+    $ wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-1.12.3/src/hdf5-1.12.3.tar.gz && \
+    $ tar -xzf hdf5-1.12.3.tar.gz && \
+    $ rm -f hdf5-1.12.3.tar.gz && \
+    $ export CC=mpicc
+    $ export CXX=mpicxx
+    $ export FC=mpifort
+    $ ./configure --prefix=$PREFIX_PATH \
+                  --enable-parallel \
+                  --enable-fortran \
+                  CC=mpicc CXX=mpicxx FC=mpifort
+    $ make -j$(nproc)    
+    $ make check            
+    $ make install
+
 Compile tandem
 --------------
 
@@ -96,3 +115,5 @@ cannot find your libraries, try to set the `CMAKE_PREFIX_PATH <https://cmake.org
    $ cmake .. -DPOLYNOMIAL_DEGREE=6 -DCMAKE_PREFIX_PATH=/path/to/your/libs
 
 If you require multiple paths to CMake, the syntax is as follows :code:`-DCMAKE_PREFIX_PATH="/usr/local/path_1;/usr/local/path_2"`
+
+If you want to use the optional HDF5 support, you need to set the CMake variable :code:`-DENABLE_HDF5=ON` and provide the path to your HDF5 installation using :code:`-DCMAKE_PREFIX_PATH`, e.g. :code:`cmake .. -DPOLYNOMIAL_DEGREE=6 -DENABLE_HDF5=ON -DCMAKE_PREFIX_PATH=/path/to/your/hdf5/installation`.
