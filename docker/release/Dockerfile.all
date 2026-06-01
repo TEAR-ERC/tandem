@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1
+# Build the all-in-one image containing all 12 Tandem builds:
+#   docker buildx build --platform linux/amd64 -f Dockerfile.all -t tandem:latest --load .
+
+# ── Stage 1: Build all 12 Tandem configurations from base ────────────────────
+ARG BASE_IMAGE=ghcr.io/tear-erc/tandem/tandem-base:3.22.5
+FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
+
+USER root
+
+RUN apt-get update && apt-get install -y python3-numpy && rm -rf /var/lib/apt/lists/*
+
+# Clone Tandem source
+RUN mkdir -p /opt/tandem && cd /opt/tandem \
+    && git clone https://github.com/TEAR-ERC/tandem.git \
+    && cd tandem \
+    && git checkout dmay/staging \
+    && git submodule update --init
+
+RUN mkdir -p /staging && \
+    for DIM in 2 3; do \
+        for DEG in 1 2 3 4 5 6; do \
+            echo "==> Building ${DIM}D degree ${DEG}..." \
+            && mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
+            && cd /opt/tandem/build_${DIM}d_${DEG}p \
+            && cmake -G Ninja /opt/tandem/tandem \
+                -DCMAKE_CXX_COMPILER=mpicxx \
+                -DCMAKE_C_COMPILER=mpicc \
+                -DCMAKE_PREFIX_PATH="${PETSC_INSTALL_DIR}" \
+                -DDOMAIN_DIMENSION=${DIM} \
+                -DPOLYNOMIAL_DEGREE=${DEG} \
+            && ninja \
+            && cp app/tandem /staging/tandem_${DIM}d_${DEG}p \
+            && cp app/static /staging/static_${DIM}d_${DEG}p; \
+        done; \
+    done
+
+# ── Stage 2: Slim runtime image with all binaries ────────────────────────────
+FROM --platform=linux/amd64 ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    openmpi-bin \
+    libopenmpi3t64 \
+    liblua5.3-0 \
+    libblas3 \
+    liblapack3 \
+    libopenblas0-pthread \
+    libparmetis4.0 \
+    libgomp1 \
+    gmsh \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy PETSc runtime libs
+COPY --from=builder /opt/petsc/lib /opt/petsc/lib
+
+# Copy all 24 binaries (tandem_Xd_Yp and static_Xd_Yp for all 12 configs)
+COPY --from=builder /staging /opt/tandem/bin
+
+# Copy examples
+COPY --from=builder /opt/tandem/tandem/examples /work/examples
+
+ENV LD_LIBRARY_PATH=/opt/petsc/lib:${LD_LIBRARY_PATH}
+ENV PATH=/opt/tandem/bin:${PATH}
+ENV OMP_NUM_THREADS=1
+ENV OMP_PROC_BIND=close
+ENV OMPI_MCA_rmaps_base_oversubscribe=1
+
+# Create non-root user
+RUN useradd -m -s /bin/bash tandem \
+    && chown -R tandem:tandem /work
+
+USER tandem
+WORKDIR /work
+
+RUN echo "ulimit -Ss 65536" >> /home/tandem/.bashrc
+
+CMD ["/bin/bash"]

@@ -9,6 +9,9 @@ unstructured simplicial meshes (triangle meshes in 2D, tetrahedral meshes in 3D)
 
 For a recent overview see our `vEGU21 display <https://tear-erc.github.io/tandem-egu21/>`_.
 
+Pre-built Docker images for all configurations are available on
+`GitHub Container Registry <https://github.com/TEAR-ERC/tandem/pkgs/container/tandem>`_.
+
 License
 -------
 
