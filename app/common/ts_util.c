@@ -795,9 +795,9 @@ PetscErrorCode read_status_file(const char* filename, const char* output_name,
 
 PetscErrorCode append_status(const char* status_file, const char* output_name, PetscViewer viewer) {
     PetscErrorCode ierr = 0;
-    if (strcmp(status_file, "status.txt") == 0) {
+    if ((strcmp(status_file, "status.txt") == 0) || (strcmp(status_file, "(null)_status.txt") == 0)) {
         PetscPrintf(PETSC_COMM_SELF,
-                    "fault output not enabled, skipping writing status in checkpoint\n");
+                    "%s not enabled, skipping writing status in checkpoint\n", output_name);
     } else {
         PetscBool fileExists;
         ierr = PetscTestFile(status_file, FILE_MODE_READ, &fileExists);
