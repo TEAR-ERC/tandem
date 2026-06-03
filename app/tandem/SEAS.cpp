@@ -226,7 +226,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         case TableWriterType::HDF5:
             auto writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
                 oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
-                checkpoint_enabled));
+                checkpoint_enabled);
             break;
 #endif
         default:
@@ -234,7 +234,7 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             // so this default handles only CSV and Tecplot.
             auto writer = std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
                 oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
-                cl, fault_map, comm));
+                cl, fault_map, comm);
             break;
         }
 
