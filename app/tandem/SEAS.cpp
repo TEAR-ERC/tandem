@@ -236,8 +236,8 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
                 oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
                 cl, fault_map, comm));
             break;
-        }      
-      
+        }
+
         if (writer_states.find(WriterType::FaultProbe) != writer_states.end()) {
             auto [step, time, Vmax] = writer_states[WriterType::FaultProbe];
             writer->set_state(step, time, Vmax);
@@ -245,26 +245,25 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         monitor.add_writer(std::move(writer));
     }
 
-    
     if (cfg.domain_probe_output && !cfg.domain_probe_output->probes.empty()) {
         auto const& oc = *cfg.domain_probe_output;
         switch (oc.type) {
 #ifdef ENABLE_HDF5
         case TableWriterType::HDF5:
             auto writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
-                    oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map,
-                    comm, checkpoint_enabled);
+                oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
+                checkpoint_enabled);
             break;
 #endif
         default:
             // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
             // so this default handles only CSV and Tecplot.
             auto writer = std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
-                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-                comm);
+                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
+                cl, comm);
             break;
-        }      
-      
+        }
+
         if (writer_states.find(WriterType::DomainProbe) != writer_states.end()) {
             auto [step, time, Vmax] = writer_states[WriterType::DomainProbe];
             writer->set_state(step, time, Vmax);
