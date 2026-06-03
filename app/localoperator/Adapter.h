@@ -19,6 +19,8 @@ public:
     void traction(std::size_t faultNo, Matrix<double> const& traction_q, Vector<double>& traction,
                   LinearAllocator<double>&) const;
     void slip(std::size_t faultNo, Vector<double const>& state, Matrix<double>& s_q) const;
+    void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
+                     Vector<double const>& slip_rate, Matrix<double>& mu_field) const;
 };
 
 } // namespace tndm

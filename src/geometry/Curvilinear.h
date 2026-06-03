@@ -80,6 +80,7 @@ public:
      * the domain, thus, the maximum diameter of the "high-order" mesh might be larger.
      */
     double local_mesh_size() const { return local_mesh_size_; }
+    long int getVolumeTag(std::size_t elNo) const;
 
 private:
     const unsigned N;
@@ -96,6 +97,7 @@ private:
     std::array<Eigen::Matrix<double, D, 1>, D + 1> refNormals;
 
     double local_mesh_size_;
+    std::vector<long int> volumeTags_;
 };
 
 } // namespace tndm

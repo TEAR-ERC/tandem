@@ -8,6 +8,7 @@
 #include <mpi.h>
 
 #include <functional>
+#include <vector>
 
 namespace tndm {
 
@@ -23,6 +24,9 @@ public:
     virtual auto slip_bc(BlockView const& state)
         -> std::function<void(std::size_t, Matrix<double>&, bool)> = 0;
     virtual void traction(BlockView const& displacement, BlockVector& result) = 0;
+
+    virtual void compute_moment_rates(Matrix<const double> const& slip_rates,
+                                      std::vector<double>& result) = 0;
 };
 
 } // namespace tndm

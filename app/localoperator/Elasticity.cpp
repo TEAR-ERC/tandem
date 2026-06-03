@@ -24,8 +24,9 @@ namespace kernel = tndm::elasticity::kernel;
 
 namespace tndm {
 
-Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                       functional_t<1> mu, std::optional<functional_t<1>> rho, DGMethod method)
+Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t_region<1> lam,
+                       functional_t_region<1> mu, std::optional<functional_t_region<1>> rho,
+                       DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
@@ -1014,6 +1015,21 @@ void Elasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info,
     krnl.traction_q = result.data();
     krnl.u(0) = u0.data();
     krnl.execute();
+}
+
+void Elasticity::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
+    // mu_avg is only valid for interior fault facets (two adjacent elements).
+    // Boundary facets have no element on one side — info.up[1] would be invalid.
+    assert(info.up[0] != info.up[1] && "mu_avg called on a boundary facet");
+    double const* mu0 = fctPre[fctNo].get<mu_q_0>().data();
+    double const* mu1 = fctPre[fctNo].get<mu_q_1>().data();
+    double* res = result.data();
+    std::size_t nq = result.size();
+
+    #pragma omp simd
+    for (std::size_t q = 0; q < nq; ++q) {
+        res[q] = 0.5 * (mu0[q] + mu1[q]);
+    }
 }
 
 } // namespace tndm

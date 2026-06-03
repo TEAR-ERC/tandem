@@ -68,8 +68,16 @@ public:
         return std::make_unique<dg_t>(topo, dg_lop);
     }
     auto friction() -> std::unique_ptr<AbstractFrictionOperator> override {
+#ifdef ENABLE_HDF5
+        // Moment rate output (HDF5-only) needs the adapter to compute moment rates in rhs().
+        auto fric = std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo,
+                                                 fault_map, this->adapter());
+#else
+        // Without HDF5 there is no moment rate output, so skip the adapter to avoid
+        // computing moment rates on every rhs() evaluation.
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
+#endif
         fric->lop().set_constant_params(friction_scenario->constant_params());
         fric->lop().set_params(friction_scenario->param_fun());
         if (friction_scenario->source_fun()) {
