@@ -35,8 +35,8 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = DomainDimension;
 
-    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-               functional_t<1> mu, std::optional<functional_t<1>> rho = std::nullopt,
+    Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t_region<1> lam,
+               functional_t_region<1> mu, std::optional<functional_t_region<1>> rho = std::nullopt,
                DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
@@ -122,6 +122,7 @@ public:
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
 private:
     template <bool WithRHS>

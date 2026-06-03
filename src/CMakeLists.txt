@@ -37,9 +37,12 @@ add_library(tandem-lib
     io/GlobalSimplexMeshBuilder.cpp
     io/GMSHLexer.cpp
     io/GMSHParser.cpp
+    io/HDF5MeshParser.cpp
+    io/MeshParser.cpp
     io/PVDWriter.cpp
     io/VTUWriter.cpp
-    io/VTUWriter.cpp
+    io/HDF5Writer.cpp
+    io/HDF5ProbeWriter.cpp
     mesh/GenMesh.cpp
     mesh/GlobalSimplexMesh.cpp
     geometry/Curvilinear.cpp
@@ -63,8 +66,41 @@ find_package(OpenMP REQUIRED)
 find_package(ZLIB REQUIRED)
 include(../cmake/filesystem.cmake)
 
+option(ENABLE_HDF5 "Enable HDF5 support" ON)
+
+if(ENABLE_HDF5)
+    set(HDF5_PREFER_PARALLEL True)
+    find_package(HDF5 COMPONENTS C HL)
+
+    if(HDF5_FOUND)
+        message(STATUS "Found HDF5: ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}")
+
+        # Verify parallel support — tandem uses collective MPI I/O (H5FD_MPIO_COLLECTIVE)
+        if(NOT (HDF5_IS_PARALLEL OR HDF5_ENABLE_PARALLEL OR HDF5_PROVIDES_PARALLEL))
+            message(WARNING
+                "The found HDF5 installation does not appear to be parallel (MPI-ready). "
+                "Tandem requires parallel HDF5 for collective I/O. "
+                "Compile errors or runtime crashes will occur. "
+                "Reinstall HDF5 with --enable-parallel or -DHDF5_ENABLE_PARALLEL=ON."
+            )
+        endif()
+
+        target_compile_definitions(tandem-lib PUBLIC ENABLE_HDF5)
+        target_include_directories(tandem-lib PUBLIC ${HDF5_INCLUDE_DIRS})
+        target_link_libraries(tandem-lib PUBLIC ${HDF5_LIBRARIES})
+        message(STATUS "HDF5 support enabled (probe output, moment rate output, HDF5 mesh parser)")
+    else()
+        message(FATAL_ERROR
+            "HDF5 requested (ENABLE_HDF5=ON) but not found. "
+            "Either install parallel HDF5 or configure with -DENABLE_HDF5=OFF."
+        )
+    endif()
+else()
+    message(STATUS "HDF5 support disabled")
+endif()
+
 target_compile_options(tandem-lib PRIVATE ${CPU_ARCH_FLAGS})
-target_include_directories(tandem-lib PUBLIC 
+target_include_directories(tandem-lib PUBLIC
     ../submodules/
     ../submodules/mneme/include/
     ${LUA_INCLUDE_DIR}

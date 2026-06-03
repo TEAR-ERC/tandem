@@ -202,6 +202,10 @@ std::map<WriterType, WriterState> read_writer_states(const std::string& checkpoi
 auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
+#ifdef ENABLE_HDF5
+    bool const checkpoint_enabled =
+        cfg.ts_checkpoint_config.storage_type != TsCheckpointStorageType::NONE;
+#endif
     if (cfg.fault_output && cfg.domain_output) {
         if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
             throw std::runtime_error(
@@ -215,11 +219,25 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         writer_states = read_writer_states(ts_checkpoint_load_directory.value(), comm);
     }
 
-    if (cfg.fault_probe_output) {
+    if (cfg.fault_probe_output && !cfg.fault_probe_output->probes.empty()) {
         auto const& oc = *cfg.fault_probe_output;
-        auto writer = std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            fault_map, comm);
+        switch (oc.type) {
+#ifdef ENABLE_HDF5
+        case TableWriterType::HDF5:
+            auto writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
+                oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
+                checkpoint_enabled));
+            break;
+#endif
+        default:
+            // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
+            // so this default handles only CSV and Tecplot.
+            auto writer = std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
+                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
+                cl, fault_map, comm));
+            break;
+        }      
+      
         if (writer_states.find(WriterType::FaultProbe) != writer_states.end()) {
             auto [step, time, Vmax] = writer_states[WriterType::FaultProbe];
             writer->set_state(step, time, Vmax);
@@ -227,11 +245,26 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         monitor.add_writer(std::move(writer));
     }
 
-    if (cfg.domain_probe_output) {
+    
+    if (cfg.domain_probe_output && !cfg.domain_probe_output->probes.empty()) {
         auto const& oc = *cfg.domain_probe_output;
-        auto writer = std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            comm);
+        switch (oc.type) {
+#ifdef ENABLE_HDF5
+        case TableWriterType::HDF5:
+            auto writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
+                    oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map,
+                    comm, checkpoint_enabled);
+            break;
+#endif
+        default:
+            // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
+            // so this default handles only CSV and Tecplot.
+            auto writer = std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
+                comm);
+            break;
+        }      
+      
         if (writer_states.find(WriterType::DomainProbe) != writer_states.end()) {
             auto [step, time, Vmax] = writer_states[WriterType::DomainProbe];
             writer->set_state(step, time, Vmax);
@@ -273,6 +306,23 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
         }
         monitor.add_writer(std::move(writer));
     }
+#ifdef ENABLE_HDF5
+    if (cfg.moment_rate_output) {
+        auto const& oc = *cfg.moment_rate_output;
+        monitor.add_writer(std::make_unique<seas::MomentRateWriter<DomainDimension>>(
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+            comm, checkpoint_enabled));
+    }
+#else
+    if (cfg.moment_rate_output) {
+        int rank;
+        MPI_Comm_rank(comm, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: moment_rate_output requires HDF5 support. "
+                         "Reconfigure with -DENABLE_HDF5=ON to enable this output.\n";
+        }
+    }
+#endif
 }
 
 template <typename seas_t> struct operator_specifics;

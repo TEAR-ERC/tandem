@@ -16,10 +16,10 @@ The sign of the fault normal is chosen such that
 
 .. math::
 
-   n \cdot n_{\text{ref}} > 0.
+   \mathbf n \cdot \mathbf n_{\text{ref}} > 0.
 
 We define that the fault normal points from the foot wall to the hanging wall.
-In this way the reference normal :math:`n_{\text{ref}}` selects the foot and
+In this way the reference normal :math:`\mathbf n_{\text{ref}}` selects the foot and
 the hanging wall.
 
 The first component of the slip or slip-rate vector is defined w.r.t. to the
@@ -29,14 +29,14 @@ component is zero.
 The third component of the slip or slip-rate vector is defined w.r.t.
 to the strike direction. The latter is defined such that a hypothetical
 observer standing on the fault looking in strike direction sees the hanging
-wall on his right. Thus, the strike direction is
+wall on their right. Thus, the strike direction is
 
 .. math::
 
-   s := u \times n,
+   \mathbf s := \mathbf n_{\text{up}} \times \mathbf n,
 
-where :math:`u` is the direction of "up", given in the configuration file.
-E.g. using the **enu** convention, up would be the vector :math:`u=(0, 0, 1)`.
+where :math:`\mathbf n_{\text{up}}` is a normal vector defined in the direction of "up", given in the configuration file.
+E.g. using the **enu** convention, "up" would be the vector :math:`\mathbf n_{\text{up}}=(0, 0, 1)`.
 
 The second component of the slip or slip-rate vector is defined w.r.t.
 to the dip direction, which we define to point "down". That is, the
@@ -44,31 +44,35 @@ dip direction is
 
 .. math::
 
-   d := s \times n
+   \mathbf d := \mathbf s \times \mathbf n.
 
 Left-lateral, right-lateral, normal, reverse
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The slip vector is given by :math:`u=[u_n] n + [u_d] d + [u_s] s`, where
-the square bracket operator for a scalar field :math:`q` is defined as
+The slip vector is given by :math:`\mathbf u = [[u_n]] \mathbf n + [[u_d]] \mathbf d + [[u_s]] \mathbf s`, where the square bracket (jump) operator for a scalar field :math:`q` is defined as
 
 .. math::
 
-   [q] := q^- - q^+ = \lim_{\epsilon \rightarrow 0} q(x-\epsilon n) - q(x+\epsilon n)
+   [[q]] := q^- - q^+ = \lim_{\epsilon \rightarrow 0} q(\mathbf x - \epsilon \mathbf n) - q(\mathbf x + \epsilon \mathbf n)
 
+and
+
+.. math::
+
+   u_n = \mathbf u \cdot \mathbf n, \quad u_d = \mathbf u \cdot \mathbf d, \quad u_s = \mathbf u \cdot \mathbf s.
 
 Recall that the normal points from the foot wall to the hanging wall.
-Thus, if :math:`[u_d] > 0` we have a **reverse** fault. Conversely,
-if :math:`[u_d] < 0` we have a **normal** fault.
+Thus, if :math:`[[u_d]] > 0` we have a **reverse** fault. Conversely,
+if :math:`[[u_d]] < 0` we have a **normal** fault.
 
-For strike slip fault, i.e. :math:`[u_s] \neq 0`, we have to distinguish
+For strike slip fault, i.e. :math:`[[u_s]] \neq 0`, we have to distinguish
 two cases:
 
 "In a left-lateral (right-lateral) fault, an observer on one of the
 walls will see the other wall moving to the left (right)." [J. Pujol,
 Elastic Wave Propagation and Generation in Seismology]
 
-If :math:`[u_s] > 0` then we have a right-lateral fault and if :math:`[u_s] < 0`
+If :math:`[[u_s]] > 0` then we have a right-lateral fault and if :math:`[[u_s]] < 0`
 then we have a left-lateral fault.
 
 .. _Vertical Fault:
@@ -76,4 +80,4 @@ then we have a left-lateral fault.
 Special-case: Flat fault
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Don't do that.
+Don't do that. The dip and strike vectors cannot be defined if :math:`\mathbf n` is parallel to :math:`\mathbf n_{\text{up}}`.

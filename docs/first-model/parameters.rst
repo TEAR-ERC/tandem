@@ -7,6 +7,7 @@ Tandem simulation parameters are written in the toml script. Here are the key pa
 - **mesh_file**: Mesh file.
 - **lib**: Lua file containing material & frictional paramters.
 - **scenario**: Name of the specific scenario defined in the Lua library.
+- **Lua material functions**: Note that the mu, lam, and rho Lua functions receive the volume tag as the last function argument. If region IDs are not set in the mesh, a value of -1 is assumed.
 - **type**: Type of problem. Available options: [poisson | elastic/elasticity].
 - **mode**: Mode of SEAS simulation. Available options: [QuasiDynamic/QD | QuasiDynamicDiscreteGreen/QDGreen | FullyDynamic/FD].
 - **ref_normal**: Define reference normal vector.
@@ -106,3 +107,32 @@ Commented parameter file:
    [domain_output]
    prefix = "output/domain"
    rtol = 0.1
+
+Optionally, you can also specify the format of the output probes (:code:`domain_probe_output` and :code:`fault_probe_output`) in order to be able to use the HDF5 format for instance. To do so, you need to set the type parameter in the probe output section, e.g. :code:`type = "HDF5"`. Note that the HDF5 output format is only available for probe outputs and not for field outputs. For example, 
+
+.. code:: toml
+   # On-fault probe outputs
+   [fault_probe_output]
+   prefix = "fltst_"
+   type = "HDF5"
+   probes = [
+       { name = "dp000", x = [0.0, -0.0] },
+       { name = "dp025", x = [1.2500000000000002, -2.1650635094610964] },
+       { name = "dp050", x = [2.5000000000000004, -4.330127018922193] },
+       { name = "dp075", x = [3.750000000000001, -6.495190528383289] },
+       { name = "dp100", x = [5.000000000000001, -8.660254037844386] },
+       { name = "dp125", x = [6.250000000000002, -10.825317547305483] },
+       { name = "dp150", x = [7.500000000000002, -12.990381056766578] },
+       { name = "dp175", x = [8.750000000000002, -15.155444566227676] },
+       { name = "dp200", x = [10.000000000000002, -17.32050807568877] },
+       { name = "dp250", x = [12.500000000000004, -21.650635094610966] },
+       { name = "dp300", x = [15.000000000000004, -25.980762113533157] },
+       { name = "dp350", x = [17.500000000000004, -30.31088913245535] }
+   ]
+
+Finally, the moment rate writer is also available as an output separately but it is only available in HDF5 format. To use it, you need to use the :code:`[moment_rate_output]` section. You do not need to sepcify a type currently because it is only available in HDF5 format at the moment. But you can specify the prefix for the output files and the frequency of the output using the same parameters as for the other outputs, e.g. :code:`prefix = "output/moment_rate"` and :code:`t_max = 9460800` to output the moment rate every 60 minutes of CPU time. For example,
+
+.. code:: toml
+   [moment_rate_output]
+   prefix = "output/moment_rate"
+   t_max = 9460800

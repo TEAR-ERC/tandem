@@ -24,9 +24,10 @@ namespace tndm {
 template <typename LocalOperator> class FrictionOperator : public AbstractFrictionOperator {
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
-                     std::shared_ptr<BoundaryMap> fault_map)
+                     std::shared_ptr<BoundaryMap> fault_map,
+                     std::unique_ptr<AbstractAdapterOperator> adapter = nullptr)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
-          scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
+          adapter_(std::move(adapter)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
         scratch_.reset();
         lop_->begin_preparation(num_local_elements());
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
@@ -34,12 +35,14 @@ public:
             lop_->prepare(faultNo, topo_->info(fctNo), scratch_);
         }
         lop_->end_preparation();
+        moment_rate_.resize(adapter_ ? num_local_elements() * (DomainDimension - 1) : 0);
     }
 
     std::size_t block_size() const override { return lop_->block_size(); }
     std::size_t slip_block_size() const override { return lop_->slip_block_size(); }
     std::size_t num_local_elements() const override { return fault_map_->local_size(); }
     double VMax_local() const override { return VMax_; }
+    std::vector<double> const& moment_rate_local() const override { return moment_rate_; }
     std::size_t num_elements() const { return fault_map_->size(); }
     MPI_Comm comm() const { return topo_->comm(); }
     BoundaryMap const& fault_map() const { return *fault_map_; }
@@ -104,7 +107,13 @@ public:
 
             VMax_ = std::max(VMax_, VMax);
         }
+
         result.end_access(result_handle);
+        if (adapter_) {
+            auto result_view = result.begin_access_readonly();
+            adapter_->compute_moment_rates(result_view, moment_rate_);
+            result.end_access_readonly(result_view);
+        }
         state.end_access_readonly(state_handle);
         traction.end_access_readonly(traction_handle);
         if (rhs_success == false) {
@@ -218,10 +227,12 @@ public:
 
 private:
     std::unique_ptr<LocalOperator> lop_;
+    std::unique_ptr<AbstractAdapterOperator> adapter_;
     std::shared_ptr<DGOperatorTopo> topo_;
     std::shared_ptr<BoundaryMap> fault_map_;
     Scratch<double> scratch_;
     double VMax_ = 0.0;
+    std::vector<double> moment_rate_;
 };
 
 } // namespace tndm

@@ -1,6 +1,6 @@
-<h1 align="center">
-  tandem
-</h1>
+<p align="center">
+	<img src="https://raw.githubusercontent.com/TEAR-ERC/tandem/main/docs/images/tandem_logo_final.png" alt="tandem"/>
+</p>
 
 <h4 align="center">
 	A scalable discontinuous Galerkin code on unstructured curvilinear grids
@@ -26,6 +26,7 @@
   <a href="#features">Features</a> •
   <a href="#dependencies">Dependencies</a> •
   <a href="#installation">Installation</a> •
+  <a href="#testing">Testing</a> •
   <a href="#documentation">Documentation</a> •
   <a href="#citing-tandem">Citing tandem</a> •
   <a href="#license">License</a>
@@ -84,6 +85,30 @@ Here the following options were used:
 * POLYNOMIAL_DEGREE: The polynomial degree of the finite element spaces
 * DOMAIN_DIMENSION: Set 2 for triangle meshes and 3 for tetrahedral meshes
 
+## Testing
+
+#### Running Basic Unit Tests
+
+By default, compiling the tests will only prepare the local C++ unit tests. Run them using:
+
+```bash
+make test
+```
+
+#### Running Integration Tests (CI)
+
+Integration tests require heavy reference data (meshes, Green's functions, `.vtu` files). Before running them, install the required Python dependencies:
+
+```bash
+pip install -r test/requirements.txt
+```
+Then compile with:
+
+```bash
+cmake -DRUN_CI_TESTS=ON ..
+```
+
+For more information please read the test [README.md](test/README.md).
 
 ## Documentation
 

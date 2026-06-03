@@ -19,7 +19,7 @@
 
 namespace tndm {
 
-enum class TableWriterType { Tecplot, CSV, Unknown };
+enum class TableWriterType { Tecplot, CSV, HDF5, Unknown };
 
 struct OutputConfig {
     std::string prefix;
@@ -53,8 +53,23 @@ struct TabularOutputConfig : OutputConfig {
     }
 };
 
-struct ProbeOutputConfig : TabularOutputConfig {
+struct ProbeOutputConfig : OutputConfig {
+    TableWriterType type = TableWriterType::CSV;
     std::vector<Probe<DomainDimension>> probes;
+
+    std::unique_ptr<TableWriter> make_writer() const {
+        switch (type) {
+        case TableWriterType::Tecplot:
+            return std::make_unique<TecplotWriter>();
+        case TableWriterType::CSV:
+            return std::make_unique<CSVWriter>();
+        case TableWriterType::HDF5:
+            return nullptr; // HDF5ProbeWriter does not use TableWriter
+        case TableWriterType::Unknown:
+            throw std::logic_error("make_writer() called with Unknown type");
+        }
+        return nullptr;
+    }
 };
 
 struct GfCheckpointConfig {
@@ -98,6 +113,7 @@ struct Config {
     std::optional<DomainOutputConfig> domain_output;
     std::optional<ProbeOutputConfig> fault_probe_output;
     std::optional<ProbeOutputConfig> domain_probe_output;
+    std::optional<OutputConfig> moment_rate_output;
     std::optional<GfCheckpointConfig> gf_checkpoint_config;
     TsCheckpointConfig ts_checkpoint_config;
 };

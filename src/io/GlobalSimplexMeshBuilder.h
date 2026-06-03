@@ -1,12 +1,13 @@
 #ifndef GLOBALSIMPLEXMESHBUILDER_20200901_H
 #define GLOBALSIMPLEXMESHBUILDER_20200901_H
 
-#include "io/GMSHParser.h"
+#include "io/MeshParser.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/Simplex.h"
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <array>
 #include <vector>
 
@@ -44,13 +45,14 @@ template <std::size_t D> inline bool is_lower_dimensional_gmsh_simplex_v(long ty
     return is_lower_dimensional_gmsh_simplex<D>::value(type);
 }
 
-template <std::size_t D> class GlobalSimplexMeshBuilder : public GMSHMeshBuilder {
+template <std::size_t D> class GlobalSimplexMeshBuilder : public MeshBuilder {
 private:
     constexpr static std::size_t NumVerts = D + 1u;
 
     std::vector<std::array<double, D>> vertices;
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
+    std::vector<long> volume_tags;
     std::vector<BC> bcs;
     Managed<Matrix<long>> high_order_nodes;
     Managed<Matrix<unsigned>> node_permutations_;
