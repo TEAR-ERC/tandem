@@ -14,10 +14,10 @@ RUN apt-get update && apt-get install -y python3-numpy && rm -rf /var/lib/apt/li
 RUN mkdir -p /opt/tandem && cd /opt/tandem \
     && git clone https://github.com/TEAR-ERC/tandem.git \
     && cd tandem \
-    && git checkout dmay/staging \
+    && git checkout main \
     && git submodule update --init
 
-RUN mkdir -p /staging && \
+RUN mkdir -p /tandem_main && \
     for DIM in 2 3; do \
         for DEG in 1 2 3 4 5 6; do \
             echo "==> Building ${DIM}D degree ${DEG}..." \
@@ -30,8 +30,8 @@ RUN mkdir -p /staging && \
                 -DDOMAIN_DIMENSION=${DIM} \
                 -DPOLYNOMIAL_DEGREE=${DEG} \
             && ninja \
-            && cp app/tandem /staging/tandem_${DIM}d_${DEG}p \
-            && cp app/static /staging/static_${DIM}d_${DEG}p; \
+            && cp app/tandem /tandem_main/tandem_${DIM}d_${DEG}p \
+            && cp app/static /tandem_main/static_${DIM}d_${DEG}p; \
         done; \
     done
 
@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /opt/petsc/lib /opt/petsc/lib
 
 # Copy all 24 binaries (tandem_Xd_Yp and static_Xd_Yp for all 12 configs)
-COPY --from=builder /staging /opt/tandem/bin
+COPY --from=builder /tandem_main /opt/tandem/bin
 
 # Copy examples
 COPY --from=builder /opt/tandem/tandem/examples /work/examples
