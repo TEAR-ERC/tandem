@@ -1,7 +1,6 @@
 #ifndef PETSCTS_20201001_H
 #define PETSCTS_20201001_H
 
-#include "common/PetscLoggingUtils.h"
 #include "common/PetscUtil.h"
 #include "common/PetscVector.h"
 #include "tandem/SeasConfig.h"
@@ -29,6 +28,8 @@ public:
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
     void set_max_time_step(double dt);
+    static PetscErrorCode customized_ts_monitor(TS ts, PetscInt step, PetscReal time, Vec u,
+                                                void* ctx);
 
 protected:
     TS ts_ = nullptr;
@@ -58,22 +59,6 @@ public:
         CHKERRTHROW(TSSetRHSFunction(ts_, nullptr, RHSFunction<TimeOp>, &timeop));
     }
     ~PetscTimeSolver() { VecDestroy(&ts_state_); }
-
-    static PetscErrorCode customized_ts_monitor(TS ts, PetscInt step, PetscReal time, Vec u,
-                                                void* ctx) {
-        PetscReal dt;
-        CHKERRTHROW(TSGetTimeStep(ts, &dt));
-
-        // Convert time and dt to the formatted string
-        std::string formatted_time = tndm::format_time(time);
-        std::string formatted_dt = tndm::format_time(dt);
-        std::string current_datetime = tndm::get_current_date_time_string();
-        // Print the step, formatted time, time step, and current date-time
-        CHKERRTHROW(PetscPrintf(PETSC_COMM_WORLD, "%s Step %" PetscInt_FMT ": t = %s, dt = %s\n",
-                                current_datetime.c_str(), step, formatted_time.c_str(),
-                                formatted_dt.c_str()));
-        return 0;
-    }
 
     void solve(double upcoming_time) {
         CHKERRTHROW(TSSetUp(ts_));

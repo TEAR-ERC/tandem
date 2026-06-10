@@ -1,4 +1,5 @@
 #include "PetscTimeSolver.h"
+#include "common/PetscLoggingUtils.h"
 
 namespace tndm {
 
@@ -42,11 +43,28 @@ PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm, Config const& cfg) {
     CHKERRTHROW(PetscOptionsHasName(NULL, NULL, "-ts_monitor", &defaultTsMonitorEnabled));
 
     if ((!disableCustomTsMonitor) && (!defaultTsMonitorEnabled)) {
-        CHKERRTHROW(TSMonitorSet(ts_, customized_ts_monitor, NULL, NULL));
+        CHKERRTHROW(TSMonitorSet(ts_, PetscTimeSolverBase::customized_ts_monitor, NULL, NULL));
     }
 }
 
 PetscTimeSolverBase::~PetscTimeSolverBase() { TSDestroy(&ts_); }
+
+PetscErrorCode PetscTimeSolverBase::customized_ts_monitor(TS ts, PetscInt step, PetscReal time,
+                                                          Vec u, void* ctx) {
+    PetscReal dt;
+    CHKERRTHROW(TSGetTimeStep(ts, &dt));
+
+    // Convert time and dt to the formatted string
+    std::string formatted_time = tndm::format_time(time);
+    std::string formatted_dt = tndm::format_time(dt);
+    std::string current_datetime = tndm::get_current_date_time_string();
+
+    // Print the step, formatted time, time step, and current date-time
+    CHKERRTHROW(PetscPrintf(PETSC_COMM_WORLD, "%s Step %" PetscInt_FMT ": t = %s, dt = %s\n",
+                            current_datetime.c_str(), step, formatted_time.c_str(),
+                            formatted_dt.c_str()));
+    return 0;
+}
 
 std::size_t PetscTimeSolverBase::get_step_number() const {
     PetscInt steps;
