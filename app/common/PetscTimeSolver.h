@@ -28,6 +28,8 @@ public:
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
     void set_max_time_step(double dt);
+    static PetscErrorCode customized_ts_monitor(TS ts, PetscInt step, PetscReal time, Vec u,
+                                                void* ctx);
 
 protected:
     TS ts_ = nullptr;
@@ -92,6 +94,7 @@ public:
             const char* loadDirectory = sload.c_str();
             CHKERRTHROW(ts_checkpoint_restart(ts_, loadDirectory));
         }
+
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
         CHKERRTHROW(TSSolve(ts_, ts_state_));
     }

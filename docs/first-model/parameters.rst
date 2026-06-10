@@ -111,6 +111,7 @@ Commented parameter file:
 Optionally, you can also specify the format of the output probes (:code:`domain_probe_output` and :code:`fault_probe_output`) in order to be able to use the HDF5 format for instance. To do so, you need to set the type parameter in the probe output section, e.g. :code:`type = "HDF5"`. Note that the HDF5 output format is only available for probe outputs and not for field outputs. For example, 
 
 .. code:: toml
+
    # On-fault probe outputs
    [fault_probe_output]
    prefix = "fltst_"
@@ -133,6 +134,7 @@ Optionally, you can also specify the format of the output probes (:code:`domain_
 Finally, the moment rate writer is also available as an output separately but it is only available in HDF5 format. To use it, you need to use the :code:`[moment_rate_output]` section. You do not need to sepcify a type currently because it is only available in HDF5 format at the moment. But you can specify the prefix for the output files and the frequency of the output using the same parameters as for the other outputs, e.g. :code:`prefix = "output/moment_rate"` and :code:`t_max = 9460800` to output the moment rate every 60 minutes of CPU time. For example,
 
 .. code:: toml
+
    [moment_rate_output]
    prefix = "output/moment_rate"
    t_max = 9460800
