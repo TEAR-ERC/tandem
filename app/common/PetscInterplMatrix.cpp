@@ -17,7 +17,7 @@ PetscInterplMatrix::PetscInterplMatrix(std::size_t rowBlockSize, std::size_t col
     CHKERRTHROW(MatSetSizes(A_, localRows, localCols, PETSC_DETERMINE, PETSC_DETERMINE));
     CHKERRTHROW(MatSetBlockSizes(A_, rowBlockSize, columnBlockSize));
     CHKERRTHROW(MatSetType(A_, MATAIJ));
-    CHKERRTHROW(MatSetFromOptions(A_));    
+    CHKERRTHROW(MatSetFromOptions(A_));
 
     // Local to global mapping
     PetscInt* l2g;

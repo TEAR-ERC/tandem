@@ -7,7 +7,8 @@ scenario = "bp6"
 ref_normal = [-1, 0]
 boundary_linear = true
 
-gf_checkpoint_prefix = "GreensFunctions/bp6_hf50"
+[gf_checkpoint]
+prefix = "GreensFunctions/bp6_hf50"
 
 [fault_output]
 prefix = "outputs_S_50m/fault"

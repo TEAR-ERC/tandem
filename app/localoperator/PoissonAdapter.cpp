@@ -54,4 +54,19 @@ void Adapter<Poisson>::slip(std::size_t faultNo, Vector<double const>& state,
     }
 }
 
+template <>
+void Adapter<Poisson>::moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
+                                   Vector<double const>& slip_rate,
+                                   Matrix<double>& mu_field) const {
+    assert(moment_rate_vector.shape()[1] == poisson_adapter::tensor::moment_rate::Shape[0]);
+    poisson_adapter::kernel::evaluate_moment_rate krnl;
+    krnl.slip_rate = slip_rate.data();
+    krnl.e_q = e_q.data();
+    krnl.moment_rate = moment_rate_vector.data();
+    krnl.w = quad_rule_.weights().data();
+    krnl.nl_q = fault_[faultNo].template get<NormalLength>().data();
+    krnl.mu = mu_field.data();
+    krnl.execute();
+}
+
 } // namespace tndm

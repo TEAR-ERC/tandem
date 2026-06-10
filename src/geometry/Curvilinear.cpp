@@ -14,6 +14,8 @@
 #include <Eigen/Geometry>
 #include <Eigen/LU>
 
+#include <mpi.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -40,6 +42,19 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     auto vertexData = dynamic_cast<VertexData<D> const*>(mesh.vertices().data());
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
+    }
+    auto volumeTagData = dynamic_cast<VolumeTagData const*>(mesh.elements().getVolumeTagData());
+    if (volumeTagData) {
+        volumeTags_ = volumeTagData->getVolumeTags();
+    } else {
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: Volume tags are not set in the mesh. "
+                         "Defaulting to tag -1 for all elements."
+                      << std::endl;
+        }
+        volumeTags_.resize(mesh.numElements(), -1);
     }
     auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
     Managed<Matrix<double>> eval_basis;
@@ -147,6 +162,13 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
 template <std::size_t D>
 TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) const {
     return TensorBase<Matrix<double>>(D, numPoints);
+}
+
+template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
+    // volumeTags_ is sized to numElements() in constructor.
+    // In release builds, elNo must be a valid element index.
+    assert(elNo < volumeTags_.size());
+    return volumeTags_[elNo];
 }
 
 template <std::size_t D>

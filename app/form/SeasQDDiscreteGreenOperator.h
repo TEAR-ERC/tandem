@@ -18,6 +18,23 @@
 
 namespace tndm {
 
+class SeasQDDiscreteGreenOperator;
+
+struct GreensFunctionIndices {
+    PetscInt slip_block_size;
+    PetscInt num_local_elements;
+    PetscInt m_bs; // traction block size
+    PetscInt n_bs; // always 1
+    PetscInt m;
+    PetscInt n;
+    PetscInt mb_offset;
+    PetscInt nb_offset;
+    int rank;
+    MPI_Comm comm;
+
+    GreensFunctionIndices(SeasQDDiscreteGreenOperator const& op);
+};
+
 class SeasQDDiscreteGreenOperator : public SeasQDOperator {
 public:
     using base = SeasQDOperator;
@@ -59,7 +76,6 @@ protected:
     void update_traction(double time, BlockVector const& state);
 
 private:
-    void compute_discrete_greens_function();
     void compute_boundary_traction();
     PetscInt create_discrete_greens_function();
     void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh,
@@ -70,6 +86,7 @@ private:
                                            PetscInt n_gf_);
     // all logic associated with matix craetion, loading / partial assembly is done here
     void get_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
+    void back_up_file(std::string file_to_backup);
     void write_discrete_greens_traction();
     void load_discrete_greens_traction();
     void get_boundary_traction();

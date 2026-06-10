@@ -1,14 +1,14 @@
 #ifndef SIMPLEX_H
 #define SIMPLEX_H
 
+#include "util/Combinatorics.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 #include <limits>
-#include "util/Combinatorics.h"
+#include <utility>
 
 namespace tndm {
 

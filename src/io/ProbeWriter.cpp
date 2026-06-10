@@ -3,6 +3,7 @@
 #include "geometry/PointLocator.h"
 #include "io/ProbeWriterUtil.h"
 
+#include <filesystem>
 #include <mpi.h>
 #include <sstream>
 #include <unordered_map>
@@ -81,7 +82,12 @@ void ProbeWriter<D>::write(double time, mneme::span<FiniteElementFunction<D>> fu
             out_->open(probe.file_name, false);
             write_header(probe, functions);
         } else {
-            out_->open(probe.file_name, true);
+            if (std::filesystem::exists(probe.file_name)) {
+                out_->open(probe.file_name, true);
+            } else {
+                out_->open(probe.file_name, false);
+                write_header(probe, functions);
+            }
         }
 
         *out_ << time;

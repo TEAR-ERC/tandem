@@ -7,6 +7,6 @@ namespace tndm {
 
 PetscErrorCode register_PCs();
 PetscErrorCode register_KSPs();
-}
+} // namespace tndm
 
 #endif // REGISTER_20210208_H

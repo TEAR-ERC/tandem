@@ -13,6 +13,7 @@
 #include "form/VolumeFunctionalFactory.h"
 #include "localoperator/Adapter.h"
 #include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -53,8 +54,7 @@ template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
     return std::make_unique<seas::Context<Type>>(
         mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
-        std::make_unique<DieterichRuinaAgeingScenario>(cfg.lib, cfg.scenario), cfg.up,
-        cfg.ref_normal);
+        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up, cfg.ref_normal);
 }
 
 template <std::size_t N>
@@ -70,23 +70,54 @@ auto make_state_vecs(std::array<std::size_t, N> const& block_sizes,
 auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
+#ifdef ENABLE_HDF5
+    bool const checkpoint_enabled =
+        cfg.ts_checkpoint_config.storage_type != TsCheckpointStorageType::NONE;
+#endif
     if (cfg.fault_output && cfg.domain_output) {
         if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
             throw std::runtime_error(
                 "Fault output prefix and domain output prefix must not be identical");
         }
     }
-    if (cfg.fault_probe_output) {
+    if (cfg.fault_probe_output && !cfg.fault_probe_output->probes.empty()) {
         auto const& oc = *cfg.fault_probe_output;
-        monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            fault_map, comm));
+        switch (oc.type) {
+#ifdef ENABLE_HDF5
+        case TableWriterType::HDF5:
+            monitor.add_writer(std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
+                oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
+                checkpoint_enabled));
+            break;
+#endif
+        default:
+            // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
+            // so this default handles only CSV and Tecplot.
+            monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
+                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
+                cl, fault_map, comm));
+            break;
+        }
     }
-    if (cfg.domain_probe_output) {
+    if (cfg.domain_probe_output && !cfg.domain_probe_output->probes.empty()) {
         auto const& oc = *cfg.domain_probe_output;
-        monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
-            oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh, cl,
-            comm));
+        switch (oc.type) {
+#ifdef ENABLE_HDF5
+        case TableWriterType::HDF5:
+            monitor.add_writer(
+                std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
+                    oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map,
+                    comm, checkpoint_enabled));
+            break;
+#endif
+        default:
+            // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
+            // so this default handles only CSV and Tecplot.
+            monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+                oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
+                cl, comm));
+            break;
+        }
     }
     if (cfg.fault_output) {
         auto const& oc = *cfg.fault_output;
@@ -105,6 +136,23 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
             comm));
     }
+#ifdef ENABLE_HDF5
+    if (cfg.moment_rate_output) {
+        auto const& oc = *cfg.moment_rate_output;
+        monitor.add_writer(std::make_unique<seas::MomentRateWriter<DomainDimension>>(
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+            comm, checkpoint_enabled));
+    }
+#else
+    if (cfg.moment_rate_output) {
+        int rank;
+        MPI_Comm_rank(comm, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: moment_rate_output requires HDF5 support. "
+                         "Reconfigure with -DENABLE_HDF5=ON to enable this output.\n";
+        }
+    }
+#endif
 }
 
 template <typename seas_t> struct operator_specifics;
@@ -146,10 +194,21 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
 
     static auto make(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
                      seas::ContextBase& ctx) {
+        auto const& cfgcp = cfg.gf_checkpoint_config;
+
+        std::optional<std::string> prefix;
+        double freq_cputime;
+        if (!cfgcp) {
+            prefix = std::nullopt;
+            freq_cputime = 1e10;
+        } else {
+            prefix = cfgcp->prefix;
+            freq_cputime = cfgcp->frequency_cputime_minutes;
+        }
+
         auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
-            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh,
-            cfg.gf_checkpoint_prefix, cfg.gf_checkpoint_every_nmins, cfg.matrix_free,
-            MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh, prefix,
+            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
         ctx.setup_seasop(*seasop);
         seasop->warmup();
         return seasop;
@@ -191,9 +250,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                         seas::ContextBase& ctx) {
     auto seasop = operator_specifics<seas_t>::make(mesh, cfg, ctx);
 
-    auto ts =
-        PetscTimeSolver(*seasop, make_state_vecs(seasop->block_sizes(),
-                                                 seasop->num_local_elements(), seasop->comm()));
+    auto ts = PetscTimeSolver(
+        *seasop,
+        make_state_vecs(seasop->block_sizes(), seasop->num_local_elements(), seasop->comm()), cfg);
 
     auto cfl_time_step = operator_specifics<seas_t>::cfl_time_step(*seasop);
     if (cfl_time_step) {
@@ -235,6 +294,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     Stopwatch sw;
     sw.start();
     ts.solve(cfg.final_time);
+
     double solve_time = sw.stop();
 
     std::optional<double> L2_error_domain = std::nullopt;

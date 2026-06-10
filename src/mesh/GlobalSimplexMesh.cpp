@@ -61,6 +61,9 @@ void GlobalSimplexMesh<D>::doPartition(std::vector<idx_t> const& partition) {
     if (elementData) {
         elementData = elementData->redistributed(enumeration, a2a);
     }
+    if (volumeTagData) {
+        volumeTagData = volumeTagData->redistributed(enumeration, a2a);
+    }
 }
 
 template <std::size_t D>
@@ -342,6 +345,17 @@ void GlobalSimplexMesh<D>::setSharedRanksAndElementData(
         }
         elems.setMeshData(elementData->redistributed(lids, a2a));
     }
+    if (volumeTagData) {
+        auto map = makeG2LMap();
+        std::vector<std::size_t> lids;
+        lids.reserve(requestedElems.size());
+        for (auto& elem : requestedElems) {
+            auto it = map.find(elem);
+            assert(it != map.end());
+            lids.emplace_back(it->second);
+        }
+        elems.setVolumeTagData(volumeTagData->redistributed(lids, a2a));
+    }
 }
 
 template <std::size_t D>
@@ -392,6 +406,7 @@ void GlobalSimplexMesh<D>::deleteDomainBoundaryFaces(facet_set_t& boundaryFaces)
     }
 }
 
+template class GlobalSimplexMesh<1u>;
 template class GlobalSimplexMesh<2u>;
 template class GlobalSimplexMesh<3u>;
 

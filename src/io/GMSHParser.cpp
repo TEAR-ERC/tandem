@@ -154,8 +154,8 @@ bool GMSHParser::parseElements() {
     }
     auto numElements = lexer.getInteger();
 
-    constexpr std::size_t MaxElementType = sizeof(NumNodes) / sizeof(std::size_t);
-    constexpr std::size_t MaxNodes = *std::max_element(NumNodes, NumNodes + MaxElementType);
+    constexpr std::size_t MaxElementType = NumNodes.size();
+    const std::size_t MaxNodes = *std::max_element(NumNodes.begin(), NumNodes.end());
     long tag = -1;
     std::array<long, MaxNodes> nodes;
 

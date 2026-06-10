@@ -1,5 +1,5 @@
-#include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
+#include "io/MeshParser.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "parallel/SimpleScatter.h"
 #include "util/Stopwatch.h"
@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <memory>
 
 using namespace tndm;
 
@@ -56,15 +57,23 @@ template <std::size_t D> void test(std::string mesh_file, unsigned long overlap)
 
     bool ok = false;
     GlobalSimplexMeshBuilder<D> builder;
+    std::string meshError;
     if (rank == 0) {
-        GMSHParser parser(&builder);
-        ok = parser.parseFile(mesh_file);
-        if (!ok) {
-            std::cerr << mesh_file << std::endl << parser.getErrorMessage();
+        auto [parser, error] = MeshParser::createWithValidation<D>(mesh_file, &builder);
+        if (!parser) {
+            meshError = error;
+        } else {
+            ok = parser->parseFile(mesh_file);
+            if (!ok) {
+                meshError = mesh_file + "\n" + std::string(parser->getErrorMessage());
+            }
         }
     }
     MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
     if (!ok) {
+        if (rank == 0) {
+            std::cerr << meshError << std::endl;
+        }
         return;
     }
     auto globalMesh = builder.create(MPI_COMM_WORLD);

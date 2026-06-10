@@ -7,7 +7,7 @@
 #include "form/AdapterOperator.h"
 #include "form/FrictionOperator.h"
 #include "form/SeasQDOperator.h"
-#include "localoperator/DieterichRuinaAgeing.h"
+#include "localoperator/DieterichRuinaBase.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
@@ -48,12 +48,17 @@ template <typename Type> class Context : public ContextBase {
 public:
     using adapter_t = AdapterOperator<Type>;
     using dg_t = DGOperator<Type>;
+
+#if defined(DR_AGEING_LAW)
     using friction_lop_t = RateAndState<DieterichRuinaAgeing>;
+#elif defined(DR_SLIP_LAW)
+    using friction_lop_t = RateAndState<DieterichRuinaSlip>;
+#endif
     using friction_t = FrictionOperator<friction_lop_t>;
 
     Context(LocalSimplexMesh<DomainDimension> const& mesh,
             std::unique_ptr<SeasScenario<Type>> seas_sc,
-            std::unique_ptr<DieterichRuinaAgeingScenario> friction_sc,
+            std::unique_ptr<DieterichRuinaScenario> friction_sc,
             std::array<double, DomainDimension> up, std::array<double, DomainDimension> ref_normal)
         : ContextBase(mesh, seas_sc->transform()), scenario(std::move(seas_sc)),
           friction_scenario(std::move(friction_sc)),
@@ -63,8 +68,16 @@ public:
         return std::make_unique<dg_t>(topo, dg_lop);
     }
     auto friction() -> std::unique_ptr<AbstractFrictionOperator> override {
+#ifdef ENABLE_HDF5
+        // Moment rate output (HDF5-only) needs the adapter to compute moment rates in rhs().
+        auto fric = std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo,
+                                                 fault_map, this->adapter());
+#else
+        // Without HDF5 there is no moment rate output, so skip the adapter to avoid
+        // computing moment rates on every rhs() evaluation.
         auto fric =
             std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
+#endif
         fric->lop().set_constant_params(friction_scenario->constant_params());
         fric->lop().set_params(friction_scenario->param_fun());
         if (friction_scenario->source_fun()) {
@@ -113,7 +126,7 @@ public:
     }
 
     std::unique_ptr<SeasScenario<Type>> scenario;
-    std::unique_ptr<DieterichRuinaAgeingScenario> friction_scenario;
+    std::unique_ptr<DieterichRuinaScenario> friction_scenario;
     std::shared_ptr<Type> dg_lop;
 
 private:
