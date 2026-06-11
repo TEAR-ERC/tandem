@@ -147,7 +147,7 @@ std::unique_ptr<typename GenMesh<D>::boundary_mesh_t>
 GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
     std::vector<boundary_simplex_t> boundaryElements;
     std::vector<BC> boundaryConditions;
-    std::vector<long int> facetTags;
+    std::vector<long int> FacetTags;
     for (auto& elem : mesh.getElements()) {
         for (auto& face : elem.downward()) {
             auto v0 = unflatten(face[0], Np1);
@@ -183,9 +183,9 @@ GenMesh<D>::extractBoundaryMesh(mesh_t const& mesh) const {
             }
         }
     }
-    facetTags.resize(boundaryConditions.size(), -1);
+    FacetTags.resize(boundaryConditions.size(), -1);
     auto boundaryData =
-        std::make_unique<boundary_data_t>(std::move(boundaryConditions), std::move(facetTags));
+        std::make_unique<boundary_data_t>(std::move(boundaryConditions), std::move(FacetTags));
 
     return std::make_unique<boundary_mesh_t>(std::move(boundaryElements), nullptr,
                                              std::move(boundaryData), nullptr, comm_);

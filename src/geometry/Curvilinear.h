@@ -98,6 +98,7 @@ private:
 
     double local_mesh_size_;
     std::vector<long int> volumeTags_;
+    std::vector<long int> FacetTags;
 };
 
 } // namespace tndm
