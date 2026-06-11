@@ -45,11 +45,11 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     }
     auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
     if (boundaryData) {
-        FacetTags = boundaryData->getFacetTags();
+        facetTags_ = boundaryData->getFacetTags();
     } else {
         std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
                   << std::endl;
-        FacetTags.resize(mesh.facets().size(), -1);
+        facetTags_.resize(mesh.facets().size(), -1);
     }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
     if (volumeData) {
@@ -184,7 +184,7 @@ void Curvilinear<D>::setFacetTags(FacetInfo const& info, Tensor<long int, 1u>& r
     // Each facet element has a single facet tag (one material region per facet element).
     // The same tag is broadcast to all quadrature points within the facet element.
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
-        result(i) = info.FacetTag;
+        result(i) = info.fctTag;
     }
 }
 
