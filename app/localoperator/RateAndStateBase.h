@@ -55,6 +55,7 @@ protected:
     };
     using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords>;
     mneme::StridedView<fault_t> fault_;
+    std::vector<long int> fault_tags_;
 };
 
 } // namespace tndm
