@@ -25,6 +25,8 @@ public:
      * @return True if write was successful.
      */
     bool write();
+    void load_from_file();
+    void truncate_after_restart(std::size_t p);
 
 private:
     std::filesystem::path base_;

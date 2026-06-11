@@ -32,6 +32,7 @@ public:
     std::vector<std::size_t> const& elNos() const { return elNos_; }
 
     auto num_probes() const { return probes_.size(); }
+    void truncate_after_restart(std::size_t p);
 
 private:
     struct ProbeMeta {

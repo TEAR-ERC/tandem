@@ -32,6 +32,7 @@ public:
     auto end() const { return bndNos_.end(); }
     auto num_probes() const { return probes_.size(); }
     std::vector<std::size_t> const& bndNos() const { return bndNos_; }
+    void truncate_after_restart(std::size_t p);
 
 private:
     struct ProbeMeta {

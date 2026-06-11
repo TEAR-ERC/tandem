@@ -4,6 +4,7 @@
 #include "io/ProbeWriterUtil.h"
 
 #include <filesystem>
+#include <fstream>
 #include <mpi.h>
 #include <sstream>
 #include <unordered_map>
@@ -73,6 +74,53 @@ void ProbeWriter<D>::write_header(ProbeMeta const& p,
         }
     }
     *out_ << endheader;
+}
+
+template <std::size_t D> void ProbeWriter<D>::truncate_after_restart(std::size_t p) {
+    for (auto const& probe : probes_) {
+        // Open file in read mode to read content
+        std::ifstream file(probe.file_name);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open file: " + probe.file_name +
+                                     " for truncation (checkpoint restart)");
+            return;
+        }
+
+        std::stringstream buffer;
+        std::string line;
+        int line_num = 0;
+
+        // Read file line by line into a stringstream, up to line p + 2
+        while (std::getline(file, line)) {
+            if (line_num >= p + 2) {
+                break; // Stop reading after reaching the target line
+            }
+            buffer << line << '\n';
+            line_num++;
+        }
+        file.close();
+
+        // Check if enough lines were read
+        if (line_num < p + 2) {
+            std::cerr << p + 2 << " lines expected in " << probe.file_name
+                      << " when truncating (checkpoint restart), but read only " << line_num
+                      << "\n";
+        }
+
+        // Reopen the original file in write mode to overwrite its content
+        std::ofstream out_file(probe.file_name, std::ios::trunc);
+        if (!out_file.is_open()) {
+            throw std::runtime_error("Failed to open file: " + probe.file_name +
+                                     " for writing truncated content");
+            return;
+        }
+
+        // Write the truncated content back
+        out_file << buffer.str();
+        out_file.close();
+
+        std::cout << "Done truncating " << probe.file_name << " to " << p << " records.\n";
+    }
 }
 
 template <std::size_t D>
