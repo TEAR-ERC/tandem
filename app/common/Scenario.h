@@ -45,7 +45,7 @@ public:
                               std::optional<functional_t<NumQuantities>>& target) {
             if (lib_.hasMember(scenario, opt)) {
                 target = std::make_optional(
-                    lib_.getMemberFunctionTagged<DomainDimension, NumQuantities>(scenario, opt));
+                    lib_.getMemberFunction<DomainDimension, NumQuantities, true>(scenario, opt));
             }
         };
         functional(Force, force_);
