@@ -157,12 +157,9 @@ protected:
     struct Coords {
         using type = std::array<double, D>;
     };
-    struct FacetTag {
-        using type = long int;
-    };
 
     using fct_t = mneme::MultiStorage<mneme::DataLayout::SoA, JInv0, JInv1, Normal, UnitNormal,
-                                      NormalLength, Coords, FacetTag>;
+                                      NormalLength, Coords>;
     using vol_t = mneme::MultiStorage<mneme::DataLayout::SoA, AbsDetJ, JInv, Coords>;
 
     mneme::StridedView<fct_t> fct;
