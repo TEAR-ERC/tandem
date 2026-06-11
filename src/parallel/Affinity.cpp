@@ -34,7 +34,7 @@ cpu_set_t Affinity::worker_mask() const {
         cpu_set_t m;
         CPU_ZERO(&m);
         sched_getaffinity(0, sizeof(cpu_set_t), &m);
-    #pragma omp critical
+        #pragma omp critical
         CPU_OR(&u, &u, &m);
     }
     return u;
