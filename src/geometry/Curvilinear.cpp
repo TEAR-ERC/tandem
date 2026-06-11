@@ -179,13 +179,13 @@ template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo)
     return volumeTags_[elNo];
 }
 
-template <std::size_t D>
-void Curvilinear<D>::setFacetTags(FacetInfo const& info, Tensor<long int, 1u>& result) const {
-    // Each facet element has a single facet tag (one material region per facet element).
-    // The same tag is broadcast to all quadrature points within the facet element.
-    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
-        result(i) = info.fctTag;
-    }
+
+template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t eleNo) const {
+    return volumeTags_[eleNo];
+}
+
+template <std::size_t D> long int Curvilinear<D>::getFacetTag(std::size_t fctNo) const {
+    return facetTags_[fctNo];
 }
 
 template <std::size_t D>
