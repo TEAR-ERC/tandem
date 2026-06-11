@@ -47,8 +47,12 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (boundaryData) {
         facetTags_ = boundaryData->getFacetTags();
     } else {
-        std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
-                  << std::endl;
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
+                      << std::endl;
+        }
         facetTags_.resize(mesh.facets().size(), -1);
     }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
