@@ -39,7 +39,7 @@ public:
     }
 
     TensorBase<Matrix<double>> mapResultInfo(std::size_t numPoints) const;
-    TensorBase<Vector<long int>> tagsInfo(std::size_t numPoints) const;
+
     void map(std::size_t eleNo, Matrix<double> const& E, Tensor<double, 2u>& result) const;
 
     TensorBase<Tensor<double, 3u>> jacobianResultInfo(std::size_t numPoints) const;
