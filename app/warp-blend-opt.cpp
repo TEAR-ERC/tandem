@@ -89,11 +89,11 @@ template <std::size_t D>
 double estimateLebesgueConstant(unsigned degree, std::vector<std::array<double, D>> const& nodes,
                                 std::vector<std::array<double, D>> const& positions) {
     double L = 0.0;
-#pragma omp parallel shared(L)
+    #pragma omp parallel shared(L)
     {
         LebesgueFunction<D> lb(degree, nodes);
 
-#pragma omp for reduction(max : L)
+        #pragma omp for reduction(max : L)
         for (std::size_t i = 0; i < positions.size(); ++i) {
             L = std::max(L, lb(positions[i]));
         }

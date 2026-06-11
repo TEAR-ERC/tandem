@@ -64,7 +64,7 @@ double surfaceInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, SurfaceFu
     }
 
     double result = 0.0;
-#pragma omp parallel shared(result)
+    #pragma omp parallel shared(result)
     {
         auto J = Managed(cl.jacobianResultInfo(pts.size()));
         auto JInv = Managed(cl.jacobianResultInfo(pts.size()));
@@ -74,7 +74,7 @@ double surfaceInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, SurfaceFu
         auto x2 = Managed(cl.mapResultInfo(rule.size()));
         auto fx = Managed<Matrix<double>>(x1.shape());
 
-#pragma omp for reduction(+ : result)
+        #pragma omp for reduction(+ : result)
         for (std::size_t fNo = 0; fNo < mesh.numFacets(); ++fNo) {
             auto elNos = mesh.template upward<D - 1u>(fNo);
             assert(elNos.size() >= 1u);
@@ -122,7 +122,7 @@ double volumeInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, VolumeFunc
     Managed<Tensor<double, 3u>> gradE = cl.evaluateGradientAt(pts);
 
     double result = 0.0;
-#pragma omp parallel shared(result)
+    #pragma omp parallel shared(result)
     {
         auto J = Managed(cl.jacobianResultInfo(pts.size()));
         auto JinvT = Managed(cl.jacobianResultInfo(pts.size()));
@@ -131,7 +131,7 @@ double volumeInt(LocalSimplexMesh<D> const& mesh, Curvilinear<D>& cl, VolumeFunc
         auto x1 = Managed(cl.mapResultInfo(rule.size()));
         auto x2 = Managed(cl.mapResultInfo(rule.size()));
 
-#pragma omp for reduction(+ : result)
+        #pragma omp for reduction(+ : result)
         for (std::size_t elNo = 0; elNo < mesh.numElements(); ++elNo) {
             cl.jacobian(elNo, gradE, J);
             cl.absDetJ(elNo, J, absDetJ);
