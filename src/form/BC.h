@@ -15,6 +15,7 @@ const long FAULT_DEFAULT = 3;
 const long NATURAL_MIN = 1;
 const long NATURAL_MAX = 1;
 const long NATURAL_DEFAULT = 1;
+const long NO_FACET_TAG = -1;
 
 inline BC classifyBC(long int tag) {
     if (tag == 0)
