@@ -23,13 +23,13 @@ public:
     static constexpr std::size_t PsiIndex = TangentialComponents;
 
     using param_fun_t =
-        std::function<typename Law::Params(std::array<double, DomainDimension> const&, long int&)>;
+        std::function<typename Law::Params(std::array<double, DomainDimension> const&, long int)>;
     using source_fun_t = std::function<std::array<double, 1>(
-        std::array<double, DomainDimension + 1> const&, long int&)>;
+        std::array<double, DomainDimension + 1> const&, long int)>;
     using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
-        std::array<double, DomainDimension + 1> const&, long int&)>;
+        std::array<double, DomainDimension + 1> const&, long int)>;
     using delta_sn_fun_t = std::function<std::array<double, 1>(
-        std::array<double, DomainDimension + 1> const&, long int&)>;
+        std::array<double, DomainDimension + 1> const&, long int)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
