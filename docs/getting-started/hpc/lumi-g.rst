@@ -20,14 +20,30 @@ We first compile PETSc (and parmetis) with:
     module load cray-python
 
     export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
-    export blas_dir=/opt/cray/pe/libsci/25.03.0/CRAYCLANG/17.0/x86_64/
-    export PETSC_ARCH=arch-cray-c-rocm-hip-tandem-32-v3.25.1
+    export PETSC_ARCH=arch-amd-c-rocm-hip-tandem-32-v3.25.2
 
-    wget https://fossies.org/linux/misc/petsc-3.25.1.tar.gz
-    cd petsc
+    wget https://fossies.org/linux/misc/petsc-3.25.2.tar.gz
+    tar -xzvf  petsc-3.25.2.tar.gz
+    cd petsc-3.25.2
     export PETSC_DIR=$(pwd)
 
-    ./configure --download-c2html=0 --download-cmake --with-debugging=no  --download-hwloc=0 --download-metis --download-parmetis --download-sowing=0 --with-64-bit-indices --with-fortran-bindings=0 --with-hip --with-hip-arch=gfx90a --with-hipc=hipcc --with-memalign=32 --with-mpi-dir=${MPICH_DIR} --with-x=0 PETSC_ARCH=${PETSC_ARCH} --with-blaslapack-lib="${blas_dir}/lib/libsci_cray.a ${blas_dir}/lib/libsci_cray.so ${blas_dir}/lib/libsci_cray_mpi.a ${blas_dir}/lib/libsci_cray_mpi.so"
+    ./configure --download-c2html=0 \
+                --download-cmake \
+                --with-debugging=no \
+                --download-hwloc=0 \
+                --download-metis \
+                --download-parmetis \
+                --download-sowing=0 \
+                --with-64-bit-indices \
+                --with-fortran-bindings=0 \
+                --with-hip \
+                --with-hip-arch=gfx90a \
+                --with-hipc=hipcc \
+                --with-memalign=32 \
+                --with-mpi-dir=${MPICH_DIR} \
+                --with-x=0 \
+                PETSC_ARCH=${PETSC_ARCH} \
+                --with-blaslapack-lib="${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd.so ${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd_mpi.so"
 
     make -j 30 all
 
