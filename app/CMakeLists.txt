@@ -206,16 +206,40 @@ set(APP_COMMON_SRCS
     common/vecnest_util.c
 )
 
+if(${LAPACK_FOUND})
+    list(APPEND APP_COMMON_SRCS
+         pc/eigdeflate.c
+         pc/reig_aux.c
+    )
+endif()
+
+
+
 add_library(app-common ${APP_COMMON_SRCS})
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
-    ${LAPACK_LIBRARIES}
     poisson-kernels-lib
     poisson_adapter-kernels-lib
     elasticity-kernels-lib
     elasticity_adapter-kernels-lib
     tandem-lib
     PETSc::PETSc)
+
+# Clean, minimalist guard for Cray/LUMI
+if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
+    message(STATUS "LUMI Environment detected. Mapping LibSci shared libraries directly.")
+    target_link_libraries(app-common PUBLIC
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_cray.so"
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_cray_mpi.so"
+    )
+    target_link_options(app-common PUBLIC "-Wl,--allow-shlib-undefined")
+else()
+    # Fallback for standard development setups
+    if(${LAPACK_FOUND} AND LAPACK_LIBRARIES)
+        target_link_libraries(app-common PUBLIC ${LAPACK_LIBRARIES})
+    endif()
+endif()
+
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Static solver

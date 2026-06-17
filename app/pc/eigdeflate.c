@@ -173,7 +173,7 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     PetscFunctionReturn(0);
 }
 
-PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems* PetscOptionsObject) {
+PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems PetscOptionsObject) {
     PC_eigdeflate* ctx;
     PetscInt M;
     PetscBool flg;
@@ -181,7 +181,8 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems* PetscOptions
     PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
 
-    PetscOptionsHeadBegin(PetscOptionsObject, "Eigdeflate options");
+    PetscOptionsBegin(PetscObjectComm((PetscObject)pc), ((PetscObject)pc)->prefix,
+                      "Eigdeflate options", "PC");
     PetscOptionsBoundedInt("-pc_eigdeflate_nev", "Number of deflated eigenvalues", "", ctx->nev,
                            &ctx->nev, &flg, 1);
     PetscOptionsBoundedInt("-pc_eigdeflate_nev_oversample",
@@ -195,7 +196,7 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems* PetscOptions
                            ctx->npost, &ctx->npost, &flg, 0);
     PetscOptionsReal("-pc_eigdeflate_relax_factor", "Relaxation factor", "", ctx->factor,
                      &ctx->factor, &flg);
-    PetscOptionsHeadEnd();
+    PetscOptionsEnd();
     PetscFunctionReturn(0);
 }
 
