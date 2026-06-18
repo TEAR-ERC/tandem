@@ -182,14 +182,11 @@ static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems PetscOp
 #endif
     CHKERRQ(PetscOptionsInt("-ksp_lspoly_esteig_steps", "Number of est steps in LSPoly", "",
                             cheb->eststeps, &cheb->eststeps, NULL));
-
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_esteig_bias",
                              "Maximum eigenvalue is multiplied with this factor", "", cheb->estbias,
                              &cheb->estbias, NULL));
-
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_alpha", "Weighting function (1-x)^alpha", "", cheb->alpha,
                              &cheb->alpha, NULL));
-
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
 

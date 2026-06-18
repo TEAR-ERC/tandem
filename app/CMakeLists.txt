@@ -205,16 +205,12 @@ set(APP_COMMON_SRCS
     common/ts_util.c
     common/vecnest_util.c
 )
-
 if(${LAPACK_FOUND})
     list(APPEND APP_COMMON_SRCS
          pc/eigdeflate.c
          pc/reig_aux.c
     )
 endif()
-
-
-
 add_library(app-common ${APP_COMMON_SRCS})
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
@@ -225,7 +221,9 @@ target_link_libraries(app-common PUBLIC
     tandem-lib
     PETSc::PETSc)
 
-# Clean, minimalist guard for Cray/LUMI
+# On Cray/LUMI, find_package(LAPACK) fails to resolve the required paths,
+# and the compiler wrappers don't implicitly link LibSci for this C++ target.
+# We must explicitly map the shared libraries to prevent link-time errors.
 if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
     message(STATUS "LUMI Environment detected. Mapping LibSci shared libraries directly.")
     target_link_libraries(app-common PUBLIC
@@ -234,8 +232,7 @@ if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
     )
     target_link_options(app-common PUBLIC "-Wl,--allow-shlib-undefined")
 else()
-    # Fallback for standard development setups
-    if(${LAPACK_FOUND} AND LAPACK_LIBRARIES)
+    if(LAPACK_FOUND)
         target_link_libraries(app-common PUBLIC ${LAPACK_LIBRARIES})
     endif()
 endif()
