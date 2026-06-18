@@ -63,7 +63,15 @@ private:
 
 class BoundaryData : public MeshData {
 public:
-    BoundaryData(std::vector<BC>&& BCs) : boundaryConditions(std::move(BCs)) {}
+    BoundaryData(std::vector<BC>&& BCs, std::vector<long int>&& tags)
+        : boundaryConditions(std::move(BCs)), facetTags_(std::move(tags)) {
+        if (boundaryConditions.size() != facetTags_.size()) {
+            throw std::invalid_argument(
+                "BoundaryData: BC vector size (" + std::to_string(boundaryConditions.size()) +
+                ") must match facetTags_ size (" + std::to_string(facetTags_.size()) + ")");
+        }
+    }
+
     virtual ~BoundaryData() {}
 
     std::size_t size() const override { return boundaryConditions.size(); }
@@ -71,28 +79,38 @@ public:
     std::unique_ptr<MeshData> redistributed(std::vector<std::size_t> const& lids,
                                             AllToAllV const& a2a) const override {
         std::vector<BC> requestedBCs;
+        std::vector<long int> requestedTags;
         requestedBCs.reserve(lids.size());
+        requestedTags.reserve(lids.size());
+
         for (auto& lid : lids) {
             if (lid == std::numeric_limits<std::size_t>::max()) {
                 requestedBCs.emplace_back(BC::None);
+                requestedTags.emplace_back(-1);
             } else {
                 requestedBCs.emplace_back(boundaryConditions[lid]);
+                requestedTags.emplace_back(facetTags_[lid]);
             }
         }
 
         static_assert(sizeof(BC::None) == sizeof(int));
         auto newBCs = a2a.exchange(requestedBCs, mpi_type_t<int>());
-        return std::make_unique<BoundaryData>(std::move(newBCs));
+        auto newTags = a2a.exchange(requestedTags, mpi_type_t<long>());
+
+        return std::make_unique<BoundaryData>(std::move(newBCs), std::move(newTags));
     }
 
     void permute(std::vector<std::size_t> const& permutation) override {
         apply_permutation(boundaryConditions, permutation);
+        apply_permutation(facetTags_, permutation);
     }
 
     std::vector<BC> const& getBoundaryConditions() const { return boundaryConditions; }
+    std::vector<long int> const& getFacetTags() const { return facetTags_; }
 
 private:
     std::vector<BC> boundaryConditions;
+    std::vector<long int> facetTags_;
 };
 
 class ElementData : public MeshData {

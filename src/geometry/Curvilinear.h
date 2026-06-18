@@ -2,6 +2,7 @@
 #define CURVILINEAR_20200609_H
 
 #include "basis/WarpAndBlend.h"
+#include "form/FacetInfo.h"
 #include "form/RefElement.h"
 #include "mesh/Simplex.h"
 #include "tensor/Tensor.h"
@@ -38,6 +39,7 @@ public:
     }
 
     TensorBase<Matrix<double>> mapResultInfo(std::size_t numPoints) const;
+
     void map(std::size_t eleNo, Matrix<double> const& E, Tensor<double, 2u>& result) const;
 
     TensorBase<Tensor<double, 3u>> jacobianResultInfo(std::size_t numPoints) const;
@@ -62,7 +64,6 @@ public:
                     Tensor<double, 3u>& result) const;
     void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
                                     Matrix<double> const& normal, Tensor<double, 3u>& result) const;
-
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;
 
@@ -80,7 +81,8 @@ public:
      * the domain, thus, the maximum diameter of the "high-order" mesh might be larger.
      */
     double local_mesh_size() const { return local_mesh_size_; }
-    long int getVolumeTag(std::size_t elNo) const;
+    long int getVolumeTag(std::size_t eleNo) const;
+    long int getFacetTag(std::size_t fctNo) const;
 
 private:
     const unsigned N;
@@ -98,6 +100,7 @@ private:
 
     double local_mesh_size_;
     std::vector<long int> volumeTags_;
+    std::vector<long int> facetTags_;
 };
 
 } // namespace tndm
