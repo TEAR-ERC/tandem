@@ -278,6 +278,20 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
                         seas::ContextBase& ctx) {
     auto seasop = operator_specifics<seas_t>::make(mesh, cfg, ctx);
 
+    // Detect whether the mesh contains a fault and inform the domain operator. For
+    // viscoelasticity this selects an adaptive step that tracks the RSF/PETSc solver
+    // (fault present) versus a fixed step = theta * tau (no fault). Must be set before
+    // the time solver is constructed, since that triggers initial_condition().
+    bool has_fault = false;
+    {
+        std::size_t local_fault_elems = seasop->friction().num_local_elements();
+        std::size_t global_fault_elems = 0;
+        MPI_Allreduce(&local_fault_elems, &global_fault_elems, 1, mpi_type_t<std::size_t>(),
+                      MPI_SUM, seasop->comm());
+        has_fault = global_fault_elems > 0;
+        seasop->domain().set_fault_present(has_fault);
+    }
+
     auto ts = PetscTimeSolver(
         *seasop,
         make_state_vecs(seasop->block_sizes(), seasop->num_local_elements(), seasop->comm()), cfg);
@@ -299,7 +313,16 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     }
 
     if (cfg.type == LocalOpType::Viscoelasticity && effective_max_dt) {
-        ts.set_max_time_step(*effective_max_dt);
+        if (has_fault) {
+            // Use the viscoelastic step only as a ceiling: the step starts from the
+            // configured -ts_dt and adapts up to the cap (min(ve cap, PETSc step)), so
+            // fault slip is resolved like the elastic case. The matrix tracks dt via
+            // prepare_for_dt().
+            ts.set_max_time_step_limit(*effective_max_dt);
+        } else {
+            // No fault: fixed viscoelastic step = theta * tau (constant, no adaptivity).
+            ts.set_max_time_step(*effective_max_dt);
+        }
     }
 
     auto monitor =

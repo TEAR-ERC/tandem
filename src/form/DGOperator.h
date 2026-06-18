@@ -475,16 +475,36 @@ public:
         lop_->set_dirichlet(std::move(fun));
     }
 
-    void update_time_step(double dt) override {
+    bool update_time_step(double dt) override {
         if constexpr (std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>) {
-            // TODO: Need to modify this to change the viscoelastic time step according to RSF
-            // solver time step.
+            if (fault_present_) {
+                // Viscoelasticity with a fault: the bulk solve follows the actual
+                // (cap-limited, adaptive) RSF/PETSc step. The stiffness matrix depends on
+                // dt via A_dt/B_dt, so when the step changes we recompute the
+                // time-dependent coefficients and signal that the matrix must be
+                // reassembled. This is free while dt is steady (e.g. pinned at the cap
+                // during the interseismic phase) and only pays its cost during fault slip.
+                double const current = lop_->get_viscoelastic_time_step();
+                double diff = dt - current;
+                if (diff < 0.0) {
+                    diff = -diff;
+                }
+                double const scale = dt > current ? dt : current;
+                if (dt > 0.0 && diff > 1.0e-12 * scale) {
+                    lop_->set_viscoelastic_time_step_value(dt);
+                    update_time_dependent_precomputation();
+                    return true;
+                }
+                return false;
+            }
+            // Viscoelasticity without a fault: fixed step = theta * tau, no adaptivity,
+            // so the matrix assembled once at construction stays valid (no reassembly).
             lop_->set_viscoelastic_time_step(relaxation_time_global_);
-            // TODO: keeping this off for now - would need this once R&S friction time stepper is
-            // also needed. Currently only working with meshes without faults.
-            // update_time_dependent_precomputation();
         }
+        return false;
     }
+
+    void set_fault_present(bool present) override { fault_present_ = present; }
 
     double relaxation_time_global() const override { return relaxation_time_global_; }
 
@@ -683,6 +703,7 @@ private:
     Scatter scatter_;
     SparseBlockVector<double> ghost_;
     double relaxation_time_global_ = 0.0;
+    bool fault_present_ = false;
 };
 
 } // namespace tndm

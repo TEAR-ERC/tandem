@@ -38,6 +38,16 @@ public:
         b_->set_zero();
         dgop.rhs(*b_);
     }
+    /*
+     * @brief Reassemble the system matrix in place after dt-dependent coefficients change.
+     *
+     * Used by viscoelasticity-with-fault when the time step changes: the assembled
+     * operator P_ depends on dt, so its entries are re-zeroed and rebuilt. The matrix
+     * object is reused, so PETSc detects the changed state and refactors on the next
+     * solve. The multigrid Galerkin coarse operators are preconditioner-only and are
+     * intentionally left untouched (they only affect convergence rate, not correctness).
+     */
+    void reassemble(AbstractDGOperator<DomainDimension>& dgop);
     void warmup();
     inline void solve() { CHKERRTHROW(KSPSolve(ksp_, b_->vec(), x_->vec())); }
     inline bool is_converged() const {

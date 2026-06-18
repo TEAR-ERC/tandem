@@ -27,7 +27,14 @@ public:
     std::size_t get_step_number() const;
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
+    // Force a fixed step of dt (also used as the ceiling). Used for viscoelasticity
+    // without a fault, where the step is constant at theta * tau.
     void set_max_time_step(double dt);
+    // Set only the maximum step (ceiling), leaving the initial/current step and the
+    // adaptive controller untouched. Used for viscoelasticity with a fault, so the
+    // step starts at the configured -ts_dt and adapts up to, but not beyond, dt
+    // (i.e. min(ve cap, PETSc step)).
+    void set_max_time_step_limit(double dt);
 
 protected:
     TS ts_ = nullptr;
@@ -163,6 +170,13 @@ private:
                 return {PetscVectorView(x)...};
             },
             x);
+
+        // TSGetTimeStep returns the step currently being attempted (updated by the
+        // adaptive controller, including on rejected-step retries), so this prepares
+        // the operator for the exact dt of the stages about to be evaluated.
+        PetscReal dt;
+        CHKERRTHROW(TSGetTimeStep(ts, &dt));
+        self->prepare_for_dt(dt);
 
         std::apply([&self, &t](auto&... xv) { self->rhs(t, xv...); }, x_view);
         return 0;

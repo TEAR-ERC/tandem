@@ -54,4 +54,10 @@ void PetscTimeSolverBase::set_max_time_step(double dt) {
     CHKERRTHROW(TSSetTimeStep(ts_, dt));
 }
 
+void PetscTimeSolverBase::set_max_time_step_limit(double dt) {
+    TSAdapt adapt;
+    CHKERRTHROW(TSGetAdapt(ts_, &adapt));
+    CHKERRTHROW(TSAdaptSetStepLimits(adapt, PETSC_DEFAULT, dt));
+}
+
 } // namespace tndm
