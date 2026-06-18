@@ -20,11 +20,11 @@ We first compile PETSc (and parmetis) with:
     module load cray-python
 
     export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
-    export PETSC_ARCH=arch-amd-c-rocm-hip-tandem-32-v3.22.2
+    export PETSC_ARCH=arch-amd-c-rocm-hip-tandem-32-v3.25.2
 
-    wget https://fossies.org/linux/misc/petsc-3.22.2.tar.gz
-    tar -xzvf  petsc-3.22.2.tar.gz
-    cd petsc-3.22.2
+    wget https://fossies.org/linux/misc/petsc-3.25.2.tar.gz
+    tar -xzvf  petsc-3.25.2.tar.gz
+    cd petsc-3.25.2
     export PETSC_DIR=$(pwd)
 
     ./configure --download-c2html=0 \
@@ -46,9 +46,6 @@ We first compile PETSc (and parmetis) with:
                 --with-blaslapack-lib="${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd.so ${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd_mpi.so"
 
     make -j 30 all
-
-Note that we do not use the latest PETSc version here.
-Newer versions (e.g., 3.25.2) can be compiled with the same workflow, but version 3.25.2 (at least) is currently facing `PETSc issue #1905 <https://gitlab.com/petsc/petsc/-/work_items/1905>`_.
 
 Next we install lua and luarocks:
 
