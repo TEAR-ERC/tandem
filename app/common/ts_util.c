@@ -969,7 +969,11 @@ PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirect
         /* Push checkpoint object into PetscContainer. Attach container to TS */
         PetscContainerCreate(PetscObjectComm((PetscObject)ts), &container);
         PetscContainerSetPointer(container, tsc);
+#if PETSC_VERSION_LT(3, 23, 0)
+        PetscContainerSetUserDestroy(container, PetscContainerUserDestroyDefault);
+#else
         PetscContainerSetCtxDestroy(container, PetscContainerCtxDestroyDefault);
+#endif
         PetscObjectCompose((PetscObject)ts, "_TSCheckPoint", (PetscObject)container);
         PetscObjectDereference((PetscObject)container); /* Let ts free container */
 

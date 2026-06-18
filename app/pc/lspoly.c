@@ -127,11 +127,13 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
         PetscReal max = 0.0;
         KSPConvergedReason reason;
         CHKERRQ(KSPSetPC(cheb->kspest, ksp->pc));
-
+#if PETSC_VERSION_LT(3, 23, 0)
+        CHKERRQ(KSPSetNoisy_Private(ksp->work[1]));
+#else
         Mat A;
         CHKERRQ(KSPGetOperators(cheb->kspest, &A, NULL));
         CHKERRQ(KSPSetNoisy_Private(A, ksp->work[1]));
-
+#endif
         CHKERRQ(KSPSolve(cheb->kspest, ksp->work[1], ksp->work[0]));
         CHKERRQ(KSPGetConvergedReason(cheb->kspest, &reason));
         if (reason == KSP_DIVERGED_ITS) {
@@ -166,13 +168,18 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
     PetscFunctionReturn(0);
 }
 
+#if PETSC_VERSION_LT(3, 23, 0)
+static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems* PetscOptionsObject) {
+    KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
+    PetscFunctionBegin;
+    PetscOptionsHeadBegin(PetscOptionsObject, "KSP LSPoly Options");
+#else
 static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems PetscOptionsObject) {
     KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
     PetscFunctionBegin;
-
     PetscOptionsBegin(PetscObjectComm((PetscObject)ksp), ((PetscObject)ksp)->prefix,
                       "KSP LSPoly Options", "KSP");
-
+#endif
     CHKERRQ(PetscOptionsInt("-ksp_lspoly_esteig_steps", "Number of est steps in LSPoly", "",
                             cheb->eststeps, &cheb->eststeps, NULL));
 
@@ -186,8 +193,13 @@ static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems PetscOp
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
 
+#if PETSC_VERSION_LT(3, 23, 0)
+    PetscOptionsHeadEnd();
+    PetscFunctionReturn(0);
+#else
     PetscOptionsEnd();
     PetscFunctionReturn(PETSC_SUCCESS);
+#endif
 }
 
 static PetscErrorCode KSPSolve_LSPoly(KSP ksp) {
