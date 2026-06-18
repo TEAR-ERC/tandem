@@ -187,6 +187,9 @@ public:
     void set_viscoelastic_time_step(double relaxation_time) {
         dt_viscoelastic_ = theta_ * relaxation_time;
     }
+    // Set the viscoelastic time step directly to dt (used when it follows the
+    // adaptive RSF/PETSc step rather than the fixed theta * tau cap).
+    void set_viscoelastic_time_step_value(double dt) { dt_viscoelastic_ = dt; }
     inline double get_viscoelastic_time_step() const { return dt_viscoelastic_; }
     void update_time_dependent_precomputation_volume(std::size_t elNo);
     void update_time_dependent_precomputation_skeleton(std::size_t fctNo);

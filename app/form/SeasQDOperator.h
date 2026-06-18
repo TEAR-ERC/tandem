@@ -72,6 +72,17 @@ public:
 
     void initial_condition(BlockVector& state);
     void rhs(double time, BlockVector const& state, BlockVector& result);
+
+    /*
+     * @brief Prepare the operator for a step of size dt before its RHS is evaluated.
+     *
+     * Called from the time integrator for every RK stage with the step currently
+     * being attempted. For viscoelasticity with a fault it recomputes the
+     * dt-dependent coefficients and reassembles the stiffness matrix when dt
+     * changes; otherwise (elasticity, or viscoelasticity without a fault) it is a
+     * no-op.
+     */
+    void prepare_for_dt(double dt);
     virtual void update_internal_state(double time, BlockVector const& state,
                                        bool state_changed_since_last_rhs, bool require_traction,
                                        bool require_displacement);

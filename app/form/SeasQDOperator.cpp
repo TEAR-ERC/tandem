@@ -27,13 +27,25 @@ void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunction
     fun_traction_boundary_ = std::move(fun);
 }
 
+void SeasQDOperator::prepare_for_dt(double dt) {
+    // Recompute dt-dependent coefficients; reassemble the matrix only if they
+    // changed (viscoelasticity with a fault). No-op for elasticity and for
+    // viscoelasticity without a fault.
+    if (dgop_->update_time_step(dt)) {
+        linear_solver_.reassemble(*dgop_);
+    }
+}
+
 void SeasQDOperator::initial_condition(BlockVector& state) {
     friction_->pre_init(state);
 
     update_ghost_state(state);
-    // For viscoelastic operators, initialize time-dependent coefficients.
-    // We use a small initial dt to avoid divide-by-zero in g_dt computation.
-    dgop_->update_time_step(1e-12);
+    // For viscoelastic operators, initialize time-dependent coefficients to match the
+    // matrix assembled at construction (dt = theta * tau, the cap). For non-viscoelastic
+    // operators relaxation_time_global() is 0 and the value passed is ignored.
+    double const tau = dgop_->relaxation_time_global();
+    double const init_dt = (tau > 0.0) ? tau * dgop_->viscoelastic_theta() : 1e-12;
+    prepare_for_dt(init_dt);
     pre_step_update_strain_history();
 
     solve(0.0, make_state_view(state));
@@ -73,7 +85,7 @@ void SeasQDOperator::update_internal_state(double time, BlockVector const& state
         // Update time-dependent coefficients (g_dt, ratio) for partial strain computation
         double dt = time - last_time_;
         if (dt > 0.0) {
-            dgop_->update_time_step(dt);
+            prepare_for_dt(dt);
         }
     }
 }
@@ -105,7 +117,7 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
     if (dt < 0.0)
         dt = 0.0;
     if (dt > 0.0) {
-        dgop_->update_time_step(dt);
+        prepare_for_dt(dt);
     }
     last_time_ = time;
 

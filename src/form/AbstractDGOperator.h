@@ -49,7 +49,23 @@ public:
     virtual void set_force(volume_functional_t fun) = 0;
     virtual void set_slip(facet_functional_t fun) = 0;
     virtual void set_dirichlet(facet_functional_t fun) = 0;
-    virtual void update_time_step(double) {}
+    /*
+     * @brief Inform the operator of the time step about to be taken.
+     *
+     * Returns true if time-dependent coefficients changed in a way that requires
+     * the stiffness matrix to be reassembled (viscoelasticity with a fault, where
+     * the matrix depends on dt). Returns false otherwise (elasticity, poisson, and
+     * viscoelasticity without a fault, which use a fixed step).
+     */
+    virtual bool update_time_step(double) { return false; }
+    /*
+     * @brief Declare whether the mesh contains a fault.
+     *
+     * For viscoelasticity this selects between a fixed step = theta*tau (no fault)
+     * and an adaptive step that tracks the RSF/PETSc solver (fault present). It is a
+     * no-op for non-viscoelastic operators.
+     */
+    virtual void set_fault_present(bool) {}
     virtual double relaxation_time_global() const { return 0.0; }
     virtual double viscoelastic_theta() const { return 0.0; }
     virtual void initialize_strain_tensor() {}

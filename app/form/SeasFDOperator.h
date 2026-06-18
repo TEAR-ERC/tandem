@@ -73,6 +73,8 @@ public:
 
     double cfl_time_step() const;
     void initial_condition(BlockVector& v, BlockVector& u, BlockVector& s);
+    // No-op: the fully dynamic operator is elastic and does not reassemble per step.
+    inline void prepare_for_dt(double) {}
     void rhs(double time, BlockVector const& v, BlockVector const& u, BlockVector const& s,
              BlockVector& dv, BlockVector& du, BlockVector& ds);
 

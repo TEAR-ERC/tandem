@@ -50,6 +50,13 @@ PetscLinearSolver::~PetscLinearSolver() {
     KSPDestroy(&ksp_);
 }
 
+void PetscLinearSolver::reassemble(AbstractDGOperator<DomainDimension>& dgop) {
+    // begin_assembly() does not clear entries and assemble() accumulates, so the
+    // matrix must be zeroed before rebuilding it for the new dt.
+    P_->set_zero();
+    dgop.assemble(*P_);
+}
+
 void PetscLinearSolver::setup_mg(AbstractDGOperator<DomainDimension>& dgop, PC pc,
                                  MGConfig const& mg_config) {
     auto i_op = dgop.interpolation_operator();
