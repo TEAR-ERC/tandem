@@ -227,8 +227,8 @@ target_link_libraries(app-common PUBLIC
 if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
     message(STATUS "LUMI Environment detected. Mapping LibSci shared libraries directly.")
     target_link_libraries(app-common PUBLIC
-        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_cray.so"
-        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_cray_mpi.so"
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd.so"
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd_mpi.so"
     )
     target_link_options(app-common PUBLIC "-Wl,--allow-shlib-undefined")
 else()

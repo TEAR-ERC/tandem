@@ -79,7 +79,7 @@ Then we can proceed with tandem
     git clone --recursive https://github.com/TEAR-ERC/tandem
     cd tandem
     mkdir build_gpu && cd build_gpu
-    CC=amdclang CXX=amdclang++ cmake .. -DCMAKE_PREFIX_PATH="${PETSC_DIR}/${PETSC_ARCH};$TANDEM_DEP" -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+    CC=amdclang CXX=amdclang++ cmake .. -DCMAKE_PREFIX_PATH="${PETSC_DIR}/${PETSC_ARCH};$TANDEM_DEP" -DPOLYNOMIAL_DEGREE=4 -DDOMAIN_DIMENSION=3 -DCMAKE_CXX_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_C_FLAGS="-I${MPICH_DIR}/include" -DCMAKE_EXE_LINKER_FLAGS="-L${MPICH_DIR}/lib -lmpi ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}" -DENABLE_HDF5=OFF
     make -j 30 all
 
 
