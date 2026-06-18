@@ -20,11 +20,11 @@ We first compile PETSc (and parmetis) with:
     module load cray-python
 
     export CPATH=$ROCM_PATH/include/rocm-core:$CPATH
-    export PETSC_ARCH=arch-amd-c-rocm-hip-tandem-32-v3.25.2
+    export PETSC_ARCH=arch-amd-c-rocm-hip-tandem-32-v3.22.2
 
-    wget https://fossies.org/linux/misc/petsc-3.25.2.tar.gz
-    tar -xzvf  petsc-3.25.2.tar.gz
-    cd petsc-3.25.2
+    wget https://fossies.org/linux/misc/petsc-3.22.2.tar.gz
+    tar -xzvf  petsc-3.22.2.tar.gz
+    cd petsc-3.22.2
     export PETSC_DIR=$(pwd)
 
     ./configure --download-c2html=0 \
@@ -46,6 +46,9 @@ We first compile PETSc (and parmetis) with:
                 --with-blaslapack-lib="${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd.so ${CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd_mpi.so"
 
     make -j 30 all
+
+Note that we do not use the latest PETSc version here.
+Newer versions (e.g., 3.25.2) can be compiled with the same workflow, but version 3.25.2 (at least) is currently facing `PETSc issue #1905 <https://gitlab.com/petsc/petsc/-/work_items/1905>`_.
 
 Next we install lua and luarocks:
 
@@ -115,7 +118,7 @@ Here is an example of slurm job file for running static on LUMI-G:
     time -p srun --cpu-bind=$CPU_BIND $tandem_exe bp5.toml --mg_strategy twolevel --mg_coarse_level 1 --petsc -options_file options_LUMI-G.cfg
 
 
-with ``options_LUMI-G.cfg`` specifying ``-vec_type hip`` and ``-mat_type aijhipsparse``, as well as ``-mg_levels_pc_type sor``:
+with ``options_LUMI-G.cfg`` specifying ``-vec_type hip`` and ``-mat_type aijhipsparse``:
 
 .. code-block:: bash
 
@@ -144,6 +147,5 @@ with ``options_LUMI-G.cfg`` specifying ``-vec_type hip`` and ``-mat_type aijhips
     -vec_type hip
     -mat_type aijhipsparse
     -log_view_gpu_time
-    # bjacobi is buggy with ROCM
-    -mg_levels_pc_type sor
+    -mg_levels_pc_type bjacobi
 
