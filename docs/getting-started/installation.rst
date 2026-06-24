@@ -17,7 +17,7 @@ The following dependencies are likely available via your package manager:
 The following dependencies likely need to be installed manually:
 
 - `METIS <http://glaros.dtc.umn.edu/gkhome/metis/metis/overview>`_ (≥ 5.1) and `ParMETIS <http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview>`_ (≥ 4.0)
-- `PETSc <https://www.mcs.anl.gov/petsc/>`_ (≥ 3.22.0)
+- `PETSc <https://www.mcs.anl.gov/petsc/>`_ (= 3.22.x)
 - (Optional) `libxsmm <https://github.com/hfp/libxsmm>`_ (= 1.16.1)
 - (Optional) `HDF5 <https://www.hdfgroup.org/solutions/hdf5/>`_ (= 1.12.3)
 
