@@ -1,4 +1,5 @@
 #include "eigdeflate.h"
+#include "../common/petsc_compat.h"
 #include "reig_aux.h"
 
 #include <petsc/private/pcimpl.h>
@@ -173,24 +174,14 @@ PetscErrorCode PCDestroy_eigdeflate(PC pc) {
     PetscFunctionReturn(0);
 }
 
-#if PETSC_VERSION_LT(3, 23, 0)
-PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems* PetscOptionsObject) {
+PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, TandemPetscOptions PetscOptionsObject) {
     PC_eigdeflate* ctx;
     PetscInt M;
     PetscBool flg;
     PetscFunctionBegin;
     ctx = (PC_eigdeflate*)pc->data;
-    PetscOptionsHeadBegin(PetscOptionsObject, "Eigdeflate options");
-#else
-PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems PetscOptionsObject) {
-    PC_eigdeflate* ctx;
-    PetscInt M;
-    PetscBool flg;
-    PetscFunctionBegin;
-    ctx = (PC_eigdeflate*)pc->data;
-    PetscOptionsBegin(PetscObjectComm((PetscObject)pc), ((PetscObject)pc)->prefix,
-                      "Eigdeflate options", "PC");
-#endif
+    TandemPetscOptionsBegin(pc, "Eigdeflate options", "PC");
+
     PetscOptionsBoundedInt("-pc_eigdeflate_nev", "Number of deflated eigenvalues", "", ctx->nev,
                            &ctx->nev, &flg, 1);
     PetscOptionsBoundedInt("-pc_eigdeflate_nev_oversample",
@@ -205,13 +196,8 @@ PetscErrorCode PCSetFromOptions_eigdeflate(PC pc, PetscOptionItems PetscOptionsO
     PetscOptionsReal("-pc_eigdeflate_relax_factor", "Relaxation factor", "", ctx->factor,
                      &ctx->factor, &flg);
 
-#if PETSC_VERSION_LT(3, 23, 0)
-    PetscOptionsHeadEnd();
+    TandemPetscOptionsEnd();
     PetscFunctionReturn(0);
-#else
-    PetscOptionsEnd();
-    PetscFunctionReturn(0);
-#endif
 }
 
 PetscErrorCode PCView_eigdeflate(PC pc, PetscViewer viewer) {
