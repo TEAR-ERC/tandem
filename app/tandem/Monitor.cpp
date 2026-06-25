@@ -140,6 +140,9 @@ void MonitorFD::write_static() {
             writer->write_static(mneme::span(&data, 1));
             break;
         }
+        case DataLevel::BoundaryForMomentRate: {
+            break;
+        }
         };
     }
 }
