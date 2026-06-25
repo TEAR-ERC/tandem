@@ -179,8 +179,8 @@ static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, TandemPetscOptions Petsc
                              &cheb->alpha, NULL));
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
-    PetscOptionsEnd();
-    PetscFunctionReturn(PETSC_SUCCESS);
+    TandemPetscOptionsEnd();
+    PetscFunctionReturn(0);
 }
 
 static PetscErrorCode KSPSolve_LSPoly(KSP ksp) {
