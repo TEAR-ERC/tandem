@@ -1,7 +1,6 @@
 #ifndef TANDEM_PETSC_COMPAT_H
 #define TANDEM_PETSC_COMPAT_H
 
-#include <petsccontainer.h>
 #include <petscksp.h>
 #include <petscsys.h>
 #include <petscversion.h>
