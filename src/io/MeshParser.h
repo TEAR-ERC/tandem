@@ -20,7 +20,6 @@ public:
 
 class MeshParser {
 public:
-    virtual ~MeshParser() = default;
     static bool isGMSHFormat(std::string const& fileName);
     static bool isH5Format(std::string const& fileName);
     static std::unique_ptr<MeshParser> create(std::string const& fileName, MeshBuilder* builder);
@@ -164,7 +163,7 @@ public:
     };
 
     MeshParser() = default;
-    ~MeshParser() = default;
+    virtual ~MeshParser() = default;
     virtual std::string_view getErrorMessage() const = 0;
     virtual bool parseFile(std::string const& fileName) = 0;
 };
