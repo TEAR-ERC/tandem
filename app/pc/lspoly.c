@@ -1,3 +1,5 @@
+#include "../common/petsc_compat.h"
+
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/pcimpl.h>
 #include <petscksp.h>
@@ -127,8 +129,7 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
         PetscReal max = 0.0;
         KSPConvergedReason reason;
         CHKERRQ(KSPSetPC(cheb->kspest, ksp->pc));
-
-        CHKERRQ(KSPSetNoisy_Private(ksp->work[1]));
+        CHKERRQ(TandemKSPSetNoisy(cheb->kspest, ksp->work[0], ksp->work[1]));
         CHKERRQ(KSPSolve(cheb->kspest, ksp->work[1], ksp->work[0]));
         CHKERRQ(KSPGetConvergedReason(cheb->kspest, &reason));
         if (reason == KSP_DIVERGED_ITS) {
@@ -163,11 +164,12 @@ static PetscErrorCode KSPSetUp_LSPoly(KSP ksp) {
     PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems* PetscOptionsObject) {
-    KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
+static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, TandemPetscOptions PetscOptionsObject) {
 
+    KSP_LSPoly* cheb = (KSP_LSPoly*)ksp->data;
     PetscFunctionBegin;
-    PetscOptionsHeadBegin(PetscOptionsObject, "KSP LSPoly Options");
+    TandemPetscOptionsBegin(ksp, "KSP LSPoly Options", "KSP");
+
     CHKERRQ(PetscOptionsInt("-ksp_lspoly_esteig_steps", "Number of est steps in LSPoly", "",
                             cheb->eststeps, &cheb->eststeps, NULL));
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_esteig_bias",
@@ -177,7 +179,7 @@ static PetscErrorCode KSPSetFromOptions_LSPoly(KSP ksp, PetscOptionItems* PetscO
                              &cheb->alpha, NULL));
     CHKERRQ(PetscOptionsReal("-ksp_lspoly_beta", "Weighting function (1+x)^beta", "", cheb->beta,
                              &cheb->beta, NULL));
-    PetscOptionsHeadEnd();
+    TandemPetscOptionsEnd();
     PetscFunctionReturn(0);
 }
 
