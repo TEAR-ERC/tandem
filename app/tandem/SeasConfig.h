@@ -46,8 +46,10 @@ struct TabularOutputConfig : OutputConfig {
             return std::make_unique<TecplotWriter>();
         case TableWriterType::CSV:
             return std::make_unique<CSVWriter>();
+        case TableWriterType::HDF5:
+            return nullptr; // HDF5 tabular output handled separately (no TableWriter)
         case TableWriterType::Unknown:
-            return nullptr;
+            throw std::logic_error("make_writer() called with Unknown type");
         }
         return nullptr;
     }
