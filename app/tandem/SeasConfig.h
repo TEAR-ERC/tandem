@@ -66,7 +66,8 @@ struct ProbeOutputConfig : OutputConfig {
         case TableWriterType::CSV:
             return std::make_unique<CSVWriter>();
         case TableWriterType::HDF5:
-            return nullptr; // HDF5ProbeWriter does not use TableWriter
+            throw std::logic_error(
+                "make_writer() called with HDF5 type - HDF5 output is dispatched separately");
         case TableWriterType::Unknown:
             throw std::logic_error("make_writer() called with Unknown type");
         }
