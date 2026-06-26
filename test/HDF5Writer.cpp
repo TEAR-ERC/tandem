@@ -32,8 +32,8 @@ TEST_CASE("HDF5Writer - basic functionality") {
             std::vector<double> timestep0 = {0.1, 0.2, 0.3};
             std::vector<hsize_t> write_dims = {1, 3};
 
-            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, static_cast<hsize_t>(1e-3),
-                                  timestep0.data(), write_dims, glueDim, extensibleDim, false);
+            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, 0, timestep0.data(), write_dims, glueDim,
+                                  extensibleDim, false);
 
             std::vector<double> timestep1 = {1.1, 1.2, 1.3};
             writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, 1, timestep1.data(), write_dims, glueDim,
