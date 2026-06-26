@@ -29,6 +29,7 @@ RUN mkdir -p /tandem_main && \
                 -DCMAKE_PREFIX_PATH="${PETSC_INSTALL_DIR}" \
                 -DDOMAIN_DIMENSION=${DIM} \
                 -DPOLYNOMIAL_DEGREE=${DEG} \
+                -DENABLE_HDF5=OFF \
             && ninja \
             && cp app/tandem /tandem_main/tandem_${DIM}d_${DEG}p \
             && cp app/static /tandem_main/static_${DIM}d_${DEG}p; \

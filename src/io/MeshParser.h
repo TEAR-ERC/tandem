@@ -11,7 +11,7 @@ namespace tndm {
 
 class MeshBuilder {
 public:
-    virtual ~MeshBuilder() {}
+    virtual ~MeshBuilder() = default;
     virtual void setNumVertices(std::size_t numVertices) = 0;
     virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
     virtual void setNumElements(std::size_t numElements) = 0;
@@ -163,7 +163,7 @@ public:
     };
 
     MeshParser() = default;
-    ~MeshParser() = default;
+    virtual ~MeshParser() = default;
     virtual std::string_view getErrorMessage() const = 0;
     virtual bool parseFile(std::string const& fileName) = 0;
 };
