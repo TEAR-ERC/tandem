@@ -27,9 +27,10 @@ struct OutputConfig {
     double rtol;
     double t_min;
     double t_max;
+    std::optional<double> v_th;
 
     AdaptiveOutputInterval make_adaptive_output_interval() const {
-        return AdaptiveOutputInterval(atol, rtol, t_min, t_max);
+        return AdaptiveOutputInterval(atol, rtol, t_min, t_max, v_th);
     }
 };
 

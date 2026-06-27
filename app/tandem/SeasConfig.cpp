@@ -31,6 +31,11 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
         .help("Maximum time difference between samples.");
+    outputSchema.add_value("v_th", up_cast<Derived>(&Derived::v_th))
+        .validator([](auto&& x) { return x > 0; })
+        .help("Velocity threshold (optional). If set, output is written only when VMax rises "
+              "through this value (once per upward crossing) and all other adaptive output for "
+              "this writer is disabled. Output is reactivated once VMax drops back below v_th.");
 }
 
 template <typename Derived>
