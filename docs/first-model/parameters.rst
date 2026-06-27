@@ -54,6 +54,7 @@ Common options:
 - **rtol**: Relative tolerance for VMax. Default = 0.01.
 - **t_min**: Minimum time difference between samples. Default = 0.0.
 - **t_max**: Maximum time difference between samples. Default = 365 * 24 * 3600.
+- **v_th**: Velocity threshold (optional, no default). If set, output for this writer is written only when the maximum slip rate VMax rises through this value (one sample per upward crossing) and all other adaptive output (atol/rtol/t_min/t_max) is disabled. The trigger resets once VMax drops back below v_th, so a later crossing produces another sample. Use this to capture a single snapshot each time the fault accelerates past a chosen seismic threshold while minimizing the amount of output written. It is meant to have a pseudo-checkpoint for the fault state at the time of a seismic event.
 
 For domain output:
 
