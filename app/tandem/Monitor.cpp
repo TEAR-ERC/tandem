@@ -57,6 +57,12 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                 writer->increase_step(time, VMax);
             }
         }
+
+        // Record VMax for this step so the next step can detect a rising
+        // threshold crossing (v_th edge-triggered output).
+        for (auto const& writer : writers_) {
+            writer->observe(VMax);
+        }
     }
 
     update_dt_limits(time);
@@ -119,6 +125,12 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                 };
                 writer->increase_step(time, VMax);
             }
+        }
+
+        // Record VMax for this step so the next step can detect a rising
+        // threshold crossing (v_th edge-triggered output).
+        for (auto const& writer : writers_) {
+            writer->observe(VMax);
         }
     }
 

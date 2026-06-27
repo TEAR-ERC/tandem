@@ -47,9 +47,26 @@ public:
     virtual bool has_static_writer() const { return false; }
 
     inline bool is_write_required(double time, double VMax) const {
+        if (auto v_th = oi_.v_th()) {
+            // Threshold triggered output: write once each time VMax rises through the
+            // threshold. last_seen_VMax_ holds VMax from the previous monitor
+            // step, so this fires only on the upward crossing and resets once
+            // VMax has dropped back below the threshold. All other (adaptive)
+            // output is suppressed in this mode.
+            return last_seen_VMax_ < *v_th && VMax >= *v_th;
+        }
         double delta_time = time - last_output_time_;
         return oi_(delta_time, last_output_VMax_, VMax);
     }
+
+    /**
+     * @brief Record VMax for the current monitor step.
+     *
+     * Must be called exactly once per monitor step, after all
+     * is_write_required() queries for that step, so that the next step can
+     * detect a rising threshold crossing.
+     */
+    inline void observe(double VMax) { last_seen_VMax_ = VMax; }
 
     virtual void write(double time, mneme::span<double> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<1u>> data) {}
@@ -82,6 +99,7 @@ protected:
     std::size_t output_step_ = 0;
     double last_output_time_ = std::numeric_limits<double>::lowest();
     double last_output_VMax_ = 0.0;
+    double last_seen_VMax_ = 0.0;
 };
 
 template <std::size_t D> class FaultProbeWriter : public Writer {
