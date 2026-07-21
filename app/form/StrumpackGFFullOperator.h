@@ -19,6 +19,10 @@
 namespace tndm {
 
 // Compresses the full GF (D*Np x slip_D*Np) as ONE STRUMPACK structured matrix.
+// This is the sole GF compression operator: the earlier per-component variant
+// (StrumpackGFOperator, one HODLR per (alpha,beta) block) was removed because the
+// full operator shares probes across all components — one solve per probe instead
+// of one per component per probe, the economics we want once probes are PDE solves.
 //
 // HODLR needs a square matrix, so the slip space is padded from slip_D*Np to
 // D*Np. The padding is *node-interleaved*, giving rows and columns an identical
@@ -123,7 +127,7 @@ private:
     static strumpack::structured::ClusterTree
     build_petsc_tree(const std::vector<int>& dist, int lo, int hi);
 
-    // Spatial median-split tree that INDUCES perm_ (see StrumpackGFOperator). Each
+    // Spatial median-split tree that INDUCES perm_. Each
     // ClusterTree node reports n_nodes*D DOFs; recursion stops at leaf_size *nodes*,
     // so depth is set by leaf_size and NOT by the MPI rank count.
     strumpack::structured::ClusterTree

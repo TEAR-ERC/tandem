@@ -19,7 +19,7 @@
 namespace tndm {
 
 // ---------------------------------------------------------------------------
-// PCA helpers (identical to StrumpackGFOperator)
+// PCA helpers (detect fault dimensionality from the node coordinates)
 // ---------------------------------------------------------------------------
 
 static void sym2_eigen(const double* A, double* eval, double* evec) {
@@ -179,7 +179,7 @@ StrumpackGFFullOperator::~StrumpackGFFullOperator() {
 }
 
 // ---------------------------------------------------------------------------
-// build_spatial_permutation — PCA-Hilbert ordering (identical to StrumpackGFOperator)
+// build_spatial_permutation — PCA-Hilbert ordering
 // ---------------------------------------------------------------------------
 
 void StrumpackGFFullOperator::build_spatial_permutation(
@@ -319,7 +319,7 @@ void StrumpackGFFullOperator::build_index_maps() {
 }
 
 // ---------------------------------------------------------------------------
-// build_petsc_tree (identical to StrumpackGFOperator)
+// build_petsc_tree
 // ---------------------------------------------------------------------------
 
 strumpack::structured::ClusterTree
@@ -381,7 +381,7 @@ static void report_tree(const strumpack::structured::ClusterTree& tree,
 // ---------------------------------------------------------------------------
 // build_kdtree — spatial median-split ClusterTree that INDUCES perm_
 //
-// Ported from StrumpackGFOperator. Each leaf writes its node indices contiguously into
+// Each leaf writes its node indices contiguously into
 // perm_ (left subtree entirely before right), so every tree node covers a contiguous
 // perm_ range AND a spatially compact tile — tree<->perm_ consistency by construction.
 //

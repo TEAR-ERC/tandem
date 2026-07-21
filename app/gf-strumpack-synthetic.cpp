@@ -3,7 +3,6 @@
 #include "config.h"
 #include "pc/register.h"
 #include "tandem/SeasConfig.h"
-#include "form/StrumpackGFOperator.h"
 #include "form/StrumpackGFFullOperator.h"
 
 #include <argparse.hpp>

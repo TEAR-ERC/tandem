@@ -11,15 +11,9 @@
 namespace tndm {
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg);
 
-// Builds G_ (from checkpoint), constructs StrumpackGFOperator, validates accuracy,
-// and prints a MatVec count + compression report.  Returns relative error ||Sv-Gv||/||Gv||.
-// If do_butterfly=true, also builds and compares BUTTERFLY (slower, more MatVecs).
-double validateGFStrumpack(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
-                           bool do_butterfly = false);
-
-// Same as validateGFStrumpack but compresses the full D*Np x slip_D*Np GF as a single
-// STRUMPACK HODLR matrix in node-interleaved spatial order (no component splitting).
-// Returns relative error ||Sv-Gv||/||Gv||.
+// Builds G_ (from checkpoint) and compresses the full D*Np x slip_D*Np GF as a single
+// STRUMPACK HODLR matrix in node-interleaved spatial order, then prints a MatVec count +
+// compression report.  Returns relative error ||Sv-Gv||/||Gv||.
 double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg);
 
 struct SolveBenchResult {

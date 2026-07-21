@@ -195,7 +195,6 @@ set(APP_COMMON_SRCS
     form/SeasFDOperator.cpp
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
-    form/StrumpackGFOperator.cpp
     form/StrumpackGFFullOperator.cpp
     localoperator/AdapterBase.cpp
     localoperator/NodalInterpolation.cpp
@@ -254,14 +253,6 @@ add_executable(gf-solve-bench
     gf-solve-bench.cpp)
 target_link_libraries(gf-solve-bench PRIVATE app-common)
 target_include_directories(gf-solve-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-
-add_executable(gf-strumpack-bench
-    tandem/Monitor.cpp
-    tandem/SeasConfig.cpp
-    tandem/SEAS.cpp
-    gf-strumpack-bench.cpp)
-target_link_libraries(gf-strumpack-bench PRIVATE app-common)
-target_include_directories(gf-strumpack-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(gf-strumpack-full-bench
     tandem/Monitor.cpp
