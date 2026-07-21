@@ -6,7 +6,6 @@
 #include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
 #include "form/FacetFunctionalFactory.h"
-#include "form/HMatrixGreenFunction.h"
 #include "form/SeasQDOperator.h"
 #include "mesh/LocalSimplexMesh.h"
 
@@ -108,41 +107,17 @@ private:
 
     HMatrixConfig hmatrix_config_;
 
-#ifdef PETSC_HAVE_HTOOL
-    std::unique_ptr<HMatrixGreenFunction> hmat_op_;
-#endif
-
 public:
     Mat dense_gf() const { return G_; }
 
-    // Accessors for external operators (e.g. StrumpackGFOperator) that need
-    // the same inputs as HMatrixGreenFunction's constructor.
+    // Accessors for external operators (e.g. StrumpackGFFullOperator) that need
+    // node coordinates and slip/traction prototype Vecs to build the compressed GF.
     std::vector<PetscReal> node_coords() const { return collect_node_coords(); }
     PetscInt fault_nbf() const {
         return static_cast<PetscInt>(base::friction().fault_num_basis_functions());
     }
     Vec slip_proto()     const { return S_->vec(); }
     Vec traction_proto() const { return base::traction_.vec(); }
-
-#ifdef PETSC_HAVE_HTOOL
-    struct ValidationResult {
-        double err_H_vs_G      = -1.0;
-        double err_G_vs_solver = -1.0;
-        double err_H_vs_solver = -1.0;
-        double time_G_matvec   = -1.0;
-        double time_H_matvec   = -1.0;
-        double time_solver     = -1.0;
-        int    n_matvec_reps   =  0;
-        double mem_G_bytes     = -1.0;
-        double mem_H_bytes     = -1.0;
-        PetscInt global_rows   =  0;
-        PetscInt global_cols   =  0;
-        int      n_ranks       =  1;
-    };
-    ValidationResult validate_all();
-
-    void export_h_structure(const std::string& prefix) const;
-#endif
 };
 
 } // namespace tndm

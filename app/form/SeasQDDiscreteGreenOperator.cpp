@@ -1,10 +1,6 @@
 #include "SeasQDDiscreteGreenOperator.h"
 #include "common/PetscUtil.h"
 
-#ifdef PETSC_HAVE_HTOOL
-#include <petscmathtool.h>
-#endif
-
 #include "form/RefElement.h"
 #include "parallel/LocalGhostCompositeView.h"
 #include "util/Stopwatch.h"
@@ -85,7 +81,6 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
     MatDestroy(&G_);
     ISDestroy(&is_perm_);
-    // hmat_op_ destructor handles all HTool resources
 }
 
 void SeasQDDiscreteGreenOperator::set_boundary(
@@ -128,16 +123,7 @@ void SeasQDDiscreteGreenOperator::update_traction(double time, BlockVector const
     S_->begin_assembly();
     S_->end_assembly();
 
-#ifdef PETSC_HAVE_HTOOL
-    if (hmatrix_config_.use_hmatrix && hmat_op_) {
-        CHKERRTHROW(VecZeroEntries(base::traction_.vec()));
-        hmat_op_->apply(S_->vec(), base::traction_.vec());
-    } else {
-#endif
-        CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
-#ifdef PETSC_HAVE_HTOOL
-    }
-#endif
+    CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
     CHKERRTHROW(VecAXPY(base::traction_.vec(), time, t_boundary_->vec()));
 }
 
@@ -169,7 +155,7 @@ std::vector<PetscReal> SeasQDDiscreteGreenOperator::collect_node_coords() const 
     std::vector<double> raw;
     fault_op.fill_fault_node_coords(raw);
     // raw layout: [e * nbf * D + n * D + d] == [(e*nbf + n) * D + d]
-    // This is exactly the format HMatrixGreenFunction expects.
+    // This is exactly the node-interleaved format the compressed GF operators expect.
     return std::vector<PetscReal>(raw.begin(), raw.end());
 }
 
@@ -623,29 +609,6 @@ void SeasQDDiscreteGreenOperator::get_discrete_greens_function(
             write_discrete_greens_operator(mesh, n_gf, n_gf);
         }
     }
-
-#ifdef PETSC_HAVE_HTOOL
-    if (hmatrix_config_.use_hmatrix) {
-        int rank;
-        MPI_Comm_rank(base::comm(), &rank);
-        if (rank == 0) {
-            std::cout << "Building " << DomainDimension << "D H-matrix split ("
-                      << DomainDimension << "x" << (DomainDimension - 1)
-                      << " sub-matrices, eta=" << hmatrix_config_.eta
-                      << " epsilon=" << hmatrix_config_.rtol
-                      << " leafsize=" << hmatrix_config_.leaf_size << ")" << std::endl;
-        }
-        auto local_coords = collect_node_coords();
-        const auto nbf = static_cast<PetscInt>(base::friction().fault_num_basis_functions());
-        hmat_op_ = std::make_unique<HMatrixGreenFunction>(
-            G_, local_coords, nbf, DomainDimension,
-            S_->vec(), base::traction_.vec(),
-            base::comm(), hmatrix_config_);
-        if (rank == 0) {
-            std::cout << "H-matrix build complete." << std::endl;
-        }
-    }
-#endif
 }
 
 void SeasQDDiscreteGreenOperator::write_discrete_greens_traction() {
@@ -700,128 +663,5 @@ void SeasQDDiscreteGreenOperator::get_boundary_traction() {
         write_discrete_greens_traction();
     }
 }
-
-// ---------------------------------------------------------------------------
-// validate_all — compare H-matrix to dense G and full PDE solver
-// ---------------------------------------------------------------------------
-#ifdef PETSC_HAVE_HTOOL
-SeasQDDiscreteGreenOperator::ValidationResult
-SeasQDDiscreteGreenOperator::validate_all() {
-    ValidationResult result;
-    if (!hmat_op_ || !G_) {
-        return result;
-    }
-    if (hmatrix_config_.planar_fault) {
-        int rank;
-        MPI_Comm_rank(base::comm(), &rank);
-        if (rank == 0) {
-            std::cout << "Note: planar_fault=true — normal-traction H-matrix components are "
-                         "skipped (zero by symmetry). Validation compares H vs G for the full "
-                         "traction vector; expect ||Hv-Gv|| dominated by the near-zero normal "
-                         "component which G stores but H returns as zero.\n";
-        }
-    }
-
-    constexpr int N_REPS = 5;
-    GreensFunctionIndices ind(*this);
-    MPI_Comm comm = base::comm();
-    CHKERRTHROW(MPI_Comm_size(comm, &result.n_ranks));
-    CHKERRTHROW(MatGetSize(G_, &result.global_rows, &result.global_cols));
-    result.n_matvec_reps = N_REPS;
-
-    result.mem_G_bytes = static_cast<double>(result.global_rows) *
-                         static_cast<double>(result.global_cols) *
-                         sizeof(PetscScalar);
-    result.mem_H_bytes = hmat_op_->total_mem_bytes();
-
-    Vec x, y_G, y_H, y_solver, diff;
-    CHKERRTHROW(VecCreateMPI(comm, ind.n, PETSC_DECIDE, &x));
-    CHKERRTHROW(VecDuplicate(base::traction_.vec(), &y_G));
-    CHKERRTHROW(VecDuplicate(base::traction_.vec(), &y_H));
-    CHKERRTHROW(VecDuplicate(base::traction_.vec(), &y_solver));
-    CHKERRTHROW(VecDuplicate(base::traction_.vec(), &diff));
-
-    PetscRandom rng;
-    CHKERRTHROW(PetscRandomCreate(comm, &rng));
-    CHKERRTHROW(PetscRandomSetType(rng, PETSCRAND48));
-    CHKERRTHROW(PetscRandomSetSeed(rng, 54321UL));
-    CHKERRTHROW(PetscRandomSeed(rng));
-    CHKERRTHROW(VecSetRandom(x, rng));
-    CHKERRTHROW(PetscRandomDestroy(&rng));
-
-    // Time G_ MatMult
-    {
-        PetscLogDouble t0, t1;
-        CHKERRTHROW(PetscTime(&t0));
-        for (int r = 0; r < N_REPS; ++r) {
-            CHKERRTHROW(MatMult(G_, x, y_G));
-        }
-        CHKERRTHROW(PetscTime(&t1));
-        result.time_G_matvec = (t1 - t0) / N_REPS;
-    }
-
-    // Time H-matrix apply pipeline
-    {
-        PetscLogDouble t0, t1;
-        CHKERRTHROW(PetscTime(&t0));
-        for (int r = 0; r < N_REPS; ++r) {
-            CHKERRTHROW(VecZeroEntries(y_H));
-            hmat_op_->apply(x, y_H);
-        }
-        CHKERRTHROW(PetscTime(&t1));
-        result.time_H_matvec = (t1 - t0) / N_REPS;
-    }
-
-    // Time full PDE solver
-    {
-        PetscLogDouble t0, t1;
-        CHKERRTHROW(VecCopy(x, S_->vec()));
-        S_->begin_assembly();
-        S_->end_assembly();
-        auto slip_block_size = base::friction().slip_block_size();
-        auto scatter = Scatter(base::adapter().fault_map().scatter_plan());
-        auto ghost = scatter.template recv_prototype<double>(slip_block_size, ALIGNMENT);
-        scatter.begin_scatter(*S_, ghost);
-        scatter.wait_scatter();
-        auto S_view = LocalGhostCompositeView(*S_, ghost);
-        CHKERRTHROW(PetscTime(&t0));
-        base::solve(0.0, S_view);
-        base::update_traction(S_view);
-        CHKERRTHROW(PetscTime(&t1));
-        result.time_solver = t1 - t0;
-    }
-    CHKERRTHROW(VecCopy(base::traction_.vec(), y_solver));
-
-    // Relative errors
-    PetscReal ref_norm;
-    CHKERRTHROW(VecNorm(y_G, NORM_2, &ref_norm));
-    if (ref_norm > 0.0) {
-        auto rel_err = [&](Vec a, Vec b) -> double {
-            CHKERRTHROW(VecCopy(a, diff));
-            CHKERRTHROW(VecAXPY(diff, -1.0, b));
-            PetscReal n;
-            CHKERRTHROW(VecNorm(diff, NORM_2, &n));
-            return static_cast<double>(n / ref_norm);
-        };
-        result.err_H_vs_G      = rel_err(y_H,    y_G);
-        result.err_G_vs_solver = rel_err(y_G,     y_solver);
-        result.err_H_vs_solver = rel_err(y_H,     y_solver);
-    }
-
-    CHKERRTHROW(VecDestroy(&x));
-    CHKERRTHROW(VecDestroy(&y_G));
-    CHKERRTHROW(VecDestroy(&y_H));
-    CHKERRTHROW(VecDestroy(&y_solver));
-    CHKERRTHROW(VecDestroy(&diff));
-
-    return result;
-}
-
-void SeasQDDiscreteGreenOperator::export_h_structure(const std::string& prefix) const {
-    if (hmat_op_) {
-        hmat_op_->export_structure(prefix);
-    }
-}
-#endif // PETSC_HAVE_HTOOL
 
 } // namespace tndm

@@ -195,7 +195,6 @@ set(APP_COMMON_SRCS
     form/SeasFDOperator.cpp
     form/SeasQDOperator.cpp
     form/SeasQDDiscreteGreenOperator.cpp
-    form/HMatrixGreenFunction.cpp
     form/StrumpackGFOperator.cpp
     form/StrumpackGFFullOperator.cpp
     localoperator/AdapterBase.cpp
@@ -231,16 +230,6 @@ target_include_directories(app-common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../external)
-# When the PETSc source tree is available, expose Mat_Htool for H-matrix leaf export.
-# The private header is only used inside #ifdef HAVE_PETSC_HTOOL_PRIVATE guards.
-set(PETSC_SRC_DIR "" CACHE PATH "PETSc source tree root (needed by gf-hmatrix-visualize)")
-if(PETSC_SRC_DIR)
-    target_include_directories(app-common PRIVATE "${PETSC_SRC_DIR}/src")
-    target_compile_definitions(app-common PRIVATE HAVE_PETSC_HTOOL_PRIVATE)
-    message(STATUS "app-common: HTool leaf export enabled via ${PETSC_SRC_DIR}/src")
-else()
-    message(STATUS "app-common: PETSC_SRC_DIR not set; HTool leaf export will be a no-op")
-endif()
 
 ## Static solver
 
@@ -257,22 +246,6 @@ add_executable(tandem
     tandem.cpp)
 target_link_libraries(tandem PRIVATE app-common)
 target_include_directories(tandem PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-
-add_executable(gf-hmatrix-validate
-    tandem/Monitor.cpp
-    tandem/SeasConfig.cpp
-    tandem/SEAS.cpp
-    gf-hmatrix-validate.cpp)
-target_link_libraries(gf-hmatrix-validate PRIVATE app-common)
-target_include_directories(gf-hmatrix-validate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-
-add_executable(gf-hmatrix-visualize
-    tandem/Monitor.cpp
-    tandem/SeasConfig.cpp
-    tandem/SEAS.cpp
-    gf-hmatrix-visualize.cpp)
-target_link_libraries(gf-hmatrix-visualize PRIVATE app-common)
-target_include_directories(gf-hmatrix-visualize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(gf-solve-bench
     tandem/Monitor.cpp
