@@ -18,11 +18,27 @@
 
 namespace tndm {
 
-// Compresses the full GF (D*Np x slip_D*Np) as ONE STRUMPACK structured matrix
-// in node-interleaved spatial (Hilbert-permuted) DOF order:
-//   permuted row  pr = new_i * D     + alpha
-//   permuted col  pc = new_j * slip_D + beta
+// Compresses the full GF (D*Np x slip_D*Np) as ONE STRUMPACK structured matrix.
+//
+// HODLR needs a square matrix, so the slip space is padded from slip_D*Np to
+// D*Np. The padding is *node-interleaved*, giving rows and columns an identical
+// layout:
+//   permuted row  pr = new_i * D + alpha,  alpha in [0, D)      — all real tractions
+//   permuted col  pc = new_j * D + beta,   beta  in [0, slip_D) — real slip
+//                                          beta  == slip_D      — fictitious slip
 // where perm_[new_i] = old_i (scalar node index).
+//
+// Two properties matter and both are consequences of interleaving:
+//   1. Row index i and column index i refer to the SAME node, so the matrix
+//      diagonal is the physical near-field self-interaction and the single
+//      cluster tree is genuinely valid for both index spaces.
+//   2. The fictitious columns are spread one-per-node instead of forming a
+//      contiguous (D-slip_D)*Np band, so no cluster-tree leaf can ever be
+//      entirely zero — which would make that diagonal block exactly singular
+//      and blow up STRUMPACK's randomized construction.
+// The fictitious columns additionally carry a scaled unit diagonal (pad_scale_)
+// so each is nonzero on its own; apply() feeds them zeros, so their content
+// never reaches the output.
 //
 // No component splitting: one MatMult call against G_dense covers all stress
 // and slip directions simultaneously.
@@ -61,10 +77,19 @@ private:
     // perm_[new_i] = old_i  — scalar permutation over N_el*nbf nodes
     std::vector<PetscInt> perm_;
 
-    // row_perm_to_tandem_[pr] = Tandem row r  for permuted row index pr  (length D*Np)
-    // col_perm_to_tandem_[pc] = Tandem col c  for permuted col index pc  (length slip_D*Np)
+    // row_perm_to_tandem_[pr] = Tandem row r for permuted row index pr (length D*Np)
+    // col_perm_to_tandem_[pc] = Tandem col c for permuted col index pc (length D*Np,
+    //                           padded space); -1 marks a fictitious (padding) column.
     std::vector<PetscInt> row_perm_to_tandem_;
     std::vector<PetscInt> col_perm_to_tandem_;
+
+    // Diagonal value carried by each fictitious column, set to the RMS 2-norm of a
+    // real column of G so the padding is neither negligible nor dominant.
+    double pad_scale_{1.0};
+
+    // Spatial median-split tree over the Np-node cloud, sizes scaled to D DOFs per
+    // node. Non-null only when config_.cluster_tree == "kdtree"; it induces perm_.
+    std::unique_ptr<strumpack::structured::ClusterTree> kd_tree_;
 
     // PETSc PETSC_DECIDE cumulative distributions (length n_ranks+1):
     //   petsc_dist_row_: for D*Np      (G_dense rows  / traction space)
@@ -90,8 +115,21 @@ private:
     void build_s_full(Mat G_dense);
     void build_scatters(Vec s_proto, Vec t_proto);
 
+    // True if permuted column index pc is a fictitious (padding) column. Rows and
+    // columns share a layout, so this also identifies the row a fictitious column's
+    // diagonal entry lands in.
+    bool is_pad_index(PetscInt pc) const { return (pc % D_) == slip_D_; }
+
     static strumpack::structured::ClusterTree
     build_petsc_tree(const std::vector<int>& dist, int lo, int hi);
+
+    // Spatial median-split tree that INDUCES perm_ (see StrumpackGFOperator). Each
+    // ClusterTree node reports n_nodes*D DOFs; recursion stops at leaf_size *nodes*,
+    // so depth is set by leaf_size and NOT by the MPI rank count.
+    strumpack::structured::ClusterTree
+    build_kdtree(std::vector<PetscInt>& indices,
+                 const std::vector<double>& proj, int eff_dim,
+                 int leaf_size, PetscInt& fill);
 };
 
 } // namespace tndm

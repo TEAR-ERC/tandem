@@ -256,6 +256,19 @@ void StrumpackGFOperator::build_spatial_permutation(
             proj[i*eff_dim+k] = p;
         }
 
+    // k-d tree path: the tree induces perm_ (spatially-compact contiguous ranges at every
+    // level, down to leaf_size). Store it once for all S_αβ. For eff_dim==1 the median split
+    // degenerates to the same sorted order as the Hilbert branch below.
+    if (config_.cluster_tree == "kdtree") {
+        std::vector<PetscInt> indices(Np);
+        std::iota(indices.begin(), indices.end(), PetscInt{0});
+        PetscInt fill = 0;
+        kd_tree_ = std::make_unique<strumpack::structured::ClusterTree>(
+            build_kdtree(indices, proj, eff_dim, config_.leaf_size, fill));
+        assert(fill == Np);
+        return;
+    }
+
     std::vector<double> pmin(eff_dim,  std::numeric_limits<double>::max());
     std::vector<double> pmax(eff_dim, -std::numeric_limits<double>::max());
     for (PetscInt i = 0; i < Np; ++i)
@@ -389,6 +402,56 @@ StrumpackGFOperator::build_petsc_tree(const std::vector<int>& dist, int lo, int 
 }
 
 // ---------------------------------------------------------------------------
+// build_kdtree — spatial median-split ClusterTree that INDUCES perm_
+//
+// Each leaf writes its indices contiguously into perm_ (left subtree entirely before
+// right), so every node covers a contiguous perm_ range AND a spatially compact tile —
+// tree↔perm_ consistency by construction. Recurses to leaf_size, not n_ranks, so the tree
+// is spatially separated at every level ButterflyPACK can subdivide.
+// ---------------------------------------------------------------------------
+
+strumpack::structured::ClusterTree
+StrumpackGFOperator::build_kdtree(std::vector<PetscInt>& indices,
+                                  const std::vector<double>& proj, int eff_dim,
+                                  int leaf_size, PetscInt& fill) {
+    const std::size_t n = indices.size();
+    strumpack::structured::ClusterTree node(static_cast<int>(n));
+
+    if (static_cast<int>(n) <= leaf_size) {
+        for (PetscInt idx : indices) perm_[fill++] = idx;   // leaf: emit in place, no children
+        return node;
+    }
+
+    // Longest spatial axis (largest extent of the projected coordinates).
+    int dim = 0;
+    double best = -1.0;
+    for (int d = 0; d < eff_dim; ++d) {
+        double lo =  std::numeric_limits<double>::max();
+        double hi = -std::numeric_limits<double>::max();
+        for (PetscInt idx : indices) {
+            double v = proj[static_cast<std::size_t>(idx) * eff_dim + d];
+            lo = std::min(lo, v);
+            hi = std::max(hi, v);
+        }
+        if (hi - lo > best) { best = hi - lo; dim = d; }
+    }
+
+    // Balanced median split along `dim` (nth_element reorders `indices` in place).
+    const std::size_t mid = n / 2;
+    std::nth_element(indices.begin(), indices.begin() + mid, indices.end(),
+                     [&](PetscInt a, PetscInt b) {
+                         return proj[static_cast<std::size_t>(a) * eff_dim + dim] <
+                                proj[static_cast<std::size_t>(b) * eff_dim + dim];
+                     });
+
+    std::vector<PetscInt> L(indices.begin(), indices.begin() + mid);
+    std::vector<PetscInt> R(indices.begin() + mid, indices.end());
+    node.c.push_back(build_kdtree(L, proj, eff_dim, leaf_size, fill));  // fills perm_ left-first
+    node.c.push_back(build_kdtree(R, proj, eff_dim, leaf_size, fill));  // then right
+    return node;
+}
+
+// ---------------------------------------------------------------------------
 // build_one_s_matrix — STRUMPACK BUTTERFLY matrix via zero-copy mult_1d_t
 // ---------------------------------------------------------------------------
 
@@ -417,10 +480,14 @@ void StrumpackGFOperator::build_one_s_matrix(int alpha, int beta, Mat G_perm_ab)
         assert(actual_rstart == perm_rstart && actual_rend == perm_rend);
     }
 
-    // Cluster tree encoding PETSc's layout (controls STRUMPACK's hierarchical blocking).
-    // Note: ButterflyPACK may use its own internal 1D distribution that differs from this
-    // tree's leaf layout. The callback below handles any distribution via allgatherv.
-    ClusterTree row_tree = build_petsc_tree(petsc_dist_, 0, n_ranks);
+    // Cluster tree controlling STRUMPACK's hierarchical blocking. "kdtree": spatial median-split
+    // tree (built once in the ctor, shared by all S_αβ) so off-diagonal blocks stay spatially
+    // separated at every level. "petsc1d": binary bisection matching PETSc's layout.
+    // Either way, ButterflyPACK may use its own internal 1D distribution that differs from this
+    // tree's leaf layout; the callback below handles any distribution via allgatherv.
+    ClusterTree row_tree = (config_.cluster_tree == "kdtree")
+        ? *kd_tree_
+        : build_petsc_tree(petsc_dist_, 0, n_ranks);
 
     // Pre-allocate PETSc work Vecs (sized to PETSc's layout, reused for all callback calls).
     Vec x_work, y_work;

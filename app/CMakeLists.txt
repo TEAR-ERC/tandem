@@ -297,3 +297,12 @@ add_executable(gf-strumpack-full-bench
     gf-strumpack-full-bench.cpp)
 target_link_libraries(gf-strumpack-full-bench PRIVATE app-common)
 target_include_directories(gf-strumpack-full-bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(gf-strumpack-synthetic
+    tandem/Monitor.cpp
+    tandem/SeasConfig.cpp
+    tandem/SEAS.cpp
+    gf-strumpack-synthetic.cpp)
+target_link_libraries(gf-strumpack-synthetic PRIVATE app-common)
+target_include_directories(gf-strumpack-synthetic PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+

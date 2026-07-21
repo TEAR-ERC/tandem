@@ -69,6 +69,10 @@ private:
     // perm_[new_i] = old_i  — shared scalar permutation over N_el*nbf nodes
     std::vector<PetscInt> perm_;
 
+    // k-d ClusterTree induced over perm_ (config.cluster_tree == "kdtree" only). Built once in
+    // the ctor and shared by every S_αβ; null for the "petsc1d" path (which uses build_petsc_tree).
+    std::unique_ptr<strumpack::structured::ClusterTree> kd_tree_;
+
     // PETSc PETSC_DECIDE row/col distribution: petsc_dist_[r] = first row on rank r.
     // Precomputed from Np and n_ranks; used for scatter infrastructure and apply().
     std::vector<int> petsc_dist_;
@@ -97,6 +101,18 @@ private:
     // in the mult_1d_t callback match PETSc's row/col ownership ranges.
     static strumpack::structured::ClusterTree
     build_petsc_tree(const std::vector<int>& dist, int lo, int hi);
+
+    // Build a spatial k-d (median-split) ClusterTree over `indices` and, as a side effect,
+    // write each leaf's indices contiguously into perm_ starting at perm_[fill] (advancing
+    // fill).  Because the left subtree fills perm_ entirely before the right, every returned
+    // node covers a contiguous perm_ range AND a spatially compact tile.  Recurses down to
+    // leaf_size (not n_ranks), so ButterflyPACK's internal subdivision only ever acts within a
+    // near-field tile.  `indices` is reordered in place (nth_element); proj is the PCA
+    // projection [Np * eff_dim] already computed in build_spatial_permutation.
+    strumpack::structured::ClusterTree
+    build_kdtree(std::vector<PetscInt>& indices,
+                 const std::vector<double>& proj, int eff_dim,
+                 int leaf_size, PetscInt& fill);
 };
 
 } // namespace tndm
