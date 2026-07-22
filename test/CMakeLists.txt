@@ -54,3 +54,11 @@ doctest_discover_tests(test-tensor)
 add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
+
+# Config-schema test: exercises the [gf_compression] schema (round-trip, defaults, and the
+# strict rejection of removed/unknown keys). Needs app/ on the include path for the
+# common/HMatrixConfig* headers; tandem-lib (via test-runner) supplies util/Schema.h.
+add_executable(test-config-schema config_schema.cpp)
+target_include_directories(test-config-schema PRIVATE ${CMAKE_SOURCE_DIR}/app)
+target_link_libraries(test-config-schema test-runner)
+doctest_discover_tests(test-config-schema)

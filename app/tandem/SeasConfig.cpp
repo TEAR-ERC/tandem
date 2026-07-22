@@ -1,5 +1,7 @@
 #include "SeasConfig.h"
 
+#include "common/HMatrixConfigSchema.h"
+
 namespace tndm {
 
 namespace detail {
@@ -243,70 +245,7 @@ void setConfigSchema(TableSchema<Config>& schema,
     auto& tsCheckpointSchema = schema.add_table("ts_checkpoint", &Config::ts_checkpoint_config);
     detail::setTsCheckpointConfigSchema(tsCheckpointSchema);
 
-    auto& hmatrixSchema = schema.add_table("hmatrix", &Config::hmatrix_config);
-    hmatrixSchema.add_value("use_hmatrix", &HMatrixConfig::use_hmatrix)
-        .default_value(false)
-        .help("Use H-matrix for Green's function MatMult.");
-    hmatrixSchema.add_value("eta", &HMatrixConfig::eta)
-        .default_value(0.9)
-        .validator([](auto&& x) { return x > 0.0; })
-        .help("Admissibility parameter (eta > 0; typical range 1.0–3.0).");
-    hmatrixSchema.add_value("leaf_size", &HMatrixConfig::leaf_size)
-        .default_value(32)
-        .validator([](auto&& x) { return x > 0; })
-        .help("Cluster tree leaf size.");
-    hmatrixSchema.add_value("basis_order", &HMatrixConfig::basis_order)
-        .default_value(8)
-        .validator([](auto&& x) { return x > 0; })
-        .help("Chebyshev basis polynomial order.");
-    hmatrixSchema.add_value("max_rank", &HMatrixConfig::max_rank)
-        .default_value(64)
-        .validator([](auto&& x) { return x > 0; })
-        .help("NO EFFECT on the STRUMPACK path: HODLRMatrix never reads it and ButterflyPACK "
-              "gets no rank cap. Reserved for the future from-mat path. Use rank_guess to set "
-              "the initial rank instead.");
-    hmatrixSchema.add_value("less_adapt", &HMatrixConfig::less_adapt)
-        .default_value(true)
-        .help("ButterflyPACK less_adapt. True (default) adapts the block rank only at the "
-              "coarsest levels and extrapolates deeper, leaving deep-level errors above rtol. "
-              "Set false to make every level adapt to rtol, at the cost of more matvecs.");
-    hmatrixSchema.add_value("rank_guess", &HMatrixConfig::rank_guess)
-        .default_value(128)
-        .validator([](auto&& x) { return x > 0; })
-        .help("ButterflyPACK rank0: initial rank guess per off-diagonal block.");
-    hmatrixSchema.add_value("rank_rate", &HMatrixConfig::rank_rate)
-        .default_value(2.0)
-        .validator([](auto&& x) { return x > 1.0; })
-        .help("ButterflyPACK rankrate: rank growth factor between adaptive trials.");
-    hmatrixSchema.add_value("bf_sampling", &HMatrixConfig::bf_sampling)
-        .default_value(1.2)
-        .validator([](auto&& x) { return x > 0.0; })
-        .help("ButterflyPACK sample_para: oversampling factor for randomized construction.");
-    hmatrixSchema.add_value("format", &HMatrixConfig::format)
-        .default_value(std::string("hodlr"))
-        .validator([](auto&& x) { return x == "hodlr" || x == "hodbf"; })
-        .help("Compressed format: \"hodlr\" (low-rank off-diagonal blocks) or \"hodbf\" "
-              "(butterfly off-diagonal blocks).");
-    hmatrixSchema.add_value("batch_size", &HMatrixConfig::batch_size)
-        .default_value(32)
-        .validator([](auto&& x) { return x > 0; })
-        .help("Assembly batch size (reserved).");
-    hmatrixSchema.add_value("rtol", &HMatrixConfig::rtol)
-        .default_value(1e-4)
-        .validator([](auto&& x) { return x > 0.0; })
-        .help("Relative compression tolerance (reserved).");
-    hmatrixSchema.add_value("planar_fault", &HMatrixConfig::planar_fault)
-        .default_value(false)
-        .help("Skip H-matrix compression for normal-traction components that are exactly zero "
-              "for planar faults in homogeneous media (tangential slip -> zero normal traction). "
-              "Validates that the assembled GF confirms near-zero normal coupling before skipping. "
-              "Leave false (default) unless you know your fault geometry satisfies this condition.");
-    hmatrixSchema.add_value("cluster_tree", &HMatrixConfig::cluster_tree)
-        .default_value(std::string("petsc1d"))
-        .validator([](auto&& x) { return x == "petsc1d" || x == "kdtree"; })
-        .help("Cluster tree for the STRUMPACK matrix-free operator: \"petsc1d\" (binary "
-              "bisection matching PETSc's distribution; default, proven on 1D faults) or "
-              "\"kdtree\" (2D/3D median-split spatial tree that keeps off-diagonal HODLR blocks "
-              "spatially separated at every level; required for 2D-fault problems like bp7).");
+    auto& gfCompressionSchema = schema.add_table("gf_compression", &Config::hmatrix_config);
+    setGfCompressionConfigSchema(gfCompressionSchema);
 }
 } // namespace tndm

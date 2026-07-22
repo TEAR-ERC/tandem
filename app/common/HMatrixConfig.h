@@ -6,17 +6,10 @@
 namespace tndm {
 
 struct HMatrixConfig {
-    bool use_hmatrix = false;
-    double eta = 0.9;
+    // Green's-function compression backend: "none" (dense MatMult, default) or "strumpack"
+    // (the matrix-free STRUMPACK HODLR operator). Replaces the old boolean use_hmatrix.
+    std::string gf_compression = "none";
     int leaf_size = 32;
-    int basis_order = 8;
-    // max_rank and batch_size are reserved for future MatCreateH2OpusFromMat path.
-    // NOTE: max_rank has NO effect on the STRUMPACK path. It is forwarded as far as
-    // HODLROptions, but HODLRMatrix never reads opts.max_rank() and ButterflyPACK is given
-    // no rank cap — only "rank0" (an initial guess) from rank_guess below. Observed block
-    // ranks routinely exceed this value; do not use it expecting a cap.
-    int max_rank = 64;
-    int batch_size = 32;
     double rtol = 1e-4;
     // --- ButterflyPACK knobs, reachable only via HODLR::HODLROptions ---
     // These are dropped by structured::construct_matrix_free (its StructuredOptions ->
@@ -35,15 +28,15 @@ struct HMatrixConfig {
     // off-diagonal blocks; better for the O(sqrt(N)) ranks a 2D fault surface produces).
     std::string format = "hodlr";
     // Cluster tree used by the STRUMPACK matrix-free operator:
-    //   "petsc1d" — binary bisection matching PETSc's PETSC_DECIDE distribution (default;
-    //               keeps the proven bp3 behaviour).
     //   "kdtree"  — 2D/3D k-d (median-split) spatial tree that induces perm_ and recurses to
     //               leaf_size, so off-diagonal HODLR blocks stay spatially separated at every
-    //               level. Needed for 2D-fault (3D) problems such as bp7.
-    std::string cluster_tree = "petsc1d";
+    //               level. Provably rank-invariant and correct in 1D and 2D; the default.
+    //   "petsc1d" — binary bisection matching PETSc's PETSC_DECIDE distribution. Reachable
+    //               only for reproducing old 1D-fault runs; not a safe production default.
+    std::string cluster_tree = "kdtree";
     // For planar faults in a homogeneous elastic medium, tangential slip produces
     // zero normal traction on the fault plane (exact result from elastostatics).
-    // Set planar_fault = true to skip building H-matrices for those zero components,
+    // Set planar_fault = true to skip compressing those zero components,
     // with validation that they are indeed negligible in the assembled dense GF.
     bool planar_fault = false;
 };

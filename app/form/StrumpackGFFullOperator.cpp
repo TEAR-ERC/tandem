@@ -675,7 +675,8 @@ void StrumpackGFFullOperator::build_s_full(Mat G_dense) {
         opts.set_butterfly_levels(1000);
         opts.set_BF_entry_n15(true);
     }
-    // NOTE: max_rank is deliberately not set — HODLRMatrix never reads it (see HMatrixConfig).
+    // NOTE: no rank cap is set — HODLRMatrix never reads opts.max_rank(), so a max_rank dial
+    // would be inert. Only rank_guess (ButterflyPACK "rank0") seeds the initial rank.
 
     if (my_rank == 0) {
         std::cout << "  Building S_full  (" << M_tot << " x " << N_tot

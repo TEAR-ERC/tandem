@@ -389,7 +389,6 @@ double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh,
         throw std::runtime_error("validateGFStrumpackFull requires mode = QDGreen");
 
     Config cfg_s = cfg;
-    cfg_s.hmatrix_config.use_hmatrix = false;
 
     std::unique_ptr<seas::ContextBase> ctx = nullptr;
     switch (cfg_s.type) {
@@ -433,7 +432,6 @@ double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh,
                   << "  Np=" << N_gf / (DomainDimension - 1) << "\n"
                   << "rtol=" << cfg_s.hmatrix_config.rtol
                   << "  leaf_size=" << cfg_s.hmatrix_config.leaf_size
-                  << "  max_rank=" << cfg_s.hmatrix_config.max_rank
                   << "  G (dense): ";
         char buf[32];
         if (mem_G >= 1e9) std::snprintf(buf, sizeof(buf), "%.2f GB", mem_G/1e9);

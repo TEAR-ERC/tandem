@@ -312,6 +312,15 @@ public:
         return schema;
     }
 
+    // Opt-in: reject any key present in the TOML that is not in this schema, instead of
+    // silently ignoring it. Off by default so every other table keeps its lenient parsing;
+    // enable it on a table whose surface must be honest (e.g. a removed key must fail loudly
+    // rather than be quietly dropped).
+    TableSchema& strict() {
+        strict_ = true;
+        return *this;
+    }
+
     template <typename U> auto& add_value(std::string&& name, U T::* member) {
         return add<U, ValueSchema>(std::move(name), member);
     }
@@ -326,6 +335,28 @@ public:
 
     T translate(toml::node_view<const toml::node> node) const {
         T table;
+        if (strict_) {
+            if (auto tbl = node.as_table()) {
+                for (auto&& kv : *tbl) {
+                    auto const& key = kv.first;
+                    bool known = false;
+                    for (auto&& [k, model] : entries_) {
+                        if (key == k) {
+                            known = true;
+                            break;
+                        }
+                    }
+                    if (!known) {
+                        std::stringstream ss;
+                        ss << "Unknown key \"" << key << "\". Valid keys are:";
+                        for (auto&& [k, model] : entries_) {
+                            ss << " " << k;
+                        }
+                        throw std::runtime_error(ss.str());
+                    }
+                }
+            }
+        }
         for (auto&& [key, model] : entries_) {
             try {
                 model->translate(table, node[key]);
@@ -465,6 +496,7 @@ private:
     }
 
     std::vector<std::pair<std::string, std::unique_ptr<Concept>>> entries_;
+    bool strict_ = false;
 };
 
 } // namespace tndm
