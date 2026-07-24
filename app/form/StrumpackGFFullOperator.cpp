@@ -104,34 +104,30 @@ StrumpackGFFullOperator::StrumpackGFFullOperator(
 
     const PetscInt Np = N_el_ * nbf_;
 
-    // Query PETSc's actual parallel layout for G_dense (rows)
-    PetscInt G_rstart, G_rend;
-    CHKERRTHROW(MatGetOwnershipRange(G_dense, &G_rstart, &G_rend));
-    PetscInt G_local_rows = G_rend - G_rstart;
+    // Query PETSc's actual parallel layout for G_dense. The dense GF is distributed by the
+    // production num_local_elements layout, which is NOT the even PETSC_DECIDE split, so BOTH
+    // the row and column distributions must be read from G_dense itself. MatGetLocalSize
+    // returns exactly the local (row, col) sizes that MatMult(G_dense, x, y) requires of its
+    // x (columns) and y (rows) — so the construction-callback matvec conforms on any rank
+    // count. (Invariant: distributions come from real PETSc objects. A PETSC_DECIDE column
+    // split silently disagrees with G_dense's columns whenever the per-rank column count is
+    // uneven, and MatMult(G_dense, col_work_) then aborts with "Nonconforming object sizes".)
+    PetscInt G_local_rows, G_local_cols;
+    CHKERRTHROW(MatGetLocalSize(G_dense, &G_local_rows, &G_local_cols));
 
     std::vector<PetscInt> all_local_rows(n_ranks);
     CHKERRTHROW(MPI_Allgather(&G_local_rows, 1, MPIU_INT, all_local_rows.data(), 1, MPIU_INT, comm_));
-
     petsc_dist_row_.resize(n_ranks + 1, 0);
     for (int r = 0; r < n_ranks; ++r) {
         petsc_dist_row_[r+1] = petsc_dist_row_[r] + all_local_rows[r];
     }
 
-    // Query PETSc's default parallel layout for slip_D*Np (cols)
-    Vec temp_col;
-    CHKERRTHROW(VecCreateMPI(comm_, PETSC_DECIDE, slip_D_ * Np, &temp_col));
-    PetscInt col_rstart, col_rend;
-    CHKERRTHROW(VecGetOwnershipRange(temp_col, &col_rstart, &col_rend));
-    PetscInt col_local_size = col_rend - col_rstart;
-
     std::vector<PetscInt> all_local_cols(n_ranks);
-    CHKERRTHROW(MPI_Allgather(&col_local_size, 1, MPIU_INT, all_local_cols.data(), 1, MPIU_INT, comm_));
-
+    CHKERRTHROW(MPI_Allgather(&G_local_cols, 1, MPIU_INT, all_local_cols.data(), 1, MPIU_INT, comm_));
     petsc_dist_col_.resize(n_ranks + 1, 0);
     for (int r = 0; r < n_ranks; ++r) {
         petsc_dist_col_[r+1] = petsc_dist_col_[r] + all_local_cols[r];
     }
-    CHKERRTHROW(VecDestroy(&temp_col));
 
     // Work vecs for MatMult inside construction callback
     const PetscInt local_col = petsc_dist_col_[my_rank+1] - petsc_dist_col_[my_rank];
