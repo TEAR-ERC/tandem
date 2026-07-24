@@ -501,12 +501,18 @@ double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh,
         };
         const std::size_t fwd = op.total_matvec_count();
         const std::size_t adj = op.total_adjoint_count();
-        const PetscInt    Np  = N_gf / (DomainDimension - 1);
+        // A full dense assembly does one elastostatic solve per GF column, i.e.
+        // slip_D*Np solves (slip_D = DomainDimension-1 slip components per fault
+        // node). N_gf already equals slip_D*Np, so it IS the assembly solve count
+        // -- 2*Np in 3D, Np in 2D. Compare construction probes against that.
+        const PetscInt    Np      = N_gf / (DomainDimension - 1);
+        const PetscInt    n_solve = N_gf;
         std::cout
             << "  Construction:  fwd=" << fwd << "  adj=" << adj
             << "  total=" << fwd+adj
-            << "  (vs Np=" << Np << " for full GF assembly"
-            << ", ratio=" << static_cast<double>(fwd+adj)/Np << "x)\n"
+            << "  (vs slip_D*Np=" << n_solve << " solves for full GF assembly"
+            << ", Np=" << Np
+            << ", ratio=" << static_cast<double>(fwd+adj)/n_solve << "x)\n"
             << "  Memory:        " << fmt_b(mem_S)
             << "  compression=" << mem_G / mem_S << "x\n"
             << "  Apply timing:  Gv=" << time_G << "s"
