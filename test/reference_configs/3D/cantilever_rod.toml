@@ -1,0 +1,4 @@
+mesh_file = "cantilever_rod.msh"
+type = "elasticity"
+lib = "cantilever_rod.lua"
+scenario = "cantilever_rod"

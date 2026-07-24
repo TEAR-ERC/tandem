@@ -28,4 +28,7 @@ bash "$SCRIPT_DIR/static_parallel_consistency.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_
 echo "Convergence study (spherical_hole, varying h)..."
 bash "$SCRIPT_DIR/convergence.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
+echo "Traction BC correctness (cantilever rod)..."
+bash "$SCRIPT_DIR/traction_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
 echo "3D reference outputs generated successfully."
