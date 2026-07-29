@@ -113,6 +113,8 @@ public:
     void compute_deviatoric_strain_q(std::size_t fctNo, FacetInfo const& info);
     void compute_partial_strain_Q(std::size_t elNo);
     void compute_partial_strain_q(std::size_t fctNo, FacetInfo const& info);
+    void initialize_partial_strain_Q(std::size_t elNo);
+    void initialize_partial_strain_q(std::size_t fctNo);
     void update_deviatoric_strain_Q(std::size_t elNo);
     void update_deviatoric_strain_q(std::size_t fctNo);
     void update_partial_strain_Q(std::size_t elNo);

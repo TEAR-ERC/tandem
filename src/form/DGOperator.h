@@ -68,6 +68,8 @@ public:
     template <class T>
     using compute_deviatoric_strain_Q_t = decltype(&T::compute_deviatoric_strain_Q);
     template <class T> using compute_partial_strain_Q_t = decltype(&T::compute_partial_strain_Q);
+    template <class T>
+    using initialize_partial_strain_Q_t = decltype(&T::initialize_partial_strain_Q);
     template <class T> using store_displacement_field_t = decltype(&T::store_displacement_field);
     template <class T> using rhs_history_volume_t = decltype(&T::rhs_history_volume);
     template <class T> using rhs_history_skeleton_t = decltype(&T::rhs_history_skeleton);
@@ -497,9 +499,28 @@ public:
                 }
                 return false;
             }
-            // Viscoelasticity without a fault: fixed step = theta * tau, no adaptivity,
-            // so the matrix assembled once at construction stays valid (no reassembly).
-            lop_->set_viscoelastic_time_step(relaxation_time_global_);
+            // Viscoelasticity without a fault: normally a fixed step = theta * tau,
+            // but PETSc may truncate the last step to hit final_time exactly.
+            // Use the same change-detection logic as the fault path so the
+            // truncated last step gets correct g_dt, ratio, and B_dt.
+            {
+                double const theta_dt =
+                    lop_->viscoelastic_theta() * relaxation_time_global_;
+                double const current = lop_->get_viscoelastic_time_step();
+                double diff = dt - current;
+                if (diff < 0.0)
+                    diff = -diff;
+                double const scale = dt > current ? dt : current;
+                if (dt > 0.0 && diff > 1.0e-12 * scale) {
+                    lop_->set_viscoelastic_time_step_value(dt);
+                    update_time_dependent_precomputation();
+                    return true;
+                }
+                // dt unchanged — ensure pinned to theta*tau on the first call.
+                if (current != theta_dt) {
+                    lop_->set_viscoelastic_time_step(relaxation_time_global_);
+                }
+            }
         }
         return false;
     }
@@ -559,6 +580,20 @@ public:
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
                 auto const& info = topo_->info(fctNo);
                 lop_->compute_partial_strain_q(fctNo, info);
+            }
+        }
+    }
+
+    void initialize_partial_strain() override {
+        // Instantaneous elastic initial condition for the memory variable: q(0) = eps(0).
+        // Run once at t=0 after the initial strain has been computed (new_grad set).
+        if constexpr (std::experimental::is_detected_v<initialize_partial_strain_Q_t,
+                                                       LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->initialize_partial_strain_Q(elNo);
+            }
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                lop_->initialize_partial_strain_q(fctNo);
             }
         }
     }

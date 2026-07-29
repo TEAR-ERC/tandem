@@ -82,41 +82,38 @@ void Viscoelasticity::stress_volume(std::size_t elNo, Matrix<double>& stress_com
     // Temporary storage for intermediate stress at quadrature points
     alignas(ALIGNMENT) double stress_total[tensor::stress_total_Q::size()];
 
-    // Step 3: Get time integration scalars and old strain history
-    const double* g_dt_Q_data = volPre[elNo].get<g_dt_Q>().data();
-    const double* ratio_Q_data = volPre[elNo].get<ratio_Q>().data();
-
-    const double* old_partial_strain = hist.get<partial_strain_old_Q>().data()->data();
+    // Step 3-5: Total stress from the CURRENT memory variable q^{n+1} (new partial strain):
+    //   σ_ij = λ δ_ij ε_kk + 2 μ0 ε_ij + 2 μ1 q^{n+1}_ij
+    // This equals the previous reconstruction
+    //   A_dt δ ε_kk + 2 B_dt ε + 2 μ1 (ratio q^n - g ε^{dev,n})
+    // for any accepted step, but is also correct at t=0: reconstructing q from the
+    // still-zero "old" buffers there under-predicts the instantaneous elastic stress by
+    // μ1(1-g)ε(0) = O(Δt), the single t=0 output point that otherwise caps temporal
+    // convergence at first order. The existing computeTotalStress kernel is reused by
+    // selecting effective coefficients A_dt->λ, B_dt->μ0, ratio->1, g->0,
+    // old_partial->new_partial (q^{n+1}). Requires the init patch so q(0) = ε(0).
+    const double* new_partial_strain = hist.get<partial_strain_new_Q>().data()->data();
     const double* old_dev_strain = hist.get<deviatoric_strain_old_Q>().data()->data();
 
-    // Step 4: Compute unscaled effective Lamé parameters A_dt and B_dt
-    alignas(ALIGNMENT) double A_dt_unscaled[numQuad];
-    alignas(ALIGNMENT) double B_dt_unscaled[numQuad];
-    {
-        kernel::precomputeVolumeABUnscaled krnl;
-        krnl.A_dt_unscaled = A_dt_unscaled;
-        krnl.B_dt_unscaled = B_dt_unscaled;
-        krnl.lam_Q = lam_Q;
-        krnl.mu0_Q = mu0_Q;
-        krnl.mu1_Q = mu1_Q;
-        krnl.g_dt_Q = g_dt_Q_data;
-        krnl.execute();
+    alignas(ALIGNMENT) double ones_Q[numQuad];
+    alignas(ALIGNMENT) double zeros_Q[numQuad];
+    for (std::size_t q = 0; q < numQuad; ++q) {
+        ones_Q[q] = 1.0;
+        zeros_Q[q] = 0.0;
     }
 
-    // Step 5: Compute total stress:
-    // σ_ij = A_dt * δ_ij * ε_kk + B_dt * ε_ij + 2*μ₁*ratio*q_ij_old - 2*μ₁*g_dt*ε^{dev}_old
     {
         kernel::computeTotalStress krnl;
         krnl.stress_total_Q = stress_total;
-        krnl.A_dt_unscaled = A_dt_unscaled;
-        krnl.B_dt_unscaled = B_dt_unscaled;
+        krnl.A_dt_unscaled = lam_Q; // λ δ_ij ε_kk  (volumetric; μ1 acts only deviatorically)
+        krnl.B_dt_unscaled = mu0_Q; // 2 μ0 ε_ij    (instantaneous elastic shear)
         krnl.strain_trace_Q = strain_trace;
         krnl.strain_tensor_Q = strain_tensor;
         krnl.mu1_Q = mu1_Q;
-        krnl.ratio_Q = ratio_Q_data;
-        krnl.old_partial_strain_tensor_Q = old_partial_strain;
-        krnl.g_dt_Q = g_dt_Q_data;
-        krnl.old_deviatoric_strain_tensor_Q = old_dev_strain;
+        krnl.ratio_Q = ones_Q;                                 // ratio -> 1
+        krnl.old_partial_strain_tensor_Q = new_partial_strain; // current q^{n+1}
+        krnl.g_dt_Q = zeros_Q;                                 // g -> 0
+        krnl.old_deviatoric_strain_tensor_Q = old_dev_strain;  // unused (g = 0)
         krnl.delta = init::delta::Values;
         krnl.execute();
     }

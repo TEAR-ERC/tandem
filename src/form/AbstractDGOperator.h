@@ -74,6 +74,7 @@ public:
     virtual void store_displacement_field(BlockVector const&) {}
     virtual void compute_deviatoric_strain() {}
     virtual void compute_partial_strain() {}
+    virtual void initialize_partial_strain() {}
     virtual void set_traction_boundary(facet_functional_t fun) {}
     virtual void set_free_slip_boundary(facet_functional_t fun) {}
 
