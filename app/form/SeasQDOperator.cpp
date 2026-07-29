@@ -50,7 +50,16 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
 
     solve(0.0, make_state_view(state));
     update_traction(make_state_view(state));
-    post_step_compute_strain_history(0.0, state);
+    // Instantaneous elastic initial condition for the viscoelastic memory variable.
+    // A strain present at t=0 fully loads the Maxwell spring (the dashpot cannot move
+    // instantaneously), so q(0) = eps(0). Running the standard partial-strain recurrence
+    // here would instead give q(0) = g(dt)*eps(0), under-predicting the t=0 stress by
+    // mu1*(1-g)*eps(0) = O(dt) and degrading a held-step relaxation test to first order.
+    update_ghost_state(state);
+    solve(0.0, make_state_view(state));
+    dgop_->store_displacement_field(linear_solver_.x());
+    dgop_->compute_deviatoric_strain();
+    dgop_->initialize_partial_strain();
     last_time_ = 0.0;
     friction_->init(0.0, traction_, state);
 }
