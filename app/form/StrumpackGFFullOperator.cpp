@@ -87,7 +87,7 @@ StrumpackGFFullOperator::StrumpackGFFullOperator(
     Vec s_proto, Vec t_proto,
     MPI_Comm comm,
     HMatrixConfig const& config)
-    : D_(D), slip_D_(D - 1), nbf_(nbf), comm_(comm), config_(config)
+    : D_(D), slip_D_(D - 1), nbf_(nbf), comm_(comm), config_(config), mpi_comm_(comm)
 {
     static_assert(sizeof(PetscScalar) == sizeof(double),
                   "StrumpackGFFullOperator requires real PETSc scalar");
@@ -690,7 +690,10 @@ void StrumpackGFFullOperator::build_s_full(Mat G_dense) {
     {
         // Two-step: build the (empty) tree-defined matrix so its row distribution can be
         // read, publish it to the callback, then compress.
-        auto H = std::make_unique<HODLR::HODLRMatrix<double>>(MPIComm(comm_), row_tree, opts);
+        // mpi_comm_, not a temporary: HODLRMatrix keeps a non-owning pointer to this
+        // MPIComm and dereferences it in compress()/mult()/memory() for the rest of the
+        // matrix's life. See the member's declaration in the header.
+        auto H = std::make_unique<HODLR::HODLRMatrix<double>>(mpi_comm_, row_tree, opts);
         hodlr_dist = H->dist();
         if (static_cast<int>(hodlr_dist.size()) != n_ranks + 1)
             throw std::runtime_error("HODLRMatrix::dist() has unexpected length");

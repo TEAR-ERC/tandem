@@ -7,6 +7,7 @@
 #include <petscmat.h>
 #include <petscvec.h>
 
+#include <misc/MPIWrapper.hpp>
 #include <structured/ClusterTree.hpp>
 #include <structured/StructuredMatrix.hpp>
 #include <structured/StructuredOptions.hpp>
@@ -74,6 +75,18 @@ private:
     PetscInt nbf_, N_el_;
     MPI_Comm comm_;
     HMatrixConfig config_;
+
+    // Owning wrapper around a duplicate of comm_, kept for the lifetime of S_full_.
+    // HODLRMatrix does NOT copy the MPIComm it is constructed with — it stores a raw
+    // non-owning `const MPIComm* c_` (HODLRMatrix.hpp:575, assigned at HODLRMatrix.cpp:257)
+    // and dereferences it in compress(), mult() and memory() (`if (c_->is_null()) return;`).
+    // MPIComm also owns its communicator: it MPI_Comm_dup()s on construction and
+    // MPI_Comm_free()s on destruction. Passing a temporary here left c_ dangling for the
+    // whole life of the matrix and freed the communicator out from under it; whether the
+    // abandoned storage still read MPI_COMM_NULL then decided, per run, whether compress()
+    // silently did nothing and apply() later crashed. Declared BEFORE S_full_ so it is
+    // destroyed AFTER it (members are destroyed in reverse declaration order).
+    strumpack::MPIComm mpi_comm_;
 
     std::unique_ptr<strumpack::structured::StructuredMatrix<double>> S_full_;
     double mem_bytes_{0.0};
