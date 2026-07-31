@@ -95,10 +95,17 @@ private:
 
     void write_facet_labels_IS(LocalSimplexMesh<DomainDimension> const& mesh);
     IS load_facet_labels_seq_IS(void);
+
+    // Applies the configured MPI-IO setting to a binary viewer. Controlled by the runtime option
+    // -gf_use_mpiio (default true). Set to false to fall back to PETSc's serial binary path, which
+    // avoids the 32-bit MPI count/displacement overflow that corrupts dense GF matrices whose total
+    // entry count M*N exceeds 2^31. See GF_CHECKPOINT_MPIIO_OVERFLOW.md.
+    void set_viewer_mpiio(PetscViewer v);
     void create_permutation_redundant_IS(LocalSimplexMesh<DomainDimension> const& mesh, IS is);
     std::tuple<Mat, Mat> create_row_col_permutation_matrices(bool create_row, bool create_col);
 
     bool checkpoint_enabled_ = false;
+    PetscBool gf_use_mpiio_ = PETSC_TRUE;
     Mat  G_ = nullptr;
     std::unique_ptr<PetscVector> S_;
     std::unique_ptr<PetscVector> t_boundary_;

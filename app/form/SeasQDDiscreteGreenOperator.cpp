@@ -44,6 +44,17 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
 
     checkpoint_every_nmins_ = gf_checkpoint_every_nmins;
 
+    // Controls whether the dense GF matrix / vector / facet-label binary files are read and written
+    // through PETSc's MPI-IO path. Default true preserves previous behavior. Setting
+    // -gf_use_mpiio false falls back to the serial binary path, which sidesteps the 32-bit MPI
+    // count/displacement overflow that corrupts dense GF matrices with M*N > 2^31 entries.
+    gf_use_mpiio_ = PETSC_TRUE;
+    CHKERRTHROW(PetscOptionsGetBool(NULL, NULL, "-gf_use_mpiio", &gf_use_mpiio_, NULL));
+    if (rank == 0) {
+        std::cout << "GF binary I/O: MPI-IO " << (gf_use_mpiio_ ? "enabled" : "disabled")
+                  << std::endl;
+    }
+
     if (prefix.has_value()) {
         std::string sprefix = prefix.value_or("");
         if (rank == 0) {
@@ -208,6 +219,10 @@ void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
     }
 }
 
+void SeasQDDiscreteGreenOperator::set_viewer_mpiio(PetscViewer v) {
+    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, gf_use_mpiio_));
+}
+
 void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf, PetscInt n_gf) {
     PetscViewer v;
@@ -220,7 +235,7 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     std::string new_filename = gf_operator_filename_ + ".tmp";
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
-    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    set_viewer_mpiio(v);
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
@@ -273,7 +288,7 @@ void SeasQDDiscreteGreenOperator ::write_facet_labels_IS(
     std::string new_filename = gf_facet_filename_ + ".tmp";
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
-    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    set_viewer_mpiio(v);
     CHKERRTHROW(ISView(is, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
     back_up_file(gf_facet_filename_);
@@ -298,7 +313,7 @@ IS SeasQDDiscreteGreenOperator ::load_facet_labels_seq_IS(void) {
         CHKERRTHROW(PetscTime(&t0));
         CHKERRTHROW(
             PetscViewerBinaryOpen(PETSC_COMM_SELF, gf_facet_filename_.c_str(), FILE_MODE_READ, &v));
-        CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+        set_viewer_mpiio(v);
         CHKERRTHROW(ISLoad(is, v));
         CHKERRTHROW(PetscViewerDestroy(&v));
         CHKERRTHROW(PetscTime(&t1));
@@ -450,7 +465,7 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_READ, &v));
-    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    set_viewer_mpiio(v);
 
     CHKERRTHROW(PetscViewerBinaryRead(v, &commsize_checkpoint, 1, NULL, PETSC_INT));
     MPI_Comm_size(comm, &commsize);
