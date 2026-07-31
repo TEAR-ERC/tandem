@@ -242,7 +242,23 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     }
 
     CHKERRTHROW(PetscViewerBinaryWrite(v, &current_gf, 1, PETSC_INT));
+
+    // Write G_ in PETSc's native dense layout rather than the default sparse-AIJ-style one.
+    // Two reasons, both mandatory for large faults:
+    //  1. In the AIJ-style layout MatView_Dense_Binary stores the header's nz field as the
+    //     PetscInt product M*N. On a 32-bit-index build that wraps once M*N > INT32_MAX, and
+    //     MatLoad_Dense_Binary rejects a negative nz that is not the dense sentinel with
+    //     "Unknown matrix format <wrapped> in file" -- the checkpoint becomes unloadable.
+    //     The native layout stores the constant MATRIX_BINARY_FORMAT_DENSE (-1) instead, so it
+    //     cannot overflow at any size.
+    //  2. It omits the column-index array, which for a dense matrix is just 0..N-1 repeated on
+    //     every row. That is a third of the file: 29.1 GB -> 19.4 GB at Np=20k.
+    // Reading needs no matching change: MatLoad_Dense_Binary branches on the nz field it finds,
+    // so checkpoints written in either layout keep loading.
+    CHKERRTHROW(PetscViewerPushFormat(v, PETSC_VIEWER_NATIVE));
     CHKERRTHROW(MatView(G_, v));
+    CHKERRTHROW(PetscViewerPopFormat(v));
+
     CHKERRTHROW(PetscViewerDestroy(&v));
 
     back_up_file(gf_operator_filename_);
