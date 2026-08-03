@@ -20,6 +20,13 @@ void Monitor::update_dt_limits(double time) {
 void MonitorQD::monitor(double time, BlockVector const& state) {
     if (!writers_.empty()) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
+
+        // Advance event-folder bookkeeping before any is_write_required()/write() calls
+        // for this step, so a new v_th excursion is already targeting its event_N folder.
+        for (auto const& writer : writers_) {
+            writer->prepare_step(VMax);
+        }
+
         bool require_traction = false;
         bool require_displacement = false;
         for (auto const& writer : writers_) {
@@ -97,6 +104,12 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                         BlockVector const& s) {
     if (!writers_.empty()) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
+
+        // Advance event-folder bookkeeping before any is_write_required()/write() calls
+        // for this step, so a new v_th excursion is already targeting its event_N folder.
+        for (auto const& writer : writers_) {
+            writer->prepare_step(VMax);
+        }
 
         for (auto const& writer : writers_) {
             if (writer->is_write_required(time, VMax)) {

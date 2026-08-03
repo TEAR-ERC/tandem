@@ -21,6 +21,7 @@
 #include <mpi.h>
 
 #include <cstddef>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <string>
@@ -45,6 +46,9 @@ public:
     virtual DataLevel level() const = 0;
     virtual std::vector<std::size_t> const* subset() const { return nullptr; }
     virtual bool has_static_writer() const { return false; }
+
+    /// True when this writer produces one event_N folder per v_th excursion (see name()).
+    inline bool event_mode() const { return oi_.v_th().has_value() && oi_.high_freq(); }
 
     inline bool is_write_required(double time, double VMax) const {
         if (auto v_th = oi_.v_th()) {
@@ -74,6 +78,30 @@ public:
      */
     inline void observe(double VMax) { last_seen_VMax_ = VMax; }
 
+    /**
+     * @brief Advance event-folder bookkeeping for high_freq + v_th output.
+     *
+     * Must be called exactly once per monitor step, for every writer, before
+     * any is_write_required()/write() calls for that step (i.e. before
+     * observe() updates last_seen_VMax_). Detects the rising edge of a new
+     * v_th excursion so that name() can immediately target a fresh event_N
+     * folder starting at step 0. No-op unless both v_th and high_freq are set.
+     */
+    inline void prepare_step(double VMax) {
+        if (!event_mode()) {
+            return;
+        }
+        double v_th = *oi_.v_th();
+        bool is_new_event = last_seen_VMax_ < v_th && VMax >= v_th;
+        if (is_new_event) {
+            if (event_started_) {
+                ++event_index_;
+            }
+            event_started_ = true;
+            event_step_ = 0;
+        }
+    }
+
     virtual void write(double time, mneme::span<double> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<1u>> data) {}
     virtual void write(double time, mneme::span<FiniteElementFunction<2u>> data) {}
@@ -82,6 +110,7 @@ public:
 
     virtual void increase_step(double time, double VMax) {
         ++output_step_;
+        ++event_step_;
         last_output_time_ = time;
         last_output_VMax_ = VMax;
     }
@@ -93,9 +122,22 @@ public:
     virtual void write_static(mneme::span<FiniteElementFunction<3u>> data) {}
 
 protected:
+    // Every excursion of VMax above v_th (until it drops back below) is one "event". In
+    // high_freq mode, each event's files are grouped into their own event_N subfolder
+    // (event_0, event_1, ...), numbered in the order events occur, with step numbering
+    // (the "_<step>" filename suffix) restarting at 0 for each event.
     inline std::string name() const {
         std::stringstream ss;
-        ss << prefix_ << "_" << output_step_;
+        if (event_mode()) {
+            std::filesystem::path prefix_path(prefix_);
+            auto parent =
+                prefix_path.has_parent_path() ? prefix_path.parent_path() : std::filesystem::current_path();
+            auto dir = parent / ("event_" + std::to_string(event_index_));
+            std::filesystem::create_directories(dir);
+            ss << (dir / prefix_path.filename()).string() << "_" << event_step_;
+        } else {
+            ss << prefix_ << "_" << output_step_;
+        }
         return ss.str();
     }
 
@@ -106,6 +148,10 @@ protected:
     double last_output_time_ = std::numeric_limits<double>::lowest();
     double last_output_VMax_ = 0.0;
     double last_seen_VMax_ = 0.0;
+
+    std::size_t event_index_ = 0;
+    std::size_t event_step_ = 0;
+    bool event_started_ = false;
 };
 
 template <std::size_t D> class FaultProbeWriter : public Writer {
