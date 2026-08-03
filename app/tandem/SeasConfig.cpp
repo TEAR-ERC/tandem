@@ -36,6 +36,11 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         .help("Velocity threshold (optional). If set, output is written only when VMax rises "
               "through this value (once per upward crossing) and all other adaptive output for "
               "this writer is disabled. Output is reactivated once VMax drops back below v_th.");
+    outputSchema.add_value("high_freq", up_cast<Derived>(&Derived::high_freq))
+        .default_value(false)
+        .help("Only has an effect when v_th is set. If true, output is written on every time "
+              "step for as long as VMax stays at or above v_th, instead of only once on the "
+              "upward crossing. Output stops once VMax drops back below v_th.");
 }
 
 template <typename Derived>

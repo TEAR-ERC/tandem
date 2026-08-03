@@ -48,6 +48,12 @@ public:
 
     inline bool is_write_required(double time, double VMax) const {
         if (auto v_th = oi_.v_th()) {
+            if (oi_.high_freq()) {
+                // High-frequency mode: write on every monitor step for as long as
+                // VMax stays at or above the threshold, resuming the single
+                // edge-triggered behavior once VMax drops back below it.
+                return VMax >= *v_th;
+            }
             // Threshold triggered output: write once each time VMax rises through the
             // threshold. last_seen_VMax_ holds VMax from the previous monitor
             // step, so this fires only on the upward crossing and resets once
