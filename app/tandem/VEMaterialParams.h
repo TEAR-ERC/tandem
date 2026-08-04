@@ -68,6 +68,50 @@ private:
     double theta_ = 0.0;
 };
 
+class PoissonViscoelasticity;
+
+// Unlike VEMaterialParams<Viscoelasticity>, there is no separate "relaxation_time"
+// field: PoissonViscoelasticity derives tau = eta / mu1 per material node (see
+// PoissonViscoelasticity.h), and mu0 comes from SeasScenario's generic mu().
+template <> struct VEMaterialParams<PoissonViscoelasticity> {
+    using functional_t = LuaLib::functional_t<DomainDimension, 1>;
+
+    static constexpr char Mu1[] = "mu1";
+    static constexpr char Viscosity[] = "viscosity";
+    static constexpr char Theta[] = "theta";
+
+    void load(LuaLib& lib, std::string const& scenario) {
+        if (lib.hasMember(scenario, Mu1)) {
+            mu1_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu1);
+        }
+        if (lib.hasMember(scenario, Viscosity)) {
+            viscosity_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Viscosity);
+        }
+        if (lib.hasMember(scenario, Theta)) {
+            theta_ = lib.getMemberConstant(scenario, Theta);
+            if (theta_ <= 0.0) {
+                throw std::runtime_error("Invalid '" + std::string(Theta) + "' value in " +
+                                         scenario);
+            }
+        }
+    }
+
+    auto const& mu1() const { return mu1_; }
+    auto const& viscosity() const { return viscosity_; }
+    double theta() const { return theta_; }
+
+private:
+    static functional_t constant_functional(double v) {
+        return [v](std::array<double, DomainDimension> const&) -> std::array<double, 1> {
+            return {v};
+        };
+    }
+
+    functional_t mu1_ = constant_functional(1.0);
+    functional_t viscosity_ = constant_functional(1.0);
+    double theta_ = 0.1;
+};
+
 } // namespace tndm
 
 #endif // VEMATERIALPARAMS_20260328_H
