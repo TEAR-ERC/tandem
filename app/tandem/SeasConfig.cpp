@@ -175,6 +175,9 @@ void setConfigSchema(TableSchema<Config>& schema,
                 return LocalOpType::Elasticity;
             } else if (iEquals(value, "viscoelastic") || iEquals(value, "viscoelasticity")) {
                 return LocalOpType::Viscoelasticity;
+            } else if (iEquals(value, "poisson_viscoelastic") ||
+                      iEquals(value, "poisson_viscoelasticity")) {
+                return LocalOpType::PoissonViscoelasticity;
             } else {
                 return LocalOpType::Unknown;
             }

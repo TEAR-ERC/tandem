@@ -8,6 +8,7 @@ sys.path.append(
     os.path.join(KERNELS_DIR, '../../submodules/yateto/'))
 sys.path.append(os.path.join(KERNELS_DIR, 'Poisson'))
 sys.path.append(os.path.join(KERNELS_DIR, 'Elasticity'))
+sys.path.append(os.path.join(KERNELS_DIR, 'PoissonViscoelasticity'))
 
 import argparse
 import json
@@ -18,6 +19,8 @@ from yateto.gemm_configuration import GeneratorCollection, Eigen, LIBXSMM
 
 import poisson
 import poisson_adapter
+import poisson_viscoelasticity
+import poisson_viscoelasticity_adapter
 import elasticity
 import elasticity_adapter
 from Viscoelasticity import add as add_viscoelasticity
@@ -56,6 +59,11 @@ elif cmdLineArgs.app == 'viscoelasticity':
                         options['numElementBasisFunctions'],
                         options['numFacetQuadPoints'],
                         options['numElementQuadPoints'], petsc_alignment)
+elif cmdLineArgs.app == 'poisson_viscoelasticity':
+    poisson_viscoelasticity.add(g, options['dim'], options['numFacetBasisFunctions'],
+                                options['numElementBasisFunctions'],
+                                options['numFacetQuadPoints'],
+                                options['numElementQuadPoints'], petsc_alignment)
 elif cmdLineArgs.app == 'poisson_adapter':
     poisson_adapter.add(g, options['dim'], options['numFaultBasisFunctions'],
                         options['numFacetQuadPoints'])
@@ -63,6 +71,10 @@ elif cmdLineArgs.app == 'elasticity_adapter':
     elasticity_adapter.add(g, options['dim'],
                            options['numFaultBasisFunctions'],
                            options['numFacetQuadPoints'])
+elif cmdLineArgs.app == 'poisson_viscoelasticity_adapter':
+    poisson_viscoelasticity_adapter.add(g, options['dim'],
+                                        options['numFaultBasisFunctions'],
+                                        options['numFacetQuadPoints'])
 elif cmdLineArgs.app == 'viscoelasticity_adapter':
     viscoelasticity_adapter.add(g, options['dim'],
                                 options['numFaultBasisFunctions'],

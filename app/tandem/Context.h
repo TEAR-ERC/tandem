@@ -10,6 +10,7 @@
 #include "localoperator/DieterichRuinaBase.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
+#include "localoperator/PoissonViscoelasticity.h"
 #include "localoperator/RateAndState.h"
 #include "tandem/ContextBase.h"
 #include "tandem/FrictionConfig.h"
@@ -30,6 +31,14 @@ template <> struct make_lop<Poisson> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Poisson> const& scenario) {
         return std::make_shared<Poisson>(std::move(cl), scenario.mu(), DGMethod::IP);
+    }
+};
+template <> struct make_lop<PoissonViscoelasticity> {
+    static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                   SeasScenario<PoissonViscoelasticity> const& scenario) {
+        return std::make_shared<PoissonViscoelasticity>(std::move(cl), scenario.mu(),
+                                                         scenario.mu1(), scenario.viscosity(),
+                                                         scenario.theta(), DGMethod::IP);
     }
 };
 template <> struct make_lop<Elasticity> {

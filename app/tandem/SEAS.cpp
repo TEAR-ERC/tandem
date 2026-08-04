@@ -17,6 +17,7 @@
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
 #include "localoperator/RateAndState.h"
+#include "localoperator/PoissonViscoelasticity.h"
 #include "localoperator/Viscoelasticity/Viscoelasticity.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "tandem/Context.h"
@@ -312,7 +313,9 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         effective_max_dt = *ve_time_step;
     }
 
-    if (cfg.type == LocalOpType::Viscoelasticity && effective_max_dt) {
+    bool const is_viscoelastic = cfg.type == LocalOpType::Viscoelasticity ||
+                                 cfg.type == LocalOpType::PoissonViscoelasticity;
+    if (is_viscoelastic && effective_max_dt) {
         if (has_fault) {
             // Use the viscoelastic step only as a ceiling: the step starts from the
             // configured -ts_dt and adapts up to the cap (min(ve cap, PETSc step)), so
@@ -364,7 +367,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         if (cfl_time_step) {
             std::cout << "CFL time step: " << *cfl_time_step << std::endl;
         }
-        if (cfg.type == LocalOpType::Viscoelasticity && ve_time_step) {
+        if (is_viscoelastic && ve_time_step) {
             std::cout << "Viscoelastic time step cap: " << *ve_time_step << std::endl;
         }
     }
@@ -440,6 +443,9 @@ void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config cons
         break;
     case LocalOpType::Viscoelasticity:
         ctx = detail::make_context<Viscoelasticity>(mesh, cfg);
+        break;
+    case LocalOpType::PoissonViscoelasticity:
+        ctx = detail::make_context<PoissonViscoelasticity>(mesh, cfg);
         break;
     default:
         throw std::runtime_error("Unknown seas type");

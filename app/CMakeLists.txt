@@ -165,6 +165,8 @@ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 ## Generate code
 generate_code(poisson)
 generate_code(poisson_adapter)
+generate_code(poisson_viscoelasticity)
+generate_code(poisson_viscoelasticity_adapter)
 generate_code(elasticity)
 generate_code(elasticity_adapter)
 generate_code(viscoelasticity)
@@ -205,6 +207,8 @@ set(APP_COMMON_SRCS
     localoperator/ElasticityAdapter.cpp
     localoperator/Poisson.cpp
     localoperator/PoissonAdapter.cpp
+    localoperator/PoissonViscoelasticity.cpp
+    localoperator/PoissonViscoelasticityAdapter.cpp
     localoperator/Viscoelasticity/init.cpp
     localoperator/Viscoelasticity/precompute.cpp
     localoperator/Viscoelasticity/assembly.cpp
@@ -232,6 +236,8 @@ target_link_libraries(app-common PUBLIC
     ${LAPACK_LIBRARIES}
     poisson-kernels-lib
     poisson_adapter-kernels-lib
+    poisson_viscoelasticity-kernels-lib
+    poisson_viscoelasticity_adapter-kernels-lib
     elasticity-kernels-lib
     elasticity_adapter-kernels-lib
     viscoelasticity-kernels-lib
