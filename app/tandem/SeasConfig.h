@@ -28,10 +28,10 @@ struct OutputConfig {
     double t_min;
     double t_max;
     std::optional<double> v_th;
-    bool high_freq;
+    std::optional<int> freq;
 
     AdaptiveOutputInterval make_adaptive_output_interval() const {
-        return AdaptiveOutputInterval(atol, rtol, t_min, t_max, v_th, high_freq);
+        return AdaptiveOutputInterval(atol, rtol, t_min, t_max, v_th, freq);
     }
 };
 

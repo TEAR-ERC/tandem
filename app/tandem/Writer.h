@@ -48,15 +48,17 @@ public:
     virtual bool has_static_writer() const { return false; }
 
     /// True when this writer produces one event_N folder per v_th excursion (see name()).
-    inline bool event_mode() const { return oi_.v_th().has_value() && oi_.high_freq(); }
+    inline bool event_mode() const { return oi_.v_th().has_value() && oi_.freq().has_value(); }
 
     inline bool is_write_required(double time, double VMax) const {
         if (auto v_th = oi_.v_th()) {
-            if (oi_.high_freq()) {
-                // High-frequency mode: write on every monitor step for as long as
-                // VMax stays at or above the threshold, resuming the single
-                // edge-triggered behavior once VMax drops back below it.
-                return VMax >= *v_th;
+            if (auto freq = oi_.freq()) {
+                // Periodic mode: write every freq-th monitor step for as long as VMax
+                // stays at or above the threshold, instead of every single step, to
+                // bound how much output an excursion can produce. freq_step_count_ is
+                // advanced once per monitor step by prepare_step(), which must run
+                // before this is called.
+                return VMax >= *v_th && (freq_step_count_ % static_cast<std::size_t>(*freq) == 0);
             }
             // Threshold triggered output: write once each time VMax rises through the
             // threshold. last_seen_VMax_ holds VMax from the previous monitor
@@ -79,13 +81,15 @@ public:
     inline void observe(double VMax) { last_seen_VMax_ = VMax; }
 
     /**
-     * @brief Advance event-folder bookkeeping for high_freq + v_th output.
+     * @brief Advance event-folder and periodic-write bookkeeping for freq + v_th output.
      *
      * Must be called exactly once per monitor step, for every writer, before
      * any is_write_required()/write() calls for that step (i.e. before
      * observe() updates last_seen_VMax_). Detects the rising edge of a new
      * v_th excursion so that name() can immediately target a fresh event_N
-     * folder starting at step 0. No-op unless both v_th and high_freq are set.
+     * folder starting at step 0, and advances freq_step_count_ so
+     * is_write_required() can decide whether this step lands on a freq
+     * multiple. No-op unless both v_th and freq are set.
      */
     inline void prepare_step(double VMax) {
         if (!event_mode()) {
@@ -99,6 +103,9 @@ public:
             }
             event_started_ = true;
             event_step_ = 0;
+            freq_step_count_ = 0;
+        } else if (VMax >= v_th) {
+            ++freq_step_count_;
         }
     }
 
@@ -123,7 +130,7 @@ public:
 
 protected:
     // Every excursion of VMax above v_th (until it drops back below) is one "event". In
-    // high_freq mode, each event's files are grouped into their own event_N subfolder
+    // freq mode, each event's files are grouped into their own event_N subfolder
     // (event_0, event_1, ...), numbered in the order events occur, with step numbering
     // (the "_<step>" filename suffix) restarting at 0 for each event.
     inline std::string name() const {
@@ -152,6 +159,7 @@ protected:
     std::size_t event_index_ = 0;
     std::size_t event_step_ = 0;
     bool event_started_ = false;
+    std::size_t freq_step_count_ = 0;
 };
 
 template <std::size_t D> class FaultProbeWriter : public Writer {
