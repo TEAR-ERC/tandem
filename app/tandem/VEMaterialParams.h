@@ -72,15 +72,21 @@ class PoissonViscoelasticity;
 
 // Unlike VEMaterialParams<Viscoelasticity>, there is no separate "relaxation_time"
 // field: PoissonViscoelasticity derives tau = eta / mu1 per material node (see
-// PoissonViscoelasticity.h), and mu0 comes from SeasScenario's generic mu().
+// PoissonViscoelasticity.h). mu0 has its own dedicated "mu0" Lua field here,
+// same as VEMaterialParams<Viscoelasticity>::Mu0 -- it must NOT be read via
+// SeasScenario's generic mu() (that reads a "mu" field, not "mu0").
 template <> struct VEMaterialParams<PoissonViscoelasticity> {
     using functional_t = LuaLib::functional_t<DomainDimension, 1>;
 
+    static constexpr char Mu0[] = "mu0";
     static constexpr char Mu1[] = "mu1";
     static constexpr char Viscosity[] = "viscosity";
     static constexpr char Theta[] = "theta";
 
     void load(LuaLib& lib, std::string const& scenario) {
+        if (lib.hasMember(scenario, Mu0)) {
+            mu0_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu0);
+        }
         if (lib.hasMember(scenario, Mu1)) {
             mu1_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu1);
         }
@@ -96,6 +102,7 @@ template <> struct VEMaterialParams<PoissonViscoelasticity> {
         }
     }
 
+    auto const& mu0() const { return mu0_; }
     auto const& mu1() const { return mu1_; }
     auto const& viscosity() const { return viscosity_; }
     double theta() const { return theta_; }
@@ -107,6 +114,7 @@ private:
         };
     }
 
+    functional_t mu0_ = constant_functional(1.0);
     functional_t mu1_ = constant_functional(1.0);
     functional_t viscosity_ = constant_functional(1.0);
     double theta_ = 0.1;
