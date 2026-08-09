@@ -214,13 +214,29 @@ endif()
 add_library(app-common ${APP_COMMON_SRCS})
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
-    ${LAPACK_LIBRARIES}
     poisson-kernels-lib
     poisson_adapter-kernels-lib
     elasticity-kernels-lib
     elasticity_adapter-kernels-lib
     tandem-lib
     PETSc::PETSc)
+
+# On Cray/LUMI, find_package(LAPACK) fails to resolve the required paths,
+# and the compiler wrappers don't implicitly link LibSci for this C++ target.
+# We must explicitly map the shared libraries to prevent link-time errors.
+if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
+    message(STATUS "LUMI Environment detected. Mapping LibSci shared libraries directly.")
+    target_link_libraries(app-common PUBLIC
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd.so"
+        "$ENV{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_amd_mpi.so"
+    )
+    target_link_options(app-common PUBLIC "-Wl,--allow-shlib-undefined")
+else()
+    if(LAPACK_FOUND)
+        target_link_libraries(app-common PUBLIC ${LAPACK_LIBRARIES})
+    endif()
+endif()
+
 target_include_directories(app-common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 ## Static solver
