@@ -62,6 +62,11 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                 }
                 };
                 writer->increase_step(time, VMax);
+                // Single-shot v_th mode (v_th set, freq unset): one snapshot has been
+                // written, so ask the time integrator to stop the run.
+                if (writer->stop_after_write()) {
+                    stop_requested_ = true;
+                }
             }
         }
 
@@ -137,6 +142,11 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                 }
                 };
                 writer->increase_step(time, VMax);
+                // Single-shot v_th mode (v_th set, freq unset): one snapshot has been
+                // written, so ask the time integrator to stop the run.
+                if (writer->stop_after_write()) {
+                    stop_requested_ = true;
+                }
             }
         }
 

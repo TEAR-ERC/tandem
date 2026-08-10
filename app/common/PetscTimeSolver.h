@@ -147,6 +147,13 @@ private:
             x);
 
         std::apply([&self, &time](auto&... xv) { self->monitor(time, xv...); }, x_view);
+
+        // A single-shot v_th writer (v_th set, freq unset) captures one snapshot and then
+        // asks to stop. Signal the integrator to end TSSolve cleanly after this step. The
+        // request is driven by the globally reduced VMax, so it is identical on every rank.
+        if (self->stop_requested()) {
+            CHKERRTHROW(TSSetConvergedReason(ts, TS_CONVERGED_USER));
+        }
         return 0;
     }
 

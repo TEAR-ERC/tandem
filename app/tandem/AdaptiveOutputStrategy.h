@@ -37,6 +37,10 @@ public:
      * step for as long as VMax >= v_th, rather than just once on the rising edge
      * (see Writer::is_write_required). This bounds how much output an excursion
      * above v_th can produce.
+     *
+     * When v_th() is set but this is left unset, the writer is in single-shot
+     * mode: it writes exactly one snapshot on the first rising crossing of v_th
+     * and the run is then stopped (see Writer::stop_after_write).
      */
     std::optional<int> freq() const { return freq_; }
 

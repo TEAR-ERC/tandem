@@ -33,6 +33,15 @@ public:
     auto min_time_step() const { return dt_min_; }
     auto max_time_step() const { return dt_max_; }
 
+    /**
+     * @brief True once a single-shot v_th writer (v_th set, freq unset) has written.
+     *
+     * The time integrator polls this after each monitor call and stops the run cleanly
+     * once it becomes true (see PetscTimeSolver::MonitorFunction). Driven by the globally
+     * reduced VMax, so it is set identically on every rank.
+     */
+    bool stop_requested() const { return stop_requested_; }
+
 protected:
     double reduce_VMax(double VMax_local, MPI_Comm comm);
 
@@ -40,6 +49,7 @@ protected:
 
     std::vector<std::unique_ptr<Writer>> writers_;
     bool fsal_;
+    bool stop_requested_ = false;
 
 private:
     double last_time_ = std::numeric_limits<double>::lowest();

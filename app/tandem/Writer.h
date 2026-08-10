@@ -50,6 +50,19 @@ public:
     /// True when this writer produces one event_N folder per v_th excursion (see name()).
     inline bool event_mode() const { return oi_.v_th().has_value() && oi_.freq().has_value(); }
 
+    /**
+     * @brief True when this writer is in single-shot threshold mode: v_th set, freq unset.
+     *
+     * In this mode the writer emits exactly one snapshot, on the first upward crossing
+     * of v_th, after which the run is aborted: the monitor raises a stop request that the
+     * time integrator honors (see Monitor::stop_requested / PetscTimeSolver). This grabs a
+     * single pseudo-checkpoint of the fault state at the onset of the first seismic event
+     * and then stops. When freq is set instead, the run keeps going and keeps sampling.
+     */
+    inline bool stop_after_write() const {
+        return oi_.v_th().has_value() && !oi_.freq().has_value();
+    }
+
     inline bool is_write_required(double time, double VMax) const {
         if (auto v_th = oi_.v_th()) {
             if (auto freq = oi_.freq()) {
