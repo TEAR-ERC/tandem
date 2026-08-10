@@ -379,6 +379,49 @@ SolveBenchResult benchmarkSolve(LocalSimplexMesh<DomainDimension> const& mesh,
 }
 
 // ---------------------------------------------------------------------------
+// dump_fault_node_coords — write the global fault node coordinates next to the GF
+// checkpoint so offline tools can reconstruct the cluster tree the operator uses.
+//
+// The gather is a plain rank-order concatenation of the per-rank
+// [(e*nbf + n) * D + d] blocks, which is exactly how StrumpackGFFullOperator builds
+// its own global_coords (see build_spatial_permutation's Allgatherv). Global node
+// index i in this file therefore addresses GF rows [i*D, (i+1)*D) and GF columns
+// [i*slip_D, (i+1)*slip_D) — any other ordering would silently mis-associate
+// coordinates with matrix entries.
+//
+// Format: Np*D PetscReal, no header, PETSc binary (big-endian). This is the same
+// convention gf-strumpack-synthetic's --coords expects.
+// ---------------------------------------------------------------------------
+static void dump_fault_node_coords(MPI_Comm comm, std::vector<PetscReal> const& local_coords,
+                                   int D, char const* path) {
+    int rank, n_ranks;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &n_ranks);
+
+    const int local_len = static_cast<int>(local_coords.size());
+    std::vector<int> rcounts(n_ranks), displs(n_ranks);
+    CHKERRTHROW(MPI_Allgather(&local_len, 1, MPI_INT, rcounts.data(), 1, MPI_INT, comm));
+    PetscInt total = 0;
+    for (int r = 0; r < n_ranks; ++r) {
+        displs[r] = static_cast<int>(total);
+        total += rcounts[r];
+    }
+
+    std::vector<PetscReal> global_coords(total);
+    CHKERRTHROW(MPI_Allgatherv(local_coords.data(), local_len, MPIU_REAL, global_coords.data(),
+                               rcounts.data(), displs.data(), MPIU_REAL, comm));
+
+    if (rank == 0) {
+        PetscViewer viewer;
+        CHKERRTHROW(PetscViewerBinaryOpen(PETSC_COMM_SELF, path, FILE_MODE_WRITE, &viewer));
+        CHKERRTHROW(PetscViewerBinaryWrite(viewer, global_coords.data(), total, PETSC_REAL));
+        CHKERRTHROW(PetscViewerDestroy(&viewer));
+        std::cout << "  Wrote " << path << ": " << total / D << " nodes x " << D
+                  << " coords\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // validateGFStrumpackFull — compress the full D*Np x slip_D*Np GF as one HODLR
 // matrix, report MatVec counts, compression ratio, and apply accuracy.
 // ---------------------------------------------------------------------------
@@ -420,6 +463,8 @@ double validateGFStrumpackFull(LocalSimplexMesh<DomainDimension> const& mesh,
 
     GreensFunctionIndices ind(*seasop);
     MPI_Comm comm = seasop->comm();
+
+    dump_fault_node_coords(comm, local_coords, DomainDimension, "gf_coords.bin");
 
     PetscInt M_gf, N_gf;
     CHKERRQ(MatGetSize(G, &M_gf, &N_gf));
