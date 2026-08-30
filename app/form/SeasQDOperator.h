@@ -74,6 +74,18 @@ public:
     void rhs(double time, BlockVector const& state, BlockVector& result);
 
     /*
+     * @brief Tell the operator whether the time integrator has the FSAL property.
+     *
+     * With First-Same-As-Last the tableau's final row of A equals b, so the last RK
+     * stage is Y[s-1] = y_n + h sum_j b[j] YdotRHS[j] = y_{n+1}, evaluated at
+     * t + h*c[s-1] = t + h. The final rhs() of an accepted step therefore already
+     * solved at exactly the accepted solution, and post_step can reuse that
+     * displacement instead of solving again. MonitorQD already relies on this same
+     * property when it passes state_changed_since_last_rhs = !fsal.
+     */
+    inline void set_fsal(bool fsal) { fsal_ = fsal; }
+
+    /*
      * @brief Prepare the operator for a step of size dt before its RHS is evaluated.
      *
      * Called from the time integrator for every RK stage with the step currently
@@ -151,6 +163,12 @@ protected:
     void solve(double time, BlockView const& state_view);
     void update_traction(BlockView const& state_view);
 
+    // True when linear_solver_.x() already holds the solve for `time` under an FSAL
+    // integrator, i.e. the final RK stage of this step solved at the accepted state.
+    inline bool solution_is_current(double time) const {
+        return fsal_ && solution_valid_ && solve_time_ == time;
+    }
+
 private:
     std::unique_ptr<dg_t> dgop_;
     PetscLinearSolver linear_solver_;
@@ -168,6 +186,12 @@ private:
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;
 
     double last_time_ = 0.0;
+
+    // Cache describing what linear_solver_.x() currently holds: the displacement
+    // solved for solve_time_, valid until the operator itself changes.
+    bool fsal_ = false;
+    bool solution_valid_ = false;
+    double solve_time_ = 0.0;
 
 protected:
     PetscVector traction_;

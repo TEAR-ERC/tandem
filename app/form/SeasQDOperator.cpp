@@ -33,6 +33,8 @@ void SeasQDOperator::prepare_for_dt(double dt) {
     // viscoelasticity without a fault.
     if (dgop_->update_time_step(dt)) {
         linear_solver_.reassemble(*dgop_);
+        // The matrix changed, so whatever x() holds is no longer its solution.
+        solution_valid_ = false;
     }
 }
 
@@ -118,8 +120,25 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
 
     // Ensure displacement corresponds to the accepted TS solution at this time,
     // independent of monitor output frequency.
-    update_ghost_state(state);
-    solve(time, make_state_view(state));
+    //
+    // Under an FSAL tableau this solve is redundant: the last row of A equals b, so
+    // the final stage is Y[s-1] = y_n + h sum_j b[j] YdotRHS[j] -- the step's own
+    // solution -- evaluated at t + h*c[s-1] = t + h. rhs() therefore already solved
+    // at exactly this state and x() still holds that displacement. TSPostStep runs
+    // before TSMonitor, and nothing between the final stage and here touches the
+    // operator (post_step's own prepare_for_dt uses the same dt the stages did), so
+    // the cached solve is still the current one.
+    //
+    // Y[s-1] and the vector TSEvaluateStep builds are equal in exact arithmetic but
+    // summed in a different order (VecMAXPY chunks by nv & 0x3, so s-1 and s terms
+    // group differently), hence they can differ in the last ulp. Reusing the stage
+    // solve is therefore a round-off-level change, not a bit-identical one.
+    //
+    // Without FSAL, Y[s-1] != y_{n+1} and the solve here is mandatory.
+    if (!solution_is_current(time)) {
+        update_ghost_state(state);
+        solve(time, make_state_view(state));
+    }
 
     // Calculate and set the actual dt for this timestep
     double dt = time - last_time_;
@@ -151,6 +170,8 @@ void SeasQDOperator::solve(double time, BlockView const& state_view) {
     dgop_->set_slip(invalid_slip_bc());
     disp_scatter_.begin_scatter(linear_solver_.x(), disp_ghost_);
     disp_scatter_.wait_scatter();
+    solve_time_ = time;
+    solution_valid_ = true;
 }
 
 void SeasQDOperator::update_traction(BlockView const& state_view) {
