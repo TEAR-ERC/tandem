@@ -199,7 +199,6 @@ void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t el
     auto g_val =
         compute_g_dt(dt_viscoelastic_, relaxation_time_global(), /*taylor expansion terms*/ 200);
     auto ratio_val = std::exp(-dt_viscoelastic_/relaxation_time_global());
-    std::fill(g_dt_data, g_dt_data + fctRule.size(), g_val);
     std::fill(g_dt_data, g_dt_data + volRule.size(), g_val);
     std::fill(ratio_data, ratio_data + volRule.size(), ratio_val);
 
