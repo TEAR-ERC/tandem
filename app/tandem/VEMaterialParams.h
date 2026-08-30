@@ -24,6 +24,7 @@ template <> struct VEMaterialParams<Viscoelasticity> {
     static constexpr char Viscosity[] = "viscosity";
     static constexpr char RelaxationTime[] = "relaxation_time";
     static constexpr char Theta[] = "theta";
+    static constexpr char GTol[] = "g_tol";
 
     void load(LuaLib& lib, std::string const& scenario) {
         if (lib.hasMember(scenario, Mu0)) {
@@ -46,6 +47,17 @@ template <> struct VEMaterialParams<Viscoelasticity> {
         if (theta_ <= 0.0) {
             throw std::runtime_error("Invalid '" + std::string(Theta) + "' value in " + scenario);
         }
+
+        // Reassembly threshold on g(dt); see DGOperator::update_time_step. Bounds the
+        // relative perturbation of the effective moduli A(dt), B(dt) by ~g_tol/g(theta).
+        // Set to 0 to fall back to the legacy gate on the relative change in dt.
+        if (lib.hasMember(scenario, GTol)) {
+            gTol_ = lib.getMemberConstant(scenario, GTol);
+            if (gTol_ < 0.0) {
+                throw std::runtime_error("Invalid '" + std::string(GTol) + "' value in " +
+                                         scenario);
+            }
+        }
     }
 
     auto const& mu0() const { return mu0_; }
@@ -53,6 +65,7 @@ template <> struct VEMaterialParams<Viscoelasticity> {
     auto const& viscosity() const { return viscosity_; }
     auto const& relaxation_time() const { return relaxationTime_; }
     double theta() const { return theta_; }
+    double g_tol() const { return gTol_; }
 
 private:
     static functional_t constant_functional(double v) {
@@ -66,6 +79,7 @@ private:
     functional_t viscosity_ = constant_functional(1.0);
     functional_t relaxationTime_ = constant_functional(1.0);
     double theta_ = 0.0;
+    double gTol_ = 1.0e-8;
 };
 
 class PoissonViscoelasticity;
