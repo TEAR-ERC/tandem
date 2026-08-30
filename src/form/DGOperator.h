@@ -85,6 +85,17 @@ public:
     template <class T>
     using update_time_dependent_precomputation_boundary_t =
         decltype(&T::update_time_dependent_precomputation_boundary);
+    // Operators that can report g(dt) separately from dt opt in to the g-based
+    // reassembly gate; the others keep the legacy gate on the relative change in dt.
+    template <class T> using viscoelastic_g_t = decltype(&T::viscoelastic_g);
+    template <class T>
+    using update_ratio_precomputation_volume_t = decltype(&T::update_ratio_precomputation_volume);
+    template <class T>
+    using update_ratio_precomputation_skeleton_t =
+        decltype(&T::update_ratio_precomputation_skeleton);
+    template <class T>
+    using update_ratio_precomputation_boundary_t =
+        decltype(&T::update_ratio_precomputation_boundary);
 
     // Stress output methods
     template <class T> using compute_stress_field_t = decltype(&T::compute_stress_field);
@@ -482,17 +493,57 @@ public:
             if (fault_present_) {
                 // Viscoelasticity with a fault: the bulk solve follows the actual
                 // (cap-limited, adaptive) RSF/PETSc step. The stiffness matrix depends on
-                // dt via A_dt/B_dt, so when the step changes we recompute the
-                // time-dependent coefficients and signal that the matrix must be
-                // reassembled. This is free while dt is steady (e.g. pinned at the cap
-                // during the interseismic phase) and only pays its cost during fault slip.
+                // dt only through g(dt) = (1 - exp(-dt/tau))/(dt/tau), via
+                // A(dt) = lam + (2/3) mu1 (1 - g) and B(dt) = mu0 + mu1 g, so g -- not dt
+                // -- is what decides whether the matrix has actually moved.
+                //
+                // The distinction matters because the RSF controller varies dt over ~11
+                // decades while g stays pinned at 1 - dt/(2 tau) + O((dt/tau)^2) for the
+                // whole coseismic phase: at dt = 1 ms and tau = 25 yr, g differs from 1 in
+                // the 13th decimal. Gating on dt therefore reassembles the entire DG
+                // stiffness matrix every single step of a rupture to chase a change that
+                // is below round-off in the coefficients it feeds.
+                //
+                // Freezing g at g_asm perturbs the effective moduli by dg relative (at
+                // most dg/g(theta), i.e. ~1.1 dg for theta <= 0.2), and because the
+                // comparison is always against the value the matrix was *built* with, the
+                // error is bounded by g_tol rather than accumulating over steps. Crucially
+                // the same frozen g feeds the matrix, the history right-hand side and the
+                // partial-strain update alike, so the scheme stays the intended one --
+                // exp-integrator with parameter g_asm -- rather than an inconsistent mix.
+                if (dt <= 0.0) {
+                    return false;
+                }
+                if constexpr (std::experimental::is_detected_v<viscoelastic_g_t,
+                                                               LocalOperator>) {
+                    double const g_tol = lop_->viscoelastic_g_tol();
+                    if (g_tol > 0.0) {
+                        double g_diff = lop_->viscoelastic_g(dt) - lop_->get_viscoelastic_g();
+                        if (g_diff < 0.0) {
+                            g_diff = -g_diff;
+                        }
+                        if (g_diff > g_tol) {
+                            lop_->set_viscoelastic_time_step_value(dt);
+                            update_time_dependent_precomputation();
+                            return true;
+                        }
+                        // Matrix stands, but ratio = exp(-dt/tau) must still follow dt
+                        // exactly -- it only enters the history terms on the RHS.
+                        if (dt != lop_->get_viscoelastic_time_step()) {
+                            lop_->set_viscoelastic_dt_keep_g(dt);
+                            update_ratio_precomputation();
+                        }
+                        return false;
+                    }
+                }
+                // g_tol <= 0 (or an operator without viscoelastic_g): legacy dt gate.
                 double const current = lop_->get_viscoelastic_time_step();
                 double diff = dt - current;
                 if (diff < 0.0) {
                     diff = -diff;
                 }
                 double const scale = dt > current ? dt : current;
-                if (dt > 0.0 && diff > 1.0e-12 * scale) {
+                if (diff > 1.0e-12 * scale) {
                     lop_->set_viscoelastic_time_step_value(dt);
                     update_time_dependent_precomputation();
                     return true;
@@ -687,6 +738,34 @@ private:
                                       update_time_dependent_precomputation_boundary_t,
                                       LocalOperator>) {
                         lop_->update_time_dependent_precomputation_boundary(fctNo);
+                    }
+                }
+            }
+        }
+    }
+
+    void update_ratio_precomputation() {
+        if constexpr (std::experimental::is_detected_v<update_ratio_precomputation_volume_t,
+                                                       LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numElements(); ++elNo) {
+                lop_->update_ratio_precomputation_volume(elNo);
+            }
+        }
+        if constexpr (std::experimental::is_detected_v<update_ratio_precomputation_skeleton_t,
+                                                       LocalOperator> ||
+                      std::experimental::is_detected_v<update_ratio_precomputation_boundary_t,
+                                                       LocalOperator>) {
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                auto const& info = topo_->info(fctNo);
+                if (info.up[0] != info.up[1]) {
+                    if constexpr (std::experimental::is_detected_v<
+                                      update_ratio_precomputation_skeleton_t, LocalOperator>) {
+                        lop_->update_ratio_precomputation_skeleton(fctNo);
+                    }
+                } else {
+                    if constexpr (std::experimental::is_detected_v<
+                                      update_ratio_precomputation_boundary_t, LocalOperator>) {
+                        lop_->update_ratio_precomputation_boundary(fctNo);
                     }
                 }
             }

@@ -195,11 +195,8 @@ void Viscoelasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 
 void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t elNo) {
     auto g_dt_data = volPre[elNo].get<g_dt_Q>().data();
-    auto ratio_data = volPre[elNo].get<ratio_Q>().data();
-    auto g_val = compute_g_dt(dt_viscoelastic_, relaxation_time_global());
-    auto ratio_val = std::exp(-dt_viscoelastic_ / relaxation_time_global());
-    std::fill(g_dt_data, g_dt_data + volRule.size(), g_val);
-    std::fill(ratio_data, ratio_data + volRule.size(), ratio_val);
+    std::fill(g_dt_data, g_dt_data + volRule.size(), g_dt_);
+    update_ratio_precomputation_volume(elNo);
 
     kernel::precomputeVolumeAB krnl_pre_ab;
     krnl_pre_ab.lam_W_J_Q = volPre[elNo].get<lam_W_J_Q>().data();
@@ -214,11 +211,8 @@ void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t el
 void Viscoelasticity::update_time_dependent_precomputation_surface(std::size_t fctNo,
                                                                    int numSides) {
     auto g_dt_data = fctPre[fctNo].get<g_dt_q>().data();
-    auto ratio_data = fctPre[fctNo].get<ratio_q>().data();
-    auto g_val = compute_g_dt(dt_viscoelastic_, relaxation_time_global());
-    auto ratio_val = std::exp(-dt_viscoelastic_ / relaxation_time_global());
-    std::fill(g_dt_data, g_dt_data + fctRule.size(), g_val);
-    std::fill(ratio_data, ratio_data + fctRule.size(), ratio_val);
+    std::fill(g_dt_data, g_dt_data + fctRule.size(), g_dt_);
+    update_ratio_precomputation_boundary(fctNo);
 
     kernel::precomputeSurfaceAB krnl_ab;
     krnl_ab.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
@@ -245,6 +239,28 @@ void Viscoelasticity::update_time_dependent_precomputation_skeleton(std::size_t 
 
 void Viscoelasticity::update_time_dependent_precomputation_boundary(std::size_t fctNo) {
     update_time_dependent_precomputation_surface(fctNo, 1);
+}
+
+// Ratio-only sweeps.
+//
+// ratio = exp(-dt/tau) governs how much of the existing memory variable relaxes away
+// during the step, so it has to follow dt exactly: freezing it would decouple the
+// relaxation from wall-clock time and annihilate (or preserve) q over a long run of
+// short steps. It appears only in the history terms on the right-hand side, never in
+// A_dt/B_dt, so refreshing it does not invalidate the assembled matrix.
+
+void Viscoelasticity::update_ratio_precomputation_volume(std::size_t elNo) {
+    auto ratio_data = volPre[elNo].get<ratio_Q>().data();
+    std::fill(ratio_data, ratio_data + volRule.size(), ratio_dt_);
+}
+
+void Viscoelasticity::update_ratio_precomputation_boundary(std::size_t fctNo) {
+    auto ratio_data = fctPre[fctNo].get<ratio_q>().data();
+    std::fill(ratio_data, ratio_data + fctRule.size(), ratio_dt_);
+}
+
+void Viscoelasticity::update_ratio_precomputation_skeleton(std::size_t fctNo) {
+    update_ratio_precomputation_boundary(fctNo);
 }
 
 } // namespace tndm

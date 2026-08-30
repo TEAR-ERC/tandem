@@ -51,9 +51,11 @@ template <> struct make_lop<Elasticity> {
 template <> struct make_lop<Viscoelasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<Viscoelasticity> const& scenario) {
-        return std::make_shared<Viscoelasticity>(
+        auto lop = std::make_shared<Viscoelasticity>(
             std::move(cl), scenario.lam(), scenario.mu0(), scenario.mu1(), scenario.viscosity(),
             scenario.relaxation_time(), scenario.theta(), scenario.rho(), DGMethod::IP);
+        lop->set_viscoelastic_g_tol(scenario.g_tol());
+        return lop;
     }
 };
 

@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -187,15 +188,44 @@ public:
         relaxation_time_global_ = relaxation_time;
     }
     void set_viscoelastic_time_step(double relaxation_time) {
-        dt_viscoelastic_ = theta_ * relaxation_time;
+        set_viscoelastic_time_step_value(theta_ * relaxation_time);
     }
     // Set the viscoelastic time step directly to dt (used when it follows the
     // adaptive RSF/PETSc step rather than the fixed theta * tau cap).
-    void set_viscoelastic_time_step_value(double dt) { dt_viscoelastic_ = dt; }
+    // Refreshes both ratio = exp(-dt/tau) and the frozen g(dt).
+    void set_viscoelastic_time_step_value(double dt) {
+        set_viscoelastic_dt_keep_g(dt);
+        g_dt_ = viscoelastic_g(dt);
+    }
+    // Advance dt (and hence ratio = exp(-dt/tau), which must always track the step
+    // exactly or the memory variable decays at the wrong rate) while leaving the
+    // frozen g(dt) -- and therefore A_dt/B_dt and the assembled matrix -- untouched.
+    void set_viscoelastic_dt_keep_g(double dt) {
+        dt_viscoelastic_ = dt;
+        ratio_dt_ = (dt > 0.0 && relaxation_time_global_ > 0.0)
+                        ? std::exp(-dt / relaxation_time_global_)
+                        : 1.0;
+    }
     inline double get_viscoelastic_time_step() const { return dt_viscoelastic_; }
+
+    // g(dt) at the *current* step, versus the value the coefficients are frozen at.
+    double viscoelastic_g(double dt) const { return compute_g_dt(dt, relaxation_time_global_); }
+    inline double get_viscoelastic_g() const { return g_dt_; }
+    inline double get_viscoelastic_ratio() const { return ratio_dt_; }
+
+    // Rebuild threshold on g. |dg| bounds the relative error introduced in the
+    // effective moduli A(dt), B(dt) (see set_viscoelastic_g_tol callers).
+    // <= 0 restores the legacy gate on the relative change in dt itself.
+    void set_viscoelastic_g_tol(double tol) { g_tol_ = tol; }
+    inline double viscoelastic_g_tol() const { return g_tol_; }
+
     void update_time_dependent_precomputation_volume(std::size_t elNo);
     void update_time_dependent_precomputation_skeleton(std::size_t fctNo);
     void update_time_dependent_precomputation_boundary(std::size_t fctNo);
+    // Cheap sweep: refresh only ratio = exp(-dt/tau). No A_dt/B_dt, no reassembly.
+    void update_ratio_precomputation_volume(std::size_t elNo);
+    void update_ratio_precomputation_skeleton(std::size_t fctNo);
+    void update_ratio_precomputation_boundary(std::size_t fctNo);
 
 private:
     template <bool WithRHS>
@@ -265,6 +295,11 @@ private:
     double theta_ = 0.0;
     double relaxation_time_global_ = 0.0;
     double dt_viscoelastic_ = 0.0;
+    // g(dt) the coefficients A_dt/B_dt and every history term are currently frozen at,
+    // and the exact exp(-dt/tau) for the current step.
+    double g_dt_ = 0.0;
+    double ratio_dt_ = 1.0;
+    double g_tol_ = 1.0e-8;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
     std::optional<facet_functional_t> fun_slip = std::nullopt;
