@@ -196,9 +196,8 @@ void Viscoelasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t elNo) {
     auto g_dt_data = volPre[elNo].get<g_dt_Q>().data();
     auto ratio_data = volPre[elNo].get<ratio_Q>().data();
-    auto g_val =
-        compute_g_dt(dt_viscoelastic_, relaxation_time_global(), /*taylor expansion terms*/ 200);
-    auto ratio_val = std::exp(-dt_viscoelastic_/relaxation_time_global());
+    auto g_val = compute_g_dt(dt_viscoelastic_, relaxation_time_global());
+    auto ratio_val = std::exp(-dt_viscoelastic_ / relaxation_time_global());
     std::fill(g_dt_data, g_dt_data + volRule.size(), g_val);
     std::fill(ratio_data, ratio_data + volRule.size(), ratio_val);
 
@@ -216,9 +215,8 @@ void Viscoelasticity::update_time_dependent_precomputation_surface(std::size_t f
                                                                    int numSides) {
     auto g_dt_data = fctPre[fctNo].get<g_dt_q>().data();
     auto ratio_data = fctPre[fctNo].get<ratio_q>().data();
-    auto g_val =
-        compute_g_dt(dt_viscoelastic_, relaxation_time_global(), /*taylor expansion terms*/ 200);
-    auto ratio_val = std::exp(-dt_viscoelastic_/relaxation_time_global());
+    auto g_val = compute_g_dt(dt_viscoelastic_, relaxation_time_global());
+    auto ratio_val = std::exp(-dt_viscoelastic_ / relaxation_time_global());
     std::fill(g_dt_data, g_dt_data + fctRule.size(), g_val);
     std::fill(ratio_data, ratio_data + fctRule.size(), ratio_val);
 

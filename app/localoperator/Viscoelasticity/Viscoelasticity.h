@@ -218,7 +218,7 @@ private:
     bool bc_free_slip(std::size_t fctNo, BC bc, double f_q_raw[]) const;
 
     void transpose_JInv(std::size_t fctNo, int side);
-    double compute_g_dt(double dt, double tau, int) const;
+    double compute_g_dt(double dt, double tau) const;
     void update_time_dependent_precomputation_surface(std::size_t fctNo, int numSides);
     void precompute_facet_material(std::size_t fctNo, FacetInfo const& info, int numSides);
     void compute_lift_boundary(std::size_t fctNo, FacetInfo const& info, double* L_q0) const;

@@ -94,20 +94,17 @@ g(Δt) = (τ/Δt)(1 − exp(−Δt/τ)) = (1 − exp(−r))/r,  r = Δt/τ
 
 Uses expm1 for stable evaluation when r is small.
 */
-double Viscoelasticity::compute_g_dt(double dt, double tau, int n) const {
+double Viscoelasticity::compute_g_dt(double dt, double tau) const {
     if (dt <= 0.0 || tau <= 0.0) {
         return 0.0;
     }
-    double sum = 0.0;
-    double ratio = -dt / tau;
-    double factorial = 1.0;
-
-    for (int i = 1; i < n; ++i) {
-        factorial *= i; // compute i!
-        sum += (1.0 / factorial) * std::pow(ratio, i - 1);
+    double const r = dt / tau;
+    if (r == 0.0) { // r underflowed; g(0) = 1
+        return 1.0;
     }
-
-    return sum;
+    // -expm1(-r) == 1 - exp(-r) evaluated without the cancellation that the naive
+    // form suffers as r -> 0 (the coseismic regime, where r ~ 1e-12).
+    return -std::expm1(-r) / r;
 }
 
 // Mass matrix utilities
