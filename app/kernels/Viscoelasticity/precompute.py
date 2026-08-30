@@ -69,12 +69,11 @@ def add(generator, t):
         # Effective Lamé params at volume quad pts, W*J-scaled, from g(Δt):
         #   A(Δt) = lam_W_J + (2/3) mu1_W_J (1 - g_dt)
         #   B(Δt) = mu0_W_J + mu1_W_J * g_dt
-        # Note: 2/3 approximated as 0.67 matching the reference implementation.
         [
             t.A_dt["q"]
             <= (
                 t.lam_W_J_Q["q"]
-                + 0.67 * (t.mu1_W_J_Q["q"] - t.g_dt_Q["q"] * t.mu1_W_J_Q["q"])
+                + (2.0 / 3.0) * (t.mu1_W_J_Q["q"] - t.g_dt_Q["q"] * t.mu1_W_J_Q["q"])
             ),
             t.B_dt["q"] <= t.mu0_W_J_Q["q"] + t.mu1_W_J_Q["q"] * t.g_dt_Q["q"],
         ],
@@ -87,7 +86,10 @@ def add(generator, t):
         #   B(Δt) = μ₀ + μ₁ g(Δt)
         [
             t.A_dt_unscaled["q"]
-            <= (t.lam_Q["q"] + 0.67 * (t.mu1_Q["q"] - t.g_dt_Q["q"] * t.mu1_Q["q"])),
+            <= (
+                t.lam_Q["q"]
+                + (2.0 / 3.0) * (t.mu1_Q["q"] - t.g_dt_Q["q"] * t.mu1_Q["q"])
+            ),
             t.B_dt_unscaled["q"] <= t.mu0_Q["q"] + t.mu1_Q["q"] * t.g_dt_Q["q"],
         ],
     )
@@ -123,7 +125,7 @@ def add(generator, t):
             t.A_dt_q[x]["q"]
             <= (
                 t.lam_q[x]["q"]
-                + 0.67 * (t.mu1_q[x]["q"] - t.mu1_q[x]["q"] * t.g_dt_q["q"])
+                + (2.0 / 3.0) * (t.mu1_q[x]["q"] - t.mu1_q[x]["q"] * t.g_dt_q["q"])
             ),
             t.B_dt_q[x]["q"] <= t.mu0_q[x]["q"] + t.mu1_q[x]["q"] * t.g_dt_q["q"],
         ],
@@ -195,9 +197,6 @@ def add(generator, t):
                 * t.E_q[0]["lq"]
                 * t.n_q["sq"]
             ),
-            t.L_q[0]["liuq"]
-            <= (
-                t.test_normal(0) * t.E_q[0]["mq"] * t.Lift[0]["lsm"]
-            ),
+            t.L_q[0]["liuq"] <= (t.test_normal(0) * t.E_q[0]["mq"] * t.Lift[0]["lsm"]),
         ],
     )
