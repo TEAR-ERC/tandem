@@ -17,7 +17,7 @@ Where:
 
 Effective stiffness tensor:
     Ĉ_ijkl(Δt) = A(Δt) δ_ij δ_kl + B(Δt)(δ_ik δ_jl + δ_il δ_jk)
-    A(Δt) = λ + (2/3)(μ₁ - μ₁ g(Δt))      [≈ lam + 0.67*(mu1 - mu1*g)]
+    A(Δt) = λ + (2/3)(μ₁ - μ₁ g(Δt))
     B(Δt) = μ₀ + μ₁ g(Δt)
 
 Time integration scalars (computed once per step in C++, passed as tensors):
