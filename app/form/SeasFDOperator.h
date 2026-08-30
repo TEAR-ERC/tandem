@@ -75,6 +75,8 @@ public:
     void initial_condition(BlockVector& v, BlockVector& u, BlockVector& s);
     // No-op: the fully dynamic operator is elastic and does not reassemble per step.
     inline void prepare_for_dt(double) {}
+    // No-op: the FD operator keeps no cached bulk solve to reuse across stages.
+    inline void set_fsal(bool) {}
     void rhs(double time, BlockVector const& v, BlockVector const& u, BlockVector const& s,
              BlockVector& dv, BlockVector& du, BlockVector& ds);
 
