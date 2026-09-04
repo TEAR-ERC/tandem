@@ -514,8 +514,7 @@ public:
                 if (dt <= 0.0) {
                     return false;
                 }
-                if constexpr (std::experimental::is_detected_v<viscoelastic_g_t,
-                                                               LocalOperator>) {
+                if constexpr (std::experimental::is_detected_v<viscoelastic_g_t, LocalOperator>) {
                     double const g_tol = lop_->viscoelastic_g_tol();
                     if (g_tol > 0.0) {
                         double g_diff = lop_->viscoelastic_g(dt) - lop_->get_viscoelastic_g();
@@ -555,8 +554,7 @@ public:
             // Use the same change-detection logic as the fault path so the
             // truncated last step gets correct g_dt, ratio, and B_dt.
             {
-                double const theta_dt =
-                    lop_->viscoelastic_theta() * relaxation_time_global_;
+                double const theta_dt = lop_->viscoelastic_theta() * relaxation_time_global_;
                 double const current = lop_->get_viscoelastic_time_step();
                 double diff = dt - current;
                 if (diff < 0.0)
