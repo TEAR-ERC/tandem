@@ -16,8 +16,8 @@
 #include "localoperator/DieterichRuinaSlip.h"
 #include "localoperator/Elasticity.h"
 #include "localoperator/Poisson.h"
-#include "localoperator/RateAndState.h"
 #include "localoperator/PoissonViscoelasticity.h"
+#include "localoperator/RateAndState.h"
 #include "localoperator/Viscoelasticity/Viscoelasticity.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "tandem/Context.h"
@@ -313,8 +313,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         effective_max_dt = *ve_time_step;
     }
 
-    bool const is_viscoelastic = cfg.type == LocalOpType::Viscoelasticity ||
-                                 cfg.type == LocalOpType::PoissonViscoelasticity;
+    bool const is_viscoelastic =
+        cfg.type == LocalOpType::Viscoelasticity || cfg.type == LocalOpType::PoissonViscoelasticity;
     if (is_viscoelastic && effective_max_dt) {
         if (has_fault) {
             // Use the viscoelastic step only as a ceiling: the step starts from the
