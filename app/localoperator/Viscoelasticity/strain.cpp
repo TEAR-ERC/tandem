@@ -306,12 +306,12 @@ void Viscoelasticity::initialize_partial_strain_q(std::size_t fctNo) {
     auto& hist = strainHistory_q[fctNo];
     kernel::updateStrain_q krnl;
     for (int side = 0; side < 2; ++side) {
-        krnl.old_strain_tensor_q(side) =
-            (side == 0) ? hist.get<partial_strain_new_q_0>().data()->data()
-                        : hist.get<partial_strain_new_q_1>().data()->data();
-        krnl.new_strain_tensor_q(side) =
-            (side == 0) ? hist.get<deviatoric_strain_new_q_0>().data()->data()
-                        : hist.get<deviatoric_strain_new_q_1>().data()->data();
+        krnl.old_strain_tensor_q(side) = (side == 0)
+                                             ? hist.get<partial_strain_new_q_0>().data()->data()
+                                             : hist.get<partial_strain_new_q_1>().data()->data();
+        krnl.new_strain_tensor_q(side) = (side == 0)
+                                             ? hist.get<deviatoric_strain_new_q_0>().data()->data()
+                                             : hist.get<deviatoric_strain_new_q_1>().data()->data();
         krnl.execute(side);
     }
 }
