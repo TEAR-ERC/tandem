@@ -143,45 +143,42 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Mesh size: " << mesh_size << std::endl;
     }
 
-    sw.start();
+
+
+    if (rank == 0) {
+        std::cout << "Solver warmup: " << time << " s" << std::endl;
+    }
     auto solver =
         PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
-
+    
+    sw.start();
+    solver.warmup();
+    time = sw.stop();
 
     PetscVector b(dgop.block_size(),
                 topo->numLocalElements(),
                 topo->comm()); // create petsc vector b with block size and number of local elements
 
+    std::size_t sourceNumber = 0;
+    std::size_t numSources = sourceTags.size();
+
     for (auto sourceTag : sourceTags) {
-        std::cout << "\nSource tag = "
-                << sourceTag
-                << std::endl;
+
+        ++sourceNumber;
+
+        if (rank == 0) {
+            std::cout << "\n----------------------------------------\n";
+            std::cout << "Working on source "
+                    << sourceNumber << " / " << numSources
+                    << "  [facet tag = " << sourceTag << "]"
+                    << std::endl;
+        }
 
         b.set_zero();
 
-        dgop.rhs(b,sourceTag);
-
-        PetscReal bnorm;
-        CHKERRTHROW(VecNorm(b.vec(), NORM_2, &bnorm));
-
-        std::cout << "RHS norm = "
-                << bnorm
-                << std::endl;
+        dgop.rhs(b, sourceTag);
     }
 
-
-    time = sw.stop();
-    if (rank == 0) {
-        std::cout << "Assembly: " << time << " s" << std::endl;
-    }
-
-sw.start();
-solver.warmup();
-time = sw.stop();
-
-if (rank == 0) {
-    std::cout << "Solver warmup: " << time << " s" << std::endl;
-}
 
 PetscLogStagePush(solve);
 
