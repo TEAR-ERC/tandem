@@ -67,6 +67,66 @@ struct Config {
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
+template <class DGOp>
+bool solve_source(
+    DGOp& dgop,
+    PetscLinearSolver& solver,
+    PetscVector& b,
+    long int sourceTag
+) {
+    // Build RHS for this source
+    b.set_zero();
+    dgop.rhs(b, sourceTag);
+
+    // Solve A x = b
+    CHKERRTHROW(
+        KSPSolve(
+            solver.ksp(),
+            b.vec(),
+            solver.x().vec()
+        )
+    );
+
+    return solver.is_converged();
+}
+
+template <class DGOp, class CurvilinearType>
+void write_vtu(
+    DGOp& dgop,
+    PetscLinearSolver& solver,
+    std::shared_ptr<CurvilinearType> const& cl,
+    std::string const& filename,
+    bool writeDisplacement = true,
+    bool writeParameters = true
+) {
+    VTUWriter<DomainDimension> writer(
+        PolynomialDegree,
+        true,
+        PETSC_COMM_WORLD
+    );
+
+    auto adapter =
+        CurvilinearVTUAdapter(
+            cl,
+            dgop.num_local_elements()
+        );
+
+    auto& piece = writer.addPiece(adapter);
+
+    if (writeDisplacement) {
+        auto numeric = dgop.solution(solver.x());
+        piece.addPointData(numeric);
+        piece.addJacobianData(numeric, adapter);
+    }
+
+    if (writeParameters) {
+        auto coeffs = dgop.params();
+        piece.addPointData(coeffs);
+    }
+
+    writer.write(filename);
+}
+
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
@@ -145,102 +205,69 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
 
 
-    if (rank == 0) {
-        std::cout << "Solver warmup: " << time << " s" << std::endl;
-    }
+
     auto solver =
         PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
     
     sw.start();
     solver.warmup();
     time = sw.stop();
+    
+    if (rank == 0) {
+        std::cout << "Solver warmup: " << time << " s" << std::endl;
+    }
 
     PetscVector b(dgop.block_size(),
                 topo->numLocalElements(),
                 topo->comm()); // create petsc vector b with block size and number of local elements
+
 
     std::size_t sourceNumber = 0;
     std::size_t numSources = sourceTags.size();
 
     for (auto sourceTag : sourceTags) {
 
-        ++sourceNumber;
+        std::size_t sourceIndex = sourceNumber;
+
+        sw.start();
+
+        bool converged =
+            solve_source(
+                dgop,
+                solver,
+                b,
+                sourceTag
+            );
+
+        time = sw.stop();
+
+        if (!converged) {
+            if (rank == 0) {
+                std::cout << "Source "
+                        << sourceNumber + 1 << " / " << numSources
+                        << " failed to converge."
+                        << std::endl;
+            }
+
+            ++sourceNumber;
+            continue;
+        }
 
         if (rank == 0) {
-            std::cout << "\n----------------------------------------\n";
-            std::cout << "Working on source "
-                    << sourceNumber << " / " << numSources
-                    << "  [facet tag = " << sourceTag << "]"
+            std::cout << "Solved source "
+                    << sourceNumber + 1 << " / " << numSources
+                    << " in " << time << " s"
                     << std::endl;
         }
+        //std::string filename = *cfg.output + "_" + std::to_string(sourceIndex) + "_" + std::to_string(sourceTag);
+        // write_vtu(dgop, solver, cl, filename, true, true);
 
-        b.set_zero();
-
-        dgop.rhs(b, sourceTag);
+        ++sourceNumber;
     }
 
+    if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
 
-PetscLogStagePush(solve);
 
-sw.start();
-
-CHKERRTHROW(
-    KSPSolve(
-        solver.ksp(),
-        b.vec(),
-        solver.x().vec()
-    )
-);
-
-time = sw.stop();
-
-if (rank == 0) {
-    std::cout << "Solve: " << time << " s" << std::endl;
-}
-
-PetscLogStagePop();
-    if (!solver.is_converged()) {
-        std::cout << "Solver did not converge." << std::endl;
-        return;
-    }
-
-    PetscReal rnorm;
-    PetscInt its;
-    CHKERRTHROW(KSPGetResidualNorm(solver.ksp(), &rnorm));
-    CHKERRTHROW(KSPGetIterationNumber(solver.ksp(), &its));
-    if (rank == 0) {
-        std::cout << "Residual norm: " << rnorm << std::endl;
-        std::cout << "Iterations: " << its << std::endl;
-    }
-
-    auto numeric = dgop.solution(solver.x());
-    auto solution = scenario.solution();
-    if (solution) {
-        double error =
-            tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "L2 error: " << error << std::endl;
-        }
-    }
-    auto solution_jacobian = scenario.solution_jacobian();
-    if (solution_jacobian) {
-        double error = tndm::Error<DomainDimension>::H1_semi(*cl, numeric, *solution_jacobian, 0,
-                                                             PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "H1-semi error: " << error << std::endl;
-        }
-    }
-
-    if (cfg.output) {
-        auto coeffs = dgop.params();
-        VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
-        auto& piece = writer.addPiece(adapter);
-        piece.addPointData(numeric);
-        piece.addJacobianData(numeric, adapter);
-        piece.addPointData(coeffs);
-        writer.write(*cfg.output);
-    }
 }
 
 int main(int argc, char** argv) {
