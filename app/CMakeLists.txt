@@ -229,6 +229,12 @@ add_executable(static static.cpp)
 target_link_libraries(static PRIVATE app-common)
 target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
+## sTsGF solver
+
+add_executable(sTsGF sTsGF.cpp)
+target_link_libraries(sTsGF PRIVATE app-common)
+target_include_directories(sTsGF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
 ## Tandem
 
 add_executable(tandem

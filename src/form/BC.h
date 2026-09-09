@@ -7,10 +7,10 @@ enum class BC : int { None = 0, Natural = 1, Fault = 3, Dirichlet = 5, Unknown =
 
 // TODO: Choose these ranges as decided
 inline constexpr long DIRICHLET_MIN = 5;
-inline constexpr long DIRICHLET_MAX = 5;
+inline constexpr long DIRICHLET_MAX = 500000;
 inline constexpr long DIRICHLET_DEFAULT = 5;
-inline constexpr long FAULT_MIN = 6;
-inline constexpr long FAULT_MAX = 1000;
+inline constexpr long FAULT_MIN = 3;
+inline constexpr long FAULT_MAX = 3;
 inline constexpr long FAULT_DEFAULT = 3;
 inline constexpr long NATURAL_MIN = 1;
 inline constexpr long NATURAL_MAX = 1;
