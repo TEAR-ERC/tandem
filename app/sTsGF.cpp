@@ -47,7 +47,7 @@
 #include <utility>
 #include <vector>
 #include "common/PetscVector.h"
-
+#include <set>
 using namespace tndm;
 
 struct Config {
@@ -84,6 +84,17 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+
+    std::set<long int> sourceTags;
+
+    for (std::size_t fctNo = 0; fctNo < topo->numLocalFacets(); ++fctNo) {
+        auto const& info = topo->info(fctNo);
+
+        if (info.bc == BC::Dirichlet) {
+            sourceTags.insert(info.facetTag);
+        }
+    }
+
     auto dgop = DGOperator(topo, std::move(lop));
 
     const auto reduce_number = [&topo](std::size_t number) {
@@ -141,8 +152,22 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                 topo->numLocalElements(),
                 topo->comm()); // create petsc vector b with block size and number of local elements
 
-    b.set_zero(); // set to zero
-    dgop.rhs(b); //ask dg to compute b
+    for (auto sourceTag : sourceTags) {
+        std::cout << "\nSource tag = "
+                << sourceTag
+                << std::endl;
+
+        b.set_zero();
+
+        dgop.rhs(b);
+
+        PetscReal bnorm;
+        CHKERRTHROW(VecNorm(b.vec(), NORM_2, &bnorm));
+
+        std::cout << "RHS norm = "
+                << bnorm
+                << std::endl;
+    }
 
 
     time = sw.stop();
