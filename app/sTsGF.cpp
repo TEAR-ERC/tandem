@@ -462,10 +462,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         if (cfg.output) {
             std::string datasetName = std::to_string(sourceTag);
             auto dset = h5->createExtendibleDataset(datasetName, H5T_IEEE_F64LE,
-                                                     {receiverPoints.size(), 3},
-                                                     {receiverPoints.size(), 3}, 0, true);
+                                                     {receiverGrid.ny, receiverGrid.nx, 3},
+                                                     {receiverGrid.ny, receiverGrid.nx, 3}, 0, true);
             h5->writeToDataset(dset, H5T_IEEE_F64LE, 0, receiverDisplacement.data(),
-                               {receiverPoints.size(), 3}, 0, 0, true);
+                               {receiverGrid.ny, receiverGrid.nx, 3}, 0, 0, true);
             h5->closeDataset(dset);
         }
 

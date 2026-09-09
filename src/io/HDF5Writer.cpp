@@ -1,6 +1,7 @@
 #include "HDF5Writer.h"
 #include <iostream>
 #include <stdexcept>
+#include <algorithm>
 
 namespace tndm {
 
@@ -80,7 +81,30 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
     H5Sclose(dataspace);
     return dset; // Caller must close later
 }
+hid_t HDF5Writer::createFixedDataset(const std::string_view name, hid_t type,
+                                     std::vector<hsize_t> dims) {
+    if (!is_open_)
+        throw std::runtime_error("HDF5Writer: file is not open");
 
+    hid_t dataspace = H5Screate_simple(dims.size(), dims.data(), nullptr);
+
+    if (dataspace < 0)
+        throw std::runtime_error("HDF5Writer: Failed to create dataspace for dataset '" +
+                                 std::string(name) + "'");
+
+    std::string datasetName(name);
+
+    hid_t dset = H5Dcreate(file_, datasetName.c_str(), type, dataspace, H5P_DEFAULT,
+                           H5P_DEFAULT, H5P_DEFAULT);
+
+    H5Sclose(dataspace);
+
+    if (dset < 0)
+        throw std::runtime_error("HDF5Writer: Failed to create fixed dataset '" +
+                                 datasetName + "'");
+
+    return dset;
+}
 void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const void* data,
                                 std::vector<hsize_t> dims, int glueDimension,
                                 int extensibleDimension, bool isDistributed) {
@@ -149,6 +173,76 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     H5Sclose(filespace);
 }
 
+
+void HDF5Writer::writeToDatasetPoints(hid_t dset, hid_t type,
+                                      std::vector<hsize_t> const& coordinates,
+                                      const void* data) {
+    if (!is_open_)
+        throw std::runtime_error("HDF5Writer: file is not open");
+
+    hid_t filespace = H5Dget_space(dset);
+
+    if (filespace < 0)
+        throw std::runtime_error("HDF5Writer: Failed to get dataset dataspace");
+
+    int ndims = H5Sget_simple_extent_ndims(filespace);
+
+    if (ndims <= 0) {
+        H5Sclose(filespace);
+        throw std::runtime_error("HDF5Writer: Invalid dataset dimensionality");
+    }
+
+    if (coordinates.size() % static_cast<std::size_t>(ndims) != 0) {
+        H5Sclose(filespace);
+        throw std::runtime_error("HDF5Writer: Point coordinates have wrong dimensionality");
+    }
+
+    hsize_t nPoints = coordinates.size() / static_cast<std::size_t>(ndims);
+
+    if (nPoints > 0) {
+        if (data == nullptr) {
+            H5Sclose(filespace);
+            throw std::runtime_error("HDF5Writer: Non-empty point selection has null data");
+        }
+
+        herr_t status = H5Sselect_elements(filespace, H5S_SELECT_SET, nPoints,
+                                           coordinates.data());
+
+        if (status < 0) {
+            H5Sclose(filespace);
+            throw std::runtime_error("HDF5Writer: Failed to select dataset points on rank " +
+                                     std::to_string(rank_));
+        }
+    } else {
+        H5Sselect_none(filespace);
+    }
+
+    hsize_t memDims[1] = {std::max<hsize_t>(nPoints, 1)};
+    hid_t memspace = H5Screate_simple(1, memDims, nullptr);
+
+    if (nPoints == 0)
+        H5Sselect_none(memspace);
+
+    hid_t plist = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist, H5FD_MPIO_COLLECTIVE);
+
+    /*
+     * HDF5 1.10 still requires a non-null buffer argument even for ranks
+     * whose memory/file selections are empty.
+     */
+    double dummy = 0.0;
+    const void* buffer = nPoints > 0 ? data : static_cast<const void*>(&dummy);
+
+    herr_t status = H5Dwrite(dset, type, memspace, filespace, plist, buffer);
+
+    H5Pclose(plist);
+    H5Sclose(memspace);
+    H5Sclose(filespace);
+
+    if (status < 0)
+        throw std::runtime_error("HDF5Writer: Error writing point selection on rank " +
+                                 std::to_string(rank_));
+}
 void HDF5Writer::closeDataset(hid_t dset) { H5Dclose(dset); }
 
 std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t localElements) {
@@ -180,6 +274,14 @@ void HDF5Writer::writeToDataset(hid_t, hid_t, hsize_t, const void*, std::vector<
 }
 void HDF5Writer::closeDataset(hid_t) { throw std::runtime_error(errMsg); }
 std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t) {
+    throw std::runtime_error(errMsg);
+}
+
+hid_t HDF5Writer::createFixedDataset(const std::string_view, hid_t, std::vector<hsize_t>) {
+    throw std::runtime_error(errMsg);
+}
+
+void HDF5Writer::writeToDatasetPoints(hid_t, hid_t, std::vector<hsize_t> const&, const void*) {
     throw std::runtime_error(errMsg);
 }
 
