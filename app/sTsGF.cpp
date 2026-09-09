@@ -174,7 +174,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     for (std::size_t fctNo = 0; fctNo < topo->numLocalFacets(); ++fctNo) {
         auto const& info = topo->info(fctNo);
 
-        if (info.facetTag >= MIN_GF && info.facetTag <= MAX_GF) sourceTags.insert(info.facetTag);
+        if (info.bc == BC::Dirichlet && info.facetTag >= MIN_GF && info.facetTag <= MAX_GF) sourceTags.insert(info.facetTag);
     }
 
     int mpiSize;
@@ -261,57 +261,53 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                 topo->comm()); // create petsc vector b with block size and number of local elements
 
 
-    std::size_t sourceNumber = 0;
-    std::size_t numSources = sourceTags.size();
+   std::size_t sourceNumber = 0;
+std::size_t numSources = sourceTags.size();
+std::unique_ptr<HDF5Writer> h5;
 
-    for (auto sourceTag : sourceTags) {
+if (cfg.output) h5 = std::make_unique<HDF5Writer>(*cfg.output, topo->comm());
 
-        std::size_t sourceIndex = sourceNumber;
+for (auto sourceTag : sourceTags) {
 
-        sw.start();
+    std::size_t sourceIndex = sourceNumber;
 
-        bool converged =
-            solve_source(
-                dgop,
-                solver,
-                b,
-                sourceTag
-            );
+    sw.start();
+    bool converged = solve_source(dgop, solver, b, sourceTag);
+    time = sw.stop();
 
-        time = sw.stop();
-
-        if (!converged) {
-            if (rank == 0) {
-                std::cout << "Source "
-                        << sourceNumber + 1 << " / " << numSources
-                        << " failed to converge."
-                        << std::endl;
-            }
-
-            ++sourceNumber;
-            continue;
-        }
-
+    if (!converged) {
         if (rank == 0) {
-            std::cout << "Solved source "
-                    << sourceNumber + 1 << " / " << numSources
-                    << " in " << time << " s"
-                    << std::endl;
+            std::cout << "Source "
+                      << sourceNumber + 1 << " / " << numSources
+                      << " failed to converge."
+                      << std::endl;
         }
-        //std::string filename = *cfg.output + "_" + std::to_string(sourceIndex) + "_" + std::to_string(sourceTag);
-        // write_vtu(dgop, solver, cl, filename, true, true);
 
         ++sourceNumber;
+        continue;
     }
 
-    if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
+    if (rank == 0) {
+        std::cout << "Solved source "
+                  << sourceNumber + 1 << " / " << numSources
+                  << " in " << time << " s"
+                  << std::endl;
+    }
+
+    std::vector<double> receiverDisplacement(naturalPoints.size() * 3, 0.0);
+
     if (cfg.output) {
-    HDF5Writer h5(*cfg.output, PETSC_COMM_WORLD);
-    hsize_t n = naturalPoints.size();
-    auto dset = h5.createExtendibleDataset("natural_points", H5T_IEEE_F64LE, {n, DomainDimension}, {n, DomainDimension}, 0, true);
-    h5.writeToDataset(dset, H5T_IEEE_F64LE, 0, naturalPoints.data(), {n, DomainDimension}, 0, 0, true);
-    h5.closeDataset(dset);
+        std::string datasetName = std::to_string(sourceTag);
+        auto dset = h5->createExtendibleDataset(datasetName, H5T_IEEE_F64LE, {naturalPoints.size(), 3}, {naturalPoints.size(), 3}, 0, true);
+        h5->writeToDataset(dset, H5T_IEEE_F64LE, 0, receiverDisplacement.data(), {naturalPoints.size(), 3}, 0, 0, true);
+        h5->closeDataset(dset);
+    }
+
+    ++sourceNumber;
 }
+
+    if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
+    
 
 }
 
