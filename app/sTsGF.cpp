@@ -48,6 +48,9 @@
 #include <vector>
 #include "common/PetscVector.h"
 #include <set>
+#include "io/HDF5Writer.h"
+#include "mesh/MeshData.h"
+
 using namespace tndm;
 
 struct Config {
@@ -127,6 +130,26 @@ void write_vtu(
     writer.write(filename);
 }
 
+template <class MeshType, class TopoType, class TransformType>
+std::vector<std::array<double, DomainDimension>> get_natural_points(MeshType const& mesh, TopoType const& topo, TransformType const& transform) {
+    std::set<std::size_t> vertexIds;
+
+    for (std::size_t fctNo = 0; fctNo < topo.numLocalFacets(); ++fctNo) {
+        if (topo.info(fctNo).facetTag != RECEIVER_SURFACE) continue;
+        auto ids = mesh.template downward<0, DomainDimension - 1>(fctNo);
+        vertexIds.insert(ids.begin(), ids.end());
+    }
+
+    auto vertexData = dynamic_cast<VertexData<DomainDimension> const*>(mesh.vertices().data());
+    if (!vertexData) throw std::runtime_error("Vertex data not available.");
+
+    std::vector<std::array<double, DomainDimension>> points;
+    for (auto id : vertexIds) points.push_back(transform(vertexData->getVertices()[id]));
+
+    return points;
+}
+
+
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
@@ -144,16 +167,32 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+    auto naturalPoints = get_natural_points(mesh, *topo, scenario.transform());
 
     std::set<long int> sourceTags;
 
     for (std::size_t fctNo = 0; fctNo < topo->numLocalFacets(); ++fctNo) {
         auto const& info = topo->info(fctNo);
 
-        if (info.bc == BC::Dirichlet) {
-            sourceTags.insert(info.facetTag);
-        }
+        if (info.facetTag >= MIN_GF && info.facetTag <= MAX_GF) sourceTags.insert(info.facetTag);
     }
+
+    int mpiSize;
+    MPI_Comm_size(topo->comm(), &mpiSize);
+
+    std::vector<long int> localTags(sourceTags.begin(), sourceTags.end());
+    int nLocal = localTags.size();
+
+    std::vector<int> counts(mpiSize);
+    MPI_Allgather(&nLocal, 1, MPI_INT, counts.data(), 1, MPI_INT, topo->comm());
+
+    std::vector<int> displs(mpiSize, 0);
+    for (int i = 1; i < mpiSize; ++i) displs[i] = displs[i - 1] + counts[i - 1];
+
+    std::vector<long int> allTags(displs.back() + counts.back());
+    MPI_Allgatherv(localTags.data(), nLocal, MPI_LONG, allTags.data(), counts.data(), displs.data(), MPI_LONG, topo->comm());
+
+    sourceTags = std::set<long int>(allTags.begin(), allTags.end());
 
     auto dgop = DGOperator(topo, std::move(lop));
 
@@ -266,7 +305,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     }
 
     if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
-
+    if (cfg.output) {
+    HDF5Writer h5(*cfg.output, PETSC_COMM_WORLD);
+    hsize_t n = naturalPoints.size();
+    auto dset = h5.createExtendibleDataset("natural_points", H5T_IEEE_F64LE, {n, DomainDimension}, {n, DomainDimension}, 0, true);
+    h5.writeToDataset(dset, H5T_IEEE_F64LE, 0, naturalPoints.data(), {n, DomainDimension}, 0, 0, true);
+    h5.closeDataset(dset);
+}
 
 }
 
