@@ -159,7 +159,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
         b.set_zero();
 
-        dgop.rhs(b);
+        dgop.rhs(b,sourceTag);
 
         PetscReal bnorm;
         CHKERRTHROW(VecNorm(b.vec(), NORM_2, &bnorm));
