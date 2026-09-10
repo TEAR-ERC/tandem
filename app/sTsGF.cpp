@@ -72,6 +72,7 @@ struct Config {
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
+    std::size_t receiver_grid_resolution;
 };
 
 struct ReceiverPoint {
@@ -321,7 +322,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     auto naturalPoints = get_natural_points(mesh, *topo, scenario.transform());
 
     auto receiverGrid =
-        make_regular_xy_grid(naturalPoints, 100, topo->comm());
+        make_regular_xy_grid(naturalPoints, cfg.receiver_grid_resolution, topo->comm());
 
     auto receiverPoints =
         project_grid_to_receiver_surface(
@@ -990,6 +991,15 @@ int main(int argc, char** argv) {
         &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
+
+    schema.add_value(
+        "receiver_grid_resolution",
+        &Config::receiver_grid_resolution)
+        .default_value(100)
+        .validator([](auto&& x) {
+            return x >= 2;
+        })
+        .help("Number of receiver-grid points along the longest horizontal dimension.");
 
     auto& genMeshSchema =
         schema.add_table(
