@@ -24,7 +24,9 @@ public:
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
-    template <std::size_t Q> using functional_direction_t = typename LuaLib::template functional_t_direction<DomainDimension, Q>;
+    template <std::size_t Q>
+    using functional_direction_t =
+        typename LuaLib::template functional_t_direction<DomainDimension, Q>;
 
     constexpr static char Warp[] = "warp";
     constexpr static char Force[] = "force";
@@ -84,7 +86,9 @@ public:
 
     void enable_directional_boundary(std::string const& scenario) {
         if (lib_.hasMember(scenario, Boundary)) {
-            boundary_direction_ = lib_.getMemberFunction<DomainDimension, NumQuantities, true, true>(scenario, Boundary);
+            boundary_direction_ =
+                lib_.getMemberFunction<DomainDimension, NumQuantities, true, true>(scenario,
+                                                                                   Boundary);
         }
     }
     std::unique_ptr<SolutionInterface> solution() const {

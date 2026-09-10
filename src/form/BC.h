@@ -20,7 +20,6 @@ inline constexpr long RECEIVER_SURFACE = 100;
 inline constexpr long MIN_GF = 500;
 inline constexpr long MAX_GF = 50000;
 
-
 inline BC classifyBC(long int tag) {
     if (tag == 0)
         return BC::None;

@@ -571,7 +571,8 @@ bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     return true;
 }
 
-bool Elasticity::bc_skeleton_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const {
+bool Elasticity::bc_skeleton_direction(std::size_t fctNo, BC bc, double f_q_raw[],
+                                       long int direction) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
     if (bc == BC::Fault && fun_slip) {
@@ -583,7 +584,8 @@ bool Elasticity::bc_skeleton_direction(std::size_t fctNo, BC bc, double f_q_raw[
     }
     return true;
 }
-bool Elasticity::bc_boundary_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const {
+bool Elasticity::bc_boundary_direction(std::size_t fctNo, BC bc, double f_q_raw[],
+                                       long int direction) const {
     assert(tensor::f_q::Shape[1] == fctRule.size());
     auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
     if (bc == BC::Fault && fun_slip) {
@@ -724,9 +726,10 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     return true;
 }
 
-
-bool Elasticity::rhs_skeleton_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                              Vector<double>& B1, LinearAllocator<double>& scratch, long int direction) const {
+bool Elasticity::rhs_skeleton_direction(std::size_t fctNo, FacetInfo const& info,
+                                        Vector<double>& B0, Vector<double>& B1,
+                                        LinearAllocator<double>& scratch,
+                                        long int direction) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     if (!bc_skeleton_direction(fctNo, info.bc, f_q_raw, direction)) {
@@ -795,8 +798,9 @@ bool Elasticity::rhs_skeleton_direction(std::size_t fctNo, FacetInfo const& info
     return true;
 }
 
-bool Elasticity::rhs_boundary_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
-                              LinearAllocator<double>& scratch, long int direction) const {
+bool Elasticity::rhs_boundary_direction(std::size_t fctNo, FacetInfo const& info,
+                                        Vector<double>& B0, LinearAllocator<double>& scratch,
+                                        long int direction) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     if (!bc_boundary_direction(fctNo, info.bc, f_q_raw, direction)) {
@@ -1179,7 +1183,7 @@ void Elasticity::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>
     double* res = result.data();
     std::size_t nq = result.size();
 
-    #pragma omp simd
+#pragma omp simd
     for (std::size_t q = 0; q < nq; ++q) {
         res[q] = 0.5 * (mu0[q] + mu1[q]);
     }

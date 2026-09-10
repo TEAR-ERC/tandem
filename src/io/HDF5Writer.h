@@ -29,13 +29,12 @@ public:
     hid_t createFixedDataset(const std::string_view name, hid_t type, std::vector<hsize_t> dims);
 
     void writeToDatasetPoints(hid_t dset, hid_t type, std::vector<hsize_t> const& coordinates,
-                            const void* data);
+                              const void* data);
 
     // Takes the dataset ID as parameter
     void writeToDataset(hid_t dset, hid_t type, hsize_t localElements, const void* data,
                         std::vector<hsize_t> dims, int glueDimension, int extensibleDimension,
                         bool isDistributed = true);
-
 
     // Add explicit close function
     void closeDataset(hid_t dset);

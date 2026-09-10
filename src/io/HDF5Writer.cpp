@@ -1,7 +1,7 @@
 #include "HDF5Writer.h"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
-#include <algorithm>
 
 namespace tndm {
 
@@ -94,14 +94,14 @@ hid_t HDF5Writer::createFixedDataset(const std::string_view name, hid_t type,
 
     std::string datasetName(name);
 
-    hid_t dset = H5Dcreate(file_, datasetName.c_str(), type, dataspace, H5P_DEFAULT,
-                           H5P_DEFAULT, H5P_DEFAULT);
+    hid_t dset = H5Dcreate(file_, datasetName.c_str(), type, dataspace, H5P_DEFAULT, H5P_DEFAULT,
+                           H5P_DEFAULT);
 
     H5Sclose(dataspace);
 
     if (dset < 0)
-        throw std::runtime_error("HDF5Writer: Failed to create fixed dataset '" +
-                                 datasetName + "'");
+        throw std::runtime_error("HDF5Writer: Failed to create fixed dataset '" + datasetName +
+                                 "'");
 
     return dset;
 }
@@ -173,10 +173,8 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     H5Sclose(filespace);
 }
 
-
 void HDF5Writer::writeToDatasetPoints(hid_t dset, hid_t type,
-                                      std::vector<hsize_t> const& coordinates,
-                                      const void* data) {
+                                      std::vector<hsize_t> const& coordinates, const void* data) {
     if (!is_open_)
         throw std::runtime_error("HDF5Writer: file is not open");
 
@@ -205,8 +203,7 @@ void HDF5Writer::writeToDatasetPoints(hid_t dset, hid_t type,
             throw std::runtime_error("HDF5Writer: Non-empty point selection has null data");
         }
 
-        herr_t status = H5Sselect_elements(filespace, H5S_SELECT_SET, nPoints,
-                                           coordinates.data());
+        herr_t status = H5Sselect_elements(filespace, H5S_SELECT_SET, nPoints, coordinates.data());
 
         if (status < 0) {
             H5Sclose(filespace);

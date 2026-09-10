@@ -89,7 +89,8 @@ struct ReceiverGrid {
 };
 
 template <class DGOp>
-bool solve_source(DGOp& dgop, PetscLinearSolver& solver, PetscVector& b, std::set<long int> const& activeTags, long int direction) {
+bool solve_source(DGOp& dgop, PetscLinearSolver& solver, PetscVector& b,
+                  std::set<long int> const& activeTags, long int direction) {
     b.set_zero();
     dgop.rhs(b, activeTags, direction);
     CHKERRTHROW(KSPSolve(solver.ksp(), b.vec(), solver.x().vec()));
@@ -124,16 +125,19 @@ get_natural_points(MeshType const& mesh, TopoType const& topo, TransformType con
     std::set<std::size_t> vertexIds;
 
     for (std::size_t fctNo = 0; fctNo < topo.numLocalFacets(); ++fctNo) {
-        if (topo.info(fctNo).facetTag != RECEIVER_SURFACE) continue;
+        if (topo.info(fctNo).facetTag != RECEIVER_SURFACE)
+            continue;
         auto ids = mesh.template downward<0, DomainDimension - 1>(fctNo);
         vertexIds.insert(ids.begin(), ids.end());
     }
 
     auto vertexData = dynamic_cast<VertexData<DomainDimension> const*>(mesh.vertices().data());
-    if (!vertexData) throw std::runtime_error("Vertex data not available.");
+    if (!vertexData)
+        throw std::runtime_error("Vertex data not available.");
 
     std::vector<std::array<double, DomainDimension>> points;
-    for (auto id : vertexIds) points.push_back(transform(vertexData->getVertices()[id]));
+    for (auto id : vertexIds)
+        points.push_back(transform(vertexData->getVertices()[id]));
 
     return points;
 }
@@ -172,22 +176,32 @@ void add_hdf5_metadata(std::string const& filename, std::set<long int> const& so
     hid_t component = H5Dopen(file, "component", H5P_DEFAULT);
     hid_t z = H5Dopen(file, "z", H5P_DEFAULT);
 
-    if (H5DSset_scale(x, "x") < 0) throw std::runtime_error("H5DSset_scale(x) failed");
-    if (H5DSset_scale(y, "y") < 0) throw std::runtime_error("H5DSset_scale(y) failed");
-    if (H5DSset_scale(direction, "direction") < 0) throw std::runtime_error("H5DSset_scale(direction) failed");
-    if (H5DSset_scale(component, "component") < 0) throw std::runtime_error("H5DSset_scale(component) failed");
+    if (H5DSset_scale(x, "x") < 0)
+        throw std::runtime_error("H5DSset_scale(x) failed");
+    if (H5DSset_scale(y, "y") < 0)
+        throw std::runtime_error("H5DSset_scale(y) failed");
+    if (H5DSset_scale(direction, "direction") < 0)
+        throw std::runtime_error("H5DSset_scale(direction) failed");
+    if (H5DSset_scale(component, "component") < 0)
+        throw std::runtime_error("H5DSset_scale(component) failed");
 
-    if (H5DSattach_scale(z, y, 0) < 0) throw std::runtime_error("attach y to z failed");
-    if (H5DSattach_scale(z, x, 1) < 0) throw std::runtime_error("attach x to z failed");
+    if (H5DSattach_scale(z, y, 0) < 0)
+        throw std::runtime_error("attach y to z failed");
+    if (H5DSattach_scale(z, x, 1) < 0)
+        throw std::runtime_error("attach x to z failed");
 
     for (auto sourceTag : sourceTags) {
         std::string datasetName = std::to_string(sourceTag);
         hid_t dset = H5Dopen(file, datasetName.c_str(), H5P_DEFAULT);
 
-        if (H5DSattach_scale(dset, y, 0) < 0) throw std::runtime_error("attach y failed");
-        if (H5DSattach_scale(dset, x, 1) < 0) throw std::runtime_error("attach x failed");
-        if (H5DSattach_scale(dset, direction, 2) < 0) throw std::runtime_error("attach direction failed");
-        if (H5DSattach_scale(dset, component, 3) < 0) throw std::runtime_error("attach component failed");
+        if (H5DSattach_scale(dset, y, 0) < 0)
+            throw std::runtime_error("attach y failed");
+        if (H5DSattach_scale(dset, x, 1) < 0)
+            throw std::runtime_error("attach x failed");
+        if (H5DSattach_scale(dset, direction, 2) < 0)
+            throw std::runtime_error("attach direction failed");
+        if (H5DSattach_scale(dset, component, 3) < 0)
+            throw std::runtime_error("attach component failed");
 
         H5Dclose(dset);
     }
@@ -199,26 +213,25 @@ void add_hdf5_metadata(std::string const& filename, std::set<long int> const& so
     H5Dclose(x);
     H5Fclose(file);
 }
-std::vector<ReceiverPoint>
-project_grid_to_receiver_surface(
+std::vector<ReceiverPoint> project_grid_to_receiver_surface(
     std::vector<std::array<double, 2>> const& receiverXY,
     std::vector<std::array<double, DomainDimension>> const& surfacePoints,
-    LocalSimplexMesh<DomainDimension> const& mesh,
-    DGOperatorTopo const& topo,
-    std::shared_ptr<Curvilinear<DomainDimension>> const& cl,
-    MPI_Comm comm) {
+    LocalSimplexMesh<DomainDimension> const& mesh, DGOperatorTopo const& topo,
+    std::shared_ptr<Curvilinear<DomainDimension>> const& cl, MPI_Comm comm) {
 
     std::vector<std::size_t> receiverFacets;
 
     for (std::size_t fctNo = 0; fctNo < topo.numLocalFacets(); ++fctNo) {
-        if (topo.info(fctNo).facetTag == RECEIVER_SURFACE) receiverFacets.push_back(fctNo);
+        if (topo.info(fctNo).facetTag == RECEIVER_SURFACE)
+            receiverFacets.push_back(fctNo);
     }
 
     auto pointLocator = std::make_shared<PointLocator<DomainDimension>>(cl);
     BoundaryPointLocator<DomainDimension> surfaceLocator(pointLocator, mesh, receiverFacets);
 
     double zLocal = 0.0;
-    for (auto const& p : surfacePoints) zLocal += p[2];
+    for (auto const& p : surfacePoints)
+        zLocal += p[2];
 
     double nLocal = static_cast<double>(surfacePoints.size());
     double zSum = 0.0;
@@ -252,15 +265,15 @@ project_grid_to_receiver_surface(
     std::vector<ReceiverPoint> receiverPoints;
     receiverPoints.reserve(located.size());
 
-    for (auto const& [id, result] : located) receiverPoints.push_back({id, result.x});
+    for (auto const& [id, result] : located)
+        receiverPoints.push_back({id, result.x});
 
     return receiverPoints;
 }
 
 ReceiverGrid
 make_regular_xy_grid(std::vector<std::array<double, DomainDimension>> const& surfacePoints,
-                     std::size_t N,
-                     MPI_Comm comm) {
+                     std::size_t N, MPI_Comm comm) {
 
     double xminLocal = std::numeric_limits<double>::max();
     double xmaxLocal = std::numeric_limits<double>::lowest();
@@ -310,8 +323,10 @@ make_regular_xy_grid(std::vector<std::array<double, DomainDimension>> const& sur
     grid.y.resize(ny);
     grid.xy.reserve(nx * ny);
 
-    for (std::size_t i = 0; i < nx; ++i) grid.x[i] = xmin + i * dx;
-    for (std::size_t j = 0; j < ny; ++j) grid.y[j] = ymin + j * dy;
+    for (std::size_t i = 0; i < nx; ++i)
+        grid.x[i] = xmin + i * dx;
+    for (std::size_t j = 0; j < ny; ++j)
+        grid.y[j] = ymin + j * dy;
 
     for (std::size_t j = 0; j < ny; ++j) {
         for (std::size_t i = 0; i < nx; ++i) {
@@ -323,20 +338,15 @@ make_regular_xy_grid(std::vector<std::array<double, DomainDimension>> const& sur
     MPI_Comm_rank(comm, &rank);
 
     if (rank == 0) {
-        std::cout << "Receiver grid: "
-                  << nx << " x " << ny
-                  << " = " << nx * ny << " points"
-                  << ", dx = " << dx
-                  << ", dy = " << dy
-                  << std::endl;
+        std::cout << "Receiver grid: " << nx << " x " << ny << " = " << nx * ny << " points"
+                  << ", dx = " << dx << ", dy = " << dy << std::endl;
     }
 
     return grid;
 }
 
 template <class Scenario>
-void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
-                    Scenario const& scenario,
+void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
 
     tndm::Stopwatch sw;
@@ -348,8 +358,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
-    auto cl = std::make_shared<Curvilinear<DomainDimension>>(
-        mesh, scenario.transform(), PolynomialDegree);
+    auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
+                                                             PolynomialDegree);
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
     if (scenario.boundary_direction()) {
@@ -366,31 +376,17 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     auto receiverGrid =
         make_regular_xy_grid(naturalPoints, cfg.receiver_grid_resolution, topo->comm());
 
-    auto receiverPoints =
-        project_grid_to_receiver_surface(
-            receiverGrid.xy,
-            naturalPoints,
-            mesh,
-            *topo,
-            cl,
-            topo->comm());
+    auto receiverPoints = project_grid_to_receiver_surface(receiverGrid.xy, naturalPoints, mesh,
+                                                           *topo, cl, topo->comm());
 
     std::size_t localReceiverCount = receiverPoints.size();
     std::size_t globalReceiverCount = 0;
 
-    MPI_Reduce(
-        &localReceiverCount,
-        &globalReceiverCount,
-        1,
-        mpi_type_t<std::size_t>(),
-        MPI_SUM,
-        0,
-        topo->comm());
+    MPI_Reduce(&localReceiverCount, &globalReceiverCount, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0,
+               topo->comm());
 
     if (rank == 0) {
-        std::cout << "Total number of receiver points:   "
-                  << globalReceiverCount
-                  << std::endl;
+        std::cout << "Total number of receiver points:   " << globalReceiverCount << std::endl;
     }
 
     /*
@@ -414,11 +410,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             throw std::runtime_error("Could not locate receiver point.");
         }
 
-        receiverLocations.push_back({
-            point.gridIndex,
-            result.no,
-            result.xi
-        });
+        receiverLocations.push_back({point.gridIndex, result.no, result.xi});
     }
 
     /*
@@ -427,15 +419,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     std::set<long int> sourceTags;
     std::set<long int> alwaysActiveTags;
 
-
     for (std::size_t fctNo = 0; fctNo < topo->numLocalFacets(); ++fctNo) {
-    auto const& info = topo->info(fctNo);
+        auto const& info = topo->info(fctNo);
 
-    if (info.facetTag >= MIN_GF && info.facetTag <= MAX_GF) sourceTags.insert(info.facetTag);
-    else alwaysActiveTags.insert(info.facetTag);
-}
-
-
+        if (info.facetTag >= MIN_GF && info.facetTag <= MAX_GF)
+            sourceTags.insert(info.facetTag);
+        else
+            alwaysActiveTags.insert(info.facetTag);
+    }
 
     /*
      * Build global source-tag list so every MPI rank enters the same
@@ -449,7 +440,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
 
     std::vector<int> counts(mpiSize);
 
-    MPI_Allgather(&nLocal,1,MPI_INT,counts.data(),1,MPI_INT,topo->comm());
+    MPI_Allgather(&nLocal, 1, MPI_INT, counts.data(), 1, MPI_INT, topo->comm());
 
     std::vector<int> displs(mpiSize, 0);
 
@@ -459,18 +450,17 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
 
     std::vector<long int> allTags(displs.back() + counts.back());
 
-    MPI_Allgatherv(localTags.data(),nLocal,MPI_LONG,allTags.data(),counts.data(),displs.data(), MPI_LONG,topo->comm());
+    MPI_Allgatherv(localTags.data(), nLocal, MPI_LONG, allTags.data(), counts.data(), displs.data(),
+                   MPI_LONG, topo->comm());
 
-    sourceTags = std::set<long int>(
-        allTags.begin(),
-        allTags.end());
+    sourceTags = std::set<long int>(allTags.begin(), allTags.end());
 
     auto dgop = DGOperator(topo, std::move(lop));
 
     const auto reduce_number = [&topo](std::size_t number) {
         std::size_t number_global;
 
-        MPI_Reduce(&number,&number_global, 1,mpi_type_t<std::size_t>(),MPI_SUM, 0,topo->comm());
+        MPI_Reduce(&number, &number_global, 1, mpi_type_t<std::size_t>(), MPI_SUM, 0, topo->comm());
 
         return number_global;
     };
@@ -504,55 +494,32 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
         if (rank == 0) {
             time /= nrepeat;
 
-            std::cout << "Shell time: "
-                      << time << " s"
-                      << std::endl;
+            std::cout << "Shell time: " << time << " s" << std::endl;
 
-            std::cout << "Shell flops: "
-                      << flops_global
-                      << std::endl;
+            std::cout << "Shell flops: " << flops_global << std::endl;
 
-            std::cout << "Shell GFLOPS: "
-                      << flops_global / time * 1e-9
-                      << std::endl;
+            std::cout << "Shell GFLOPS: " << flops_global / time * 1e-9 << std::endl;
         }
 
         CHKERRTHROW(VecDestroy(&x));
         CHKERRTHROW(VecDestroy(&y));
     }
 
-    std::size_t num_dofs_domain =
-        reduce_number(dgop.number_of_local_dofs());
+    std::size_t num_dofs_domain = reduce_number(dgop.number_of_local_dofs());
 
     double local_mesh_size = cl->local_mesh_size();
     double mesh_size;
 
-    MPI_Reduce(
-        &local_mesh_size,
-        &mesh_size,
-        1,
-        mpi_type_t<double>(),
-        MPI_MAX,
-        0,
-        topo->comm());
+    MPI_Reduce(&local_mesh_size, &mesh_size, 1, mpi_type_t<double>(), MPI_MAX, 0, topo->comm());
 
     if (rank == 0) {
-        std::cout << "DOFs: "
-                  << num_dofs_domain
-                  << std::endl;
+        std::cout << "DOFs: " << num_dofs_domain << std::endl;
 
-        std::cout << "Mesh size: "
-                  << mesh_size
-                  << std::endl;
+        std::cout << "Mesh size: " << mesh_size << std::endl;
     }
 
     auto solver =
-        PetscLinearSolver(
-            dgop,
-            cfg.matrix_free,
-            MGConfig(
-                cfg.mg_coarse_level,
-                cfg.mg_strategy));
+        PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
 
     sw.start();
 
@@ -561,15 +528,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     time = sw.stop();
 
     if (rank == 0) {
-        std::cout << "Solver warmup: "
-                  << time << " s"
-                  << std::endl;
+        std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
 
-    PetscVector b(
-        dgop.block_size(),
-        topo->numLocalElements(),
-        topo->comm());
+    PetscVector b(dgop.block_size(), topo->numLocalElements(), topo->comm());
 
     std::size_t sourceNumber = 0;
     std::size_t numSources = sourceTags.size();
@@ -582,21 +544,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
     hid_t directionDset = -1;
 
     if (cfg.output) {
-        h5 = std::make_unique<HDF5Writer>(
-            *cfg.output,
-            topo->comm());
+        h5 = std::make_unique<HDF5Writer>(*cfg.output, topo->comm());
 
         /*
          * ------------------------------------------------------------
          * X coordinate
          * ------------------------------------------------------------
          */
-        xDset = h5->createFixedDataset(
-            "x",
-            H5T_IEEE_F64LE,
-            {receiverGrid.nx});
-
-        
+        xDset = h5->createFixedDataset("x", H5T_IEEE_F64LE, {receiverGrid.nx});
 
         std::vector<hsize_t> xCoordinates;
         std::vector<double> xValues;
@@ -610,13 +565,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             }
         }
 
-        h5->writeToDatasetPoints(
-            xDset,
-            H5T_NATIVE_DOUBLE,
-            xCoordinates,
-            xValues.data());
+        h5->writeToDatasetPoints(xDset, H5T_NATIVE_DOUBLE, xCoordinates, xValues.data());
 
-        directionDset = h5->createFixedDataset("direction", H5T_STD_I32LE, {static_cast<hsize_t>(DomainDimension - 1)});
+        directionDset = h5->createFixedDataset("direction", H5T_STD_I32LE,
+                                               {static_cast<hsize_t>(DomainDimension - 1)});
 
         std::vector<hsize_t> directionCoordinates;
         std::vector<int> directionValues;
@@ -628,19 +580,15 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             }
         }
 
-        h5->writeToDatasetPoints(directionDset, H5T_NATIVE_INT, directionCoordinates, directionValues.data());   
+        h5->writeToDatasetPoints(directionDset, H5T_NATIVE_INT, directionCoordinates,
+                                 directionValues.data());
 
         /*
          * ------------------------------------------------------------
          * Y coordinate
          * ------------------------------------------------------------
          */
-        yDset = h5->createFixedDataset(
-            "y",
-            H5T_IEEE_F64LE,
-            {receiverGrid.ny});
-
-        
+        yDset = h5->createFixedDataset("y", H5T_IEEE_F64LE, {receiverGrid.ny});
 
         std::vector<hsize_t> yCoordinates;
         std::vector<double> yValues;
@@ -654,23 +602,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             }
         }
 
-        h5->writeToDatasetPoints(
-            yDset,
-            H5T_NATIVE_DOUBLE,
-            yCoordinates,
-            yValues.data());
+        h5->writeToDatasetPoints(yDset, H5T_NATIVE_DOUBLE, yCoordinates, yValues.data());
 
         /*
          * ------------------------------------------------------------
          * Displacement component coordinate
          * ------------------------------------------------------------
          */
-        componentDset = h5->createFixedDataset(
-            "component",
-            H5T_STD_I32LE,
-            {3});
-
-        
+        componentDset = h5->createFixedDataset("component", H5T_STD_I32LE, {3});
 
         std::vector<hsize_t> componentCoordinates;
         std::vector<int> componentValues;
@@ -680,11 +619,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             componentValues = {0, 1, 2};
         }
 
-        h5->writeToDatasetPoints(
-            componentDset,
-            H5T_NATIVE_INT,
-            componentCoordinates,
-            componentValues.data());
+        h5->writeToDatasetPoints(componentDset, H5T_NATIVE_INT, componentCoordinates,
+                                 componentValues.data());
 
         /*
          * ------------------------------------------------------------
@@ -697,10 +633,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
          * Each MPI rank writes only the receiver points it owns.
          * ------------------------------------------------------------
          */
-        auto zDset = h5->createFixedDataset(
-            "z",
-            H5T_IEEE_F64LE,
-            {receiverGrid.ny, receiverGrid.nx});
+        auto zDset =
+            h5->createFixedDataset("z", H5T_IEEE_F64LE, {receiverGrid.ny, receiverGrid.nx});
 
         std::vector<hsize_t> zCoordinates;
         std::vector<double> zValues;
@@ -718,13 +652,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             zValues.push_back(receiver.x[2]);
         }
 
-        h5->writeToDatasetPoints(
-            zDset,
-            H5T_NATIVE_DOUBLE,
-            zCoordinates,
-            zValues.data());
-
-
+        h5->writeToDatasetPoints(zDset, H5T_NATIVE_DOUBLE, zCoordinates, zValues.data());
 
         h5->closeDataset(zDset);
     }
@@ -734,76 +662,86 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
      * Green-function source loop
      * ================================================================
      */
-for (auto sourceTag : sourceTags) {
-    auto activeTags = alwaysActiveTags;
-    activeTags.insert(sourceTag);
+    for (auto sourceTag : sourceTags) {
+        auto activeTags = alwaysActiveTags;
+        activeTags.insert(sourceTag);
 
-    std::string datasetName = std::to_string(sourceTag);
-    hid_t dset = -1;
+        std::string datasetName = std::to_string(sourceTag);
+        hid_t dset = -1;
 
-    if (cfg.output) dset = h5->createFixedDataset(datasetName, H5T_IEEE_F64LE, {receiverGrid.ny, receiverGrid.nx, static_cast<hsize_t>(DomainDimension - 1), 3});
+        if (cfg.output)
+            dset = h5->createFixedDataset(
+                datasetName, H5T_IEEE_F64LE,
+                {receiverGrid.ny, receiverGrid.nx, static_cast<hsize_t>(DomainDimension - 1), 3});
 
-    for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
-        sw.start();
+        for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
+            sw.start();
 
-        bool converged = solve_source(dgop, solver, b, activeTags, direction);
+            bool converged = solve_source(dgop, solver, b, activeTags, direction);
 
-        time = sw.stop();
+            time = sw.stop();
 
-        if (!converged) {
-            if (rank == 0) {
-                std::cout << "Source " << sourceNumber + 1 << " / " << numSources
-                          << ", direction " << direction
-                          << " failed to converge." << std::endl;
-            }
-            continue;
-        }
-
-        if (rank == 0) {
-            std::cout << "Solved source " << sourceNumber + 1 << " / " << numSources
-                      << ", direction " << direction
-                      << " in " << time << " s" << std::endl;
-        }
-
-        if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output + "_" + std::to_string(sourceTag) + "_" + std::to_string(direction), true, true);
-
-        auto displacement = dgop.solution(solver.x());
-        auto receiverDisplacement = evaluate_receiver_displacement(displacement, receiverLocations);
-
-        if (cfg.output) {
-            std::vector<hsize_t> coordinates;
-            coordinates.reserve(receiverLocations.size() * 12);
-
-            for (auto const& receiver : receiverLocations) {
-                hsize_t j = receiver.gridIndex / receiverGrid.nx;
-                hsize_t i = receiver.gridIndex % receiverGrid.nx;
-
-                for (hsize_t c = 0; c < 3; ++c) {
-                    coordinates.push_back(j);
-                    coordinates.push_back(i);
-                    coordinates.push_back(static_cast<hsize_t>(direction));
-                    coordinates.push_back(c);
+            if (!converged) {
+                if (rank == 0) {
+                    std::cout << "Source " << sourceNumber + 1 << " / " << numSources
+                              << ", direction " << direction << " failed to converge." << std::endl;
                 }
+                continue;
             }
 
-            h5->writeToDatasetPoints(dset, H5T_NATIVE_DOUBLE, coordinates, receiverDisplacement.data());
+            if (rank == 0) {
+                std::cout << "Solved source " << sourceNumber + 1 << " / " << numSources
+                          << ", direction " << direction << " in " << time << " s" << std::endl;
+            }
+
+            if (cfg.output)
+                write_vtu(dgop, solver, cl,
+                          *cfg.output + "_" + std::to_string(sourceTag) + "_" +
+                              std::to_string(direction),
+                          true, true);
+
+            auto displacement = dgop.solution(solver.x());
+            auto receiverDisplacement =
+                evaluate_receiver_displacement(displacement, receiverLocations);
+
+            if (cfg.output) {
+                std::vector<hsize_t> coordinates;
+                coordinates.reserve(receiverLocations.size() * 12);
+
+                for (auto const& receiver : receiverLocations) {
+                    hsize_t j = receiver.gridIndex / receiverGrid.nx;
+                    hsize_t i = receiver.gridIndex % receiverGrid.nx;
+
+                    for (hsize_t c = 0; c < 3; ++c) {
+                        coordinates.push_back(j);
+                        coordinates.push_back(i);
+                        coordinates.push_back(static_cast<hsize_t>(direction));
+                        coordinates.push_back(c);
+                    }
+                }
+
+                h5->writeToDatasetPoints(dset, H5T_NATIVE_DOUBLE, coordinates,
+                                         receiverDisplacement.data());
+            }
         }
+
+        if (cfg.output)
+            h5->closeDataset(dset);
+
+        ++sourceNumber;
     }
 
-    if (cfg.output) h5->closeDataset(dset);
+    if (cfg.output)
+        write_vtu(dgop, solver, cl, *cfg.output, false, true);
 
-    ++sourceNumber;
-    }
-
-    if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
-    
     if (cfg.output) {
         h5->closeDataset(xDset);
         h5->closeDataset(yDset);
         h5->closeDataset(directionDset);
         h5->closeDataset(componentDset);
     }
-    if (cfg.output) h5.reset();
+    if (cfg.output)
+        h5.reset();
 
     MPI_Barrier(topo->comm());
 
@@ -829,31 +767,20 @@ int main(int argc, char** argv) {
 
     argparse::ArgumentParser program("sTsGF");
 
-    program.add_argument("--petsc")
-        .help("PETSc options, must be passed last!");
+    program.add_argument("--petsc").help("PETSc options, must be passed last!");
 
-    program.add_argument("config")
-        .help("Configuration file (.toml)");
+    program.add_argument("config").help("Configuration file (.toml)");
 
     auto makePathRelativeToConfig =
-        MakePathRelativeToOtherPath(
-            [&program]() {
-                return program.get("config");
-            });
+        MakePathRelativeToOtherPath([&program]() { return program.get("config"); });
 
     TableSchema<Config> schema;
 
-    schema.add_value(
-        "resolution",
-        &Config::resolution)
-        .validator([](auto&& x) {
-            return x > 0;
-        })
+    schema.add_value("resolution", &Config::resolution)
+        .validator([](auto&& x) { return x > 0; })
         .help("Non-negative resolution parameter");
 
-    schema.add_value(
-        "method",
-        &Config::method)
+    schema.add_value("method", &Config::method)
         .converter([](std::string_view value) {
             if (iEquals(value, "ip")) {
                 return DGMethod::IP;
@@ -864,67 +791,41 @@ int main(int argc, char** argv) {
             }
         })
         .default_value(DGMethod::IP)
-        .validator([](DGMethod const& type) {
-            return type != DGMethod::Unknown;
-        });
+        .validator([](DGMethod const& type) { return type != DGMethod::Unknown; });
 
-    schema.add_value(
-        "type",
-        &Config::type)
+    schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
-            if (iEquals(value, "elastic") ||
-                iEquals(value, "elasticity")) {
+            if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
                 return LocalOpType::Elasticity;
             } else {
                 return LocalOpType::Unknown;
             }
         })
-        .validator([](LocalOpType const& type) {
-            return type == LocalOpType::Elasticity;
-        });
+        .validator([](LocalOpType const& type) { return type == LocalOpType::Elasticity; });
 
-    schema.add_value(
-        "lib",
-        &Config::lib)
+    schema.add_value("lib", &Config::lib)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
 
-    schema.add_value(
-        "scenario",
-        &Config::scenario);
+    schema.add_value("scenario", &Config::scenario);
 
     {
-        auto default_ref_normal =
-            std::array<double, DomainDimension>{};
+        auto default_ref_normal = std::array<double, DomainDimension>{};
 
         default_ref_normal[0] = 1.0;
 
-        schema.add_array(
-            "ref_normal",
-            &Config::ref_normal)
-            .default_value(
-                std::move(default_ref_normal))
+        schema.add_array("ref_normal", &Config::ref_normal)
+            .default_value(std::move(default_ref_normal))
             .of_values();
     }
 
-    schema.add_value(
-        "matrix_free",
-        &Config::matrix_free)
-        .default_value(false);
+    schema.add_value("matrix_free", &Config::matrix_free).default_value(false);
 
-    schema.add_value(
-        "test_matrix_free",
-        &Config::test_matrix_free)
-        .default_value(false);
+    schema.add_value("test_matrix_free", &Config::test_matrix_free).default_value(false);
 
-    schema.add_value(
-        "mg_coarse_level",
-        &Config::mg_coarse_level)
-        .default_value(1);
+    schema.add_value("mg_coarse_level", &Config::mg_coarse_level).default_value(1);
 
-    schema.add_value(
-        "mg_strategy",
-        &Config::mg_strategy)
+    schema.add_value("mg_strategy", &Config::mg_strategy)
         .converter([](std::string_view value) {
             if (iEquals(value, "TwoLevel")) {
                 return MGStrategy::TwoLevel;
@@ -937,170 +838,104 @@ int main(int argc, char** argv) {
             }
         })
         .default_value(MGStrategy::TwoLevel)
-        .validator([](MGStrategy const& type) {
-            return type != MGStrategy::Unknown;
-        });
+        .validator([](MGStrategy const& type) { return type != MGStrategy::Unknown; });
 
-    schema.add_value(
-        "profile",
-        &Config::profile)
+    schema.add_value("profile", &Config::profile)
         .default_value(0)
-        .validator([](auto&& x) {
-            return x >= 0;
-        })
-        .help(
-            "Run static in profile mode. "
-            "The parameter controls the amount of repetitions.");
+        .validator([](auto&& x) { return x >= 0; })
+        .help("Run static in profile mode. "
+              "The parameter controls the amount of repetitions.");
 
-    schema.add_value(
-        "output",
-        &Config::output)
-        .help("Output file name");
+    schema.add_value("output", &Config::output).help("Output file name");
 
-    schema.add_value(
-        "mesh_file",
-        &Config::mesh_file)
+    schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
 
-    schema.add_value(
-        "receiver_grid_resolution",
-        &Config::receiver_grid_resolution)
+    schema.add_value("receiver_grid_resolution", &Config::receiver_grid_resolution)
         .default_value(100)
-        .validator([](auto&& x) {
-            return x >= 2;
-        })
+        .validator([](auto&& x) { return x >= 2; })
         .help("Number of receiver-grid points along the longest horizontal dimension.");
 
-    auto& genMeshSchema =
-        schema.add_table(
-            "generate_mesh",
-            &Config::generate_mesh);
+    auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
 
-    GenMeshConfig<DomainDimension>::setSchema(
-        genMeshSchema);
+    GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
-    std::optional<Config> cfg =
-        readFromConfigurationFileAndCmdLine(
-            schema,
-            program,
-            argc,
-            argv);
+    std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
 
-    if (!cfg) return -1;
+    if (!cfg)
+        return -1;
 
-    CHKERRQ(
-        PetscInitialize(
-            &pArgc,
-            &pArgv,
-            nullptr,
-            nullptr));
+    CHKERRQ(PetscInitialize(&pArgc, &pArgv, nullptr, nullptr));
 
     CHKERRQ(register_PCs());
     CHKERRQ(register_KSPs());
 
     int rank, procs;
 
-    MPI_Comm_rank(
-        PETSC_COMM_WORLD,
-        &rank);
+    MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
-    MPI_Comm_size(
-        PETSC_COMM_WORLD,
-        &procs);
+    MPI_Comm_size(PETSC_COMM_WORLD, &procs);
 
-    auto node_mask =
-        affinity.to_string(
-            affinity.worker_mask_on_node(
-                PETSC_COMM_WORLD));
+    auto node_mask = affinity.to_string(affinity.worker_mask_on_node(PETSC_COMM_WORLD));
 
     if (rank == 0) {
-        Banner::standard(
-            std::cout,
-            affinity,
-            node_mask);
+        Banner::standard(std::cout, affinity, node_mask);
     }
 
-    std::unique_ptr<
-        GlobalSimplexMesh<DomainDimension>>
-        globalMesh;
+    std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
 
     if (cfg->mesh_file) {
         bool ok = false;
 
-        GlobalSimplexMeshBuilder<DomainDimension>
-            builder;
+        GlobalSimplexMeshBuilder<DomainDimension> builder;
 
         std::string meshError;
 
         if (rank == 0) {
             auto [parser, error] =
-                MeshParser::createWithValidation<
-                    DomainDimension>(
-                    *cfg->mesh_file,
-                    &builder);
+                MeshParser::createWithValidation<DomainDimension>(*cfg->mesh_file, &builder);
 
             if (!parser) {
                 meshError = error;
             } else {
-                ok = parser->parseFile(
-                    *cfg->mesh_file);
+                ok = parser->parseFile(*cfg->mesh_file);
 
                 if (!ok) {
-                    meshError =
-                        *cfg->mesh_file +
-                        "\n" +
-                        std::string(
-                            parser->getErrorMessage());
+                    meshError = *cfg->mesh_file + "\n" + std::string(parser->getErrorMessage());
                 }
             }
         }
 
-        MPI_Bcast(
-            &ok,
-            1,
-            MPI_CXX_BOOL,
-            0,
-            PETSC_COMM_WORLD);
+        MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, PETSC_COMM_WORLD);
 
         if (!ok) {
             if (rank == 0) {
-                std::cerr
-                    << meshError
-                    << std::endl;
+                std::cerr << meshError << std::endl;
             }
 
             PetscFinalize();
             return -1;
         }
 
-        globalMesh =
-            builder.create(
-                PETSC_COMM_WORLD);
+        globalMesh = builder.create(PETSC_COMM_WORLD);
 
         if (procs > 1) {
             globalMesh->repartitionByHash();
         }
 
-    } else if (
-        cfg->generate_mesh &&
-        cfg->resolution) {
+    } else if (cfg->generate_mesh && cfg->resolution) {
 
-        auto meshGen =
-            cfg->generate_mesh->create(
-                *cfg->resolution,
-                PETSC_COMM_WORLD);
+        auto meshGen = cfg->generate_mesh->create(*cfg->resolution, PETSC_COMM_WORLD);
 
-        globalMesh =
-            meshGen.uniformMesh();
+        globalMesh = meshGen.uniformMesh();
     }
 
     if (!globalMesh) {
-        std::cerr
-            << "You must either provide a valid mesh file "
-               "or provide the mesh generation config "
-               "(including the resolution parameter)."
-            << std::endl;
+        std::cerr << "You must either provide a valid mesh file "
+                     "or provide the mesh generation config "
+                     "(including the resolution parameter)."
+                  << std::endl;
 
         PetscFinalize();
         return -1;
@@ -1108,37 +943,25 @@ int main(int argc, char** argv) {
 
     globalMesh->repartition();
 
-    auto mesh =
-        globalMesh->getLocalMesh(1);
+    auto mesh = globalMesh->getLocalMesh(1);
 
     switch (cfg->type) {
 
-
     case LocalOpType::Elasticity: {
-        auto scenario =
-            ElasticityScenario(
-                cfg->lib,
-                cfg->scenario,
-                cfg->ref_normal);
+        auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
         scenario.enable_directional_boundary(cfg->scenario);
-        static_problem(
-            *mesh,
-            scenario,
-            *cfg);
+        static_problem(*mesh, scenario, *cfg);
 
         break;
     }
 
     default:
-        std::cerr
-            << "Unknown type. sTsGF requires elasticity."
-            << std::endl;
+        std::cerr << "Unknown type. sTsGF requires elasticity." << std::endl;
 
         break;
     }
 
-    PetscErrorCode ierr =
-        PetscFinalize();
+    PetscErrorCode ierr = PetscFinalize();
 
     return ierr;
 }

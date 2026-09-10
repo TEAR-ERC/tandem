@@ -235,66 +235,67 @@ public:
         }
         vector.end_access(access_handle);
     }
-void rhs(BlockVector& vector, std::set<long int> const& activeTags, long int direction) {
-    auto bs = lop_->block_size();
+    void rhs(BlockVector& vector, std::set<long int> const& activeTags, long int direction) {
+        auto bs = lop_->block_size();
 
-    auto b_size =
-        LinearAllocator<double>::allocation_size(bs, lop_->alignment());
+        auto b_size = LinearAllocator<double>::allocation_size(bs, lop_->alignment());
 
-    auto a_scratch =
-        Scratch<double>(2 * b_size, lop_->alignment());
+        auto a_scratch = Scratch<double>(2 * b_size, lop_->alignment());
 
-    auto sv = [&bs](LinearAllocator<double>& scratch) {
-        double* buffer = scratch.allocate(bs);
-        return Vector<double>(buffer, bs);
-    };
+        auto sv = [&bs](LinearAllocator<double>& scratch) {
+            double* buffer = scratch.allocate(bs);
+            return Vector<double>(buffer, bs);
+        };
 
-    auto access_handle = vector.begin_access();
+        auto access_handle = vector.begin_access();
 
-    if constexpr (std::experimental::is_detected_v<rhs_volume_t, LocalOperator>) {
-        for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
-            scratch_.reset();
-            auto B0 = access_handle.subtensor(slice{}, elNo);
-            lop_->rhs_volume(elNo, B0, scratch_);
+        if constexpr (std::experimental::is_detected_v<rhs_volume_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
+                auto B0 = access_handle.subtensor(slice{}, elNo);
+                lop_->rhs_volume(elNo, B0, scratch_);
+            }
         }
-    }
 
-    if constexpr (std::experimental::is_detected_v<rhs_skeleton_t, LocalOperator> ||
-                  std::experimental::is_detected_v<rhs_boundary_t, LocalOperator>) {
-        for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
-            scratch_.reset();
-            a_scratch.reset();
+        if constexpr (std::experimental::is_detected_v<rhs_skeleton_t, LocalOperator> ||
+                      std::experimental::is_detected_v<rhs_boundary_t, LocalOperator>) {
+            for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
+                scratch_.reset();
+                a_scratch.reset();
 
-            auto const& info = topo_->info(fctNo);
+                auto const& info = topo_->info(fctNo);
 
-            if (activeTags.find(info.facetTag) == activeTags.end()) continue;
+                if (activeTags.find(info.facetTag) == activeTags.end())
+                    continue;
 
-            auto ib0 = info.up[0];
-            auto ib1 = info.up[1];
+                auto ib0 = info.up[0];
+                auto ib1 = info.up[1];
 
-            if (info.up[0] != info.up[1]) {
-                auto B0 = info.inside[0] ? access_handle.subtensor(slice{}, ib0) : sv(a_scratch);
-                auto B1 = info.inside[1] ? access_handle.subtensor(slice{}, ib1) : sv(a_scratch);
-                lop_->rhs_skeleton_direction(fctNo, info, B0, B1, scratch_, direction);
-            } else {
-                if (info.inside[0]) {
-                    auto B0 = access_handle.subtensor(slice{}, ib0);
-                    lop_->rhs_boundary_direction(fctNo, info, B0, scratch_, direction);
+                if (info.up[0] != info.up[1]) {
+                    auto B0 =
+                        info.inside[0] ? access_handle.subtensor(slice{}, ib0) : sv(a_scratch);
+                    auto B1 =
+                        info.inside[1] ? access_handle.subtensor(slice{}, ib1) : sv(a_scratch);
+                    lop_->rhs_skeleton_direction(fctNo, info, B0, B1, scratch_, direction);
+                } else {
+                    if (info.inside[0]) {
+                        auto B0 = access_handle.subtensor(slice{}, ib0);
+                        lop_->rhs_boundary_direction(fctNo, info, B0, scratch_, direction);
+                    }
                 }
             }
         }
-    }
 
-    if constexpr (std::experimental::is_detected_v<rhs_volume_post_skeleton_t, LocalOperator>) {
-        for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
-            scratch_.reset();
-            auto B0 = access_handle.subtensor(slice{}, elNo);
-            lop_->rhs_volume_post_skeleton(elNo, B0, scratch_);
+        if constexpr (std::experimental::is_detected_v<rhs_volume_post_skeleton_t, LocalOperator>) {
+            for (std::size_t elNo = 0; elNo < topo_->numLocalElements(); ++elNo) {
+                scratch_.reset();
+                auto B0 = access_handle.subtensor(slice{}, elNo);
+                lop_->rhs_volume_post_skeleton(elNo, B0, scratch_);
+            }
         }
-    }
 
-    vector.end_access(access_handle);
-}
+        vector.end_access(access_handle);
+    }
     void apply(BlockVector const& x, BlockVector& y) override {
         if constexpr (std::experimental::is_detected_v<apply_t, LocalOperator>) {
             apply_(x, y, &LocalOperator::apply);
