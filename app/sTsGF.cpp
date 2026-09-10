@@ -172,22 +172,22 @@ void add_hdf5_metadata(std::string const& filename, std::set<long int> const& so
     hid_t component = H5Dopen(file, "component", H5P_DEFAULT);
     hid_t z = H5Dopen(file, "z", H5P_DEFAULT);
 
-    H5DSset_scale(x, "x");
-    H5DSset_scale(y, "y");
-    H5DSset_scale(direction, "direction");
-    H5DSset_scale(component, "component");
+    if (H5DSset_scale(x, "x") < 0) throw std::runtime_error("H5DSset_scale(x) failed");
+    if (H5DSset_scale(y, "y") < 0) throw std::runtime_error("H5DSset_scale(y) failed");
+    if (H5DSset_scale(direction, "direction") < 0) throw std::runtime_error("H5DSset_scale(direction) failed");
+    if (H5DSset_scale(component, "component") < 0) throw std::runtime_error("H5DSset_scale(component) failed");
 
-    H5DSattach_scale(z, y, 0);
-    H5DSattach_scale(z, x, 1);
+    if (H5DSattach_scale(z, y, 0) < 0) throw std::runtime_error("attach y to z failed");
+    if (H5DSattach_scale(z, x, 1) < 0) throw std::runtime_error("attach x to z failed");
 
     for (auto sourceTag : sourceTags) {
         std::string datasetName = std::to_string(sourceTag);
         hid_t dset = H5Dopen(file, datasetName.c_str(), H5P_DEFAULT);
 
-        H5DSattach_scale(dset, y, 0);
-        H5DSattach_scale(dset, x, 1);
-        H5DSattach_scale(dset, direction, 2);
-        H5DSattach_scale(dset, component, 3);
+        if (H5DSattach_scale(dset, y, 0) < 0) throw std::runtime_error("attach y failed");
+        if (H5DSattach_scale(dset, x, 1) < 0) throw std::runtime_error("attach x failed");
+        if (H5DSattach_scale(dset, direction, 2) < 0) throw std::runtime_error("attach direction failed");
+        if (H5DSattach_scale(dset, component, 3) < 0) throw std::runtime_error("attach component failed");
 
         H5Dclose(dset);
     }
@@ -388,11 +388,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
         topo->comm());
 
     if (rank == 0) {
-        std::cout << "Expected receiver points: "
-                  << receiverGrid.nx * receiverGrid.ny
-                  << std::endl;
-
-        std::cout << "Actual receiver points:   "
+        std::cout << "Total number of receiver points:   "
                   << globalReceiverCount
                   << std::endl;
     }
