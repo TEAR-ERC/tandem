@@ -231,11 +231,13 @@ target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CU
 
 ## sTsGF solver
 
-find_library(HDF5_HL_LIBRARY NAMES hdf5_hl hdf5_serial_hl REQUIRED)
+if(DOMAIN_DIMENSION EQUAL 3)
+    find_library(HDF5_HL_LIBRARY NAMES hdf5_hl hdf5_serial_hl REQUIRED)
 
-add_executable(sTsGF sTsGF.cpp)
-target_link_libraries(sTsGF PRIVATE app-common ${HDF5_HL_LIBRARY})
-target_include_directories(sTsGF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+    add_executable(sTsGF sTsGF.cpp)
+    target_link_libraries(sTsGF PRIVATE app-common ${HDF5_HL_LIBRARY})
+    target_include_directories(sTsGF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
 ## Tandem
 

@@ -5,7 +5,6 @@
 #include "common/MeshConfig.h"
 #include "common/PetscLinearSolver.h"
 #include "common/PetscUtil.h"
-#include "common/PoissonScenario.h"
 #include "common/Type.h"
 #include "config.h"
 #include "form/DGCurvilinearCommon.h"
@@ -901,10 +900,7 @@ int main(int argc, char** argv) {
         "type",
         &Config::type)
         .converter([](std::string_view value) {
-            if (iEquals(value, "poisson")) {
-                return LocalOpType::Poisson;
-            } else if (
-                iEquals(value, "elastic") ||
+            if (iEquals(value, "elastic") ||
                 iEquals(value, "elasticity")) {
                 return LocalOpType::Elasticity;
             } else {
@@ -912,7 +908,7 @@ int main(int argc, char** argv) {
             }
         })
         .validator([](LocalOpType const& type) {
-            return type != LocalOpType::Unknown;
+            return type == LocalOpType::Elasticity;
         });
 
     schema.add_value(
@@ -1136,20 +1132,6 @@ int main(int argc, char** argv) {
 
     switch (cfg->type) {
 
-    case LocalOpType::Poisson: {
-        auto scenario =
-            PoissonScenario(
-                cfg->lib,
-                cfg->scenario,
-                cfg->ref_normal);
-
-        static_problem(
-            *mesh,
-            scenario,
-            *cfg);
-
-        break;
-    }
 
     case LocalOpType::Elasticity: {
         auto scenario =
