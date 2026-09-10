@@ -828,7 +828,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    argparse::ArgumentParser program("static");
+    argparse::ArgumentParser program("sTsGF");
 
     program.add_argument("--petsc")
         .help("PETSc options, must be passed last!");
