@@ -13,6 +13,7 @@ extern "C" {
 #include <stdexcept>
 #include <string>
 #include <variant>
+#include <type_traits>
 
 namespace tndm {
 
@@ -22,8 +23,13 @@ public:
     using functional_t =
         std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int tag)>;
 
+    template <std::size_t Din, std::size_t Dout>
+    using functional_t_direction =
+        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int tag, long int direction)>;
+
     LuaLib();
     ~LuaLib();
+
 
     void load(std::string const& code);
     void loadFile(std::string const& fileName);
@@ -69,15 +75,13 @@ public:
         return ok;
     }
 
-    template <int Din, int Dout, bool WithTag = false>
+    template <int Din, int Dout, bool WithTag = false, bool WithDirection = false>
     auto getMemberFunction(std::string const& table_name, char const* method_name) {
         lua_State* myL = L;
 
-        return [myL, table_name,
-                method_name](std::array<double, Din> const& x,
-                             // Conditionally add tag parameter via a lambda
-                             std::conditional_t<WithTag, long int, std::monostate> tag = {})
-                   -> std::array<double, Dout> {
+        return [myL, table_name, method_name](std::array<double, Din> const& x, 
+            std::conditional_t<WithTag, long int, std::monostate> tag = {}, std::conditional_t<WithDirection, 
+            long int, std::monostate> direction = {}) -> std::array<double, Dout> {
             std::array<double, Dout> result;
             result.fill(std::numeric_limits<double>::signaling_NaN());
 
@@ -99,6 +103,10 @@ public:
             // Push tag as integer
             if constexpr (WithTag) {
                 lua_pushinteger(myL, tag);
+                num_inputs += 1;
+            }
+            if constexpr (WithDirection) {
+                lua_pushinteger(myL, direction);
                 num_inputs += 1;
             }
 
