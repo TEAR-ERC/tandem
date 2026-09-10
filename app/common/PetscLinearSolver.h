@@ -30,8 +30,10 @@ namespace tndm {
 
 class PetscLinearSolver {
 public:
-    PetscLinearSolver(AbstractDGOperator<DomainDimension>& dgop, bool matrix_free = false,
-                      MGConfig const& mg_config = MGConfig());
+    PetscLinearSolver(AbstractDGOperator<DomainDimension>& dgop,
+                  bool matrix_free = false,
+                  MGConfig const& mg_config = MGConfig(),
+                  bool initialize_rhs = true);
     ~PetscLinearSolver();
 
     inline void update_rhs(AbstractDGOperator<DomainDimension>& dgop) {

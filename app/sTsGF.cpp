@@ -518,15 +518,11 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Mesh size: " << mesh_size << std::endl;
     }
 
-    auto solver =
-        PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+    auto solver = PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy), false);
 
     sw.start();
-
     solver.warmup();
-
     time = sw.stop();
-
     if (rank == 0) {
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
@@ -545,12 +541,6 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     if (cfg.output) {
         h5 = std::make_unique<HDF5Writer>(*cfg.output, topo->comm());
-
-        /*
-         * ------------------------------------------------------------
-         * X coordinate
-         * ------------------------------------------------------------
-         */
         xDset = h5->createFixedDataset("x", H5T_IEEE_F64LE, {receiverGrid.nx});
 
         std::vector<hsize_t> xCoordinates;
