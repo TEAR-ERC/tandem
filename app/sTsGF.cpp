@@ -73,6 +73,7 @@ struct Config {
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::size_t receiver_grid_resolution;
+    std::size_t num_gf_directions;
 };
 
 struct ReceiverPoint {
@@ -558,13 +559,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         h5->writeToDatasetPoints(xDset, H5T_NATIVE_DOUBLE, xCoordinates, xValues.data());
 
         directionDset = h5->createFixedDataset("direction", H5T_STD_I32LE,
-                                               {static_cast<hsize_t>(DomainDimension - 1)});
+                                               {static_cast<hsize_t>(cfg.num_gf_directions)});
 
         std::vector<hsize_t> directionCoordinates;
         std::vector<int> directionValues;
 
         if (rank == 0) {
-            for (hsize_t d = 0; d < DomainDimension - 1; ++d) {
+            for (hsize_t d = 0; d <cfg.num_gf_directions; ++d) {
                 directionCoordinates.push_back(d);
                 directionValues.push_back(static_cast<int>(d));
             }
@@ -662,9 +663,9 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         if (cfg.output)
             dset = h5->createFixedDataset(
                 datasetName, H5T_IEEE_F64LE,
-                {receiverGrid.ny, receiverGrid.nx, static_cast<hsize_t>(DomainDimension - 1), 3});
+                {receiverGrid.ny, receiverGrid.nx, static_cast<hsize_t>(cfg.num_gf_directions), 3});
 
-        for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
+        for (long int direction = 0; direction < cfg.num_gf_directions; ++direction) {
             sw.start();
 
             bool converged = solve_source(dgop, solver, b, activeTags, direction);
@@ -846,6 +847,13 @@ int main(int argc, char** argv) {
         .default_value(100)
         .validator([](auto&& x) { return x >= 2; })
         .help("Number of receiver-grid points along the longest horizontal dimension.");
+
+    schema.add_value("num_gf_directions", &Config::num_gf_directions)
+    .default_value(DomainDimension - 1)
+    .validator([](auto&& x) {
+        return x >= 1;
+    })
+    .help("Number of source displacement directions.");
 
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
 
