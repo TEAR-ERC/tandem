@@ -52,7 +52,6 @@ public:
         functional(Force, force_);
         functional(Boundary, boundary_);
         functional(Slip, slip_);
-        enable_directional_boundary(scenario);
         if (lib_.hasMember(scenario, Solution)) {
             auto myF = lib_.getMemberFunction<DomainDimension, NumQuantities>(scenario, Solution);
             solution_ = [myF](Vector<double> const& v) -> std::array<double, NumQuantities> {
@@ -108,9 +107,6 @@ public:
         }
         if (boundary_) {
             lop.set_dirichlet(*boundary_, ref_normal_);
-        }
-        if (boundary_direction_) {
-            lop.set_dirichlet_direction(*boundary_direction_, ref_normal_);
         }
         if (slip_) {
             lop.set_slip(*slip_, ref_normal_);

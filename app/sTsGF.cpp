@@ -352,6 +352,9 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
         mesh, scenario.transform(), PolynomialDegree);
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
+    if (scenario.boundary_direction()) {
+        lop->set_dirichlet_direction(*scenario.boundary_direction(), cfg.ref_normal);
+    }
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
 
     /*
@@ -1121,7 +1124,7 @@ int main(int argc, char** argv) {
                 cfg->lib,
                 cfg->scenario,
                 cfg->ref_normal);
-
+        scenario.enable_directional_boundary(cfg->scenario);
         static_problem(
             *mesh,
             scenario,
