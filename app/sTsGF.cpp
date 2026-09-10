@@ -159,7 +159,46 @@ evaluate_receiver_displacement(DisplacementType& displacement,
 
     return receiverDisplacement;
 }
+void add_hdf5_metadata(std::string const& filename, std::set<long int> const& sourceTags) {
+    hid_t file = H5Fopen(filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
 
+    if (file < 0) {
+        throw std::runtime_error("Could not open HDF5 file for metadata: " + filename);
+    }
+
+    hid_t y = H5Dopen(file, "y", H5P_DEFAULT);
+    hid_t x = H5Dopen(file, "x", H5P_DEFAULT);
+    hid_t direction = H5Dopen(file, "direction", H5P_DEFAULT);
+    hid_t component = H5Dopen(file, "component", H5P_DEFAULT);
+    hid_t z = H5Dopen(file, "z", H5P_DEFAULT);
+
+    H5DSset_scale(x, "x");
+    H5DSset_scale(y, "y");
+    H5DSset_scale(direction, "direction");
+    H5DSset_scale(component, "component");
+
+    H5DSattach_scale(z, y, 0);
+    H5DSattach_scale(z, x, 1);
+
+    for (auto sourceTag : sourceTags) {
+        std::string datasetName = std::to_string(sourceTag);
+        hid_t dset = H5Dopen(file, datasetName.c_str(), H5P_DEFAULT);
+
+        H5DSattach_scale(dset, y, 0);
+        H5DSattach_scale(dset, x, 1);
+        H5DSattach_scale(dset, direction, 2);
+        H5DSattach_scale(dset, component, 3);
+
+        H5Dclose(dset);
+    }
+
+    H5Dclose(z);
+    H5Dclose(component);
+    H5Dclose(direction);
+    H5Dclose(y);
+    H5Dclose(x);
+    H5Fclose(file);
+}
 std::vector<ReceiverPoint>
 project_grid_to_receiver_surface(
     std::vector<std::array<double, 2>> const& receiverXY,
@@ -538,13 +577,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
 
     std::unique_ptr<HDF5Writer> h5;
 
-    /*
-     * Coordinate datasets stay open while source datasets are written
-     * because every source dataset attaches to these dimension scales.
-     */
     hid_t xDset = -1;
     hid_t yDset = -1;
     hid_t componentDset = -1;
+    hid_t directionDset = -1;
 
     if (cfg.output) {
         h5 = std::make_unique<HDF5Writer>(
@@ -561,7 +597,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             H5T_IEEE_F64LE,
             {receiverGrid.nx});
 
-        H5DSset_scale(xDset, "x");
+        
 
         std::vector<hsize_t> xCoordinates;
         std::vector<double> xValues;
@@ -581,6 +617,20 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             xCoordinates,
             xValues.data());
 
+        directionDset = h5->createFixedDataset("direction", H5T_STD_I32LE, {static_cast<hsize_t>(DomainDimension - 1)});
+
+        std::vector<hsize_t> directionCoordinates;
+        std::vector<int> directionValues;
+
+        if (rank == 0) {
+            for (hsize_t d = 0; d < DomainDimension - 1; ++d) {
+                directionCoordinates.push_back(d);
+                directionValues.push_back(static_cast<int>(d));
+            }
+        }
+
+        h5->writeToDatasetPoints(directionDset, H5T_NATIVE_INT, directionCoordinates, directionValues.data());   
+
         /*
          * ------------------------------------------------------------
          * Y coordinate
@@ -591,7 +641,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             H5T_IEEE_F64LE,
             {receiverGrid.ny});
 
-        H5DSset_scale(yDset, "y");
+        
 
         std::vector<hsize_t> yCoordinates;
         std::vector<double> yValues;
@@ -621,7 +671,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             H5T_STD_I32LE,
             {3});
 
-        H5DSset_scale(componentDset, "component");
+        
 
         std::vector<hsize_t> componentCoordinates;
         std::vector<int> componentValues;
@@ -675,8 +725,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             zCoordinates,
             zValues.data());
 
-        H5DSattach_scale(zDset, yDset, 0);
-        H5DSattach_scale(zDset, xDset, 1);
+
 
         h5->closeDataset(zDset);
     }
@@ -686,158 +735,81 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
      * Green-function source loop
      * ================================================================
      */
-    for (auto sourceTag : sourceTags) {
-        auto activeTags = alwaysActiveTags;
-        activeTags.insert(sourceTag);
+for (auto sourceTag : sourceTags) {
+    auto activeTags = alwaysActiveTags;
+    activeTags.insert(sourceTag);
+
+    std::string datasetName = std::to_string(sourceTag);
+    hid_t dset = -1;
+
+    if (cfg.output) dset = h5->createFixedDataset(datasetName, H5T_IEEE_F64LE, {receiverGrid.ny, receiverGrid.nx, static_cast<hsize_t>(DomainDimension - 1), 3});
+
+    for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
         sw.start();
 
-        for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
         bool converged = solve_source(dgop, solver, b, activeTags, direction);
-            
-        }
+
         time = sw.stop();
 
         if (!converged) {
             if (rank == 0) {
-                std::cout
-                    << "Source "
-                    << sourceNumber + 1
-                    << " / "
-                    << numSources
-                    << " failed to converge."
-                    << std::endl;
+                std::cout << "Source " << sourceNumber + 1 << " / " << numSources
+                          << ", direction " << direction
+                          << " failed to converge." << std::endl;
             }
-
-            ++sourceNumber;
             continue;
         }
 
         if (rank == 0) {
-            std::cout
-                << "Solved source "
-                << sourceNumber + 1
-                << " / "
-                << numSources
-                << " in "
-                << time
-                << " s"
-                << std::endl;
+            std::cout << "Solved source " << sourceNumber + 1 << " / " << numSources
+                      << ", direction " << direction
+                      << " in " << time << " s" << std::endl;
         }
-        if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output + "_" + std::to_string(sourceTag), true, true);
-        auto displacement =
-            dgop.solution(solver.x());
 
-        auto receiverDisplacement =
-            evaluate_receiver_displacement(
-                displacement,
-                receiverLocations);
+        if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output + "_" + std::to_string(sourceTag) + "_" + std::to_string(direction), true, true);
 
-        /*
-         * Write one global [ny,nx,3] dataset for this source.
-         */
+        auto displacement = dgop.solution(solver.x());
+        auto receiverDisplacement = evaluate_receiver_displacement(displacement, receiverLocations);
+
         if (cfg.output) {
-            std::string datasetName =
-                std::to_string(sourceTag);
-
-            auto dset =h5->createFixedDataset(datasetName,H5T_IEEE_F64LE,{receiverGrid.ny,receiverGrid.nx,3});
-            
             std::vector<hsize_t> coordinates;
-
-            /*
-             * Three HDF5 coordinates for every scalar:
-             *
-             *     (j,i,0)
-             *     (j,i,1)
-             *     (j,i,2)
-             *
-             * for each receiver.
-             */
-            coordinates.reserve(
-                receiverLocations.size() * 9);
+            coordinates.reserve(receiverLocations.size() * 12);
 
             for (auto const& receiver : receiverLocations) {
-                hsize_t j =
-                    receiver.gridIndex /
-                    receiverGrid.nx;
-
-                hsize_t i =
-                    receiver.gridIndex %
-                    receiverGrid.nx;
+                hsize_t j = receiver.gridIndex / receiverGrid.nx;
+                hsize_t i = receiver.gridIndex % receiverGrid.nx;
 
                 for (hsize_t c = 0; c < 3; ++c) {
                     coordinates.push_back(j);
                     coordinates.push_back(i);
+                    coordinates.push_back(static_cast<hsize_t>(direction));
                     coordinates.push_back(c);
                 }
             }
 
-            h5->writeToDatasetPoints(
-                dset,
-                H5T_NATIVE_DOUBLE,
-                coordinates,
-                receiverDisplacement.data());
-
-            /*
-             * Tell HDF5/xarray what the three dimensions mean.
-             */
-            H5DSattach_scale(dset, yDset, 0);
-            H5DSattach_scale(dset, xDset, 1);
-            H5DSattach_scale(dset, componentDset, 2);
-
-            h5->closeDataset(dset);
+            h5->writeToDatasetPoints(dset, H5T_NATIVE_DOUBLE, coordinates, receiverDisplacement.data());
         }
-
-        ++sourceNumber;
     }
 
-    /*
-     * Coordinate datasets must remain open until all source datasets
-     * have had their dimension scales attached.
-     */
-    if (cfg.output) {
-        h5->closeDataset(xDset);
-        h5->closeDataset(yDset);
-        h5->closeDataset(componentDset);
+    if (cfg.output) h5->closeDataset(dset);
+
+    ++sourceNumber;
     }
 
     if (cfg.output) write_vtu(dgop, solver, cl, *cfg.output, false, true);
-
+    
+    if (cfg.output) {
+        h5->closeDataset(xDset);
+        h5->closeDataset(yDset);
+        h5->closeDataset(directionDset);
+        h5->closeDataset(componentDset);
+    }
     if (cfg.output) h5.reset();
 
     MPI_Barrier(topo->comm());
 
     if (cfg.output && rank == 0) {
-        std::string h5Filename = *cfg.output + ".h5";
-
-        hid_t file = H5Fopen(h5Filename.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
-        hid_t x = H5Dopen(file, "x", H5P_DEFAULT);
-        hid_t y = H5Dopen(file, "y", H5P_DEFAULT);
-        hid_t component = H5Dopen(file, "component", H5P_DEFAULT);
-        hid_t z = H5Dopen(file, "z", H5P_DEFAULT);
-
-        H5DSset_scale(x, "x");
-        H5DSset_scale(y, "y");
-        H5DSset_scale(component, "component");
-
-        H5DSattach_scale(z, y, 0);
-        H5DSattach_scale(z, x, 1);
-
-        for (auto sourceTag : sourceTags) {
-            std::string datasetName = std::to_string(sourceTag);
-            hid_t dset = H5Dopen(file, datasetName.c_str(), H5P_DEFAULT);
-
-            H5DSattach_scale(dset, y, 0);
-            H5DSattach_scale(dset, x, 1);
-            H5DSattach_scale(dset, component, 2);
-
-            H5Dclose(dset);
-        }
-
-        H5Dclose(z);
-        H5Dclose(component);
-        H5Dclose(y);
-        H5Dclose(x);
-        H5Fclose(file);
+        add_hdf5_metadata(*cfg.output + ".h5", sourceTags);
     }
 }
 
@@ -1160,7 +1132,7 @@ int main(int argc, char** argv) {
 
     default:
         std::cerr
-            << "Unknown type. Should be either poisson or elasticity."
+            << "Unknown type. sTsGF requires elasticity."
             << std::endl;
 
         break;
