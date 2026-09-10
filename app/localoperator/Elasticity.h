@@ -71,6 +71,11 @@ public:
     bool rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                       LinearAllocator<double>& scratch) const;
 
+    bool rhs_skeleton_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                      Vector<double>& B1, LinearAllocator<double>& scratch, long int direction) const;
+    bool rhs_boundary_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                      LinearAllocator<double>& scratch, long int direction) const;
+
     void apply(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
                std::array<Vector<double const>, NumFacets> const& x_n, Vector<double>& y_0) const;
     void wave_rhs(std::size_t elNo, mneme::span<SideInfo> info, Vector<double const> const& x_0,
@@ -121,6 +126,9 @@ public:
                   std::array<double, DomainDimension> const& refNormal) {
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
+    void set_dirichlet_direction(functional_direction_t<NumQuantities> fun, std::array<double, DomainDimension> const& refNormal) {
+        fun_dirichlet_direction = make_facet_functional_direction(std::move(fun), refNormal);
+    }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
     void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
@@ -141,6 +149,8 @@ private:
     void compute_inverse_mass_matrix(std::size_t elNo, double* Minv) const;
     bool bc_skeleton(std::size_t fctNo, BC bc, double f_q_raw[]) const;
     bool bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const;
+    bool bc_skeleton_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const;
+    bool bc_boundary_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const;
     void transpose_JInv(std::size_t fctNo, int side);
 
     DGMethod method_;
@@ -172,6 +182,7 @@ private:
     volume_functional_t fun_rho;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
+    std::optional<facet_functional_direction_t> fun_dirichlet_direction = std::nullopt;
     std::optional<facet_functional_t> fun_slip = std::nullopt;
 
     // Precomputed data

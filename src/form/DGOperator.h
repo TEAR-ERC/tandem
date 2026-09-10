@@ -235,7 +235,7 @@ public:
         }
         vector.end_access(access_handle);
     }
-void rhs(BlockVector& vector, std::set<long int> const& activeTags) {
+void rhs(BlockVector& vector, std::set<long int> const& activeTags, long int direction) {
     auto bs = lop_->block_size();
 
     auto b_size =
@@ -275,11 +275,11 @@ void rhs(BlockVector& vector, std::set<long int> const& activeTags) {
             if (info.up[0] != info.up[1]) {
                 auto B0 = info.inside[0] ? access_handle.subtensor(slice{}, ib0) : sv(a_scratch);
                 auto B1 = info.inside[1] ? access_handle.subtensor(slice{}, ib1) : sv(a_scratch);
-                lop_->rhs_skeleton(fctNo, info, B0, B1, scratch_);
+                lop_->rhs_skeleton_direction(fctNo, info, B0, B1, scratch_, direction);
             } else {
                 if (info.inside[0]) {
                     auto B0 = access_handle.subtensor(slice{}, ib0);
-                    lop_->rhs_boundary(fctNo, info, B0, scratch_);
+                    lop_->rhs_boundary_direction(fctNo, info, B0, scratch_, direction);
                 }
             }
         }

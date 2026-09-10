@@ -571,6 +571,36 @@ bool Elasticity::bc_boundary(std::size_t fctNo, BC bc, double f_q_raw[]) const {
     return true;
 }
 
+bool Elasticity::bc_skeleton_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const {
+    assert(tensor::f_q::Shape[1] == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (bc == BC::Fault && fun_slip) {
+        (*fun_slip)(fctNo, f_q, false);
+    } else if (bc == BC::Dirichlet && fun_dirichlet_direction) {
+        (*fun_dirichlet_direction)(fctNo, f_q, false, direction);
+    } else {
+        return false;
+    }
+    return true;
+}
+bool Elasticity::bc_boundary_direction(std::size_t fctNo, BC bc, double f_q_raw[], long int direction) const {
+    assert(tensor::f_q::Shape[1] == fctRule.size());
+    auto f_q = Matrix<double>(f_q_raw, NumQuantities, fctRule.size());
+    if (bc == BC::Fault && fun_slip) {
+        (*fun_slip)(fctNo, f_q, true);
+        for (std::size_t q = 0; q < tensor::f_q::Shape[1]; ++q) {
+            for (std::size_t p = 0; p < NumQuantities; ++p) {
+                f_q(p, q) *= 0.5;
+            }
+        }
+    } else if (bc == BC::Dirichlet && fun_dirichlet_direction) {
+        (*fun_dirichlet_direction)(fctNo, f_q, true, direction);
+    } else {
+        return false;
+    }
+    return true;
+}
+
 bool Elasticity::rhs_skeleton(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
                               Vector<double>& B1, LinearAllocator<double>& scratch) const {
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
@@ -646,6 +676,130 @@ bool Elasticity::rhs_boundary(std::size_t fctNo, FacetInfo const& info, Vector<d
     alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
     alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
     if (!bc_boundary(fctNo, info.bc, f_q_raw)) {
+        return false;
+    }
+
+    alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
+    if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
+        alignas(ALIGNMENT) double Minv0[tensor::M::size()];
+        compute_inverse_mass_matrix(info.up[0], Minv0);
+
+        kernel::rhs_lift_boundary lift;
+        lift.delta = init::delta::Values;
+        lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
+        lift.f_lifted_q = f_lifted_q;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        lift.E_q(0) = E_q[info.localNo[0]].data();
+        lift.Minv(0) = Minv0;
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.execute();
+    }
+
+    kernel::rhsFacet rhs;
+    rhs.b = B0.data();
+    rhs.c10 = epsilon;
+    rhs.c20 = penalty(fctNo);
+    rhs.Dx_q(0) = Dx_q;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
+    rhs.f_q = f_q_raw;
+    rhs.f_lifted_q = f_lifted_q;
+    rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
+    rhs.w = fctRule.weights().data();
+    rhs.execute();
+
+    return true;
+}
+
+
+bool Elasticity::rhs_skeleton_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                              Vector<double>& B1, LinearAllocator<double>& scratch, long int direction) const {
+    alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
+    if (!bc_skeleton_direction(fctNo, info.bc, f_q_raw, direction)) {
+        return false;
+    }
+
+    alignas(ALIGNMENT) double f_lifted_q[tensor::f_lifted_q::size()];
+    if (method_ == DGMethod::BR2) {
+        alignas(ALIGNMENT) double f_lifted0[tensor::f_lifted::size(0)];
+        alignas(ALIGNMENT) double f_lifted1[tensor::f_lifted::size(1)];
+        alignas(ALIGNMENT) double Minv[2][tensor::M::size()];
+        for (int i = 0; i < 2; ++i) {
+            compute_inverse_mass_matrix(info.up[i], Minv[i]);
+        }
+
+        kernel::rhs_lift_skeleton lift;
+        lift.delta = init::delta::Values;
+        lift.f_q = f_q_raw;
+        lift.f_lifted(0) = f_lifted0;
+        lift.f_lifted(1) = f_lifted1;
+        lift.f_lifted_q = f_lifted_q;
+        lift.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+        lift.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
+        lift.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+        lift.mu_q(1) = fctPre[fctNo].get<mu_q_1>().data();
+        lift.n_q = fct[fctNo].get<Normal>().data()->data();
+        lift.w = fctRule.weights().data();
+        for (int i = 0; i < 2; ++i) {
+            lift.E_q(i) = E_q[info.localNo[i]].data();
+            lift.Minv(i) = Minv[i];
+        }
+        lift.execute();
+    } else { // IP
+        kernel::rhs_lift_ip lift;
+        lift.f_q = f_q_raw;
+        lift.f_lifted_q = f_lifted_q;
+        lift.nl_q = fct[fctNo].get<NormalLength>().data();
+        lift.execute();
+    }
+
+    kernel::rhsFacet rhs;
+    rhs.b = B0.data();
+    rhs.c10 = 0.5 * epsilon;
+    rhs.c20 = penalty(fctNo);
+    rhs.Dx_q(0) = Dx_q;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[0]].data();
+    rhs.E_q(0) = E_q[info.localNo[0]].data();
+    rhs.f_q = f_q_raw;
+    rhs.f_lifted_q = f_lifted_q;
+    rhs.g(0) = fct[fctNo].get<JInv0>().data()->data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_0>().data();
+    rhs.n_q = fct[fctNo].get<Normal>().data()->data();
+    rhs.w = fctRule.weights().data();
+    rhs.execute();
+
+    rhs.b = B1.data();
+    rhs.c20 *= -1.0;
+    rhs.Dxi_q(0) = Dxi_q[info.localNo[1]].data();
+    rhs.E_q(0) = E_q[info.localNo[1]].data();
+    rhs.g(0) = fct[fctNo].get<JInv1>().data()->data();
+    rhs.lam_q(0) = fctPre[fctNo].get<lam_q_1>().data();
+    rhs.mu_q(0) = fctPre[fctNo].get<mu_q_1>().data();
+    rhs.execute();
+
+    return true;
+}
+
+bool Elasticity::rhs_boundary_direction(std::size_t fctNo, FacetInfo const& info, Vector<double>& B0,
+                              LinearAllocator<double>& scratch, long int direction) const {
+    alignas(ALIGNMENT) double Dx_q[tensor::Dx_q::size(0)];
+    alignas(ALIGNMENT) double f_q_raw[tensor::f_q::size()];
+    if (!bc_boundary_direction(fctNo, info.bc, f_q_raw, direction)) {
         return false;
     }
 

@@ -33,6 +33,10 @@ public:
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;
 
+    template <std::size_t Q>
+    using functional_direction_t = std::function<std::array<double, Q>(std::array<double, D> const&, long int, long int)>;  
+
+    using facet_functional_direction_t = std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary, long int direction)>;
     constexpr static std::size_t NumFacets = D + 1;
 
     DGCurvilinearCommon(std::shared_ptr<Curvilinear<D>> cl, unsigned minQuadOrder);
@@ -82,6 +86,30 @@ public:
 
             for (std::size_t q = 0; q < f.shape(1); ++q) {
                 auto fx = fun(coords[q], tag);
+                for (std::size_t p = 0; p < f.shape(0); ++p) {
+                    f(p, q) = fx[p];
+                }
+            }
+        };
+    }
+
+    template <std::size_t Q>
+    auto make_facet_functional_direction(functional_direction_t<Q> fun, std::array<double, D> const& refNormal) const -> facet_functional_direction_t {
+        return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary, long int direction) {
+            assert(Q == f.shape(0));
+            auto coords = this->fct[fctNo].template get<Coords>();
+            auto tag = cl_->getFacetTag(fctNo);
+
+            for (std::size_t q = 0; q < f.shape(1); ++q) {
+                auto fx = fun(coords[q], tag, direction);
+
+                if (!is_boundary) {
+                    auto normal = this->fct[fctNo].template get<Normal>()[q];
+                    if (dot(refNormal, normal) < 0) {
+                        fx = -1.0 * fx;
+                    }
+                }
+
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
                     f(p, q) = fx[p];
                 }

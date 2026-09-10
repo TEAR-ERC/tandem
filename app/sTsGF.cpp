@@ -89,9 +89,9 @@ struct ReceiverGrid {
 };
 
 template <class DGOp>
-bool solve_source(DGOp& dgop, PetscLinearSolver& solver, PetscVector& b, std::set<long int> const& activeTags) {
+bool solve_source(DGOp& dgop, PetscLinearSolver& solver, PetscVector& b, std::set<long int> const& activeTags, long int direction) {
     b.set_zero();
-    dgop.rhs(b, activeTags);
+    dgop.rhs(b, activeTags, direction);
     CHKERRTHROW(KSPSolve(solver.ksp(), b.vec(), solver.x().vec()));
     return solver.is_converged();
 }
@@ -691,9 +691,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
         activeTags.insert(sourceTag);
         sw.start();
 
-        bool converged = solve_source(dgop,solver,b,activeTags);
+        for (long int direction = 0; direction < DomainDimension - 1; ++direction) {
+        bool converged = solve_source(dgop, solver, b, activeTags, direction);
             
-
+        }
         time = sw.stop();
 
         if (!converged) {
@@ -738,16 +739,8 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh,
             std::string datasetName =
                 std::to_string(sourceTag);
 
-            auto dset =
-                h5->createFixedDataset(
-                    datasetName,
-                    H5T_IEEE_F64LE,
-                    {
-                        receiverGrid.ny,
-                        receiverGrid.nx,
-                        3
-                    });
-
+            auto dset =h5->createFixedDataset(datasetName,H5T_IEEE_F64LE,{receiverGrid.ny,receiverGrid.nx,3});
+            
             std::vector<hsize_t> coordinates;
 
             /*
