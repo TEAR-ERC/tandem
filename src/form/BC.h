@@ -10,10 +10,10 @@ inline constexpr long DIRICHLET_MIN = 5;
 inline constexpr long DIRICHLET_MAX = 5;
 inline constexpr long DIRICHLET_DEFAULT = 5;
 inline constexpr long FAULT_MIN = 6;
-inline constexpr long FAULT_MAX = 1000;
+inline constexpr long FAULT_MAX = 10000;
 inline constexpr long FAULT_DEFAULT = 3;
-inline constexpr long NATURAL_MIN = 1;
-inline constexpr long NATURAL_MAX = 1;
+inline constexpr long NATURAL_MIN = 100000;
+inline constexpr long NATURAL_MAX = 200000;
 inline constexpr long NATURAL_DEFAULT = 1;
 inline constexpr long NO_FACET_TAG = -1;
 

@@ -204,6 +204,35 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
 
+    std::size_t numGfs = gfTags.size() * (DomainDimension - 1);
+    std::size_t gfNo = 0;
+
+    for (auto gfTag : gfTags) {
+        for (std::size_t direction = 0; direction < DomainDimension - 1; ++direction) {
+            ++gfNo;
+
+            sw.start();
+
+            // Set unit slip on gfTag in this direction
+
+            // Build RHS b for this slip source
+
+            // KSPSolve using the already-warmed-up solver
+
+            // Check convergence
+
+            // Evaluate displacement at receiver grid
+
+            // Write this GF to HDF5
+
+            time = sw.stop();
+
+            if (rank == 0) {
+                std::cout << "Computed " << gfNo << "/" << numGfs << " GF on tag " << gfTag
+                        << " in direction " << direction << " in " << time << " s" << std::endl;
+            }
+        }
+    }
 
 }
 
