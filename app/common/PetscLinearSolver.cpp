@@ -5,7 +5,7 @@
 namespace tndm {
 
 PetscLinearSolver::PetscLinearSolver(AbstractDGOperator<DomainDimension>& dgop, bool matrix_free,
-                                     MGConfig const& mg_config) {
+                                     MGConfig const& mg_config, bool initialize_rhs) {
     auto const& topo = dgop.topo();
     if (matrix_free) {
         A_ = std::make_unique<PetscDGShell>(dgop);
@@ -16,7 +16,11 @@ PetscLinearSolver::PetscLinearSolver(AbstractDGOperator<DomainDimension>& dgop, 
 
     b_ = std::make_unique<PetscVector>(dgop.block_size(), topo.numLocalElements(), topo.comm());
     x_ = std::make_unique<PetscVector>(*b_);
-    dgop.rhs(*b_);
+    if (initialize_rhs) {
+        dgop.rhs(*b_);
+    } else {
+        b_->set_zero();
+    }
 
     CHKERRTHROW(KSPCreate(topo.comm(), &ksp_));
     CHKERRTHROW(KSPSetType(ksp_, KSPCG));
