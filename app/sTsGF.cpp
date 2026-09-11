@@ -46,6 +46,12 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include "quadrules/SimplexQuadratureRule.h"
+#include "form/AdapterOperator.h"
+#include "form/BoundaryMap.h"
+#include "localoperator/Adapter.h"
+#include "localoperator/RateAndStateBase.h"
+
 
 using namespace tndm;
 
@@ -64,8 +70,108 @@ struct Config {
     std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
+    std::array<double, DomainDimension> up;
 };
 
+/* Sampling "rule" whose points are the nodes of the fault space. */
+auto nodal_sampling_rule() -> SimplexQuadratureRule<DomainDimension - 1u> {
+    auto space = RateAndStateBase::Space();
+    auto const& nodes = space.refNodes();
+    auto rule = SimplexQuadratureRule<DomainDimension - 1u>(nodes.size(), -1);
+    rule.points() = nodes;
+    // Only used for the mass matrix, which this adapter never applies.
+    std::fill(rule.weights().begin(), rule.weights().end(), 1.0 / nodes.size());
+    return rule;
+}
+
+/**
+ * Strike, dip and the unit normal at every node of every local fault facet.
+ *
+ * A throwaway AdapterOperator built on the nodal sampling rule. Its prepare()
+ * runs exactly the same Curvilinear::normal and Curvilinear::facetBasis calls
+ * as the real one, just evaluated at the nodes.
+ */
+
+template <class LocalOperator>
+auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                          std::shared_ptr<LocalOperator> lop,
+                          std::shared_ptr<DGOperatorTopo> topo,
+                          std::shared_ptr<BoundaryMap> fault_map,
+                          std::array<double, DomainDimension> const& up,
+                          std::array<double, DomainDimension> const& ref_normal)
+    -> FiniteElementFunction<DomainDimension - 1u> {
+    static_assert(DomainDimension == 3u, "strike and dip are 3D only");
+
+    auto cross = [](std::array<double, 3> const& a, std::array<double, 3> const& b) {
+        auto c = std::array<double, 3>{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                                       a[0] * b[1] - a[1] * b[0]};
+        auto l = std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+        return std::array<double, 3>{c[0] / l, c[1] / l, c[2] / l};
+    };
+
+    auto space = RateAndStateBase::Space();
+    auto rule = nodal_sampling_rule();
+
+    auto probe = AdapterOperator<LocalOperator>(
+        lop, std::make_unique<Adapter<LocalOperator>>(cl, space, rule, up, ref_normal), topo,
+        fault_map);
+    auto const& a = probe.lop();
+
+    auto nbf = space.numBasisFunctions();
+    auto num = fault_map->local_size();
+
+    auto f = FiniteElementFunction<DomainDimension - 1u>(
+        space.clone(),
+        std::vector<std::string>{"strike", "dip", "tag", "nx", "ny", "nz", "dip_dir_x",
+                                 "dip_dir_y", "dip_dir_z", "strike_dir_x", "strike_dir_y",
+                                 "strike_dir_z"},
+        num);
+    auto& v = f.values();
+
+    for (std::size_t faultNo = 0; faultNo < num; ++faultNo) {
+        auto tag = static_cast<double>(topo->info(fault_map->fctNo(faultNo)).facetTag);
+
+        for (std::size_t l = 0; l < nbf; ++l) {
+            auto const& B = a.fault_basis(faultNo, l);
+
+            /*
+             * Column 0 is the raw mesh normal. prepare() flips it against
+             * ref_normal, builds the basis, then negates the whole basis again,
+             * so the stored columns carry the uncorrected orientation. Redo the
+             * correction and rebuild the frame the way facetBasis does.
+             */
+            std::array<double, 3> n{B[0], B[1], B[2]};
+            if (n[0] * ref_normal[0] + n[1] * ref_normal[1] + n[2] * ref_normal[2] < 0.0) {
+                n = {-n[0], -n[1], -n[2]};
+            }
+
+            auto s = cross(up, n); // strike direction
+            auto d = cross(s, n);  // dip direction
+
+            auto az = std::atan2(s[0], s[1]) * 180.0 / M_PI;
+            if (az < 0.0) {
+                az += 360.0;
+            }
+            if (az > 360.0 - 1e-9) {
+                az = 0.0;
+            }
+
+            v(l, 0, faultNo) = az;
+            v(l, 1, faultNo) = std::acos(std::clamp(std::fabs(n[2]), 0.0, 1.0)) * 180.0 / M_PI;
+            v(l, 2, faultNo) = tag;
+            v(l, 3, faultNo) = n[0];
+            v(l, 4, faultNo) = n[1];
+            v(l, 5, faultNo) = n[2];
+            v(l, 6, faultNo) = d[0];
+            v(l, 7, faultNo) = d[1];
+            v(l, 8, faultNo) = d[2];
+            v(l, 9, faultNo) = s[0];
+            v(l, 10, faultNo) = s[1];
+            v(l, 11, faultNo) = s[2];
+        }
+    }
+    return f;
+}
 std::set<long int>
 get_gf_tags(DGOperatorTopo const& topo) {
     /*
@@ -123,6 +229,18 @@ get_gf_tags(DGOperatorTopo const& topo) {
         allTags.end());
 }
 
+void write_fault_vtu(LocalSimplexMesh<DomainDimension> const& mesh,
+                     std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                     std::vector<std::size_t> const& fctNos,
+                     FiniteElementFunction<DomainDimension - 1u> const& f,
+                     std::string const& filename) {
+    auto adapter = CurvilinearBoundaryVTUAdapter(mesh, cl, fctNos);
+    auto writer = VTUWriter<DomainDimension - 1u>(PolynomialDegree, true, PETSC_COMM_WORLD);
+    auto& piece = writer.addPiece(adapter);
+    piece.addPointData(f);
+    writer.write(filename);
+}
+
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
@@ -141,7 +259,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
     auto gfTags = get_gf_tags(*topo);
-    auto dgop = DGOperator(topo, std::move(lop));
+    auto dgop = DGOperator(topo, lop);   
 
     const auto reduce_number = [&topo](std::size_t number) {
         std::size_t number_global;
@@ -234,6 +352,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         }
     }
 
+
+    if (cfg.output) {
+        auto fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
+        auto f = fault_angle_function(cl, lop, topo, fault_map, cfg.up, cfg.ref_normal);
+        write_fault_vtu(mesh, cl, fault_map->localFctNos(), f, *cfg.output + "_fault_angles");
+    }
+
 }
 
 int main(int argc, char** argv) {
@@ -322,6 +447,15 @@ int main(int argc, char** argv) {
         .validator(PathExists());
     auto& genMeshSchema = schema.add_table("generate_mesh", &Config::generate_mesh);
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
+
+    {
+    auto default_up = std::array<double, DomainDimension>{};
+    default_up.back() = 1.0;
+    schema.add_array("up", &Config::up)
+        .default_value(std::move(default_up))
+        .of_values()
+        .help("Up direction, used to orient strike and dip in the fault basis.");
+    }
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {
