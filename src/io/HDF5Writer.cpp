@@ -162,7 +162,57 @@ std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t localElements)
 
     return {totalElements, offset};
 }
+hid_t HDF5Writer::createFixedDataset(const std::string_view name, hid_t type,
+                                     std::vector<hsize_t> dims) {
+    if (!is_open_)
+        throw std::runtime_error("HDF5Writer: file is not open");
 
+    hid_t space = H5Screate_simple(static_cast<int>(dims.size()), dims.data(), nullptr);
+    hid_t dset = H5Dcreate(file_, std::string(name).c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT,
+                           H5P_DEFAULT);
+    H5Sclose(space);
+
+    if (dset < 0)
+        throw std::runtime_error("HDF5Writer: could not create dataset " + std::string(name));
+
+    return dset;
+}
+
+void HDF5Writer::writeToDatasetPoints(hid_t dset, hid_t type, std::vector<hsize_t> const& coords,
+                                      const void* data) {
+    hid_t fileSpace = H5Dget_space(dset);
+    int ndims = H5Sget_simple_extent_ndims(fileSpace);
+
+    hsize_t numPoints = (ndims > 0) ? coords.size() / static_cast<std::size_t>(ndims) : 0;
+
+    if (numPoints > 0) {
+        H5Sselect_elements(fileSpace, H5S_SELECT_SET, numPoints, coords.data());
+    } else {
+        H5Sselect_none(fileSpace);
+    }
+
+    hsize_t memDims[1] = {numPoints};
+    hid_t memSpace = H5Screate_simple(1, memDims, nullptr);
+    if (numPoints == 0) {
+        H5Sselect_none(memSpace);
+    }
+
+    /* Independent, because each rank writes a different, disjoint set of
+     * elements. Every rank still calls this, including the ones with nothing. */
+    hid_t xfer = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(xfer, H5FD_MPIO_INDEPENDENT);
+
+    if (H5Dwrite(dset, type, memSpace, fileSpace, xfer, data) < 0) {
+        H5Pclose(xfer);
+        H5Sclose(memSpace);
+        H5Sclose(fileSpace);
+        throw std::runtime_error("HDF5Writer: point write failed");
+    }
+
+    H5Pclose(xfer);
+    H5Sclose(memSpace);
+    H5Sclose(fileSpace);
+}
 #else // ENABLE_HDF5 not defined
 
 static constexpr const char* errMsg = "HDF5Writer: tandem was built without HDF5 support. "

@@ -36,6 +36,11 @@ public:
     MPI_Comm comm() const { return comm_; }
     hid_t file() const { return file_; }
 
+    hid_t createFixedDataset(const std::string_view name, hid_t type, std::vector<hsize_t> dims);
+    
+    void writeToDatasetPoints(hid_t dset, hid_t type, std::vector<hsize_t> const& coords,
+                              const void* data);
+
 private:
     hid_t file_;
     MPI_Comm comm_;

@@ -51,7 +51,7 @@
 #include "form/BoundaryMap.h"
 #include "localoperator/Adapter.h"
 #include "localoperator/RateAndStateBase.h"
-
+#include "sTsGF_receivers.h"
 
 using namespace tndm;
 
@@ -71,6 +71,8 @@ struct Config {
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::array<double, DomainDimension> up;
+    long int receiver_surface_tag;
+    std::size_t receiver_grid_n;
 };
 
 /* Sampling "rule" whose points are the nodes of the fault space. */
@@ -91,7 +93,63 @@ auto nodal_sampling_rule() -> SimplexQuadratureRule<DomainDimension - 1u> {
  * runs exactly the same Curvilinear::normal and Curvilinear::facetBasis calls
  * as the real one, just evaluated at the nodes.
  */
+template <class LocalOperator> struct slip_traits;
+template <> struct slip_traits<Elasticity> {
+    static constexpr std::size_t NumSlipComponents = DomainDimension - 1u;
+};
+template <> struct slip_traits<Poisson> {
+    static constexpr std::size_t NumSlipComponents = 1u;
+};
 
+/**
+ * Put unit slip on every facet carrying gfTag, in the given fault-basis
+ * direction, and assemble b for it.
+ *
+ * Same sequence as SeasQDOperator::solve.
+ */
+template <class LocalOperator>
+void set_slip_and_rhs(long int gfTag, std::size_t direction,
+                      std::vector<long int> const& faultNo2tag, std::size_t nbf_fault,
+                      PetscVector& S, Scatter& scatter, SparseBlockVector<double>& ghost,
+                      AdapterOperator<LocalOperator>& adapter, DGOperator<LocalOperator>& dgop,
+                      PetscLinearSolver& solver) {
+    /*
+     * The fault space is nodal, so setting all nbf coefficients of one
+     * direction to 1 is exactly unit slip over the patch. The block layout
+     * matches the yateto tensor slip(nbf_fault, D-1), first index fastest.
+     */
+    S.set_zero();
+    {
+        auto handle = S.begin_access();
+        for (std::size_t faultNo = 0; faultNo < faultNo2tag.size(); ++faultNo) {
+            if (faultNo2tag[faultNo] != gfTag) {
+                continue;
+            }
+            for (std::size_t l = 0; l < nbf_fault; ++l) {
+                handle(l + direction * nbf_fault, faultNo) = 1.0;
+            }
+        }
+        S.end_access(handle);
+    }
+
+    // Fault facets shared with another rank need the owner's slip.
+    scatter.begin_scatter(S, ghost);
+    scatter.wait_scatter();
+    auto S_view = LocalGhostCompositeView(S, ghost);
+
+    /*
+     * slip_bc rotates the nodal slip into the fault basis and evaluates it at
+     * the facet quadrature points. update_rhs zeroes b and calls dgop.rhs(b),
+     * so the Lua force and Dirichlet terms come along in the same pass.
+     */
+    dgop.set_slip(adapter.slip_bc(S_view));
+    solver.update_rhs(dgop);
+
+    // S_view dies at the end of this scope, so drop the functional holding it.
+    dgop.set_slip([](std::size_t, Matrix<double>&, bool) {
+        throw std::logic_error("Slip boundary condition not set");
+    });
+}
 template <class LocalOperator>
 auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                           std::shared_ptr<LocalOperator> lop,
@@ -321,27 +379,74 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     if (rank == 0) {
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
+    
+    using local_operator_t = typename decltype(lop)::element_type;
+    constexpr std::size_t NumSlipComponents = slip_traits<local_operator_t>::NumSlipComponents;
+
+    auto fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
+    auto space = RateAndStateBase::Space();
+    auto nbf_fault = space.numBasisFunctions();
+    auto slip_block_size = nbf_fault * NumSlipComponents;
+
+    auto adapter = AdapterOperator<local_operator_t>(
+        lop,
+        std::make_unique<Adapter<local_operator_t>>(cl, space, lop->facetQuadratureRule(), cfg.up,
+                                                    cfg.ref_normal),
+        topo, fault_map);
+
+    // Only local facets get written; shared ones arrive through the scatter.
+    auto faultNo2tag = std::vector<long int>(fault_map->local_size());
+    for (std::size_t faultNo = 0; faultNo < fault_map->local_size(); ++faultNo) {
+        faultNo2tag[faultNo] = topo->info(fault_map->fctNo(faultNo)).facetTag;
+    }
+
+    auto S = PetscVector(slip_block_size, fault_map->local_size(), PETSC_COMM_WORLD);
+    auto scatter = Scatter(fault_map->scatter_plan());
+    auto ghost = scatter.recv_prototype<double>(slip_block_size, ALIGNMENT);
+
+
+    auto surfacePoints = receiver_surface_points(mesh, *topo, scenario.transform(),
+                                                 cfg.receiver_surface_tag);
+    auto grid = make_regular_xy_grid(surfacePoints, cfg.receiver_grid_n, PETSC_COMM_WORLD);
+    auto receivers = project_grid_to_receiver_surface(grid.xy, surfacePoints, mesh, *topo, cl,
+                                                      lop->solution_prototype(1),
+                                                      cfg.receiver_surface_tag, PETSC_COMM_WORLD);
+
+    std::vector<double> u_recv;
+
+    std::unique_ptr<GfHDF5Writer> h5;
+    if (cfg.output) {
+        h5 = std::make_unique<GfHDF5Writer>(*cfg.output, grid, receivers,
+                                            DomainDimension - 1, PETSC_COMM_WORLD);
+    }
+    
 
     std::size_t numGfs = gfTags.size() * (DomainDimension - 1);
     std::size_t gfNo = 0;
 
     for (auto gfTag : gfTags) {
+        if (h5) {
+            h5->begin_source(gfTag);
+        }
         for (std::size_t direction = 0; direction < DomainDimension - 1; ++direction) {
             ++gfNo;
 
             sw.start();
 
-            // Set unit slip on gfTag in this direction
+            set_slip_and_rhs(gfTag, direction, faultNo2tag, nbf_fault, S, scatter, ghost, adapter,
+                             dgop, solver);
+            solver.solve();
 
-            // Build RHS b for this slip source
+            if (!solver.is_converged()) {
+                throw std::runtime_error("Solver did not converge for GF " + std::to_string(gfNo));
+            }
 
-            // KSPSolve using the already-warmed-up solver
+            auto u = dgop.solution(solver.x(), receivers.elNos);
+            evaluate_receiver_displacement(u, receivers, u_recv);
 
-            // Check convergence
-
-            // Evaluate displacement at receiver grid
-
-            // Write this GF to HDF5
+            if (h5) {
+                h5->write_direction(direction, receivers, u_recv);
+            }
 
             time = sw.stop();
 
@@ -350,8 +455,22 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                         << " in direction " << direction << " in " << time << " s" << std::endl;
             }
         }
+
+        if (h5) {
+            h5->end_source();
+        }
     }
 
+    if (h5) {
+        h5->close();
+        h5.reset();
+    }
+
+    MPI_Barrier(PETSC_COMM_WORLD);
+
+    if (cfg.output && rank == 0) {
+        add_hdf5_metadata(*cfg.output + ".h5", gfTags);
+    }
 
     if (cfg.output) {
         auto fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
@@ -456,6 +575,14 @@ int main(int argc, char** argv) {
         .of_values()
         .help("Up direction, used to orient strike and dip in the fault basis.");
     }
+    schema.add_value("receiver_surface_tag", &Config::receiver_surface_tag)
+    .default_value(100001L)
+    .help("Facet tag of the surface receivers are projected onto");
+    
+    schema.add_value("receiver_grid_n", &Config::receiver_grid_n)
+        .default_value(std::size_t(100))
+        .validator([](auto&& x) { return x >= 2; })
+        .help("Number of receiver grid points along the longer horizontal side");
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {
