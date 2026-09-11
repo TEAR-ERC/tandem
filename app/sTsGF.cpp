@@ -66,6 +66,63 @@ struct Config {
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
 };
 
+std::set<long int>
+get_gf_tags(DGOperatorTopo const& topo) {
+    /*
+     * Find distinct BC::Fault facet tags on this MPI rank.
+     * Each distinct physical facet tag represents one GF source.
+     */
+    std::set<long int> localGfTags;
+
+    for (std::size_t fctNo = 0; fctNo < topo.numLocalFacets(); ++fctNo) {
+        auto const& info = topo.info(fctNo);
+
+        if (info.bc == BC::Fault) {
+            localGfTags.insert(info.facetTag);
+        }
+    }
+
+    /*
+     * Gather tags from all MPI ranks.
+     *
+     * Every rank must know the complete GF source list because
+     * KSPSolve is collective: all ranks must perform the same
+     * sequence of source solves.
+     */
+    int mpiSize;
+    MPI_Comm_size(topo.comm(), &mpiSize);
+
+    std::vector<long int> localTags(
+        localGfTags.begin(),
+        localGfTags.end());
+
+    int nLocal = static_cast<int>(localTags.size());
+
+    std::vector<int> counts(mpiSize);
+
+    MPI_Allgather(&nLocal, 1, MPI_INT,counts.data(),1,MPI_INT,topo.comm());
+
+    std::vector<int> displs(mpiSize, 0);
+
+    for (int rank = 1; rank < mpiSize; ++rank) {
+        displs[rank] =
+            displs[rank - 1] + counts[rank - 1];
+    }
+
+    int nGlobal =
+        displs.back() + counts.back();
+
+    std::vector<long int> allTags(nGlobal);
+
+    MPI_Allgatherv(localTags.data(),nLocal,MPI_LONG,allTags.data(),counts.data(),displs.data(),MPI_LONG,topo.comm());
+    /*
+     * std::set removes duplicates and sorts the tags.
+     */
+    return std::set<long int>(
+        allTags.begin(),
+        allTags.end());
+}
+
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
@@ -83,6 +140,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
+    auto gfTags = get_gf_tags(*topo);
     auto dgop = DGOperator(topo, std::move(lop));
 
     const auto reduce_number = [&topo](std::size_t number) {
@@ -133,93 +191,20 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     sw.start();
     auto solver =
-        PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+        PetscLinearSolver(dgop, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy),false);
     time = sw.stop();
     if (rank == 0) {
         std::cout << "Assembly: " << time << " s" << std::endl;
     }
 
     sw.start();
-    if (cfg.profile > 0) {
-        solver.solve();
-    } else {
-        solver.warmup();
-    }
+    solver.warmup();
     time = sw.stop();
     if (rank == 0) {
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
 
-    PetscLogStagePush(solve);
-    if (cfg.profile > 0) {
-        double avg_time = 0.0;
-        double max_time = 0.0;
-        double min_time = std::numeric_limits<double>::max();
-        for (int p = 0; p < cfg.profile; ++p) {
-            sw.start();
-            solver.solve();
-            time = sw.stop();
-            avg_time += time;
-            max_time = std::max(max_time, time);
-            min_time = std::min(min_time, time);
-        }
-        avg_time /= cfg.profile;
-        if (rank == 0) {
-            std::cout << "Solve (min): " << min_time << " s" << std::endl;
-            std::cout << "Solve (avg): " << avg_time << " s" << std::endl;
-            std::cout << "Solve (max): " << max_time << " s" << std::endl;
-        }
-    } else {
-        sw.start();
-        solver.solve();
-        time = sw.stop();
-        if (rank == 0) {
-            std::cout << "Solve: " << time << " s" << std::endl;
-        }
-    }
-    PetscLogStagePop();
-    if (!solver.is_converged()) {
-        std::cout << "Solver did not converge." << std::endl;
-        return;
-    }
 
-    PetscReal rnorm;
-    PetscInt its;
-    CHKERRTHROW(KSPGetResidualNorm(solver.ksp(), &rnorm));
-    CHKERRTHROW(KSPGetIterationNumber(solver.ksp(), &its));
-    if (rank == 0) {
-        std::cout << "Residual norm: " << rnorm << std::endl;
-        std::cout << "Iterations: " << its << std::endl;
-    }
-
-    auto numeric = dgop.solution(solver.x());
-    auto solution = scenario.solution();
-    if (solution) {
-        double error =
-            tndm::Error<DomainDimension>::L2(*cl, numeric, *solution, 0, PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "L2 error: " << error << std::endl;
-        }
-    }
-    auto solution_jacobian = scenario.solution_jacobian();
-    if (solution_jacobian) {
-        double error = tndm::Error<DomainDimension>::H1_semi(*cl, numeric, *solution_jacobian, 0,
-                                                             PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "H1-semi error: " << error << std::endl;
-        }
-    }
-
-    if (cfg.output) {
-        auto coeffs = dgop.params();
-        VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
-        auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
-        auto& piece = writer.addPiece(adapter);
-        piece.addPointData(numeric);
-        piece.addJacobianData(numeric, adapter);
-        piece.addPointData(coeffs);
-        writer.write(*cfg.output);
-    }
 }
 
 int main(int argc, char** argv) {
@@ -236,7 +221,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    argparse::ArgumentParser program("static");
+    argparse::ArgumentParser program("sTsGF");
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
