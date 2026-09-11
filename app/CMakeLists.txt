@@ -229,6 +229,17 @@ add_executable(static static.cpp)
 target_link_libraries(static PRIVATE app-common)
 target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
+## sTsGF solver
+
+if (ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
+    set(HDF5_PREFER_PARALLEL True)
+    find_package(HDF5 REQUIRED COMPONENTS C HL)
+
+    add_executable(sTsGF sTsGF.cpp)
+    target_link_libraries(sTsGF PRIVATE app-common ${HDF5_LIBRARIES} ${HDF5_HL_LIBRARIES})
+    target_include_directories(sTsGF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${HDF5_INCLUDE_DIRS})
+endif()
+
 ## Tandem
 
 add_executable(tandem
