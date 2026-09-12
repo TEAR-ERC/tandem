@@ -107,6 +107,29 @@ template <> struct slip_traits<Poisson> {
  *
  * Same sequence as SeasQDOperator::solve.
  */
+
+template <class DGOp, class CurvilinearType>
+void write_vtu(DGOp& dgop, PetscLinearSolver& solver, std::shared_ptr<CurvilinearType> const& cl,
+               std::string const& filename, bool writeDisplacement = true,
+               bool writeParameters = true) {
+    VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
+    auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
+    auto& piece = writer.addPiece(adapter);
+
+    if (writeDisplacement) {
+        auto numeric = dgop.solution(solver.x());
+        piece.addPointData(numeric);
+        piece.addJacobianData(numeric, adapter);
+    }
+
+    if (writeParameters) {
+        auto coeffs = dgop.params();
+        piece.addPointData(coeffs);
+    }
+
+    writer.write(filename);
+}
+
 template <class LocalOperator>
 void set_slip_and_rhs(long int gfTag, std::size_t direction,
                       std::vector<long int> const& faultNo2tag, std::size_t nbf_fault,
@@ -476,6 +499,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         auto fault_map = std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD);
         auto f = fault_angle_function(cl, lop, topo, fault_map, cfg.up, cfg.ref_normal);
         write_fault_vtu(mesh, cl, fault_map->localFctNos(), f, *cfg.output + "_fault_angles");
+        write_vtu(dgop, solver, cl, *cfg.output, false, true);
     }
 
 }
