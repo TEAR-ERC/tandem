@@ -1,0 +1,58 @@
+# sgf example: three small faults in a large elastic half space.
+#
+#   gmsh -3 sgf_3_faults_example.geo -o sgf_3_faults_example.msh
+#   mpirun -n 8 ./sgf sgf_3_faults_example.toml --petsc \
+#       -ksp_type cg -pc_type gamg -ksp_rtol 1e-10 -ksp_converged_reason
+
+type = "elasticity"
+lib = "sgf_3_faults_example.lua"
+scenario = "tde"
+mesh_file = "sgf_3_faults_example.msh"
+
+# up orients strike and dip in the fault basis: s = up x n, d = s x n.
+# Slip direction 0 is d, direction 1 is s.
+up = [0.0, 0.0, 1.0]
+
+# ref_normal fixes which side of each fault is side 0, so positive slip means
+# the same thing on every facet. It must not be near perpendicular to any fault
+# normal. These faults dip 30 to 60 degrees, so vertical works.
+ref_normal = [0.0, 0.0, 1.0]
+
+
+# ---------------------------------------------------------------------------
+# Outputs. Every table below is optional: delete one and that output is skipped.
+# ---------------------------------------------------------------------------
+
+# Displacement on a regular grid over the facets tagged 100001, as
+# sgf_3_faults_example_grid.h5 with dims (y, x, direction, component).
+[receiver_grid_output]
+prefix = "sgf_3_faults_example_grid"
+surface_tag = 100001
+n = 120
+
+# Displacement at named points, as sgf_3_faults_example_probes.h5 with
+# probeData of shape (probe, gf, component). Each rank writes its own points.
+[receiver_probe_output]
+prefix = "sgf_3_faults_example_probes"
+probes = [
+    { name = "obs0", x = [  0.00,   0.00,   0.00] },
+    { name = "obs1", x = [  2.50,   1.50,   0.00] },
+    { name = "obs2", x = [ -2.00,   2.00,   0.00] },
+    { name = "obs3", x = [  4.00,  -3.00,   0.00] },
+    { name = "obs4", x = [ -4.50,  -1.00,   0.00] },
+    { name = "obs5", x = [  1.00,   5.00,   0.00] },
+]
+
+# Volume VTU. parameters writes lam and mu once to <prefix>. per_source writes
+# the displacement field to <prefix>_<tag>_<direction> for every GF, which is
+# one full volume dump per solve, so better to leave it off except when debugging.
+[domain_output]
+prefix = "sgf_3_faults_example_domain"
+parameters = true
+per_source = false
+jacobian = false
+
+# Fault geometry VTU: strike, dip, tag, unit normal and both slip direction
+# vectors at every node of every fault facet.
+[fault_output]
+prefix = "sgf_3_faults_example_faults"
