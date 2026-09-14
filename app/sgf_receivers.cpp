@@ -1,4 +1,4 @@
-#include "sTsGF_receivers.h"
+#include "sgf_receivers.h"
 
 #include "geometry/PointLocator.h"
 #include "io/Probe.h"

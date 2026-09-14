@@ -1,5 +1,5 @@
-#ifndef STSGF_RECEIVERS_H
-#define STSGF_RECEIVERS_H
+#ifndef SGF_RECEIVERS_H
+#define SGF_RECEIVERS_H
 
 #include "config.h"
 #include "form/DGOperatorTopo.h"
@@ -131,4 +131,4 @@ void add_hdf5_metadata(std::string const& filename, std::set<long int> const& gf
 
 } // namespace tndm
 
-#endif // STSGF_RECEIVERS_H
+#endif // SGF_RECEIVERS_H

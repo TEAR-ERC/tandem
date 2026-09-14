@@ -51,7 +51,7 @@
 #include "form/BoundaryMap.h"
 #include "localoperator/Adapter.h"
 #include "localoperator/RateAndStateBase.h"
-#include "sTsGF_receivers.h"
+#include "sgf_receivers.h"
 
 #include "io/HDF5ProbeWriter.h"
 #include "io/Probe.h"
@@ -545,7 +545,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    argparse::ArgumentParser program("sTsGF");
+    argparse::ArgumentParser program("sgf");
     program.add_argument("--petsc").help("PETSc options, must be passed last!");
     program.add_argument("config").help("Configuration file (.toml)");
 
