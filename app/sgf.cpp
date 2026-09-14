@@ -69,6 +69,17 @@ struct ReceiverGridConfig {
     std::size_t n;
 };
 
+struct DomainOutputConfig {
+    std::string prefix;
+    bool per_source = false;   // one VTU per fault tag and direction
+    bool jacobian = false;     // add the displacement gradient to those
+    bool parameters = true;    // lam and mu, once, at the end
+};
+
+struct FaultOutputConfig {
+    std::string prefix;
+};
+
 struct Config {
     std::optional<double> resolution;
     DGMethod method;
@@ -81,12 +92,13 @@ struct Config {
     MGStrategy mg_strategy;
     unsigned mg_coarse_level;
     int profile;
-    std::optional<std::string> output;
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::array<double, DomainDimension> up;
     std::optional<ReceiverProbeConfig> receiver_probe_output;
     std::optional<ReceiverGridConfig> receiver_grid_output;
+    std::optional<DomainOutputConfig> domain_output;
+    std::optional<FaultOutputConfig> fault_output;
 };
 
 /* Sampling "rule" whose points are the nodes of the fault space. */
@@ -125,7 +137,7 @@ template <> struct slip_traits<Poisson> {
 template <class DGOp, class CurvilinearType>
 void write_vtu(DGOp& dgop, PetscLinearSolver& solver, std::shared_ptr<CurvilinearType> const& cl,
                std::string const& filename, bool writeDisplacement = true,
-               bool writeParameters = true) {
+               bool writeParameters = true, bool writeJacobian = false) {
     VTUWriter<DomainDimension> writer(PolynomialDegree, true, PETSC_COMM_WORLD);
     auto adapter = CurvilinearVTUAdapter(cl, dgop.num_local_elements());
     auto& piece = writer.addPiece(adapter);
@@ -133,7 +145,9 @@ void write_vtu(DGOp& dgop, PetscLinearSolver& solver, std::shared_ptr<Curvilinea
     if (writeDisplacement) {
         auto numeric = dgop.solution(solver.x());
         piece.addPointData(numeric);
-        piece.addJacobianData(numeric, adapter);
+        if (writeJacobian) {
+            piece.addJacobianData(numeric, adapter);
+        }
     }
 
     if (writeParameters) {
@@ -510,6 +524,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                 std::cout << "Computed " << gfNo << "/" << numGfs << " GF on tag " << gfTag
                         << " in direction " << direction << " in " << time << " s" << std::endl;
             }
+
+            if (cfg.domain_output && cfg.domain_output->per_source) {
+                write_vtu(dgop, solver, cl,
+                          cfg.domain_output->prefix + "_" + std::to_string(gfTag) + "_" +
+                              std::to_string(direction),
+                          true, false, cfg.domain_output->jacobian);
+            }
+
         }
 
         if (gridWriter) {
@@ -518,11 +540,13 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     }
 
 
-    if (cfg.output) {
-        
+    if (cfg.fault_output) {
         auto f = fault_angle_function(cl, lop, topo, fault_map, cfg.up, cfg.ref_normal);
-        write_fault_vtu(mesh, cl, fault_map->localFctNos(), f, *cfg.output + "_fault_angles");
-        write_vtu(dgop, solver, cl, *cfg.output, false, true);
+        write_fault_vtu(mesh, cl, fault_map->localFctNos(), f, cfg.fault_output->prefix);
+    }
+
+    if (cfg.domain_output && cfg.domain_output->parameters) {
+        write_vtu(dgop, solver, cl, cfg.domain_output->prefix, false, true);
     }
 
     if (gridWriter) {
@@ -617,7 +641,25 @@ int main(int argc, char** argv) {
         .default_value(0)
         .validator([](auto&& x) { return x >= 0; })
         .help("Run static in profile mode. The parameter controls the amount of repetitions.");
-    schema.add_value("output", &Config::output).help("Output file name");
+    auto& domainOutputSchema = schema.add_table("domain_output", &Config::domain_output);
+    domainOutputSchema.add_value("prefix", &DomainOutputConfig::prefix)
+        .validator(ParentPathExists())
+        .help("Output file name prefix for the volume VTUs");
+    domainOutputSchema.add_value("per_source", &DomainOutputConfig::per_source)
+        .default_value(false)
+        .help("Write <prefix>_<tag>_<direction> with the displacement for every GF. "
+              "Debugging only, one full volume dump per solve.");
+    domainOutputSchema.add_value("jacobian", &DomainOutputConfig::jacobian)
+        .default_value(false)
+        .help("Add the Jacobian to the per_source output");
+    domainOutputSchema.add_value("parameters", &DomainOutputConfig::parameters)
+        .default_value(true)
+        .help("Write <prefix> with lam and mu once at the end");
+
+    auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
+    faultOutputSchema.add_value("prefix", &FaultOutputConfig::prefix)
+        .validator(ParentPathExists())
+        .help("Output file name prefix for the fault geometry VTU");
     schema.add_value("mesh_file", &Config::mesh_file)
         .converter(makePathRelativeToConfig)
         .validator(PathExists());
