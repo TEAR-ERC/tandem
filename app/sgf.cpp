@@ -63,6 +63,12 @@ struct ReceiverProbeConfig {
     std::vector<Probe<DomainDimension>> probes;
 };
 
+struct ReceiverGridConfig {
+    std::string prefix;
+    long int surface_tag;
+    std::size_t n;
+};
+
 struct Config {
     std::optional<double> resolution;
     DGMethod method;
@@ -79,9 +85,8 @@ struct Config {
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::array<double, DomainDimension> up;
-    std::optional<long int> receiver_surface_tag;   // was long int
-    std::size_t receiver_grid_n;
     std::optional<ReceiverProbeConfig> receiver_probe_output;
+    std::optional<ReceiverGridConfig> receiver_grid_output;
 };
 
 /* Sampling "rule" whose points are the nodes of the fault space. */
@@ -201,7 +206,7 @@ auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
 
     auto space = RateAndStateBase::Space();
     auto rule = nodal_sampling_rule();
-
+    
     auto probe = AdapterOperator<LocalOperator>(
         lop, std::make_unique<Adapter<LocalOperator>>(cl, space, rule, up, ref_normal), topo,
         fault_map);
@@ -442,15 +447,16 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     ReceiverSet gridReceivers;
     std::vector<double> u_recv;
 
-    if (cfg.output && cfg.receiver_surface_tag) {
+    if (cfg.receiver_grid_output) {
+        auto const& gc = *cfg.receiver_grid_output;
         auto surfacePoints = receiver_surface_points(mesh, *topo, scenario.transform(),
-                                                     *cfg.receiver_surface_tag);
-        grid = make_regular_xy_grid(surfacePoints, cfg.receiver_grid_n, PETSC_COMM_WORLD);
+                                                     gc.surface_tag);
+        grid = make_regular_xy_grid(surfacePoints, gc.n, PETSC_COMM_WORLD);
         gridReceivers = project_grid_to_receiver_surface(
             grid.xy, surfacePoints, mesh, *topo, cl, lop->solution_prototype(1),
-            *cfg.receiver_surface_tag, PETSC_COMM_WORLD);
+            gc.surface_tag, PETSC_COMM_WORLD);
         gridWriter = std::make_unique<GfHDF5Writer>(
-            *cfg.output + "_grid", grid, gridReceivers, DomainDimension - 1, PETSC_COMM_WORLD);
+            gc.prefix, grid, gridReceivers, DomainDimension - 1, PETSC_COMM_WORLD);
     }
 
     std::unique_ptr<HDF5ProbeWriter<DomainDimension, false>> probeWriter;
@@ -524,7 +530,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         gridWriter.reset();
         MPI_Barrier(PETSC_COMM_WORLD);
         if (rank == 0) {
-            add_hdf5_metadata(*cfg.output + "_grid.h5", gfTags);
+            add_hdf5_metadata(cfg.receiver_grid_output->prefix + ".h5", gfTags);
         }
     }
     probeWriter.reset();
@@ -626,13 +632,17 @@ int main(int argc, char** argv) {
         .of_values()
         .help("Up direction, used to orient strike and dip in the fault basis.");
     }
-    schema.add_value("receiver_surface_tag", &Config::receiver_surface_tag)
-    .help("Facet tag of the surface receivers are projected onto");
     
-    schema.add_value("receiver_grid_n", &Config::receiver_grid_n)
+    auto& gridOutputSchema =
+        schema.add_table("receiver_grid_output", &Config::receiver_grid_output);
+    gridOutputSchema.add_value("prefix", &ReceiverGridConfig::prefix)
+        .help("Output prefix; the grid is written to <prefix>.h5");
+    gridOutputSchema.add_value("surface_tag", &ReceiverGridConfig::surface_tag)
+        .help("Facet tag of the surface receivers are projected onto");
+    gridOutputSchema.add_value("n", &ReceiverGridConfig::n)
         .default_value(std::size_t(100))
         .validator([](auto&& x) { return x >= 2; })
-        .help("Number of receiver grid points along the longer horizontal side");
+        .help("Grid points along the longer horizontal side");
     
     auto& probeOutputSchema =
         schema.add_table("receiver_probe_output", &Config::receiver_probe_output);
