@@ -17,6 +17,8 @@
 
 #include <Eigen/LU>
 #include <cassert>
+#include <stdexcept>
+#include <string>
 
 namespace tensor = tndm::elasticity::tensor;
 namespace init = tndm::elasticity::init;
@@ -29,9 +31,13 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
-      fun_lam(make_volume_functional(std::move(lam))),
-      fun_mu(make_volume_functional(std::move(mu))),
-      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
+      // Material coefficients are interpolated in materialSpace_, i.e. they are evaluated at
+      // the nodes of materialSpace_ and not L2-projected from the quadrature points. A nodal
+      // basis has phi_i(xi_j) = delta_ij, so the point values *are* the coefficients.
+      fun_lam(make_volume_functional(std::move(lam), materialSpace_.refNodes())),
+      fun_mu(make_volume_functional(std::move(mu), materialSpace_.refNodes())),
+      fun_rho(rho ? make_volume_functional(std::move(*rho), materialSpace_.refNodes())
+                  : one_volume_function) {
 
     MhatInv = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
@@ -103,64 +109,30 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
 void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
-    alignas(ALIGNMENT) double lam_Q_raw[tensor::lam_Q::size()];
-    auto lam_Q = Matrix<double>(lam_Q_raw, 1, volRule.size());
-    fun_lam(elNo, lam_Q);
-
-    alignas(ALIGNMENT) double mu_Q_raw[tensor::mu_Q::size()];
-    auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
-    fun_mu(elNo, mu_Q);
-
-    alignas(ALIGNMENT) double rhoInv_Q_raw[tensor::rhoInv_Q::size()];
-    auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
-    fun_rho(elNo, rhoInv_Q);
-    for (unsigned q = 0; q < tensor::rhoInv_Q::Shape[0]; ++q) {
-        rhoInv_Q(0, q) = 1.0 / rhoInv_Q(0, q);
-    }
-
-    alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
-    kernel::project_material_lhs krnl_lhs;
-    krnl_lhs.matE_Q_T = matE_Q_T.data();
-    krnl_lhs.J = vol[elNo].get<AbsDetJ>().data();
-    krnl_lhs.matM = Mmem;
-    krnl_lhs.W = volRule.weights().data();
-    krnl_lhs.execute();
+    // Interpolate the material in materialSpace_: fun_lam, fun_mu and fun_rho evaluate at the
+    // nodes of materialSpace_, and for a nodal basis the point values are the coefficients.
+    // Unlike an L2 projection this cannot turn a non-negative lambda or mu into a negative
+    // coefficient, which matters where the material is close to zero (e.g. at a free surface).
+    constexpr std::size_t matNbf = tensor::lam::Shape[0];
+    static_assert(matNbf == tensor::mu::Shape[0]);
+    static_assert(matNbf == tensor::rhoInv::Shape[0]);
+    assert(matNbf == materialSpace_.numBasisFunctions());
 
     auto lam_field = material[elNo].get<lam>().data();
     auto mu_field = material[elNo].get<mu>().data();
     auto rhoInv_field = material[elNo].get<rhoInv>().data();
-    kernel::project_material_rhs krnl_rhs;
-    krnl_rhs.matE_Q_T = matE_Q_T.data();
-    krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
-    krnl_rhs.lam = lam_field;
-    krnl_rhs.lam_Q = lam_Q_raw;
-    krnl_rhs.mu = mu_field;
-    krnl_rhs.mu_Q = mu_Q_raw;
-    krnl_rhs.rhoInv = rhoInv_field;
-    krnl_rhs.rhoInv_Q = rhoInv_Q_raw;
-    krnl_rhs.W = volRule.weights().data();
-    krnl_rhs.execute();
 
-    using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
-                            Eigen::Unaligned,
-                            Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
-    using LamMap = Eigen::Map<Eigen::Matrix<double, tensor::lam::Shape[0], 1>, Eigen::Unaligned,
-                              Eigen::InnerStride<1>>;
-    using MuMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
-                             Eigen::InnerStride<1>>;
-    using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
-                                 Eigen::Unaligned, Eigen::InnerStride<1>>;
+    auto lam_N = Matrix<double>(lam_field, 1, matNbf);
+    fun_lam(elNo, lam_N);
 
-    auto proj = MMap(Mmem).fullPivLu();
+    auto mu_N = Matrix<double>(mu_field, 1, matNbf);
+    fun_mu(elNo, mu_N);
 
-    auto lam_eigen = LamMap(lam_field);
-    lam_eigen = proj.solve(lam_eigen);
-
-    auto mu_eigen = MuMap(mu_field);
-    mu_eigen = proj.solve(mu_eigen);
-
-    auto rhoInv_eigen = RhoInvMap(rhoInv_field);
-    rhoInv_eigen = proj.solve(rhoInv_eigen);
+    auto rho_N = Matrix<double>(rhoInv_field, 1, matNbf);
+    fun_rho(elNo, rho_N);
+    for (std::size_t i = 0; i < matNbf; ++i) {
+        rhoInv_field[i] = 1.0 / rhoInv_field[i];
+    }
 
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
@@ -261,6 +233,16 @@ std::pair<double, double> Elasticity::stiffness_tensor_bounds(std::size_t elNo) 
     for (std::size_t i = 0, n = lam_field.size(); i < n; ++i) {
         c0 = std::min(c0, 2.0 * mu_field[i]);
         c1 = std::max(c1, Dim * lam_field[i] + 2.0 * mu_field[i]);
+    }
+    // c0 is a lower bound on the smallest eigenvalue of the stiffness tensor and ends up in the
+    // denominator of the interior penalty (see prepare_penalty). A non-positive c0 gives a
+    // non-positive penalty, which destroys coercivity of the DG bilinear form, so fail loudly
+    // here instead of producing an indefinite operator or a NaN time step later on.
+    if (!(c0 > 0.0)) {
+        throw std::runtime_error("Element " + std::to_string(elNo) +
+                                 ": min(2 mu) = " + std::to_string(c0) +
+                                 " is not positive. The interior penalty requires mu > 0 "
+                                 "everywhere; put a positive lower bound on mu in the scenario.");
     }
     return {c0, c1};
 }

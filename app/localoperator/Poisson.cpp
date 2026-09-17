@@ -17,6 +17,8 @@
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <cassert>
+#include <stdexcept>
+#include <string>
 
 namespace tensor = tndm::poisson::tensor;
 namespace init = tndm::poisson::init;
@@ -29,8 +31,12 @@ Poisson::Poisson(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
-      fun_K(make_volume_functional(std::move(K))), fun_force(zero_volume_function),
-      fun_dirichlet(zero_facet_function), fun_slip(zero_facet_function) {
+      // K is interpolated in materialSpace_, i.e. evaluated at the nodes of materialSpace_ and
+      // not L2-projected from the quadrature points. A nodal basis has phi_i(xi_j) = delta_ij,
+      // so the point values *are* the coefficients.
+      fun_K(make_volume_functional(std::move(K), materialSpace_.refNodes())),
+      fun_force(zero_volume_function), fun_dirichlet(zero_facet_function),
+      fun_slip(zero_facet_function) {
 
     Minv_ = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
@@ -133,35 +139,15 @@ void Poisson::begin_preparation(std::size_t numElements, std::size_t numLocalEle
 void Poisson::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
+    // Interpolate K in materialSpace_: fun_K evaluates at the nodes of materialSpace_, and for a
+    // nodal basis the point values are the coefficients. Unlike an L2 projection this cannot turn
+    // a non-negative K into a negative coefficient.
+    constexpr std::size_t matNbf = tensor::K::Shape[0];
+    assert(matNbf == materialSpace_.numBasisFunctions());
+
     auto Kfield = material[elNo].get<K>().data();
-    alignas(ALIGNMENT) double K_Q_raw[tensor::K_Q::size()];
-    auto K_Q = Matrix<double>(K_Q_raw, 1, volRule.size());
-    fun_K(elNo, K_Q);
-
-    alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
-    kernel::project_K_lhs krnl_lhs;
-    krnl_lhs.matE_Q_T = matE_Q_T.data();
-    krnl_lhs.J_Q = vol[elNo].get<AbsDetJ>().data();
-    krnl_lhs.matM = Mmem;
-    krnl_lhs.W = volRule.weights().data();
-    krnl_lhs.execute();
-
-    kernel::project_K_rhs krnl_rhs;
-    krnl_rhs.matE_Q_T = matE_Q_T.data();
-    krnl_rhs.J_Q = vol[elNo].get<AbsDetJ>().data();
-    krnl_rhs.K = Kfield;
-    krnl_rhs.K_Q = K_Q_raw;
-    krnl_rhs.W = volRule.weights().data();
-    krnl_rhs.execute();
-
-    using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
-                            Eigen::Unaligned,
-                            Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
-    using KMap = Eigen::Map<Eigen::Matrix<double, tensor::K::Shape[0], 1>, Eigen::Unaligned,
-                            Eigen::InnerStride<1>>;
-
-    auto K_eigen = KMap(Kfield);
-    K_eigen = MMap(Mmem).fullPivLu().solve(K_eigen);
+    auto K_N = Matrix<double>(Kfield, 1, matNbf);
+    fun_K(elNo, K_N);
 }
 
 void Poisson::prepare_skeleton(std::size_t fctNo, FacetInfo const& info,
@@ -211,6 +197,15 @@ void Poisson::prepare_penalty(std::size_t fctNo, FacetInfo const& info, LinearAl
         auto Kfield = material[info.up[side]].get<K>().data();
         auto k0 = *std::min_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
         auto k1 = *std::max_element(Kfield, Kfield + materialSpace_.numBasisFunctions());
+        // k0 ends up in the denominator of the interior penalty. A non-positive k0 gives a
+        // non-positive penalty, which destroys coercivity of the DG bilinear form, so fail
+        // loudly here instead of producing an indefinite operator later on.
+        if (!(k0 > 0.0)) {
+            throw std::runtime_error(
+                "Element " + std::to_string(info.up[side]) + ": min(K) = " + std::to_string(k0) +
+                " is not positive. The interior penalty requires K > 0 everywhere; put a "
+                "positive lower bound on K in the scenario.");
+        }
         constexpr double c_N_1 = InverseInequality<Dim>::trace_constant(PolynomialDegree - 1);
         return (Dim + 1) * c_N_1 * (area_[fctNo] / volume_[info.up[side]]) * (k1 * k1 / k0);
     };

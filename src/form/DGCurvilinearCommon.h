@@ -73,6 +73,42 @@ public:
         };
     }
 
+    /**
+     * @brief make_volume_functional for evaluation points other than the quadrature points
+     *
+     * The overload above is tied to volRule.points(), because it reads the pre-computed
+     * coordinates of the quadrature points. This one maps an arbitrary set of reference points
+     * to physical space itself, which is what nodal interpolation of a coefficient needs.
+     *
+     * @param fun Function to evaluate
+     * @param refPoints Evaluation points in the reference element
+     */
+    template <std::size_t Q>
+    auto make_volume_functional(functional_t<Q> fun,
+                                std::vector<std::array<double, D>> const& refPoints) const
+        -> volume_functional_t {
+        auto geoE = std::make_shared<Managed<Matrix<double>>>(cl_->evaluateBasisAt(refPoints));
+        auto const numPoints = refPoints.size();
+        return [fun, geoE, numPoints, this](std::size_t elNo, Matrix<double>& F) {
+            assert(Q == F.shape(0));
+            assert(numPoints == F.shape(1));
+            // Allocated here rather than captured so that the functional stays re-entrant
+            auto coords = Managed<Matrix<double>>(cl_->mapResultInfo(numPoints));
+            cl_->map(elNo, *geoE, coords);
+            long int tag = cl_->getVolumeTag(elNo);
+            auto x = std::array<double, D>{};
+            for (std::size_t q = 0; q < numPoints; ++q) {
+                for (std::size_t d = 0; d < D; ++d) {
+                    x[d] = coords(d, q);
+                }
+                auto fx = fun(x, tag);
+                for (std::size_t p = 0; p < Q; ++p) {
+                    F(p, q) = fx[p];
+                }
+            }
+        };
+    }
+
     template <std::size_t Q>
     auto make_facet_functional(functional_t<Q> fun) const -> facet_functional_t {
         return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
