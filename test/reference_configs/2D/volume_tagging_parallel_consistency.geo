@@ -27,10 +27,6 @@ v() = BooleanFragments{ Surface{box}; Delete; }{ Line{h_line, v_line}; Delete; }
 
 MeshSize{ PointsOf{Surface{:};} } = res;
 
-//Physical Curve(1) = { 1, 8, 9, 11, 12, 6, 7, 4 }; // exterior
-//Physical Curve(2) = { 2, 5 }; // horiz lines (left, right)
-//Physical Curve(3) = { 3, 10 }; // vert lines (bottom, top)
-
 Physical Curve(1) = { 9, 11, 7, 4 }; // top, bottom
 Physical Curve(5) = { 1, 8, 6, 12 }; // left, right
 
