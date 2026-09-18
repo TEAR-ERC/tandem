@@ -323,9 +323,9 @@ private:
 template <std::size_t D, bool isBoundary> class HDF5CommonProbeWriter : public Writer {
 public:
     HDF5CommonProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
-                         std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
-                         LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
-                         BoundaryMap const& bnd_map, MPI_Comm comm)
+                          std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
+                          LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                          BoundaryMap const& bnd_map, MPI_Comm comm)
         : Writer(prefix, oi),
           writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), bnd_map, comm) {}
 
