@@ -6,8 +6,8 @@ import numpy as np
 def check_moment_rate_h5(temp_results_path, tolerances):
     """
     Checks that the moment_rate.h5 file is valid and that the sum of moment
-    rates over all fault elements at the first non-zero timestep (index 0),
-    matches the expected value.
+    rates over all fault elements at the first timestep (index 0)
+    matches the expected value of 1.281524803579644e-06
 
     Expected: 1.2815248035796437e-06
     """
@@ -44,13 +44,13 @@ def check_moment_rate_h5(temp_results_path, tolerances):
     # Sum over all fault elements at first time step
     moment_rate_sum = np.sum(moment_rate[:, 0, 0])
 
-    expected = 1.2815248035796437e-06
+    expected = 1.281524803579644e-06
     np.testing.assert_allclose(
         moment_rate_sum,
         expected,
         rtol=tolerances["seas"],
         err_msg=(
-            f"Sum of moment rates at first non-zero timestep "
+            f"Sum of moment rates at first timestep "
             f"(normalized) {moment_rate_sum} does not match expected {expected}"
         ),
     )
