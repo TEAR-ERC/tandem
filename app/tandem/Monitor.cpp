@@ -106,6 +106,10 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     writer->write(time, mneme::span(data.data(), 2));
                     break;
                 }
+                case DataLevel::Heirarchical: {
+                    writer->write_static();
+                    break;
+                }
                 };
                 writer->increase_step(time, VMax);
             }
