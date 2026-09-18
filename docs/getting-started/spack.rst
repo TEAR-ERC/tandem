@@ -69,11 +69,18 @@ e.g.:
 
     module use $HOME/spack/modules/x86_avx512/linux-sles15-skylake_avx512/
 
+.. _installing-branches-spack:
+
 Installing various branches using Spack
 ---------------------------------------
 
 Spack installs the main branch by default. 
-Compiling tandem from other branches using Spack can be done by modifying the file :code:`package.py` under directory :code:`spack/var/spack/repos/builtin/packages/tandem` or :code:`seissol-spack-aid/spack/packages/tandem` in SuperMUC.
+Compiling tandem from other branches using Spack can be done by modifying the tandem spack recipe with:
+
+.. code-block:: bash
+
+    spack edit tandem
+
 The lines one may want to alter include:
 
 .. code-block:: python
@@ -98,3 +105,17 @@ If one aims to install their own fork of tandem, one may alter the git address, 
 .. code-block:: python
 
     git = "https://github.com/USER_REPO/fork_of_tandem.git"
+
+If your branch is stale, you may need to fix it by including a patch, e.g.:
+
+.. code-block:: python
+
+    patch("fix_v1.0_compilation.diff", when="@TScheckpoint")
+
+Note: only include this when your branch is STALE. Check if the modifications are already applied in ``app/CMakeLists.txt`` in your branch.
+
+Then install using the build name after ``tandem@``:
+
+.. code-block:: bash
+
+    spack install tandem@BUILD_NAME domain_dimension=2 polynomial_degree=6
