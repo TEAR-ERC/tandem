@@ -91,6 +91,16 @@ Build and install:
     $ make check            
     $ make install
 
+(Optional) Installing Lua Modules
+---------------------------------
+
+Additional Lua modules can be installed through ``luarocks``. This is often required for specific benchmark setups that parse external files or interact with the system environment—for example, the Ridgecrest setup of Uphoff et al. (2023):
+
+.. code-block:: bash
+
+   luarocks install csv
+   luarocks install luaposix
+
 Compile tandem
 --------------
 
