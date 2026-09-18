@@ -31,33 +31,20 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
         std::cout << "Creating dataset: " << name << std::endl;
     }
 
-    // Get local number of faults
-    hsize_t timeStepDim = dims[0];
-    hsize_t nDataPointsPerRank = dims[1];
-    hsize_t dataDimension = dims[2];
-
     // Compute total number of faults and rank offsets
     auto [totalDataPoints, _] = calculateOffsets(dims[extensibleIndex]);
     dims[extensibleIndex] = totalDataPoints; // Update the dimension for the dataset
     // Set initial and max dimensions
-
     max_dims[extensibleIndex] = totalDataPoints; // Time is unlimited
 
     // Define chunking for efficient access
-    hsize_t chunk_dims[3];
-    chunk_dims[0] = dims[0];
-    chunk_dims[1] = dims[1];
-    chunk_dims[2] = dims[2];
+    std::vector<hsize_t> chunk_dims = dims;
     // Create dataspace
-    // For time dataset (1D), use different chunking
-    if (dims.size() == 1) {
-        chunk_dims[0] = 1; // Chunk size for time values
-    }
     hid_t dataspace = H5Screate_simple(dims.size(), dims.data(), max_dims.data());
 
     // Set dataset creation properties (chunking enabled)
     hid_t prop = H5Pcreate(H5P_DATASET_CREATE);
-    H5Pset_chunk(prop, dims.size(), chunk_dims);
+    H5Pset_chunk(prop, dims.size(), chunk_dims.data());
 
     // Create the dataset
     hid_t dset = H5Dcreate(file_, name.data(), type, dataspace, H5P_DEFAULT, prop, H5P_DEFAULT);
