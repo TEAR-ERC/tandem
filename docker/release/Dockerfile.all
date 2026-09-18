@@ -8,6 +8,8 @@ FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
 
 USER root
 
+RUN apt-get update && apt-get install -y python3-numpy && rm -rf /var/lib/apt/lists/*
+
 # Clone Tandem source
 RUN mkdir -p /opt/tandem && cd /opt/tandem \
     && git clone https://github.com/TEAR-ERC/tandem.git \
