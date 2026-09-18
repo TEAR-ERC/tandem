@@ -4,11 +4,13 @@
 #include "meshParser.h"
 #include <array>
 #include <cstdint>
-#include <hdf5.h>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#ifdef ENABLE_HDF5
+#include <hdf5.h>
+#endif
 
 namespace tndm {
 
@@ -19,18 +21,20 @@ private:
 
     template <typename T> T logError(std::string_view msg);
     template <typename T> T logErrorAnnotated(std::string_view msg);
+
+#ifdef ENABLE_HDF5
     template <typename T> bool readDataset(hid_t file, const char* name, std::vector<T>& data);
     bool parseNodes(hid_t file);
     bool parseElements(hid_t file);
     bool parseBoundary(hid_t file);
     bool retrieveLowerDimensionalElements(hid_t file);
+    bool addAllElements(std::string const& fileName);
+#endif
 
 public:
     H5Parser(meshBuilder* builder) : builder(builder) {}
 
     bool parseFile(std::string const& fileName) override;
-    bool addAllElements(std::string const& fileName);
-
     std::string_view getErrorMessage() const override { return errorMsg; }
 
     std::vector<std::array<long, 4>> higherDimensionalElements;
