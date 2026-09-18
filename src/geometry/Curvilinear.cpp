@@ -43,9 +43,17 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
     }
-    auto volumeTagData = dynamic_cast<VolumeTagData const*>(mesh.elements().getVolumeTagData());
-    if (volumeTagData) {
-        volumeTags_ = volumeTagData->getVolumeTags();
+    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
+    if (boundaryData) {
+        facetTags = boundaryData->getFacetTags();
+    } else {
+        std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
+                  << std::endl;
+        facetTags.resize(mesh.numElements(), -1);
+    }
+    auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
+    if (volumeData) {
+        volumeTags_ = volumeData->getVolumeTags();
     } else {
         int rank = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -169,6 +177,13 @@ template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo)
     // In release builds, elNo must be a valid element index.
     assert(elNo < volumeTags_.size());
     return volumeTags_[elNo];
+}
+
+template <std::size_t D>
+void Curvilinear<D>::setFacetTags(FacetInfo const& info, Tensor<long int, 1u>& result) const {
+    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
+        result(i) = info.facetTag;
+    }
 }
 
 template <std::size_t D>
