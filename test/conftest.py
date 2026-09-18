@@ -59,7 +59,7 @@ def traction_bc_config():
 
 
 @pytest.fixture(scope="module")
-def convergence_config():
+def convergence_config(polynomial_degree):
     """
     Theoretical convergence rates for DG verification.
     For a polynomial basis of order N, we expect:
@@ -68,7 +68,7 @@ def convergence_config():
 
     The 'lower' and 'upper' bounds provide a buffer for numerical noise.
     """
-    n = 3
+    n = polynomial_degree
     return {
         "l2": {"lower": n, "upper": n + 1},
         "h1": {"lower": n - 1, "upper": n},
@@ -86,14 +86,26 @@ def domain_dim(request):
     return request.config.getoption("domain_dimension")
 
 
+@pytest.fixture(scope="module")
+def polynomial_degree(request):
+    return request.config.getoption("--polynomial_degree")
+
+
 def pytest_addoption(parser):
     """
     Add custom pytest CLI options used by the tests.
 
     Adds --domain_dimension to select 2D or 3D test artifacts.
+    Adds --polynomial_degree to specify the polynomial degree for tests.
     """
     parser.addoption(
-        "--domain_dimension", action="store", help="Domain dimension (2 or 3)"
+        "--domain_dimension", action="store", type=int, help="Domain dimension (2 or 3)"
+    )
+    parser.addoption(
+        "--polynomial_degree",
+        action="store",
+        type=int,
+        help="Polynomial degree (integer)",
     )
 
 
@@ -230,25 +242,29 @@ def compute_l2_error_with_reference_data():
             nearest_idx = np.argmin(distances)
 
             if distances[nearest_idx] > spatial_tol:
-                print(
-                    f"Centroid {centroid} not found in comparison data "
-                    f"(nearest distance: {distances[nearest_idx]:.2e})"
-                )
                 unmatched_centroids += 1
                 continue
 
             matched_centroid = tuple(cmp_centroids[nearest_idx])
             cmp_points = cmp_dict[matched_centroid]
 
+            # Build point array for nearest-neighbour lookup, same as centroids
+            cmp_point_coords = np.array(list(cmp_points.keys()))
+
             for point, ref_dof in points.items():
-                if point not in cmp_points:
+                point_arr = np.array(point)
+                pt_distances = np.linalg.norm(cmp_point_coords - point_arr, axis=1)
+                nearest_pt_idx = np.argmin(pt_distances)
+
+                if pt_distances[nearest_pt_idx] > spatial_tol:
                     print(
                         f"Point {point} not found in comparison data "
                         f"for centroid {centroid}"
                     )
                     continue
 
-                cmp_dof = cmp_points[point]
+                matched_point = tuple(cmp_point_coords[nearest_pt_idx])
+                cmp_dof = cmp_points[matched_point]
                 abs_diff = abs(cmp_dof - ref_dof)
                 errors.append(abs_diff)
 
