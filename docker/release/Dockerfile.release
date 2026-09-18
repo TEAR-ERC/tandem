@@ -4,10 +4,11 @@
 #     --build-arg DIM=2 --build-arg DEG=6 \
 #     -t tandem:2d-6p --load .
 
+ARG BASE_IMAGE=ghcr.io/tear-erc/tandem-base:latest
 ARG DIM=2
 ARG DEG=6
 
-FROM --platform=linux/amd64 ghcr.io/tear-erc/tandem-base:latest AS builder
+FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
 
 ARG DIM
 ARG DEG
