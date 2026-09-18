@@ -10,13 +10,12 @@ end
 
 
 function VolumeTagging:mu(x, y, tag)
-    local _tag = tag
     local _mu = 1.0
-    if _tag == 1 then
+    if tag == 1 then
       _mu = 1.0
-    elseif _tag == 2 then
+    elseif tag == 2 then
       _mu = 2.0
-    elseif _tag == 3 then
+    elseif tag == 3 then
       _mu = 3.0
     else
       _mu = 4.0
