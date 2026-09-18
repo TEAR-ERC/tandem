@@ -100,7 +100,6 @@ jobs:
         run: |
           if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-          if docker manifest inspect "${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "image_exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
