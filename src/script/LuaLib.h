@@ -25,7 +25,7 @@ public:
 
     LuaLib();
     ~LuaLib();
-f
+
     void load(std::string const& code);
     void loadFile(std::string const& fileName);
 
