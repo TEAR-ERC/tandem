@@ -157,18 +157,8 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
     return TensorBase<Matrix<double>>(D, numPoints);
 }
 
-template <std::size_t D>
-TensorBase<Vector<long int>> Curvilinear<D>::volumeTagsInfo(std::size_t numPoints) const {
-    return TensorBase<Vector<long int>>(numPoints);
-}
-
-template <std::size_t D>
-void Curvilinear<D>::setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const {
-    // Each element has a single physical tag (one material region per element).
-    // The same tag is broadcast to all quadrature points within the element.
-    for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
-        result(i) = volumeTags[eleNo];
-    }
+template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
+    return volumeTags[elNo];
 }
 
 template <std::size_t D>

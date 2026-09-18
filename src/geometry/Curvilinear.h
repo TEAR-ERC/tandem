@@ -62,8 +62,7 @@ public:
                     Tensor<double, 3u>& result) const;
     void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
                                     Matrix<double> const& normal, Tensor<double, 3u>& result) const;
-    TensorBase<Vector<long int>> volumeTagsInfo(std::size_t numPoints) const;
-    void setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const;
+
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;
 
@@ -81,6 +80,7 @@ public:
      * the domain, thus, the maximum diameter of the "high-order" mesh might be larger.
      */
     double local_mesh_size() const { return local_mesh_size_; }
+    long int getVolumeTag(std::size_t elNo) const;
 
 private:
     const unsigned N;
