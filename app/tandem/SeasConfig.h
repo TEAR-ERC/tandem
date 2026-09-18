@@ -49,7 +49,7 @@ struct TabularOutputConfig : OutputConfig {
         case TableWriterType::Unknown:
             return nullptr;
         case TableWriterType::HDF5:
-            return nullptr; // HDF5ProbeWriter does not use TableWriter 
+            return nullptr; // HDF5ProbeWriter does not use TableWriter
         }
         return nullptr;
     }

@@ -61,8 +61,8 @@ public:
                                                                                   Boundary));
         }
         if (lib_.hasMember(scenario, TractionBoundary)) {
-            traction_boundary_ =
-                std::make_optional(lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(
+            traction_boundary_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities, true>(
                     scenario, TractionBoundary));
         }
 
@@ -75,7 +75,7 @@ public:
         if (lib_.hasMember(scenario, FreeSlipBoundary)) {
             // free slip is a scalar (1 quantity)
             free_slip_boundary_ = std::make_optional(
-                lib_.getMemberFunction<DomainDimension + 1u, 1>(scenario, FreeSlipBoundary));
+                lib_.getMemberFunction<DomainDimension + 1u, 1, true>(scenario, FreeSlipBoundary));
         }
 
         if (lib_.hasMember(scenario, InitialDisplacement)) {

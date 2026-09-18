@@ -75,7 +75,7 @@ public:
         if (lib_.hasMember(scenario, FreeSlipBoundary)) {
             // free slip is a scalar (1 quantity)
             free_slip_boundary_ =
-                std::make_optional(lib_.getMemberFunction<DomainDimension, ScalarQuantity>(
+                std::make_optional(lib_.getMemberFunction<DomainDimension, ScalarQuantity, true>(
                     scenario, FreeSlipBoundary));
         }
         if (lib_.hasMember(scenario, Solution)) {
