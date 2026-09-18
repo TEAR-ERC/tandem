@@ -56,6 +56,7 @@ private:
     bool initialized_ = false;
     hid_t timeStepDataset_ = -1;
     hid_t probe_dataset_ = -1; 
+    hid_t probeFieldsDataset_ = -1; 
 };
 
 } // namespace tndm
