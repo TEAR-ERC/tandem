@@ -721,6 +721,9 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     krnl.execute();
 }
 void Poisson::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
+    // mu_avg is only valid for interior fault facets (two adjacent elements).
+    // Boundary facets have no element on one side — info.up[1] would be invalid.
+    assert(info.up[0] != info.up[1] && "mu_avg called on a boundary facet");
     double const* K0 = material[info.up[0]].get<K>().data();
     double const* K1 = material[info.up[1]].get<K>().data();
     double* res = result.data();
