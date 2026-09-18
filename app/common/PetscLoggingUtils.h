@@ -24,7 +24,8 @@ inline std::string get_current_date_time_string() {
                         std::chrono::system_clock::now().time_since_epoch())
                         .count() %
                     1000;
-    oss << "." << std::setw(2) << std::setfill('0') << (millisec / 10);
+
+    oss << "." << std::setw(3) << std::setfill('0') << millisec;
 
     return oss.str();
 }

@@ -31,6 +31,19 @@ PetscTimeSolverBase::PetscTimeSolverBase(MPI_Comm comm, Config const& cfg) {
         fsal_ = false;
         break;
     };
+
+    // Set custom monitor
+    // disable if -ts_monitor is set (then the default monitor will be used)
+    // or if -disable_ts_custom_monitor is set
+    PetscBool disableCustomTsMonitor = PETSC_FALSE;
+    PetscBool defaultTsMonitorEnabled = PETSC_FALSE;
+    CHKERRTHROW(
+        PetscOptionsHasName(NULL, NULL, "-disable_custom_ts_monitor", &disableCustomTsMonitor));
+    CHKERRTHROW(PetscOptionsHasName(NULL, NULL, "-ts_monitor", &defaultTsMonitorEnabled));
+
+    if ((!disableCustomTsMonitor) && (!defaultTsMonitorEnabled)) {
+        CHKERRTHROW(TSMonitorSet(ts_, customized_ts_monitor, NULL, NULL));
+    }
 }
 
 PetscTimeSolverBase::~PetscTimeSolverBase() { TSDestroy(&ts_); }
