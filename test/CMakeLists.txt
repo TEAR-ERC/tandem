@@ -165,7 +165,11 @@ if(RUN_CI_TESTS)
         "test_parallel_consistency_static.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
-        
+
+    # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=2
+    if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_probe_writer_consistency.py")
+    endif()
     # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=3
     if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
         set(MESH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data/reference_meshes/${DOMAIN_DIMENSION}D)
@@ -183,8 +187,6 @@ if(RUN_CI_TESTS)
         doctest_discover_tests(test-mesh-parser-integration
             PROPERTIES FIXTURES_REQUIRED TestData
         )
-
-        add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_probe_writer_consistency.py")
     endif()
 
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
