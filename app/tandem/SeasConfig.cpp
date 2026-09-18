@@ -1,5 +1,7 @@
 #include "SeasConfig.h"
 
+#include <stdexcept>
+
 namespace tndm {
 
 namespace detail {
@@ -125,7 +127,29 @@ template <typename Derived> void setTabularOutputConfigSchema(TableSchema<Derive
 }
 
 template <typename Derived> void setProbeOutputConfigSchema(TableSchema<Derived>& outputSchema) {
-    setTabularOutputConfigSchema(outputSchema);
+    setOutputConfigSchema(outputSchema);
+
+    outputSchema.add_value("type", up_cast<Derived>(&Derived::type))
+        .converter([](std::string_view value) {
+            if (iEquals(value, "Tecplot")) {
+                return TableWriterType::Tecplot;
+            } else if (iEquals(value, "CSV")) {
+                return TableWriterType::CSV;
+            } else if (iEquals(value, "HDF5")) {
+#ifdef ENABLE_HDF5
+                return TableWriterType::HDF5;
+#else
+                throw std::runtime_error(
+                    "HDF5 type requested but tandem was built without HDF5 support. "
+                    "Reconfigure with -DENABLE_HDF5=ON to enable HDF5 output.");
+#endif
+            } else {
+                return TableWriterType::Unknown;
+            }
+        })
+        .validator([](TableWriterType const& fmt) { return fmt != TableWriterType::Unknown; })
+        .default_value(TableWriterType::CSV)
+        .help("Output type (CSV|Tecplot|HDF5). HDF5 requires compile-time support.");
 
     auto& probeSchema =
         outputSchema.add_array("probes", up_cast<Derived>(&Derived::probes)).of_tables();
@@ -237,14 +261,8 @@ void setConfigSchema(TableSchema<Config>& schema,
         schema.add_table("domain_probe_output", &Config::domain_probe_output);
     detail::setProbeOutputConfigSchema(domainProbeOutputSchema);
     auto& momentRateOutputSchema =
-        schema.add_table("HDF5_moment_rate_output", &Config::HDF5_moment_rate_output);
+        schema.add_table("moment_rate_output", &Config::moment_rate_output);
     detail::setOutputConfigSchema(momentRateOutputSchema);
-    auto& HDF5faultProbeOutputSchema =
-        schema.add_table("HDF5_fault_probe_output", &Config::HDF5_fault_probe_output);
-    detail::setProbeOutputConfigSchema(HDF5faultProbeOutputSchema);
-    auto& HDF5DomainProbeOutputSchema =
-        schema.add_table("HDF5_domain_probe_output", &Config::HDF5_domain_probe_output);
-    detail::setProbeOutputConfigSchema(HDF5DomainProbeOutputSchema);
 
     auto& gfCheckpointSchema = schema.add_table("gf_checkpoint", &Config::gf_checkpoint_config);
     detail::setGfCheckpointConfigSchema(gfCheckpointSchema);
