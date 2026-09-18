@@ -277,8 +277,12 @@ public:
                                extensibleDimensionTimeStep, isDistributed);
     }
     ~MomentRateWriter() {
-        writer_.closeDataset(momentRateDataset_);
-        writer_.closeDataset(timeStepDataset_);
+        if (momentRateDataset_ != -1) {
+            writer_.closeDataset(momentRateDataset_);
+        }
+        if (timeStepDataset_ != -1) {
+            writer_.closeDataset(timeStepDataset_);
+        }
     }
     void write_static() override {
         // Get the vertex data from the adapter
