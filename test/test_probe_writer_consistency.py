@@ -47,7 +47,7 @@ def check_moment_rate_h5(temp_results_path, tolerances, expected_moment_rate_sum
     np.testing.assert_allclose(
         moment_rate_sum,
         expected_moment_rate_sum_t0,
-        rtol=tolerances["seas"],
+        rtol=tolerances["seas"]["p3"],
         err_msg=(
             f"Sum of moment rates at first timestep "
             f"(normalized) {moment_rate_sum} does not match expected {expected_moment_rate_sum_t0}"
@@ -112,8 +112,8 @@ def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
         np.testing.assert_allclose(
             df["Time"].values,
             h5_time,
-            rtol=tolerances["seas"],
-            atol=tolerances["seas"],
+            rtol=tolerances["seas"]["p3"],
+            atol=tolerances["seas"]["p3"],
             err_msg=f"[{prefix}] Time arrays do not match for probe {probe_name}",
         )
 
@@ -132,8 +132,8 @@ def check_csv_and_h5_match(prefix, temp_results_path, tolerances):
             np.testing.assert_allclose(
                 csv_field_data,
                 h5_field_data,
-                rtol=tolerances["seas"],
-                atol=tolerances["seas"],
+                rtol=tolerances["seas"]["p3"],
+                atol=tolerances["seas"]["p3"],
                 err_msg=f"[{prefix}] Data for field '{field_name}' does not match for probe {probe_name}",
             )
 
