@@ -10,9 +10,9 @@ namespace tndm {
 #ifdef ENABLE_HDF5
 
 template <typename T> T HDF5MeshParser::logError(std::string_view msg) {
-    errorMsg += "H5 parser error:\n\t";
-    errorMsg += msg;
-    errorMsg += '\n';
+    errorMsg_ += "H5 parser error:\n\t";
+    errorMsg_ += msg;
+    errorMsg_ += '\n';
     return {};
 }
 
@@ -70,20 +70,20 @@ bool HDF5MeshParser::parseNodes(hid_t file) {
     }
     constexpr std::size_t DOMAIN_DIMENSION = 3;
     std::size_t numVertices = nodeData.size() / DOMAIN_DIMENSION;
-    builder->setNumVertices(numVertices);
+    builder_->setNumVertices(numVertices);
 
     for (std::size_t i = 0; i < numVertices; ++i) {
         std::array<double, DOMAIN_DIMENSION> x = {nodeData[i * DOMAIN_DIMENSION],
                                                   nodeData[i * DOMAIN_DIMENSION + 1],
                                                   nodeData[i * DOMAIN_DIMENSION + 2]};
         // H5/PUMGen vertex ids are already 0-based, and the builder expects 0-based ids too.
-        builder->setVertex(i, x);
+        builder_->setVertex(i, x);
     }
     return true;
 }
 
 bool HDF5MeshParser::readBoundaryData(hid_t file) {
-    if (!readDataset<uint32_t>(file, "/boundary", boundaryData)) {
+    if (!readDataset<uint32_t>(file, "/boundary", boundaryData_)) {
         return logError<bool>("Failed to parse boundary");
     }
     return true;
@@ -94,10 +94,10 @@ bool HDF5MeshParser::parseElements(hid_t file) {
     if (!readDataset<long>(file, "/connect", elementData)) {
         return logError<bool>("Failed to parse elements");
     }
-    if (!readDataset<uint32_t>(file, "/group", groupTags)) {
+    if (!readDataset<uint32_t>(file, "/group", groupTags_)) {
         // /group is optional; default all group tags to 0 if absent.
-        errorMsg.clear();
-        groupTags.assign(elementData.size() / 4, 0u);
+        errorMsg_.clear();
+        groupTags_.assign(elementData.size() / 4, 0u);
     }
 
     constexpr std::size_t ELEMENT_SIDES = 4;
@@ -108,7 +108,7 @@ bool HDF5MeshParser::parseElements(hid_t file) {
         std::array<long, 4> nodes = {
             elementData[i * ELEMENT_SIDES], elementData[i * ELEMENT_SIDES + 1],
             elementData[i * ELEMENT_SIDES + 2], elementData[i * ELEMENT_SIDES + 3]};
-        higherDimensionalElements.push_back(nodes);
+        higherDimensionalElements_.push_back(nodes);
     }
     return true;
 }
@@ -137,14 +137,14 @@ bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 
     // Tracks which faces have already been added, to avoid duplicates.
     std::unordered_set<FaceKey, FaceHash> seen;
-    seen.reserve(higherDimensionalElements.size() * 3);
+    seen.reserve(higherDimensionalElements_.size() * 3);
 
-    for (size_t i = 0; i < higherDimensionalElements.size(); ++i) {
-        const auto& tetNodes = higherDimensionalElements[i];
+    for (size_t i = 0; i < higherDimensionalElements_.size(); ++i) {
+        const auto& tetNodes = higherDimensionalElements_[i];
 
         // The boundary condition for this tet is packed as four 8-bit tags,
         // one per face: bits [7:0]=face0, [15:8]=face1, [23:16]=face2, [31:24]=face3.
-        const uint32_t boundaryCondition = boundaryData[i];
+        const uint32_t boundaryCondition = boundaryData_[i];
 
         for (int face = 0; face < 4; ++face) {
 
@@ -166,8 +166,8 @@ bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 
             // Only add if this face hasn't been seen before.
             if (seen.insert(FaceKey{sortedNodes}).second) {
-                lowerDimensionalElements.push_back(faceNodes);
-                boundary.push_back(faceTag);
+                lowerDimensionalElements_.push_back(faceNodes);
+                boundary_.push_back(faceTag);
             }
         }
     }
@@ -175,30 +175,30 @@ bool HDF5MeshParser::retrieveLowerDimensionalElements() {
 }
 
 bool HDF5MeshParser::addAllElements() {
-    for (size_t i = 0; i < lowerDimensionalElements.size(); ++i) {
+    for (size_t i = 0; i < lowerDimensionalElements_.size(); ++i) {
         // Assuming only 3 node triangular faces for lower Dimensional elements
         constexpr long TRIANGLE_TYPE = 2;
-        builder->addElement(TRIANGLE_TYPE, long(boundary[i]), lowerDimensionalElements[i].data(),
-                            NumNodes[TRIANGLE_TYPE - 1]);
+        builder_->addElement(TRIANGLE_TYPE, long(boundary_[i]), lowerDimensionalElements_[i].data(),
+                             NumNodes[TRIANGLE_TYPE - 1]);
     }
-    for (size_t i = 0; i < higherDimensionalElements.size(); ++i) {
+    for (size_t i = 0; i < higherDimensionalElements_.size(); ++i) {
         // Assuming only 4 node tetrahedral for higher Dimensional elements
         constexpr long TET_TYPE = 4;
         // Information not available in the HDF5 file from PUMGen  - but also not used by the
         // builder for higher Dimensional simplices
-        builder->addElement(TET_TYPE, static_cast<long>(groupTags[i]),
-                            higherDimensionalElements[i].data(), NumNodes[TET_TYPE - 1]);
+        builder_->addElement(TET_TYPE, static_cast<long>(groupTags_[i]),
+                             higherDimensionalElements_[i].data(), NumNodes[TET_TYPE - 1]);
     }
     return true;
 }
 
 bool HDF5MeshParser::parseFile(std::string const& fileName) {
-    errorMsg.clear();
-    higherDimensionalElements.clear();
-    lowerDimensionalElements.clear();
-    groupTags.clear();
-    boundaryData.clear();
-    boundary.clear();
+    errorMsg_.clear();
+    higherDimensionalElements_.clear();
+    lowerDimensionalElements_.clear();
+    groupTags_.clear();
+    boundaryData_.clear();
+    boundary_.clear();
 
     hid_t file = H5Fopen(fileName.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file < 0) {
@@ -206,7 +206,7 @@ bool HDF5MeshParser::parseFile(std::string const& fileName) {
     }
 
     bool ok = parseElements(file) && parseNodes(file) && readBoundaryData(file) &&
-              (boundaryData.size() == higherDimensionalElements.size() ||
+              (boundaryData_.size() == higherDimensionalElements_.size() ||
                logError<bool>("Boundary tag count does not match connectivity")) &&
               retrieveLowerDimensionalElements() && addAllElements();
 

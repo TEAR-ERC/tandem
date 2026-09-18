@@ -16,13 +16,13 @@ namespace tndm {
 
 class HDF5MeshParser : public MeshParser {
 private:
-    MeshBuilder* builder;
-    std::string errorMsg;
-    std::vector<std::array<long, 4>> higherDimensionalElements;
-    std::vector<std::array<long, 3>> lowerDimensionalElements;
-    std::vector<uint32_t> groupTags;
-    std::vector<uint32_t> boundaryData;
-    std::vector<uint8_t> boundary;
+    MeshBuilder* builder_;
+    std::string errorMsg_;
+    std::vector<std::array<long, 4>> higherDimensionalElements_;
+    std::vector<std::array<long, 3>> lowerDimensionalElements_;
+    std::vector<uint32_t> groupTags_;
+    std::vector<uint32_t> boundaryData_;
+    std::vector<uint8_t> boundary_;
 
     template <typename T> T logError(std::string_view msg);
 
@@ -36,19 +36,19 @@ private:
 #endif
 
 public:
-    HDF5MeshParser(MeshBuilder* builder) : builder(builder) {}
+    HDF5MeshParser(MeshBuilder* builder) : builder_(builder) {}
 
     bool parseFile(std::string const& fileName) override;
-    std::string_view getErrorMessage() const override { return errorMsg; }
+    std::string_view getErrorMessage() const override { return errorMsg_; }
 
     const std::vector<std::array<long, 4>>& getHigherDimensionalElements() const {
-        return higherDimensionalElements;
+        return higherDimensionalElements_;
     }
     const std::vector<std::array<long, 3>>& getLowerDimensionalElements() const {
-        return lowerDimensionalElements;
+        return lowerDimensionalElements_;
     }
-    const std::vector<uint32_t>& getBoundaryData() const { return boundaryData; }
-    const std::vector<uint8_t>& getBoundary() const { return boundary; }
+    const std::vector<uint32_t>& getBoundaryData() const { return boundaryData_; }
+    const std::vector<uint8_t>& getBoundary() const { return boundary_; }
 };
 
 } // namespace tndm
