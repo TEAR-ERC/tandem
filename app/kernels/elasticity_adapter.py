@@ -9,6 +9,7 @@ def add(generator, dim, nbf_fault, nq):
     minv = Tensor('minv', (nbf_fault, nbf_fault))
     w = Tensor('w', (nq, ))
     nl_q = Tensor('nl_q', (nq, ))
+    mu = Tensor('mu', (nq, ))
 
     copy_slip = Tensor('copy_slip', (dim - 1, dim),
                        spp={(d - 1, d): '1.0'
@@ -33,7 +34,6 @@ def add(generator, dim, nbf_fault, nq):
     generator.add(
         'evaluate_slip_rate', slip_rate_q['pq'] <=
             e_q['lq'] * slip_rate['lp']) 
-    # TODO: Add lame parameter mu during moment rate calculation
     generator.add(
         'evaluate_moment_rate', moment_rate['p'] <=
-            w['q'] * slip_rate_q['pq'] * nl_q['q']) 
+            w['q'] * slip_rate_q['pq'] * nl_q['q'] * mu['q'])
