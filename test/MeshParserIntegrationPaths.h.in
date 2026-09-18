@@ -1,0 +1,5 @@
+#pragma once
+namespace tndm::test {
+inline constexpr const char* H5MeshPath = "@MESH_DIR@/bp5_mesh_parser_test.h5";
+inline constexpr const char* MshMeshPath = "@MESH_DIR@/bp5_mesh_parser_test.msh";
+} // namespace tndm::test

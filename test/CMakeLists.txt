@@ -152,6 +152,25 @@ if(RUN_CI_TESTS)
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
 
+    # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=3
+    if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
+        set(MESH_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data/reference_meshes/${DOMAIN_DIMENSION}D)
+
+        configure_file(
+            MeshParserIntegrationPaths.h.in
+            MeshParserIntegrationPaths.h
+        )
+
+        add_executable(test-mesh-parser-integration MeshParserIntegration.cpp)
+        target_link_libraries(test-mesh-parser-integration test-runner-mpi)
+        target_include_directories(test-mesh-parser-integration PRIVATE
+            ${CMAKE_CURRENT_BINARY_DIR}
+        )
+        doctest_discover_tests(test-mesh-parser-integration
+            PROPERTIES FIXTURES_REQUIRED TestData
+        )
+    endif()
+
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 
     if(${has_reference_data} GREATER -1)
