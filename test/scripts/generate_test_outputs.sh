@@ -6,6 +6,7 @@ set -e
 EXECUTABLE_DIR=$1
 TEMP_TEST_RESULTS=$2
 DOMAIN_DIMENSION=$3
+POLYNOMIAL_DEGREE=$4
 
 # Check if any required arguments are missing
 if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" || -z "$DOMAIN_DIMENSION" ]]; then
@@ -15,12 +16,18 @@ if [[ -z "$EXECUTABLE_DIR" || -z "$TEMP_TEST_RESULTS" || -z "$DOMAIN_DIMENSION" 
     echo "  EXECUTABLE_DIR    - Path to tandem/static executable"
     echo "  TEMP_TEST_RESULTS - Path to temporary test output directory"
     echo "  DOMAIN_DIMENSION  - 2 or 3"
+    echo "  POLYNOMIAL_DEGREE - Polynomial degree used by the test build"
     exit 1
 fi
 
 # Validate the DOMAIN_DIMENSION argument
 if [[ "$DOMAIN_DIMENSION" != "2" && "$DOMAIN_DIMENSION" != "3" ]]; then
     echo "Error: DOMAIN_DIMENSION must be '2' or '3'. Got: '$DOMAIN_DIMENSION'"
+    exit 1
+fi
+
+if [[ ! "$POLYNOMIAL_DEGREE" =~ ^[0-9]+$ || "$POLYNOMIAL_DEGREE" -le 0 ]]; then
+    echo "Error: POLYNOMIAL_DEGREE must be a positive integer. Got: '$POLYNOMIAL_DEGREE'"
     exit 1
 fi
 
@@ -32,7 +39,7 @@ echo ""
 
 
 echo "${DOMAIN_DIMENSION}D Reference Outputs"
-bash "$SCRIPT_DIR/${DOMAIN_DIMENSION}D/generate_${DOMAIN_DIMENSION}D_outputs.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+bash "$SCRIPT_DIR/${DOMAIN_DIMENSION}D/generate_${DOMAIN_DIMENSION}D_outputs.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
 echo ""
 
 echo "Reference outputs generated successfully!"
