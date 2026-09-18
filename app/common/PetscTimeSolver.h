@@ -109,11 +109,19 @@ public:
             const char* loadDirectory = sload.c_str();
             CHKERRTHROW(ts_checkpoint_restart(ts_, loadDirectory));
         }
+        // Print custom time-stepping output by default
+        // disable if -ts_monitor is set (then the default monitor will be used)
+        // or if -disable_ts_custom_monitor is set
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
-        // Remove the default monitoring (if previously enabled)
-        CHKERRTHROW(TSMonitorCancel(ts_));
-        // Set the custom monitor
-        CHKERRTHROW(TSMonitorSet(ts_, customized_ts_monitor, NULL, NULL));
+        PetscBool disableCustomTsMonitor = PETSC_FALSE;
+        PetscBool defaultTsMonitorEnabled = PETSC_FALSE;
+        CHKERRTHROW(
+            PetscOptionsHasName(NULL, NULL, "-disable_custom_ts_monitor", &disableCustomTsMonitor));
+        CHKERRTHROW(PetscOptionsHasName(NULL, NULL, "-ts_monitor", &defaultTsMonitorEnabled));
+
+        if ((!disableCustomTsMonitor) && (!defaultTsMonitorEnabled)) {
+            CHKERRTHROW(TSMonitorSet(ts_, customized_ts_monitor, NULL, NULL));
+        }
 
         CHKERRTHROW(TSSolve(ts_, ts_state_));
     }
