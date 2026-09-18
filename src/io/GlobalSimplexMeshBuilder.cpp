@@ -71,7 +71,8 @@ void GlobalSimplexMeshBuilder<D>::addElement(long type, long tag, long* node,
                 high_order_nodes(i - NumVerts, elNo) = node[p_i];
             }
         }
-    } else if (is_gmsh_simplex<D - 1u>(type)) { // Lower order simplex parsing (triangle for example)
+    } else if (is_gmsh_simplex<D - 1u>(
+                   type)) { // Lower order simplex parsing (triangle for example)
         assert(numNodes >= D);
         std::array<uint64_t, D> elem;
         std::copy(node, node + D, elem.begin());
