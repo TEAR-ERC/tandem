@@ -3,3 +3,4 @@ numpy
 pandas
 meshio
 vtk
+matplotlib
