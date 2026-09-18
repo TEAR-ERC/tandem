@@ -20,7 +20,6 @@ auto makeLocator(std::shared_ptr<Curvilinear<D>> cl, LocalSimplexMesh<D> const& 
 
 template <std::size_t D, bool isBoundary>
 HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
-                                                std::unique_ptr<TableWriter> table_writer,
                                                 std::vector<Probe<D>> const& probes,
                                                 LocalSimplexMesh<D> const& mesh,
                                                 std::shared_ptr<Curvilinear<D>> cl,

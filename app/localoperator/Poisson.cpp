@@ -721,8 +721,6 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     krnl.execute();
 }
 void Poisson::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const {
-    assert(result.size() == tensor::mu_avg_q::size());
-
     double const* K0 = material[info.up[0]].get<K>().data();
     double const* K1 = material[info.up[1]].get<K>().data();
     double* res = result.data();

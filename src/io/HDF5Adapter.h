@@ -87,7 +87,6 @@ public:
     std::size_t numElements() const override { return bnds_.size(); }
     std::size_t pointDim() const override { return D; }
 
-    // void setRefNodes(std::vector<std::array<double, D - 1u>> const& points) override {}
     void map(std::size_t no, Tensor<double, 2u>& result) const {
         assert(no < bnds_.size());
         auto const& bnd = bnds_[no];
