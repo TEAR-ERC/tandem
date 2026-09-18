@@ -93,7 +93,7 @@ if(DEFINED RUN_CI_TESTS)
         endif()
     else()
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} fetch origin
+            COMMAND ${GIT_EXECUTABLE} fetch --depth 1 origin ${TEST_DATA_BRANCH}
             WORKING_DIRECTORY ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_FETCH_RESULT
         )
@@ -102,13 +102,21 @@ if(DEFINED RUN_CI_TESTS)
         endif()
 
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} origin/${TEST_DATA_BRANCH}
+            COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} FETCH_HEAD
             WORKING_DIRECTORY ${TEST_DATA_DIR}
             RESULT_VARIABLE GIT_CHECKOUT_RESULT
         )
-
         if(NOT GIT_CHECKOUT_RESULT EQUAL 0)
             message(FATAL_ERROR "Failed to checkout branch ${TEST_DATA_BRANCH}")
+        endif()
+
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} clean -fd
+            WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_CLEAN_RESULT
+        )
+        if(NOT GIT_CLEAN_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to clean working tree for branch ${TEST_DATA_BRANCH}")
         endif()
     endif()
 
@@ -156,6 +164,9 @@ if(DEFINED RUN_CI_TESTS)
         "test_parallel_consistency_static.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
+    if(DOMAIN_DIMENSION EQUAL 2)
+        add_pytest_test("probe-writer-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}" "test_probe_writer_consistency.py")
+    endif()
 
     # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=3
     if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
