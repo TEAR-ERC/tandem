@@ -45,10 +45,10 @@ TEST_CASE("HDF5Writer - basic functionality") {
 
     SUBCASE("File exists after closing") {
         // Create and immediately destroy the writer so the file is flushed to disk
-        { 
-            HDF5Writer writer(filename, comm); 
+        {
+            HDF5Writer writer(filename, comm);
         }
-        
+
         if (rank == 0) {
             CHECK(std::filesystem::exists(filename + ".h5"));
         }
