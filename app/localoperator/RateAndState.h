@@ -23,13 +23,13 @@ public:
     static constexpr std::size_t PsiIndex = TangentialComponents;
 
     using param_fun_t =
-        std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
-    using source_fun_t =
-        std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
+        std::function<typename Law::Params(std::array<double, DomainDimension> const&, long int&)>;
+    using source_fun_t = std::function<std::array<double, 1>(
+        std::array<double, DomainDimension + 1> const&, long int&)>;
     using delta_tau_fun_t = std::function<std::array<double, TangentialComponents>(
-        std::array<double, DomainDimension + 1> const&)>;
-    using delta_sn_fun_t =
-        std::function<std::array<double, 1>(std::array<double, DomainDimension + 1> const&)>;
+        std::array<double, DomainDimension + 1> const&, long int&)>;
+    using delta_sn_fun_t = std::function<std::array<double, 1>(
+        std::array<double, DomainDimension + 1> const&, long int&)>;
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
@@ -38,7 +38,8 @@ public:
         auto num_nodes = fault_.storage().size();
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
-            auto params = pfun(fault_.storage()[index].template get<Coords>());
+            auto params = pfun(fault_.storage()[index].template get<Coords>(),
+                               fault_.storage()[index].template get<faultTag>());
             law_.set_params(index, params);
         }
     }
@@ -87,17 +88,19 @@ private:
     }
     auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
+        auto tag = fault_[faultNo].template get<faultTag>()[node];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
-        return (*delta_tau_)(xt);
+        return (*delta_tau_)(xt, tag);
     }
     auto get_delta_sn(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
+        auto tag = fault_[faultNo].template get<faultTag>()[node];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
-        return (*delta_sn_)(xt)[0];
+        return (*delta_sn_)(xt, tag)[0];
     }
 
     Law law_;
@@ -164,6 +167,7 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto r_mat = state_mat(result);
     auto t_mat = traction_mat(traction);
     auto coords = fault_[faultNo].template get<Coords>();
+    auto tags = fault_[faultNo].template get<faultTag>();
     int ierr = 0, ierr_max = 0;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];
@@ -194,9 +198,10 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
         std::array<double, DomainDimension + 1> xt;
         for (std::size_t node = 0; node < nbf; ++node) {
             auto const& x = coords[node];
+            auto& tag = tags[node];
             std::copy(x.begin(), x.end(), xt.begin());
             xt.back() = time;
-            r_mat(node, PsiIndex) += (*source_)(xt)[0];
+            r_mat(node, PsiIndex) += (*source_)(xt, tag)[0];
         }
     }
     *_ierr = ierr_max;
