@@ -51,4 +51,7 @@ bash "$SCRIPT_DIR/volume_tagging_parallel_consistency.sh" "$EXECUTABLE_DIR" "$TE
 echo "Volume tagging correctness test..."
 bash "$SCRIPT_DIR/volume_tagging_correctness.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
+echo "Parallel volume consistency test..."
+bash "$SCRIPT_DIR/volume_tagging_parallel_consistency.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
 echo "2D reference outputs generated successfully."
