@@ -16,5 +16,5 @@ test/**/*.msh
 
 # Test output folders
 test/temp_test_results/
-test/test_data/tandem_test_data/
+test/test_data/
 test/reference_configs/2D/*_temp.toml
