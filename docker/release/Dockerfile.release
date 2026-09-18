@@ -24,7 +24,10 @@ RUN mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
         -DCMAKE_PREFIX_PATH="${PETSC_INSTALL};${EIGEN_INSTALL}" \
         -DDOMAIN_DIMENSION=${DIM} \
         -DPOLYNOMIAL_DEGREE=${DEG} \
-    && ninja
+    && ninja \
+    && mkdir -p /staging \
+    && cp app/tandem /staging/tandem_${DIM}d_${DEG}p \
+    && cp app/static /staging/static_${DIM}d_${DEG}p
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 ubuntu:22.04
@@ -50,8 +53,8 @@ RUN apt-get update && apt-get install -y \
 # Copy PETSc runtime libs
 COPY --from=builder /opt/petsc/build/lib /opt/petsc/build/lib
 
-# Copy this specific Tandem build's binaries
-COPY --from=builder /opt/tandem/build_${DIM}d_${DEG}p/app /opt/tandem/bin
+# Copy only the tandem and static binaries, named tandem_${DIM}d_${DEG}p / static_${DIM}d_${DEG}p
+COPY --from=builder /staging /opt/tandem/bin
 
 # Copy examples
 COPY --from=builder /opt/tandem/tandem/examples /work/examples
