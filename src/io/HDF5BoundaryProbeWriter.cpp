@@ -91,7 +91,7 @@ void HDF5BoundaryProbeWriter<D>::initialize_datasets(
     auto strtype = H5Tcopy(H5T_C_S1);
     std::vector<hsize_t> probe_names_dims = {numProbes};
     std::vector<hsize_t> probe_names_max_dims = {numProbes};
-    H5Tset_size(strtype, max_length_global);  // Set to maximum string length
+    H5Tset_size(strtype, max_length_global);  // Set to maximum string length type
     H5Tset_strpad(strtype, H5T_STR_NULLTERM); // Pad with spaces
     hsize_t probeNameDataset_ = hdf5_writer_->createExtendibleDataset(
         "probeNames", strtype, probe_names_dims, probe_names_max_dims, glueDimension);
@@ -151,7 +151,7 @@ void HDF5BoundaryProbeWriter<D>::write(double time,
     }
     int max_length_global = 0;
     MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-    // Write time step
+    // Write probe field names (slip, slip rate, tractions etc.)
     auto strtype = H5Tcopy(H5T_C_S1);
     H5Tset_size(strtype, max_length_global);
     H5Tset_strpad(strtype, H5T_STR_NULLTERM);
