@@ -1,0 +1,49 @@
+final_time = 400000000
+mesh_file = "bp1_ref.msh"
+mode = "QDGreen"
+type = "poisson"
+lib = "bp1_ref.lua"
+scenario = "bp1_ref"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[ts_checkpoint]
+storage_type="none"
+
+[gf_checkpoint]
+prefix = "../../temp_test_results/gf_bp1/"
+
+[fault_probe_output]
+prefix = "../../temp_test_results/fltst_"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [0.0, 0.0] },
+]
+
+[HDF5_fault_probe_output]
+prefix = "../../temp_test_results/fltst"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [0.0, 0.0] },
+]
+
+[domain_probe_output]
+prefix = "../../temp_test_results/blkst_"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [5.0, -5.0] },
+]
+
+[HDF5_domain_probe_output]
+prefix = "../../temp_test_results/blkst"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [5.0, -5.0] },
+]
+
+[HDF5_moment_rate_output]
+prefix = "../../temp_test_results/moment_rate"
+t_max = 9460800
+probes = [
+    { name = "dp000", x = [5.0, -5.0] },
+]
