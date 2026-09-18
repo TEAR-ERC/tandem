@@ -124,6 +124,15 @@ A typical workflow for running a bundled example:
       # Inside the container:
       mpirun -n 4 tandem_2d_3p_tandem /host/bp1_sym.toml
 
+   .. warning::
+
+      Tandem writes output files to the path specified in the ``.toml``
+      configuration. If ``/host`` is not bound to your host machine as shown in
+      the mount step above, all output will be written inside the container and
+      lost when it exits. Simulation output files can be very large; writing them
+      inside the container may also exhaust the container's writable layer and
+      cause unexpected failures.
+
 Building from Source
 --------------------
 
