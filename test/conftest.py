@@ -268,8 +268,10 @@ def compute_l2_error_with_reference_data():
                 abs_diff = abs(cmp_dof - ref_dof)
                 errors.append(abs_diff)
 
-        if unmatched_centroids > 0:
-            print(f"Warning: {unmatched_centroids} centroids could not be matched")
+        assert unmatched_centroids == 0, (
+            f"{unmatched_centroids} centroids could not be matched "
+            f"within spatial_tol={spatial_tol}"
+        )
 
         L2_norm = np.sqrt(np.sum(np.square(errors)))
         return L2_norm
