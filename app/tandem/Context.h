@@ -69,13 +69,12 @@ public:
     }
     auto friction() -> std::unique_ptr<AbstractFrictionOperator> override {
 #ifdef ENABLE_HDF5
-        auto fric =
-            std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map,
-                                         dg_lop->facetQuadratureRule().size(), this->adapter());
+        auto fric = std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo,
+                                                 fault_map, this->adapter());
 #else
         // Moment rate not computed for HDF5 output, so no need to prepare adapter
-        auto fric = std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo,
-                                                 fault_map, dg_lop->facetQuadratureRule().size());
+        auto fric =
+            std::make_unique<friction_t>(std::make_unique<friction_lop_t>(cl), topo, fault_map);
 #endif
         fric->lop().set_constant_params(friction_scenario->constant_params());
         fric->lop().set_params(friction_scenario->param_fun());

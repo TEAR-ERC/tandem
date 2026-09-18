@@ -24,11 +24,10 @@ namespace tndm {
 template <typename LocalOperator> class FrictionOperator : public AbstractFrictionOperator {
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
-                     std::shared_ptr<BoundaryMap> fault_map, std::size_t quadRuleSize,
+                     std::shared_ptr<BoundaryMap> fault_map,
                      std::unique_ptr<AbstractAdapterOperator> adapter = nullptr)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
-          quadRuleSize_(quadRuleSize), adapter_(std::move(adapter)),
-          scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
+          adapter_(std::move(adapter)), scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
         scratch_.reset();
         lop_->begin_preparation(num_local_elements());
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
@@ -96,7 +95,6 @@ public:
         VMax_ = 0.0;
         scratch_.reset();
         std::size_t mr_idx = 0;
-        auto nq = quadRuleSize_;
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
             auto state_block = state_handle.subtensor(slice{}, faultNo);
@@ -110,21 +108,15 @@ public:
 
             VMax_ = std::max(VMax_, VMax);
 
-            // Interpolate slip rate values at Basis function nodes to quadrature
-            // nodes
+            // Compute moment rate directly from slip rate at basis function nodes
             if (adapter_) {
-                std::vector<double> slip_rate_q_raw(LocalOperator::NumQuantities * quadRuleSize_);
-                auto slip_rate_q = Matrix<double>(slip_rate_q_raw.data(),
-                                                  LocalOperator::NumQuantities, quadRuleSize_);
-                auto slip_rate_reshaped =
-                    tndm::Vector<const double>(result_block.data(), result_block.shape());
-                adapter_->slip_rate(slip_rate_reshaped, slip_rate_q);
-
                 std::vector<double> moment_rate_q_raw(DomainDimension);
                 auto moment_rate_q = Matrix<double>(moment_rate_q_raw.data(), 1, DomainDimension);
+                auto slip_rate =
+                    tndm::Vector<const double>(result_block.data(), result_block.shape());
                 auto fctNo = fault_map_->fctNo(faultNo);
                 auto info = topo_->info(fctNo);
-                adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, fctNo, info);
+                adapter_->moment_rate(faultNo, moment_rate_q, slip_rate, fctNo, info);
                 for (std::size_t i = 0; i < static_cast<std::size_t>(DomainDimension - 1); ++i) {
                     moment_rate_[mr_idx++] = moment_rate_q(0, i);
                 }
@@ -251,7 +243,6 @@ private:
     Scratch<double> scratch_;
     double VMax_ = 0.0;
     std::vector<double> moment_rate_ = {};
-    std::size_t quadRuleSize_ = 0;
 };
 
 } // namespace tndm

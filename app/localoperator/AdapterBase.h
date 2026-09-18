@@ -37,6 +37,7 @@ public:
                nbf_ * nbf_;
     }
     auto ref_normal() const { return ref_normal_; }
+    std::size_t num_quad_points() const { return quad_rule_.size(); }
 
     void begin_preparation(std::size_t numFaultFaces);
     void prepare(std::size_t faultNo, FacetInfo const& info, LinearAllocator<double>& scratch);
