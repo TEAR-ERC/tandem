@@ -136,6 +136,7 @@ if(RUN_CI_TESTS)
         ${CMAKE_SOURCE_DIR}/test/temp_test_results
         ${DOMAIN_DIMENSION}
         ${POLYNOMIAL_DEGREE}
+        ${ENABLE_HDF5}
     )
     set_tests_properties(generate-test-outputs PROPERTIES
         FIXTURES_REQUIRED PreClean
