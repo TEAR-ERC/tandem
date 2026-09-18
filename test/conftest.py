@@ -110,9 +110,9 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(scope="module")
-def reference_results_path():
-    """Path to the directory containing reference test outputs."""
-    return Path("./test_data/reference_results")
+def reference_results_path(polynomial_degree):
+    """Path to reference outputs for the active polynomial degree."""
+    return Path("./test_data/reference_results") / f"p{polynomial_degree}"
 
 
 @pytest.fixture(scope="module")
