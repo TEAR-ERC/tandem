@@ -25,7 +25,7 @@ template <typename LocalOperator> class FrictionOperator : public AbstractFricti
 public:
     FrictionOperator(std::unique_ptr<LocalOperator> lop, std::shared_ptr<DGOperatorTopo> topo,
                      std::shared_ptr<BoundaryMap> fault_map, int quadRuleSize,
-                     std::unique_ptr<AbstractAdapterOperator> adapter = nullptr)
+                     std::unique_ptr<AbstractAdapterOperator> adapter)
         : lop_(std::move(lop)), topo_(std::move(topo)), fault_map_(std::move(fault_map)),
           quadRuleSize_(quadRuleSize), adapter_(std::move(adapter)),
           scratch_(lop_->scratch_mem_size(), ALIGNMENT) {
@@ -95,7 +95,7 @@ public:
         bool rhs_success = true;
         VMax_ = 0.0;
         scratch_.reset();
-        moment_rate_ = {};
+        std::size_t mr_idx = 0;
         auto nq = quadRuleSize_;
         for (std::size_t faultNo = 0, num = num_local_elements(); faultNo < num; ++faultNo) {
             auto traction_block = traction_handle.subtensor(slice{}, faultNo);
@@ -125,8 +125,8 @@ public:
             auto fctNo = fault_map_->fctNo(faultNo);
             auto info = topo_->info(fctNo);
             adapter_->moment_rate(faultNo, moment_rate_q, slip_rate_q, fctNo, info);
-            for (int i = 0; i < DomainDimension - 1; i++) {
-                moment_rate_.push_back(moment_rate_q(0, i));
+            for (std::size_t i = 0; i < static_cast<std::size_t>(DomainDimension - 1); ++i) {
+                moment_rate_[mr_idx++] = moment_rate_q(0, i);
             }
         }
 
