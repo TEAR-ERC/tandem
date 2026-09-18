@@ -23,7 +23,7 @@ class FacetFunctionalFactory : public AbstractFacetFunctionalFactory {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using time_functional_t = std::function<std::array<double, NumQuantities>(
-        std::array<double, LocalOperator::Dim + 1u> const&, long int&)>;
+        std::array<double, LocalOperator::Dim + 1u> const&, long int)>;
 
     FacetFunctionalFactory(std::shared_ptr<LocalOperator> lop, time_functional_t time_function,
                            std::array<double, LocalOperator::Dim> const& ref_normal)
@@ -31,7 +31,7 @@ public:
 
     auto operator()(double time) const -> facet_functional_t override {
         auto function = std::function(
-            [this, time](std::array<double, LocalOperator::Dim> const& x, long int& facetTag) {
+            [this, time](std::array<double, LocalOperator::Dim> const& x, long int facetTag) {
                 std::array<double, LocalOperator::Dim + 1u> xt;
                 std::copy(x.begin(), x.end(), xt.begin());
                 xt.back() = time;

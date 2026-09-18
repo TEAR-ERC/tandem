@@ -22,11 +22,11 @@ class DieterichRuinaScenario {
 public:
     template <std::size_t D>
     using functional_t =
-        std::function<std::array<double, 1>(std::array<double, D> const&, long int&)>;
+        std::function<std::array<double, 1>(std::array<double, D> const&, long int)>;
     template <std::size_t D>
     using vector_functional_t =
         std::function<std::array<double, DieterichRuinaBase::TangentialComponents>(
-            std::array<double, D> const&, long int&)>;
+            std::array<double, D> const&, long int)>;
     static constexpr std::size_t NumQuantities = RateAndStateBase::NumQuantities;
 
     constexpr static char A[] = "a";
@@ -94,7 +94,7 @@ public:
 
     auto const& constant_params() const { return cp_; }
     auto param_fun() const {
-        return [this](std::array<double, DomainDimension> const& x, long int& region) {
+        return [this](std::array<double, DomainDimension> const& x, long int region) {
             DieterichRuinaBase::Params p;
             p.a = this->a_(x, region)[0];
             p.eta = this->eta_(x, region)[0];
@@ -124,20 +124,14 @@ protected:
     LuaLib lib_;
     functional_t<DomainDimension> a_, eta_, L_;
     functional_t<DomainDimension> sn_pre_ = [](std::array<double, DomainDimension> const& x,
-                                               long int&) -> std::array<double, 1> {
-        return {0.0};
-    };
+                                               long int) -> std::array<double, 1> { return {0.0}; };
     vector_functional_t<DomainDimension> tau_pre_ =
         [](std::array<double, DomainDimension> const& x,
-           long int&) -> std::array<double, DieterichRuinaBase::TangentialComponents> {
-        return {};
-    };
+           long int) -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };
     vector_functional_t<DomainDimension> Vinit_;
     vector_functional_t<DomainDimension> Sinit_ =
         [](std::array<double, DomainDimension> const& x,
-           long int&) -> std::array<double, DieterichRuinaBase::TangentialComponents> {
-        return {};
-    };
+           long int) -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };
     std::optional<functional_t<DomainDimension + 1>> source_ = std::nullopt;
     std::optional<vector_functional_t<DomainDimension + 1>> delta_tau_ = std::nullopt;
     std::optional<functional_t<DomainDimension + 1>> delta_sn_ = std::nullopt;
