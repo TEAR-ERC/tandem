@@ -1,5 +1,6 @@
 #include "io/H5Parser.h"
 #include "doctest.h"
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <fstream>
@@ -25,7 +26,7 @@ public:
         // Test case: simple tetrahedron mesh with 4 vertices
         std::array<std::array<double, 3>, 4> reference = {
             {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}};
-        REQUIRE(id < expectedVertices);
+        REQUIRE(id < (long)expectedVertices);
         if (expectedVertices == 4 && id < 4) {
             for (std::size_t i = 0; i < 3; ++i) {
                 CHECK(x[i] == doctest::Approx(reference[id][i]));
@@ -44,10 +45,9 @@ public:
 
         if (type == 4) { // Tetrahedral element (higher Dimensional)
             CHECK(numNodes == 4);
-            // Verify node indices are valid
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
-                CHECK(node[i] < static_cast<long>(expectedVertices));
+                CHECK(node[i] < (long)expectedVertices);
             }
         } else if (type == 2) { // Triangular boundary element (lower Dimensional)
             CHECK(numNodes == 3);
@@ -55,7 +55,7 @@ public:
             // Verify node indices are valid
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
-                CHECK(node[i] < static_cast<long>(expectedVertices));
+                CHECK(node[i] < (long)expectedVertices);
             }
         }
         ++elNo;
@@ -117,176 +117,180 @@ bool createTestHDF5File(const std::string& filename) {
     return true;
 }
 
-TEST_CASE("H5Parser - Basic Functionality") {
-    const std::string test_filename = "test_mesh.h5";
+// Two tetrahedra sharing face {0,1,2}; that face is tagged from both sides -> must appear once
+bool createTwoTetHDF5File(const std::string& filename) {
+    hid_t file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file_id < 0) {
+        return false;
+    }
+    hsize_t geom_dims[2] = {5, 3};
+    hid_t geom_space = H5Screate_simple(2, geom_dims, NULL);
+    hid_t geom_dset = H5Dcreate2(file_id, "/geometry", H5T_NATIVE_DOUBLE, geom_space, H5P_DEFAULT,
+                                 H5P_DEFAULT, H5P_DEFAULT);
+    double geometry_data[15] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1};
+    H5Dwrite(geom_dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, geometry_data);
+    H5Dclose(geom_dset);
+    H5Sclose(geom_space);
 
-    SUBCASE("File Creation and Parsing") {
-        // Create test HDF5 file
-        REQUIRE(createTestHDF5File(test_filename));
+    hsize_t conn_dims[2] = {2, 4};
+    hid_t conn_space = H5Screate_simple(2, conn_dims, NULL);
+    hid_t conn_dset = H5Dcreate2(file_id, "/connect", H5T_NATIVE_LONG, conn_space, H5P_DEFAULT,
+                                 H5P_DEFAULT, H5P_DEFAULT);
+    long connectivity_data[8] = {0, 1, 2, 3, 0, 1, 2, 4};
+    H5Dwrite(conn_dset, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, connectivity_data);
+    H5Dclose(conn_dset);
+    H5Sclose(conn_space);
 
-        H5TestBuilder builder;
-        H5Parser parser(&builder);
+    hsize_t bound_dims[1] = {2};
+    hid_t bound_space = H5Screate_simple(1, bound_dims, NULL);
+    hid_t bound_dset = H5Dcreate2(file_id, "/boundary", H5T_NATIVE_UINT32, bound_space, H5P_DEFAULT,
+                                  H5P_DEFAULT, H5P_DEFAULT);
+    // tet0: face0=9,face1=2,face2=3,face3=4 -> 0x04030209
+    // tet1: face0=9,face1=5,face2=6,face3=7 -> 0x07060509
+    uint32_t boundary_data[2] = {0x04030209u, 0x07060509u};
+    H5Dwrite(bound_dset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, boundary_data);
+    H5Dclose(bound_dset);
+    H5Sclose(bound_space);
 
-        // Test successful parsing
-        bool parseResult = parser.parseFile(test_filename);
-        if (!parseResult) {
-            std::cout << "Parse error: " << parser.getErrorMessage() << std::endl;
+    H5Fclose(file_id);
+    return true;
+}
+
+// Single tetrahedron where only 2 of 4 faces are tagged
+bool createPartialBoundaryHDF5File(const std::string& filename) {
+    hid_t file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file_id < 0) {
+        return false;
+    }
+    hsize_t geom_dims[2] = {4, 3};
+    hid_t geom_space = H5Screate_simple(2, geom_dims, NULL);
+    hid_t geom_dset = H5Dcreate2(file_id, "/geometry", H5T_NATIVE_DOUBLE, geom_space, H5P_DEFAULT,
+                                 H5P_DEFAULT, H5P_DEFAULT);
+    double geometry_data[12] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+    H5Dwrite(geom_dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, geometry_data);
+    H5Dclose(geom_dset);
+    H5Sclose(geom_space);
+
+    hsize_t conn_dims[2] = {1, 4};
+    hid_t conn_space = H5Screate_simple(2, conn_dims, NULL);
+    hid_t conn_dset = H5Dcreate2(file_id, "/connect", H5T_NATIVE_LONG, conn_space, H5P_DEFAULT,
+                                 H5P_DEFAULT, H5P_DEFAULT);
+    long connectivity_data[4] = {0, 1, 2, 3};
+    H5Dwrite(conn_dset, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, connectivity_data);
+    H5Dclose(conn_dset);
+    H5Sclose(conn_space);
+
+    hsize_t bound_dims[1] = {1};
+    hid_t bound_space = H5Screate_simple(1, bound_dims, NULL);
+    hid_t bound_dset = H5Dcreate2(file_id, "/boundary", H5T_NATIVE_UINT32, bound_space, H5P_DEFAULT,
+                                  H5P_DEFAULT, H5P_DEFAULT);
+    // Only face0 (tag=1) and face2 (tag=5) tagged; faces 1 and 3 are zero
+    // 0x00050001 -> face0=1, face1=0, face2=5, face3=0
+    uint32_t boundary_data[1] = {0x00050001u};
+    H5Dwrite(bound_dset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, boundary_data);
+    H5Dclose(bound_dset);
+    H5Sclose(bound_space);
+
+    H5Fclose(file_id);
+    return true;
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+TEST_CASE("H5Parser - Single tetrahedron, all faces tagged") {
+    const std::string fname = "test_single_tet.h5";
+    REQUIRE(createTestHDF5File(fname));
+
+    H5TestBuilder builder;
+    H5Parser parser(&builder);
+    REQUIRE(parser.parseFile(fname));
+
+    CHECK(builder.getExpectedVertices() == 4);
+    CHECK(builder.getVertexCount() == 4);
+    CHECK(builder.getExpectedElements() == 1);
+
+    CHECK(parser.higherDimensionalElements.size() == 1);
+    CHECK(parser.higherDimensionalElements[0] == std::array<long, 4>{0, 1, 2, 3});
+
+    CHECK(parser.boundaryData[0] == 0x03050301u);
+
+    // All 4 faces tagged -> 4 boundary triangles
+    CHECK(parser.lowerDimensionalElements.size() == 4);
+    CHECK(parser.boundary.size() == 4);
+
+    // Tags must match the byte-by-byte decoding order
+    CHECK(parser.boundary == std::vector<uint8_t>{1, 3, 5, 3});
+
+    // Every face must have 3 distinct valid node indices
+    for (const auto& face : parser.lowerDimensionalElements) {
+        CHECK(face[0] != face[1]);
+        CHECK(face[1] != face[2]);
+        CHECK(face[0] != face[2]);
+        for (int i = 0; i < 3; ++i) {
+            CHECK(face[i] >= 0);
+            CHECK(face[i] <= 3);
         }
-        REQUIRE(parseResult);
-
-        // Verify basic counts
-        CHECK(builder.getExpectedVertices() == 4);
-        CHECK(builder.getVertexCount() == 4);
-        CHECK(builder.getExpectedElements() == 1); // One tetrahedron
-
-        // Check that higher Dimensional elements were parsed
-        CHECK(parser.higherDimensionalElements.size() == 1);
-        CHECK(parser.higherDimensionalElements[0][0] == 0);
-        CHECK(parser.higherDimensionalElements[0][1] == 1);
-        CHECK(parser.higherDimensionalElements[0][2] == 2);
-        CHECK(parser.higherDimensionalElements[0][3] == 3);
-
-        // Check boundary data
-        CHECK(parser.boundaryData.size() == 1);
-        CHECK(parser.boundaryData[0] == 0x03050301);
-
-        // Check lower Dimensional elements (boundary faces) - should have all 4 faces
-        CHECK(parser.lowerDimensionalElements.size() == 4);
-        CHECK(parser.boundary.size() == 4);
-
-        // Verify all 4 boundary tags are present and in the expected order
-        std::vector<uint8_t> expectedTags = {1, 3, 5, 3};
-        CHECK(parser.boundary == expectedTags);
-
-        // Clean up
-        std::remove(test_filename.c_str());
     }
 
-    SUBCASE("Error Handling - Invalid File") {
+    std::remove(fname.c_str());
+}
+
+TEST_CASE("H5Parser - Duplicate face deduplication (two tets sharing a face)") {
+    const std::string fname = "test_two_tet.h5";
+    REQUIRE(createTwoTetHDF5File(fname));
+
+    H5TestBuilder builder;
+    H5Parser parser(&builder);
+    REQUIRE(parser.parseFile(fname));
+
+    // 4 faces per tet, 1 shared face tagged on both sides -> 7 unique boundary faces
+    CHECK(parser.lowerDimensionalElements.size() == 7);
+    CHECK(parser.boundary.size() == 7);
+
+    // Shared face {0,1,2} must appear exactly once
+    std::array<long, 3> sharedSorted = {0, 1, 2};
+    int count = 0;
+    for (auto& face : parser.lowerDimensionalElements) {
+        std::array<long, 3> s = face;
+        std::sort(s.begin(), s.end());
+        if (s == sharedSorted)
+            ++count;
+    }
+    CHECK(count == 1);
+
+    std::remove(fname.c_str());
+}
+
+TEST_CASE("H5Parser - Partial boundary (only some faces tagged)") {
+    const std::string fname = "test_partial_boundary.h5";
+    REQUIRE(createPartialBoundaryHDF5File(fname));
+
+    H5TestBuilder builder;
+    H5Parser parser(&builder);
+    REQUIRE(parser.parseFile(fname));
+
+    // Only 2 of the 4 faces are tagged
+    CHECK(parser.lowerDimensionalElements.size() == 2);
+    CHECK(parser.boundary.size() == 2);
+
+    // Tags should be exactly the two non-zero ones, in face order
+    CHECK(parser.boundary == std::vector<uint8_t>{1, 5});
+
+    std::remove(fname.c_str());
+}
+
+TEST_CASE("H5Parser - Error handling") {
+    SUBCASE("Nonexistent file returns false with message") {
         H5TestBuilder builder;
         H5Parser parser(&builder);
 
-        bool parseResult = parser.parseFile("file_doesnt_exist.h5");
-        REQUIRE_FALSE(parseResult);
-
-        std::string_view errorMsg = parser.getErrorMessage();
-        CHECK(errorMsg.find("Unable to open HDF5 file") != std::string_view::npos);
+        REQUIRE_FALSE(parser.parseFile("does_not_exist.h5"));
+        CHECK(parser.getErrorMessage().find("Unable to open HDF5 file") != std::string::npos);
     }
 
-    SUBCASE("Error Message Functionality") {
+    SUBCASE("No error message before any parse attempt") {
         H5TestBuilder builder;
         H5Parser parser(&builder);
-
-        // Initially should have no error message
         CHECK(parser.getErrorMessage().empty());
-
-        // After failed parse, should have error message
-        parser.parseFile("nonexistent_file.h5");
-        CHECK_FALSE(parser.getErrorMessage().empty());
     }
-}
-
-TEST_CASE("H5Parser - Data Structure Validation") {
-    const std::string test_filename = "test_mesh_validation.h5";
-
-    REQUIRE(createTestHDF5File(test_filename));
-
-    H5TestBuilder builder;
-    H5Parser parser(&builder);
-
-    REQUIRE(parser.parseFile(test_filename));
-
-    SUBCASE("Higher Dimensional Elements Structure") {
-        REQUIRE(parser.higherDimensionalElements.size() > 0);
-
-        // Each higher Dimensional element should have 4 nodes (tetrahedron)
-        for (const auto& element : parser.higherDimensionalElements) {
-            // Verify all node indices are valid
-            for (int i = 0; i < 4; ++i) {
-                CHECK(element[i] >= 0);
-                CHECK(element[i] < 4); // We have 4 vertices
-            }
-        }
-    }
-
-    SUBCASE("Lower Dimensional Elements Structure") {
-        // Should have exactly 4 boundary faces (all faces of tetrahedron)
-        CHECK(parser.lowerDimensionalElements.size() == 4);
-        CHECK(parser.boundary.size() == 4);
-
-        // Each lower Dimensional element should have 3 nodes (triangle)
-        for (const auto& element : parser.lowerDimensionalElements) {
-            for (int i = 0; i < 3; ++i) {
-                CHECK(element[i] >= 0);
-                CHECK(element[i] < 4); // We have 4 vertices
-            }
-        }
-
-        // Verify tags sequence is exactly as encoded
-        std::vector<uint8_t> expectedTags = {1, 3, 5, 3};
-        CHECK(parser.boundary == expectedTags);
-    }
-
-    SUBCASE("Boundary Data Consistency") {
-        REQUIRE(parser.boundaryData.size() > 0);
-
-        // Our test data should have all 4 faces tagged
-        CHECK(parser.boundaryData[0] == 0x03050301u);
-
-        // Should have exactly 4 triangular boundary faces
-        CHECK(parser.lowerDimensionalElements.size() == 4);
-
-        // Each face should correspond to the correct vertices of the tetrahedron
-        // Tetrahedron faces (using SEISSOL vertex Dimensionaling):
-        // Face 0: vertices {0,2,1} -> nodes {0,1,2} (reDimensionaled)
-        // Face 1: vertices {0,1,3} -> nodes {0,1,3}
-        // Face 2: vertices {1,2,3} -> nodes {1,2,3}
-        // Face 3: vertices {0,3,2} -> nodes {0,2,3} (reDimensionaled)
-
-        // Verify that we have valid triangular faces
-        for (const auto& face : parser.lowerDimensionalElements) {
-            // Each face should have 3 different vertices
-            CHECK(face[0] != face[1]);
-            CHECK(face[1] != face[2]);
-            CHECK(face[0] != face[2]);
-
-            // All vertices should be in range [0,3]
-            for (int i = 0; i < 3; ++i) {
-                CHECK(face[i] >= 0);
-                CHECK(face[i] <= 3);
-            }
-        }
-    }
-
-    std::remove(test_filename.c_str());
-}
-
-TEST_CASE("H5Parser - Integration with meshBuilder") {
-    const std::string test_filename = "test_mesh_integration.h5";
-
-    REQUIRE(createTestHDF5File(test_filename));
-
-    H5TestBuilder builder;
-    H5Parser parser(&builder);
-
-    bool parseResult = parser.parseFile(test_filename);
-    if (!parseResult) {
-        std::cout << "Integration test parse error: " << parser.getErrorMessage() << std::endl;
-    }
-    REQUIRE(parseResult);
-
-    SUBCASE("Builder Verification") {
-        // Verify that the builder was called correctly
-        CHECK(builder.getVertexCount() == builder.getExpectedVertices());
-        CHECK(builder.getElementCount() >
-              builder.getExpectedElements()); // Includes boundary elements
-
-        // Verify vertices were set correctly
-        CHECK(builder.getExpectedVertices() == 4);
-
-        // Verify elements were added (both volume and boundary)
-        CHECK(builder.getElementCount() >= 1); // At least the volume element
-    }
-
-    std::remove(test_filename.c_str());
 }
