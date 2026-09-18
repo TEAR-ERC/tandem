@@ -31,7 +31,7 @@
 
 namespace tndm::seas {
 
-enum class DataLevel { Scalar, Boundary, Volume, Heirarchical };
+enum class DataLevel { Scalar, Boundary, Volume, Hierarchical };
 
 class Writer {
 public:
@@ -244,7 +244,7 @@ public:
           adapter_(mesh, std::move(cl), bnd_map.localFctNos(), degree), degree_(degree),
           comm_(std::move(comm)) {}
 
-    DataLevel level() const override { return DataLevel::Heirarchical; }
+    DataLevel level() const override { return DataLevel::Hierarchical; }
     bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> data) override {
         // Get the vertex data from the adapter
