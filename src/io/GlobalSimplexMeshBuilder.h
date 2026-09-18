@@ -1,23 +1,20 @@
 #ifndef GLOBALSIMPLEXMESHBUILDER_20200901_H
 #define GLOBALSIMPLEXMESHBUILDER_20200901_H
 
-#include "io/GMSHParser.h"
-
 #include "io/meshParser.h"
 #include "mesh/GlobalSimplexMesh.h"
 #include "mesh/Simplex.h"
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <array>
 #include <vector>
 
 namespace tndm {
 
 template <std::size_t D> struct GMSHSimplexType {};
-template <> struct GMSHSimplexType<0u> {
-    static constexpr std::array<long, 1> types = {15};
-};
+template <> struct GMSHSimplexType<0u> { static constexpr std::array<long, 1> types = {15}; };
 template <> struct GMSHSimplexType<1u> {
     static constexpr std::array<long, 10> types = {1, 8, 26, 27, 28, 62, 63, 64, 65, 66};
 };
