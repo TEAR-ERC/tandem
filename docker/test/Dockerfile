@@ -11,7 +11,8 @@ RUN python3 -m venv /home/tandem/venv && \
     matplotlib \
     pytest \
     pandas \
-    vtk
+    vtk \
+    h5py
 
 # Set PATH to include venv binaries
 ENV PATH="/home/tandem/venv/bin:$PATH"
