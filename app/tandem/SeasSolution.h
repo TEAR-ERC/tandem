@@ -22,8 +22,9 @@ public:
         for (std::size_t i = 0; i < DomainDimension; ++i) {
             xt[i] = v(i);
         }
+        long int faultTag = -1;
         xt.back() = time_;
-        return solution_(xt);
+        return solution_(xt, faultTag);
     }
 
     void set_time(double time) { time_ = time; }
