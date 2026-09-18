@@ -23,8 +23,9 @@ HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
                                                 std::vector<Probe<D>> const& probes,
                                                 LocalSimplexMesh<D> const& mesh,
                                                 std::shared_ptr<Curvilinear<D>> cl,
-                                                BoundaryMap const& bnd_map, MPI_Comm comm)
-    : hdf5_writer_(std::make_unique<HDF5Writer>(prefix, comm)) {
+                                                BoundaryMap const& bnd_map, MPI_Comm comm,
+                                                bool enable_checkpoint)
+    : hdf5_writer_(std::make_unique<HDF5Writer>(prefix, comm, enable_checkpoint)) {
 
     using ElementFunction = tndm::FiniteElementFunction<isBoundary ? D - 1 : D>;
     using ResultType =

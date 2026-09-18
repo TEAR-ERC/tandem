@@ -19,7 +19,7 @@ using hsize_t = uint64_t;
 namespace tndm {
 class HDF5Writer {
 public:
-    HDF5Writer(std::string_view filename, MPI_Comm comm);
+    HDF5Writer(std::string_view filename, MPI_Comm comm, bool enable_checkpoint = false);
     ~HDF5Writer();
     // Returns the dataset ID for later writing
     hid_t createExtendibleDataset(const std::string_view name, hid_t type,

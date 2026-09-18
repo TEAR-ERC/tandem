@@ -6,15 +6,31 @@ namespace tndm {
 
 #ifdef ENABLE_HDF5
 
-HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm) : comm_(comm) {
+HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm, bool enable_checkpoint)
+    : comm_(comm) {
     MPI_Comm_rank(comm_, &rank_);
     MPI_Comm_size(comm_, &size_);
+
+    std::string filepath = std::string(filename) + ".h5";
 
     // Create HDF5 file with parallel access
     hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
     H5Pset_fapl_mpio(plist_id, comm_, MPI_INFO_NULL);
-    file_ =
-        H5Fcreate((std::string(filename) + ".h5").c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+
+    // Check if file exists and checkpointing is enabled
+    if (enable_checkpoint) {
+        htri_t file_exists = H5Fis_hdf5(filepath.c_str());
+        if (file_exists > 0) {
+            // File exists - open for read/write to support checkpointing
+            file_ = H5Fopen(filepath.c_str(), H5F_ACC_RDWR, plist_id);
+        } else {
+            // File doesn't exist - create new
+            file_ = H5Fcreate(filepath.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+        }
+    } else {
+        // Checkpointing disabled - always create fresh file
+        file_ = H5Fcreate(filepath.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+    }
     H5Pclose(plist_id);
 
     is_open_ = (file_ >= 0);
@@ -141,7 +157,7 @@ std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t localElements)
 static constexpr const char* errMsg = "HDF5Writer: tandem was built without HDF5 support. "
                                       "Reconfigure with -DENABLE_HDF5=ON.";
 
-HDF5Writer::HDF5Writer(std::string_view, MPI_Comm) { throw std::runtime_error(errMsg); }
+HDF5Writer::HDF5Writer(std::string_view, MPI_Comm, bool) { throw std::runtime_error(errMsg); }
 HDF5Writer::~HDF5Writer() {}
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view, hid_t, std::vector<hsize_t>,
                                           std::vector<hsize_t>, int, bool) {

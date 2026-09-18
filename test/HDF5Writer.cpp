@@ -98,6 +98,120 @@ TEST_CASE("HDF5Writer - dataset extends correctly") {
     H5Dclose(read_dset);
     H5Fclose(file);
 }
+
+TEST_CASE("HDF5Writer - checkpoint mode appends to existing file") {
+    std::string filename = "test_checkpoint";
+    std::filesystem::remove(filename + ".h5");
+
+    // Create initial file with 3 timesteps
+    {
+        HDF5Writer writer(filename, MPI_COMM_WORLD, true); // Enable checkpointing
+        std::vector<hsize_t> dims = {1, 2};
+        std::vector<hsize_t> max_dims = {H5S_UNLIMITED, 2};
+        hid_t dset =
+            writer.createExtendibleDataset("data", H5T_NATIVE_DOUBLE, dims, max_dims, 0, false);
+
+        for (int t = 0; t < 3; ++t) {
+            std::vector<double> data = {t * 10.0, t * 20.0};
+            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, t, data.data(), {1, 2}, 0, 0, false);
+        }
+        writer.closeDataset(dset);
+    }
+
+    // Reopen with checkpoint and append more timesteps
+    {
+        HDF5Writer writer(filename, MPI_COMM_WORLD, true); // Enable checkpointing
+        hid_t dset = H5Dopen(writer.file(), "data", H5P_DEFAULT);
+        CHECK(dset >= 0);
+
+        // Append 2 more timesteps (t=3, t=4)
+        for (int t = 3; t < 5; ++t) {
+            std::vector<double> data = {t * 10.0, t * 20.0};
+            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, t, data.data(), {1, 2}, 0, 0, false);
+        }
+        writer.closeDataset(dset);
+    }
+
+    // Should have 5 timesteps total
+    hid_t file = H5Fopen((filename + ".h5").c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    CHECK(file >= 0);
+    hid_t read_dset = H5Dopen(file, "data", H5P_DEFAULT);
+    hid_t space = H5Dget_space(read_dset);
+    std::vector<hsize_t> read_dims(2);
+    H5Sget_simple_extent_dims(space, read_dims.data(), NULL);
+    CHECK(read_dims[0] == 5); // 3 original + 2 appended
+    CHECK(read_dims[1] == 2);
+
+    // Verify data values
+    std::vector<double> all_data(5 * 2);
+    H5Dread(read_dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, all_data.data());
+    for (int t = 0; t < 5; ++t) {
+        CHECK(all_data[t * 2 + 0] == doctest::Approx(t * 10.0));
+        CHECK(all_data[t * 2 + 1] == doctest::Approx(t * 20.0));
+    }
+
+    H5Sclose(space);
+    H5Dclose(read_dset);
+    H5Fclose(file);
+}
+
+TEST_CASE("HDF5Writer - checkpoint disabled creates fresh file") {
+    std::string filename = "test_no_checkpoint";
+    std::filesystem::remove(filename + ".h5");
+
+    // Create file with 3 timesteps
+    {
+        HDF5Writer writer(filename, MPI_COMM_WORLD, false); // Disable checkpointing
+        std::vector<hsize_t> dims = {1, 2};
+        std::vector<hsize_t> max_dims = {H5S_UNLIMITED, 2};
+        hid_t dset =
+            writer.createExtendibleDataset("data", H5T_NATIVE_DOUBLE, dims, max_dims, 0, false);
+
+        for (int t = 0; t < 3; ++t) {
+            std::vector<double> data = {t * 10.0, t * 20.0};
+            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, t, data.data(), {1, 2}, 0, 0, false);
+        }
+        writer.closeDataset(dset);
+    }
+
+    // Reopen WITHOUT checkpoint - should OVERWRITE (fresh file)
+    {
+        HDF5Writer writer(filename, MPI_COMM_WORLD, false); // Disable checkpointing
+        std::vector<hsize_t> dims = {1, 2};
+        std::vector<hsize_t> max_dims = {H5S_UNLIMITED, 2};
+        hid_t dset =
+            writer.createExtendibleDataset("data", H5T_NATIVE_DOUBLE, dims, max_dims, 0, false);
+
+        // Write only 2 timesteps (fresh start)
+        for (int t = 0; t < 2; ++t) {
+            std::vector<double> data = {t * 100.0, t * 200.0};
+            writer.writeToDataset(dset, H5T_NATIVE_DOUBLE, t, data.data(), {1, 2}, 0, 0, false);
+        }
+        writer.closeDataset(dset);
+    }
+
+    // Should have only 2 timesteps (not 5), with new values
+    hid_t file = H5Fopen((filename + ".h5").c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    CHECK(file >= 0);
+    hid_t read_dset = H5Dopen(file, "data", H5P_DEFAULT);
+    hid_t space = H5Dget_space(read_dset);
+    std::vector<hsize_t> read_dims(2);
+    H5Sget_simple_extent_dims(space, read_dims.data(), NULL);
+    CHECK(read_dims[0] == 2); // Only 2 timesteps (fresh file)
+    CHECK(read_dims[1] == 2);
+
+    // Verify new data values (multiplied by 100)
+    std::vector<double> all_data(2 * 2);
+    H5Dread(read_dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, all_data.data());
+    for (int t = 0; t < 2; ++t) {
+        CHECK(all_data[t * 2 + 0] == doctest::Approx(t * 100.0));
+        CHECK(all_data[t * 2 + 1] == doctest::Approx(t * 200.0));
+    }
+
+    H5Sclose(space);
+    H5Dclose(read_dset);
+    H5Fclose(file);
+}
 #else
 TEST_CASE("HDF5Writer - no HDF5 support") {
     CHECK_THROWS_AS(tndm::HDF5Writer("any", MPI_COMM_WORLD), std::runtime_error);

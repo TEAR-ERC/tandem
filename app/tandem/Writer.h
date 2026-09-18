@@ -36,7 +36,7 @@ enum class DataLevel {
     Volume
 #ifdef ENABLE_HDF5
     ,
-    Hierarchical
+    Area // Fault surface data (moment rate) computed over fault area
 #endif
 };
 
@@ -247,12 +247,27 @@ template <std::size_t D> class MomentRateWriter : public Writer {
 public:
     MomentRateWriter(std::string_view prefix, AdaptiveOutputInterval oi,
                      LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
-                     unsigned degree, BoundaryMap const& bnd_map, MPI_Comm comm)
-        : Writer(prefix, oi), writer_(prefix, comm),
-          adapter_(mesh, std::move(cl), bnd_map.localFctNos(), degree), degree_(degree),
-          comm_(std::move(comm)) {}
+                     unsigned degree, BoundaryMap const& bnd_map, MPI_Comm comm,
+                     bool enable_checkpoint)
+        : Writer(prefix, oi), writer_(prefix, comm, enable_checkpoint),
+          adapter_(mesh, std::move(cl), bnd_map.localFctNos(), degree) {
+        // Check if time dataset exists from previous run (checkpoint restart)
+        htri_t dataset_exists = H5Lexists(writer_.file(), "time", H5P_DEFAULT);
+        if (dataset_exists > 0) {
+            // Open existing time dataset and get its extent
+            hid_t time_dset = H5Dopen(writer_.file(), "time", H5P_DEFAULT);
+            if (time_dset >= 0) {
+                hid_t space = H5Dget_space(time_dset);
+                hsize_t dims[1];
+                H5Sget_simple_extent_dims(space, dims, nullptr);
+                output_step_ = dims[0]; // Resume from where we left off
+                H5Sclose(space);
+                H5Dclose(time_dset);
+            }
+        }
+    }
 
-    DataLevel level() const override { return DataLevel::Hierarchical; }
+    DataLevel level() const override { return DataLevel::Area; }
     bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> const& data) override {
         // Get the vertex data from the adapter
@@ -303,26 +318,27 @@ public:
         // Create a dataset for the vertices
         int glueDimension = 0;
         int extensibleDimension = 0;
-        hid_t verticesDataset_ =
+        hid_t vertices_dset =
             writer_.createExtendibleDataset("faultVertices", H5T_IEEE_F64LE, {numElements, D, D},
                                             {numElements, D, D}, glueDimension);
         // Write the data
-        writer_.writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, faultVertices.data(),
+        writer_.writeToDataset(vertices_dset, H5T_IEEE_F64LE, 0, faultVertices.data(),
                                {numElements, D, D}, glueDimension, extensibleDimension);
-        writer_.closeDataset(verticesDataset_);
+        writer_.closeDataset(vertices_dset);
 
         auto globalFctNos = adapter_.getGlobalFctNos();
         hsize_t numFcts = globalFctNos.size();
-        hid_t fctNoDataset_ = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
-                                                              {numFcts}, extensibleDimension);
+        hid_t fct_no_dset = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
+                                                            {numFcts}, extensibleDimension);
 
-        writer_.writeToDataset(fctNoDataset_, H5T_NATIVE_LLONG, 0, globalFctNos.data(), {numFcts},
+        writer_.writeToDataset(fct_no_dset, H5T_NATIVE_LLONG, 0, globalFctNos.data(), {numFcts},
                                glueDimension, extensibleDimension);
 
-        writer_.closeDataset(fctNoDataset_);
+        writer_.closeDataset(fct_no_dset);
     }
     void increase_step(double time, double VMax) override {
-        if (time == 0.0) {
+        if (!received_first_step_) {
+            received_first_step_ = true;
             return;
         }
         Writer::increase_step(time, VMax);
@@ -331,21 +347,20 @@ public:
 private:
     HDF5Writer writer_;
     CurvilinearBoundaryHDF5Adapter<D> adapter_;
-    unsigned degree_;
-    MPI_Comm comm_;
     hid_t momentRateDataset_ = -1;
     hid_t timeStepDataset_ = -1;
+    bool received_first_step_ = false;
 };
 #endif
 
 template <std::size_t D, bool isBoundary> class HDF5CommonProbeWriter : public Writer {
 public:
-    HDF5CommonProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
-                          std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
-                          LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
-                          BoundaryMap const& bnd_map, MPI_Comm comm)
+    HDF5CommonProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
+                          AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
+                          std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map,
+                          MPI_Comm comm, bool enable_checkpoint)
         : Writer(prefix, oi),
-          writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), bnd_map, comm) {}
+          writer_(prefix, probes, mesh, std::move(cl), bnd_map, comm, enable_checkpoint) {}
 
     DataLevel level() const override {
         if constexpr (isBoundary) {
