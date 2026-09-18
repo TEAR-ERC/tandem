@@ -1,4 +1,4 @@
-#include "io/H5Parser.h"
+#include "io/HDF5MeshParser.h"
 #include "doctest.h"
 #include <algorithm>
 #include <array>
@@ -225,13 +225,13 @@ bool createPartialBoundaryHDF5File(const std::string& filename) {
     return true;
 }
 
-// Test cases for H5Parser
-TEST_CASE("H5Parser - Single tetrahedron, all faces tagged") {
+// Test cases for HDF5MeshParser
+TEST_CASE("HDF5MeshParser - Single tetrahedron, all faces tagged") {
     const std::string fname = "test_single_tet.h5";
     REQUIRE(createTestHDF5File(fname));
 
     H5TestBuilder builder;
-    H5Parser parser(&builder);
+    HDF5MeshParser parser(&builder);
     REQUIRE(parser.parseFile(fname));
 
     CHECK(builder.getExpectedVertices() == 4);
@@ -264,12 +264,12 @@ TEST_CASE("H5Parser - Single tetrahedron, all faces tagged") {
     std::remove(fname.c_str());
 }
 
-TEST_CASE("H5Parser - Duplicate face deduplication (two tets sharing a face)") {
+TEST_CASE("HDF5MeshParser - Duplicate face deduplication (two tets sharing a face)") {
     const std::string fname = "test_two_tet.h5";
     REQUIRE(createTwoTetHDF5File(fname));
 
     H5TestBuilder builder;
-    H5Parser parser(&builder);
+    HDF5MeshParser parser(&builder);
     REQUIRE(parser.parseFile(fname));
 
     // 4 faces per tet, 1 shared face tagged on both sides -> 7 unique boundary faces
@@ -290,12 +290,12 @@ TEST_CASE("H5Parser - Duplicate face deduplication (two tets sharing a face)") {
     std::remove(fname.c_str());
 }
 
-TEST_CASE("H5Parser - Partial boundary (only some faces tagged)") {
+TEST_CASE("HDF5MeshParser - Partial boundary (only some faces tagged)") {
     const std::string fname = "test_partial_boundary.h5";
     REQUIRE(createPartialBoundaryHDF5File(fname));
 
     H5TestBuilder builder;
-    H5Parser parser(&builder);
+    HDF5MeshParser parser(&builder);
     REQUIRE(parser.parseFile(fname));
 
     // Only 2 of the 4 faces are tagged
@@ -308,10 +308,10 @@ TEST_CASE("H5Parser - Partial boundary (only some faces tagged)") {
     std::remove(fname.c_str());
 }
 
-TEST_CASE("H5Parser - Error handling") {
+TEST_CASE("HDF5MeshParser - Error handling") {
     SUBCASE("Nonexistent file returns false with message") {
         H5TestBuilder builder;
-        H5Parser parser(&builder);
+        HDF5MeshParser parser(&builder);
 
         REQUIRE_FALSE(parser.parseFile("does_not_exist.h5"));
         CHECK(parser.getErrorMessage().find("Unable to open HDF5 file") != std::string::npos);
@@ -319,14 +319,14 @@ TEST_CASE("H5Parser - Error handling") {
 
     SUBCASE("No error message before any parse attempt") {
         H5TestBuilder builder;
-        H5Parser parser(&builder);
+        HDF5MeshParser parser(&builder);
         CHECK(parser.getErrorMessage().empty());
     }
 }
 
 #else
 
-TEST_CASE("H5Parser - no HDF5 support") {
+TEST_CASE("HDF5MeshParser - no HDF5 support") {
     // Verify the stub throws the right exception if HDF5 support is
     // not enabled.
     struct DummyBuilder : tndm::MeshBuilder {
@@ -336,7 +336,7 @@ TEST_CASE("H5Parser - no HDF5 support") {
         void addElement(long, long, long*, std::size_t) override {}
     };
     DummyBuilder builder;
-    H5Parser parser(&builder);
+    HDF5MeshParser parser(&builder);
     CHECK_THROWS_AS(parser.parseFile("any.h5"), std::runtime_error);
 }
 
