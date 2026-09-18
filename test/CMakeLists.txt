@@ -60,9 +60,13 @@ add_executable(test-util util.cpp)
 target_link_libraries(test-util test-runner)
 doctest_discover_tests(test-util)
 
-add_executable(test-H5Parser H5Parser.cpp)
-target_link_libraries(test-H5Parser test-runner-mpi)
-doctest_discover_tests(test-H5Parser)
+if(ENABLE_HDF5)
+    find_package(HDF5 COMPONENTS C HL QUIET)
+endif()
+
+add_executable(test-HDF5MeshParser HDF5MeshParser.cpp)
+target_link_libraries(test-HDF5MeshParser test-runner-mpi)
+doctest_discover_tests(test-HDF5MeshParser)
 
 if(RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
