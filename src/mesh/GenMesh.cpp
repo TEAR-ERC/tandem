@@ -133,8 +133,8 @@ std::unique_ptr<typename GenMesh<D>::mesh_t> GenMesh<D>::uniformMesh() const {
     }
 
     auto vertexData = std::make_unique<vertex_data_t>(std::move(vertices));
-    auto mesh =
-        std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr, nullptr, comm_);
+    auto mesh = std::make_unique<mesh_t>(std::move(elements), std::move(vertexData), nullptr,
+                                         nullptr, comm_);
     auto boundaryMesh = extractBoundaryMesh(*mesh);
     mesh->template setBoundaryMesh<D - 1>(std::move(boundaryMesh));
     return mesh;
