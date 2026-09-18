@@ -48,6 +48,12 @@ TEST_CASE("HDF5Writer - basic functionality") {
             CHECK(std::filesystem::exists(filename + ".h5"));
         }
     }
+
+    // Cleanup
+    if (rank == 0) {
+        std::filesystem::remove("test_output.h5");
+    }
+    MPI_Barrier(comm); // wait for rank 0 to finish cleanup
 }
 TEST_CASE("HDF5Writer - file is properly closed after destruction") {
     MPI_Comm comm = MPI_COMM_WORLD;
@@ -69,6 +75,12 @@ TEST_CASE("HDF5Writer - file is properly closed after destruction") {
     if (file >= 0) {
         H5Fclose(file);
     }
+
+    // Cleanup
+    if (rank == 0) {
+        std::filesystem::remove("test_close.h5");
+    }
+    MPI_Barrier(comm); // wait for rank 0 to finish cleanup
 }
 
 TEST_CASE("HDF5Writer - dataset extends correctly") {
@@ -97,6 +109,14 @@ TEST_CASE("HDF5Writer - dataset extends correctly") {
     H5Sclose(space);
     H5Dclose(read_dset);
     H5Fclose(file);
+
+    // Cleanup
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank == 0) {
+        std::filesystem::remove("test_extend.h5");
+    }
+    MPI_Barrier(MPI_COMM_WORLD); // wait for rank 0 to finish cleanup
 }
 
 TEST_CASE("HDF5Writer - checkpoint mode appends to existing file") {
@@ -153,6 +173,14 @@ TEST_CASE("HDF5Writer - checkpoint mode appends to existing file") {
     H5Sclose(space);
     H5Dclose(read_dset);
     H5Fclose(file);
+
+    // Cleanup
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank == 0) {
+        std::filesystem::remove("test_checkpoint.h5");
+    }
+    MPI_Barrier(MPI_COMM_WORLD); // wait for rank 0 to finish cleanup
 }
 
 TEST_CASE("HDF5Writer - checkpoint disabled creates fresh file") {
@@ -211,6 +239,14 @@ TEST_CASE("HDF5Writer - checkpoint disabled creates fresh file") {
     H5Sclose(space);
     H5Dclose(read_dset);
     H5Fclose(file);
+
+    // Cleanup
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank == 0) {
+        std::filesystem::remove("test_no_checkpoint.h5");
+    }
+    MPI_Barrier(MPI_COMM_WORLD); // wait for rank 0 to finish cleanup
 }
 #else
 TEST_CASE("HDF5Writer - no HDF5 support") {
