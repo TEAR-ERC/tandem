@@ -31,7 +31,7 @@ jobs:
         run: |
           MAJOR_VERSION=3
           MINOR_VERSION=22
-          VERSION=$(curl -s https://web.cels.anl.gov/projects/petsc/download/release-snapshots/ \
+          VERSION=$(curl -sf https://web.cels.anl.gov/projects/petsc/download/release-snapshots/ \
             | grep -oP "petsc-${MAJOR_VERSION}\.${MINOR_VERSION}\.\d+\.tar\.gz" \
             | sed 's/[^0-9]*\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/' \
             | sort -V \
