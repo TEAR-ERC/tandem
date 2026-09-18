@@ -14,7 +14,7 @@ struct SideInfo {
     std::size_t lid;
     std::size_t localNo;
     BC bc;
-    long int facetTag;
+    long int FacetTag;
 };
 
 struct FacetInfo {
@@ -23,7 +23,7 @@ struct FacetInfo {
     std::array<std::size_t, 2> g_up;
     std::array<std::size_t, 2> localNo;
     BC bc;
-    long int facetTag;
+    long int FacetTag;
 };
 
 } // namespace tndm

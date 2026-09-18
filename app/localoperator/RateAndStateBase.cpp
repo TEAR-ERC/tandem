@@ -31,7 +31,7 @@ void RateAndStateBase::prepare(std::size_t faultNo, FacetInfo const& info,
     auto nbf = space_.numBasisFunctions();
     auto coords =
         Tensor(fault_[faultNo].template get<Coords>().data()->data(), cl_->mapResultInfo(nbf));
-    auto fTag = Tensor(fault_[faultNo].template get<faultTag>().data(), cl_->tagsInfo(nbf));
+    auto fTag = Tensor(fault_[faultNo].template get<FaultTag>().data(), cl_->tagsInfo(nbf));
     cl_->map(info.up[0], geoE_q[info.localNo[0]], coords);
     cl_->setFacetTags(info, fTag);
 }
