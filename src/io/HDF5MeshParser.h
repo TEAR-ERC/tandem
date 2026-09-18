@@ -1,5 +1,5 @@
-#ifndef H5PARSER_H
-#define H5PARSER_H
+#ifndef HDF5MESHPARSER
+#define HDF5MESHPARSER
 
 #include "MeshParser.h"
 #include <array>
@@ -53,4 +53,4 @@ public:
 
 } // namespace tndm
 
-#endif // H5PARSER_H
+#endif // HDF5MESHPARSER_H
