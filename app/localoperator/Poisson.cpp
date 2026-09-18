@@ -720,5 +720,8 @@ void Poisson::traction_boundary(std::size_t fctNo, FacetInfo const& info, Vector
     krnl.u(0) = u0.data();
     krnl.execute();
 }
-
+double* Poisson::get_mu_field(FacetInfo const& info) const {
+    double* a;
+    return a;
+}
 } // namespace tndm
