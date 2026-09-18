@@ -116,7 +116,7 @@ public:
             auto slip_rate_q = Matrix<double>(slip_rate_q_raw, LocalOperator::NumQuantities, nq);
             auto slip_rate_reshaped =
                 tndm::Vector<const double>(result_block.data(), result_block.shape());
-            adapter_->slip_rate(faultNo, slip_rate_reshaped, slip_rate_q);
+            adapter_->slip_rate(slip_rate_reshaped, slip_rate_q);
 
             // Compute moment rate using slip rate values at quadrature nodes and
             // quadrature weights and normal vectors - see moment_rate kernel for more

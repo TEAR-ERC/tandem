@@ -49,7 +49,7 @@ void Adapter<Elasticity>::slip(std::size_t faultNo, Vector<double const>& state,
 }
 
 template <>
-void Adapter<Elasticity>::slip_rate(std::size_t faultNo, Vector<double const>& state,
+void Adapter<Elasticity>::slip_rate(Vector<double const>& state,
                                     Matrix<double>& slip_rate_q) const {
     assert(slip_rate_q.shape(0) == DomainDimension);
     assert(slip_rate_q.shape(1) == elasticity_adapter::tensor::slip_rate_q::Shape[1]);
