@@ -12,9 +12,6 @@ class HDF5Writer {
 public:
     HDF5Writer(std::string_view filename, MPI_Comm comm);
     ~HDF5Writer();
-
-    void writeStaticData(const std::string_view name, hid_t type, const void* data,
-                         std::vector<hsize_t> dims);
     // Returns the dataset ID for later writing
     hid_t createExtendibleDataset(const std::string_view name, hid_t type,
                                   std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
