@@ -2,13 +2,8 @@ name: Build and Push Tandem Release Images
 
 on:
   push:
-    branches:
-      - ymagen/docker-release-images    # your PR branch - builds for testing
-    paths:
-      - 'docker/release/**'      # trigger if Dockerfiles changed
-      - '.github/workflows/release-images.yml'  # trigger if workflow itself changed
     tags:
-      - 'v*'                     # v1.2.0, v1.3.0 etc - full versioned release
+      - 'v*'                     # v1.2.0, v1.3.0 etc
   workflow_dispatch:             # manual trigger from GitHub Actions UI
 
 env:
@@ -44,12 +39,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_BASE }}
           tags: |
-            # PR branch → :ymagen-docker-release-images (for testing)
-            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_type == 'branch' }}
-            # Version tag → :1.2.0, :1.2, :latest
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
       - name: Build and push tandem image
         uses: docker/build-push-action@v6
