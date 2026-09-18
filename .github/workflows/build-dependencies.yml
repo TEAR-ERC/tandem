@@ -65,11 +65,22 @@ jobs:
         id: set-built
         run: |
           # If the build step was skipped, it means we didn't rebuild.
-          if [ "${{ steps.docker-build-base.outcome }}" == "success" ]; then
-            echo "built=true" >> $GITHUB_OUTPUT
-          else
-            echo "built=false" >> $GITHUB_OUTPUT
-          fi
+          case "${{ steps.docker-build-base.outcome }}" in
+            success)
+              echo "built=true" >> $GITHUB_OUTPUT
+              ;;
+            skipped)
+              echo "built=false" >> $GITHUB_OUTPUT
+              ;;
+            failure|cancelled)
+              echo "Base image build failed — cannot continue"
+              exit 1
+              ;;
+            *)
+              echo "Unexpected outcome: ${{ steps.docker-build-base.outcome }}"
+              exit 1
+              ;;
+          esac
 
   build-test-image:
     runs-on: ubuntu-24.04
