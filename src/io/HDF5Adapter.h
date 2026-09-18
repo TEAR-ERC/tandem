@@ -16,7 +16,6 @@
 
 #include <array>
 #include <cstddef>
-#include <hdf5.h>
 #include <memory>
 #include <vector>
 

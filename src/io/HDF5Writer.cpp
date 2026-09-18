@@ -1,9 +1,10 @@
 #include "HDF5Writer.h"
-#include <algorithm>
-#include <hdf5_hl.h>
 #include <iostream>
+#include <stdexcept>
 
 namespace tndm {
+
+#ifdef ENABLE_HDF5
 
 HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm) : comm_(comm) {
     MPI_Comm_rank(comm_, &rank_);
@@ -20,6 +21,11 @@ HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm) : comm_(comm) {
     if (!is_open_) {
         std::cerr << "Error: Unable to open HDF5 file!" << std::endl;
     }
+}
+
+HDF5Writer::~HDF5Writer() {
+    if (is_open_)
+        H5Fclose(file_);
 }
 
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t type,
@@ -129,5 +135,27 @@ std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t localElements)
 
     return {totalElements, offset};
 }
+
+#else // ENABLE_HDF5 not defined
+
+static constexpr const char* errMsg = "HDF5Writer: tandem was built without HDF5 support. "
+                                      "Reconfigure with -DENABLE_HDF5=ON.";
+
+HDF5Writer::HDF5Writer(std::string_view, MPI_Comm) { throw std::runtime_error(errMsg); }
+HDF5Writer::~HDF5Writer() {}
+hid_t HDF5Writer::createExtendibleDataset(const std::string_view, hid_t, std::vector<hsize_t>,
+                                          std::vector<hsize_t>, int, bool) {
+    throw std::runtime_error(errMsg);
+}
+void HDF5Writer::writeToDataset(hid_t, hid_t, hsize_t, const void*, std::vector<hsize_t>, int, int,
+                                bool) {
+    throw std::runtime_error(errMsg);
+}
+void HDF5Writer::closeDataset(hid_t) { throw std::runtime_error(errMsg); }
+std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t) {
+    throw std::runtime_error(errMsg);
+}
+
+#endif // ENABLE_HDF5
 
 } // namespace tndm
