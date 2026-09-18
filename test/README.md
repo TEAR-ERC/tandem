@@ -63,6 +63,9 @@ Fine-grained tests verifying specific codebase functionalities.
 | `simplex.cpp` | Tests simplex creation and upward/downward dimensional mapping |
 | `tensor.cpp` | Validates tensor creation and value copying operations |
 | `util.cpp` | Tests utility functions (combinatorics, root finding, permutations) |
+| `HDF5MeshParser.cpp` | Basic parsing, Boundary tag decoding, Face deduplication, node validation, error handling, compilation fallback |
+
+
 
 ### 2. Pytest Integration Tests
 
