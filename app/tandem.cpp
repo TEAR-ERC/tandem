@@ -88,7 +88,8 @@ int main(int argc, char** argv) {
         GlobalSimplexMeshBuilder<DomainDimension> builder;
         std::string meshError;
         if (rank == 0) {
-            auto [parser, error] = MeshParser::createWithValidation<DomainDimension>(*cfg->mesh_file, &builder);
+            auto [parser, error] =
+                MeshParser::createWithValidation<DomainDimension>(*cfg->mesh_file, &builder);
             if (!parser) {
                 meshError = error;
             } else {
