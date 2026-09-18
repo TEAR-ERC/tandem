@@ -7,6 +7,7 @@
 #include "geometry/Curvilinear.h"
 #include "io/BoundaryProbeWriter.h"
 #include "io/HDF5Adapter.h"
+#include "io/HDF5BoundaryProbeWriter.h"
 #include "io/HDF5Writer.h"
 #include "io/PVDWriter.h"
 #include "io/ProbeWriter.h"
@@ -255,7 +256,7 @@ public:
 
         if (momentRateDataset_ == -1) {
             momentRateDataset_ = writer_.createExtendibleDataset(
-                "Moment_rate", H5T_IEEE_F64LE, {numElements, 1, D - 1},
+                "momentRate", H5T_IEEE_F64LE, {numElements, 1, D - 1},
                 {numElements, H5S_UNLIMITED, D - 1}, glueDimensionMoment);
         }
         // Write the data
@@ -317,6 +318,28 @@ private:
     std::vector<std::array<std::array<double, D>, 3>> faultVertices;
     hid_t momentRateDataset_ = -1;
     hid_t timeStepDataset_ = -1;
+};
+
+template <std::size_t D> class HDF5FaultProbeWriter : public Writer {
+public:
+    HDF5FaultProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+                         std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
+                         LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
+                         BoundaryMap const& bnd_map, MPI_Comm comm)
+        : Writer(prefix, oi),
+          writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), bnd_map, comm) {}
+
+    DataLevel level() const override { return DataLevel::Boundary; }
+    void write_static(mneme::span<FiniteElementFunction<D - 1u>> data) override {
+        writer_.initialize_datasets(data);
+    }
+    std::vector<std::size_t> const* subset() const override { return &writer_.bndNos(); }
+    void write(double time, mneme::span<FiniteElementFunction<D - 1u>> data) override {
+        writer_.write(time, std::move(data), output_step_);
+    }
+
+private:
+    HDF5BoundaryProbeWriter<D> writer_;
 };
 
 } // namespace tndm::seas
