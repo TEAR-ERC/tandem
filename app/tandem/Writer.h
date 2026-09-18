@@ -245,7 +245,6 @@ public:
           comm_(std::move(comm)) {}
 
     DataLevel level() const override { return DataLevel::Heirarchical; }
-    bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> data) override {
         // Get the vertex data from the adapter
         auto numElements = data.size() / (D - 1);
@@ -279,35 +278,6 @@ public:
     ~MomentRateWriter() {
         writer_.closeDataset(momentRateDataset_);
         writer_.closeDataset(timeStepDataset_);
-    }
-    void write_static() override {
-        // Get the vertex data from the adapter
-        auto faultVertices = adapter_.getVertices();
-        auto numFaultBasis = adapter_.getNumBasisNodes();
-        // Calculate element count
-
-        hsize_t numElements = faultVertices.size() / (numFaultBasis * D);
-
-        // Create a dataset for the vertices
-        int glueDimension = 0;
-        int extensibleDimension = 0;
-        hid_t verticesDataset_ =
-            writer_.createExtendibleDataset("faultVertices", H5T_IEEE_F64LE, {numElements, D, D},
-                                            {numElements, D, D}, glueDimension);
-        // Write the data
-        writer_.writeToDataset(verticesDataset_, H5T_IEEE_F64LE, 0, faultVertices.data(),
-                               {numElements, D, D}, glueDimension, extensibleDimension);
-        writer_.closeDataset(verticesDataset_);
-
-        auto globalFctNos = adapter_.getGlobalFctNos();
-        hsize_t numFcts = globalFctNos.size();
-        hid_t fctNoDataset_ = writer_.createExtendibleDataset("faultNo", H5T_NATIVE_INT, {numFcts},
-                                                              {numFcts}, extensibleDimension);
-
-        writer_.writeToDataset(fctNoDataset_, H5T_NATIVE_LLONG, 0, globalFctNos.data(), {numFcts},
-                               glueDimension, extensibleDimension);
-
-        writer_.closeDataset(fctNoDataset_);
     }
 
 private:
