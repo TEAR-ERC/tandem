@@ -7,6 +7,7 @@
 #include "interface/BlockVector.h"
 #include "util/Range.h"
 
+#include <array>
 #include <cstddef>
 #include <optional>
 
