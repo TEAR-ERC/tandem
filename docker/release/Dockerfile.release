@@ -13,16 +13,18 @@ FROM --platform=linux/amd64 ${BASE_IMAGE} AS builder
 ARG DIM
 ARG DEG
 
+RUN apt-get update && apt-get install -y ninja-build && rm -rf /var/lib/apt/lists/*
+
 # ── Build Tandem for this specific DIM + DEG ──────────────────────────────────
 RUN mkdir -p /opt/tandem/build_${DIM}d_${DEG}p \
     && cd /opt/tandem/build_${DIM}d_${DEG}p \
-    && cmake /opt/tandem/tandem \
+    && cmake -G Ninja /opt/tandem/tandem \
         -DCMAKE_CXX_COMPILER=mpicxx \
         -DCMAKE_C_COMPILER=mpicc \
         -DCMAKE_PREFIX_PATH="${PETSC_INSTALL};${EIGEN_INSTALL}" \
         -DDOMAIN_DIMENSION=${DIM} \
         -DPOLYNOMIAL_DEGREE=${DEG} \
-    && make -j$(nproc)
+    && ninja
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 ubuntu:22.04
