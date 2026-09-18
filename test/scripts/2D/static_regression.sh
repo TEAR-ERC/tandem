@@ -17,7 +17,7 @@ ln -sf "$MESH_DIR/circular_hole.msh" .
 ${EXECUTABLE_DIR}/app/static circular_hole.toml \
 --matrix_free yes --mg_strategy twolevel \
 --mg_coarse_level 1 --output ${TEMP_TEST_RESULTS}/output2D \
---petsc -options_file mg_cheby.cfg >> ${TEMP_TEST_RESULTS}/static_regression_2D.log
+--petsc -options_file mg_cheby.cfg > ${TEMP_TEST_RESULTS}/static_regression_2D.log
 
 # clean up the sym link
 rm circular_hole.msh

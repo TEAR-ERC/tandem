@@ -16,9 +16,9 @@ ln -sf "$MESH_DIR/bp1_ref.msh" .
 
 
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QD.toml \
---petsc -options_file solver.cfg >> ${TEMP_TEST_RESULTS}/seas_regression_QD.log
+--petsc -options_file solver.cfg > ${TEMP_TEST_RESULTS}/seas_regression_QD.log
 ${EXECUTABLE_DIR}/app/tandem bp1_ref_QDGreen.toml \
---petsc -options_file solver.cfg>> ${TEMP_TEST_RESULTS}/seas_regression_QDGreen.log
+--petsc -options_file solver.cfg > ${TEMP_TEST_RESULTS}/seas_regression_QDGreen.log
 
 # clean up the sym link
 rm bp1_ref.msh

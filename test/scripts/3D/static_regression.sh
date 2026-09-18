@@ -17,7 +17,7 @@ ln -sf "$MESH_DIR/spherical_hole.msh" .
 ${EXECUTABLE_DIR}/app/static spherical_hole.toml \
 --matrix_free yes --mg_strategy twolevel \
 --mg_coarse_level 1 --output ${TEMP_TEST_RESULTS}/output3D \
---petsc -options_file mg_cheby.cfg >> ${TEMP_TEST_RESULTS}/static_regression_3D.log
+--petsc -options_file mg_cheby.cfg > ${TEMP_TEST_RESULTS}/static_regression_3D.log
 
 # clean up the sym link
 rm spherical_hole.msh
