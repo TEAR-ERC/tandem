@@ -1,5 +1,5 @@
 import glob
-from test_parallel_consistency import _run_parallel_consistency
+from test_parallel_consistency_static import _run_parallel_consistency
 
 
 def test_parallel_consistency_volume_tagging(
