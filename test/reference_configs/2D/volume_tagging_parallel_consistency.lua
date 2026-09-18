@@ -10,7 +10,7 @@ end
 
 
 function VolumeTagging:mu(x, y, tag)
-    local _tag = math.floor(tag)
+    local _tag = tag
     local _mu = 1.0
     if _tag == 1 then
       _mu = 1.0
