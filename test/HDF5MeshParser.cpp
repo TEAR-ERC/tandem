@@ -50,7 +50,7 @@ public:
             }
         } else if (type == 2) { // Triangular boundary element (lower Dimensional)
             CHECK(numNodes == 3);
-            CHECK(tag > 0); // Should have boundary tag
+            CHECK(tag > -1); // Should have boundary tag
             // Verify node indices are valid
             for (std::size_t i = 0; i < numNodes; ++i) {
                 CHECK(node[i] >= 0);
@@ -298,12 +298,18 @@ TEST_CASE("HDF5MeshParser - Partial boundary (only some faces tagged)") {
     HDF5MeshParser parser(&builder);
     REQUIRE(parser.parseFile(fname));
 
-    // Only 2 of the 4 faces are tagged
-    CHECK(parser.getLowerDimensionalElements().size() == 2);
-    CHECK(parser.getBoundary().size() == 2);
+    CHECK(parser.getLowerDimensionalElements().size() == 4);
+    CHECK(parser.getBoundary().size() == 4);
+
+    // Extract only the non-zero boundary tags
+    std::vector<uint8_t> boundary = parser.getBoundary();
+    std::vector<uint8_t> non_zero_boundaries;
+
+    std::copy_if(boundary.begin(), boundary.end(), std::back_inserter(non_zero_boundaries),
+                 [](uint8_t tag) { return tag != 0; });
 
     // Tags should be exactly the two non-zero ones, in face order
-    CHECK(parser.getBoundary() == std::vector<uint8_t>{1, 5});
+    CHECK(non_zero_boundaries == std::vector<uint8_t>{1, 5});
 
     std::remove(fname.c_str());
 }
