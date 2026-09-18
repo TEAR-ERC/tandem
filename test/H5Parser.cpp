@@ -235,7 +235,6 @@ TEST_CASE("H5Parser - Data Structure Validation") {
 
         std::vector<uint8_t> foundTags;
         for (const auto& tag : parser.boundary) {
-            std::cout<<int(tag)<<std::endl;
             CHECK(tag > 0);
             CHECK(tag <= 5);
             foundTags.push_back(tag);
