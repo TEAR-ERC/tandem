@@ -1,0 +1,4 @@
+mesh_file = "volume_tagging.msh"
+type = "poisson"
+lib = "volume_tagging.lua"
+scenario = "volume_tagging"
