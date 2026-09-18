@@ -21,7 +21,7 @@ jobs:
           - cc: clang-18
             cxx: clang++-18
         dimension: [2, 3]
-        degree: [3]
+        degree: [2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
