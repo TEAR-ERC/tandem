@@ -43,11 +43,11 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     }
     auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
     if (volumeData) {
-        volumeTags = volumeData->getVolumeTags();
+        volumeTags_ = volumeData->getVolumeTags();
     } else {
         std::cerr << "Warning: Volume tags are not set in the mesh. Setting to a default of -1"
                   << std::endl;
-        volumeTags.resize(mesh.numElements(), -1);
+        volumeTags_.resize(mesh.numElements(), -1);
     }
     auto elementData = dynamic_cast<ElementData const*>(mesh.elements().data());
     Managed<Matrix<double>> eval_basis;
@@ -158,7 +158,7 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
 }
 
 template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
-    return volumeTags[elNo];
+    return volumeTags_[elNo];
 }
 
 template <std::size_t D>
