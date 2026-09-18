@@ -1,9 +1,9 @@
 #ifndef H5PARSER_H
 #define H5PARSER_H
 
-#include <hdf5.h>
 #include "meshParser.h"
 #include <array>
+#include <hdf5.h>
 #include <optional>
 #include <string>
 #include <string_view>
