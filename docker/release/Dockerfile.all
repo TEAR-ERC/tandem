@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y \
     liblua5.3-0 \
     libblas3 \
     liblapack3 \
+    libopenblas0-pthread \
     libgomp1 \
     gmsh \
     && rm -rf /var/lib/apt/lists/*
