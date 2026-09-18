@@ -1,7 +1,7 @@
 SuperMUC-NG
 ===========
 
-First, have a look at `this page <https://seissol.readthedocs.io/en/latest/behind-firewall.html>`_ to best configure git on SuperMUC-NG.
+First, have a look at `this page <https://seissol.readthedocs.io/en/latest/behind-firewall.html>`__ to best configure git on SuperMUC-NG.
 
 The software stack on SuperMUC-NG has been installed with spack.
 Yet, spack on SuperMUC-NG is not recent enough to natively know how to compile tandem. 
@@ -129,4 +129,4 @@ Submit the script using ``sbatch``:
 
     sbatch run_Tandem_supermuc.sh
 
-More information about the job submission process on SuperMUC-NG can be found on `this page <https://doku.lrz.de/job-processing-with-slurm-on-supermuc-ng-10746568.html>`_.
+More information about the job submission process on SuperMUC-NG can be found on `this page <https://doku.lrz.de/job-processing-with-slurm-on-supermuc-ng-10746568.html>`__.

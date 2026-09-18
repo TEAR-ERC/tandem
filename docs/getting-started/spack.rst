@@ -69,7 +69,7 @@ e.g.:
     module use $HOME/spack/modules/x86_avx512/linux-sles15-skylake_avx512/
 
 Installing various branches using Spack
---------------------------------------
+---------------------------------------
 
 Spack installs the main branch by default. 
 Compiling tandem from other branches using Spack can be done by modifying the file :code:`package.py` under directory :code:`spack/var/spack/repos/builtin/packages/tandem` or :code:`seissol-spack-aid/spack/packages/tandem` in SuperMUC.

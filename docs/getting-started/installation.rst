@@ -38,7 +38,7 @@ Consult your package manager's documentation for other operating systems.
 
 
 Install PETSc METIS and ParMETIS
--------------
+--------------------------------
 
 .. code-block:: bash
 
