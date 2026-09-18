@@ -36,36 +36,28 @@ Consult your package manager's documentation for other operating systems.
          python3 python3-distutils python3-numpy \
          liblua5.3-0 liblua5.3-dev zlib1g zlib1g-dev
 
-Install METIS and ParMETIS
---------------------------
 
-.. code:: console
-
-    $ wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-    $ wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz
-    $ tar -xvf metis-5.1.0.tar.gz
-    $ tar -xvf parmetis-4.0.3.tar.gz
-    $ cd metis-5.1.0
-    $ make config && make && make install
-    $ cd ../parmetis-4.0.3
-    $ make config && make && make install
-    $ cd ..
-
-Install PETSc
+Install PETSc METIS and ParMETIS
 -------------
 
-.. code:: console
+.. code-block:: bash
 
-    $ wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-lite-3.14.6.tar.gz
-    $ tar -xvf petsc-lite-3.14.6.tar.gz
-    $ cd petsc-3.14.6
-    $ ./configure --with-fortran-bindings=0 --with-debugging=0 \
-         --with-memalign=32 --with-64-bit-indices \
-         CC=mpicc CXX=mpicxx FC=mpif90 --prefix=/usr/local/ \
-         --download-mumps --download-scalapack \
-         COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3"
-    $ make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt -j
-    $ make PETSC_DIR=`pwd` PETSC_ARCH=arch-linux-c-opt install
+   mkdir petsc && cd petsc
+   wget https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-3.22.3.tar.gz
+   tar -xvf petsc-3.22.3.tar.gz
+   cd petsc-3.22.3
+   ./configure --with-fortran-bindings=0 --with-debugging=0 --with-memalign=32 \
+               --with-64-bit-indices CC=mpicc CXX=mpicxx FC=mpif90 \
+               COPTFLAGS="-g -O3" CXXOPTFLAGS="-g -O3" --download-mumps \
+               --download-scalapack --download-metis --download-parmetis \
+               --download-fblaslapack=1 --prefix=$HOME/petsc/build
+
+Build and install:
+
+.. code-block:: bash
+
+   make PETSC_DIR=$PWD PETSC_ARCH=arch-linux-c-opt all
+   make PETSC_DIR=$PWD PETSC_ARCH=arch-linux-c-opt install
     $ cd ..
 
 (Optional) Install libxsmm
