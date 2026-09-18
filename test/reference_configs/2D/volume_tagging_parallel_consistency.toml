@@ -1,0 +1,6 @@
+mesh_file = "volume_tagging_parallel_consistency.msh"
+type = "elasticity"
+lib = "volume_tagging_parallel_consistency.lua"
+scenario = "volumeTagging"
+
+
