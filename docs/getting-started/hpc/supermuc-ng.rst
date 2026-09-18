@@ -98,15 +98,15 @@ In SuperMUC-NG, you need to submit a job using SLURM. An example job submission 
 
     #Setup of execution environment
     #SBATCH --export=ALL
-    #SBATCH --account=pn49ha
+    #SBATCH --account=<your account name>
 
-    #SBATCH --partition=general
+    #SBATCH --partition=<desired queue name>
 
     #EAR may impact code performance
     #SBATCH --ear=off
 
     #Number of nodes and MPI tasks per node:
-    #SBATCH --nodes=40
+    #SBATCH --nodes=<nodes number>
     #SBATCH --ntasks-per-node=1
 
     module load slurm_setup
@@ -118,7 +118,10 @@ In SuperMUC-NG, you need to submit a job using SLURM. An example job submission 
     echo 'num_nodes:' $SLURM_JOB_NUM_NODES 'ntasks:' $SLURM_NTASKS 'cpus_per_task:' $SLURM_CPUS_PER_TASK
     ulimit -Ss 2097152
 
-    mpiexec -n $SLURM_NTASKS tandem parameters.toml --petsc -options_file options/lu_mumps.cfg -options_file options/rk45.cfg -ts_monitor
+    mpiexec -n $SLURM_NTASKS tandem parameters.toml --petsc -options_file petsc_options.cfg
+
+note::
+   Replace the placeholders (e.g., ``<job name>``, ``<work directory>``, ``<your account name>``, ``<desired queue name>``, ``<nodes number>``) with your desired values.
 
 Submit the script using ``sbatch``:
 
