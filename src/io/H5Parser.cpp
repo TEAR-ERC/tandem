@@ -16,13 +16,6 @@ template <typename T> T H5Parser::logError(std::string_view msg) {
     return {};
 }
 
-template <typename T> T H5Parser::logErrorAnnotated(std::string_view msg) {
-    errorMsg += "H5 parser error:\n\t";
-    errorMsg += msg;
-    errorMsg += '\n';
-    return {};
-}
-
 template <typename T> hid_t nativeH5Type();
 template <> hid_t nativeH5Type<double>() { return H5T_NATIVE_DOUBLE; }
 template <> hid_t nativeH5Type<long>() { return H5T_NATIVE_LONG; }
@@ -73,7 +66,7 @@ bool H5Parser::readDataset(hid_t file, std::string_view name, std::vector<T>& da
 bool H5Parser::parseNodes(hid_t file) {
     std::vector<double> nodeData;
     if (!readDataset<double>(file, "/geometry", nodeData)) {
-        return logErrorAnnotated<bool>("Failed to parse nodes");
+        return logError<bool>("Failed to parse nodes");
     }
     constexpr std::size_t DOMAIN_DIMENSION = 3;
     std::size_t numVertices = nodeData.size() / DOMAIN_DIMENSION;
@@ -91,7 +84,7 @@ bool H5Parser::parseNodes(hid_t file) {
 
 bool H5Parser::readBoundaryData(hid_t file) {
     if (!readDataset<uint32_t>(file, "/boundary", boundaryData)) {
-        return logErrorAnnotated<bool>("Failed to parse boundary");
+        return logError<bool>("Failed to parse boundary");
     }
     return true;
 }
@@ -99,15 +92,16 @@ bool H5Parser::readBoundaryData(hid_t file) {
 bool H5Parser::parseElements(hid_t file) {
     std::vector<long> elementData;
     if (!readDataset<long>(file, "/connect", elementData)) {
-        return logErrorAnnotated<bool>("Failed to parse elements");
+        return logError<bool>("Failed to parse elements");
     }
     if (!readDataset<uint32_t>(file, "/group", groupTags)) {
-        return logErrorAnnotated<bool>("Failed to parse group tags");
+        // /group is optional; default all group tags to 0 if absent.
+        errorMsg.clear();
+        groupTags.assign(elementData.size() / 4, 0u);
     }
 
     constexpr std::size_t ELEMENT_SIDES = 4;
     std::size_t numElements = elementData.size() / ELEMENT_SIDES;
-    builder->setNumElements(numElements);
 
     for (std::size_t i = 0; i < numElements; ++i) {
         // PUMGen connectivity is already 0-based, which matches the builder's expectations.
