@@ -80,6 +80,9 @@ def add(generator, dim, nbf, Nbf, nq, Nq, petsc_alignment):
     L_q = [Tensor('L_q({})'.format(x), (Nbf, dim, dim, nq)) for x in range(2)]
     Minv = [Tensor('Minv({})'.format(x), (Nbf, Nbf)) for x in range(2)]
     a = [[Tensor('a({},{})'.format(x, y), (Nbf, dim, Nbf, dim)) for y in range(2)] for x in range(2)]
+    mu_avg_q = Tensor('mu_avg_q', (nq,))
+    generator.add('mu_avg', mu_avg_q['q'] <= 0.5 * (mu_q[0]['q'] + mu_q[1]['q']))
+
 
     generator.addFamily('precomputeSurface', simpleParameterSpace(2), lambda x: [
         lam_q[x]['q'] <= matE_q_T[x]['qt'] * lam['t'],

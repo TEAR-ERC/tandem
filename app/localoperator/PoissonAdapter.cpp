@@ -68,14 +68,14 @@ void Adapter<Poisson>::slip_rate(std::size_t faultNo, Vector<double const>& stat
 
 template <>
 void Adapter<Poisson>::moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                                   Matrix<double>& slip_rate_q, double* mu_field) const {
-    // TODO: Add lame parameter mu during moment rate calculation
+                                   Matrix<double>& slip_rate_q, Matrix<double>& mu_field) const {
     assert(moment_rate_vector.shape()[1] == poisson_adapter::tensor::moment_rate::Shape[0]);
     poisson_adapter::kernel::evaluate_moment_rate krnl;
     krnl.slip_rate_q = slip_rate_q.data();
     krnl.moment_rate = moment_rate_vector.data();
     krnl.w = quad_rule_.weights().data();
     krnl.nl_q = fault_[faultNo].template get<NormalLength>().data();
+    krnl.mu = mu_field.data();
     krnl.execute();
 }
 

@@ -147,6 +147,7 @@ public:
 
     void set_free_slip_boundary(facet_functional_t fun) { fun_free_slip = std::move(fun); }
     double* get_mu_field(FacetInfo const& info) const;
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
 private:
     template <bool WithRHS>
