@@ -47,7 +47,8 @@ HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
     clean_duplicate_probes(probes, located_probes, hdf5_writer_->comm());
 
     std::unordered_set<std::size_t> entityNos;
-    for (auto const& [p, result] : located_probes) {
+    for (auto const& probe_pair : located_probes) {
+        auto const& result = probe_pair.second;
         entityNos.emplace(result.no);
     }
 
@@ -61,7 +62,9 @@ HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
 
     // Store probe data
     probes_.reserve(located_probes.size());
-    for (auto const& [p, result] : located_probes) {
+    for (auto const& probe_pair : located_probes) {
+        auto const& p = probe_pair.first;
+        auto const& result = probe_pair.second;
         auto const& refCoord = [&]() {
             if constexpr (isBoundary) {
                 return result.chi;
