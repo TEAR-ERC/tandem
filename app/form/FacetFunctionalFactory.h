@@ -31,11 +31,11 @@ public:
 
     auto operator()(double time) const -> facet_functional_t override {
         auto function = std::function(
-            [this, time](std::array<double, LocalOperator::Dim> const& x, long int FacetTag) {
+            [this, time](std::array<double, LocalOperator::Dim> const& x, long int facetTag) {
                 std::array<double, LocalOperator::Dim + 1u> xt;
                 std::copy(x.begin(), x.end(), xt.begin());
                 xt.back() = time;
-                return time_function_(xt, FacetTag);
+                return time_function_(xt, facetTag);
             });
         return lop_->make_facet_functional(std::move(function), ref_normal_);
     }
