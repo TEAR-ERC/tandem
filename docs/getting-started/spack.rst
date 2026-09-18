@@ -33,6 +33,7 @@ You may want to update ``~/.spack/modules.yaml``, to specify the path where the 
       default:
         tcl:
           all:
+            autoload: none
             suffixes:
               domain_dimension=2: 'd2'
               domain_dimension=3: 'd3'
@@ -54,7 +55,7 @@ We can then generate a tandem module file with:
 
 .. code-block:: bash
 
-    spack module tcl refresh tandem
+    spack module tcl refresh -y $(spack find -d --format "{name}{/hash:5}" tandem)
 
 to access the module at start up, add to your ``~/.bashrc``:
 
