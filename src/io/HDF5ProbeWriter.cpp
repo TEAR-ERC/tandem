@@ -176,7 +176,7 @@ void HDF5ProbeWriter<D, isBoundary>::write(double time, mneme::span<ElementFunct
         probe_field_names.insert(probe_field_names.end(), padded_name.begin(), padded_name.end());
     }
     int max_length_global = 0;
-    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, hdf5_writer_->comm());
     // Write probe field names (slip, slip rate, tractions etc.)
     auto strtype = H5Tcopy(H5T_C_S1);
     H5Tset_size(strtype, max_length_global);
