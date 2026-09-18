@@ -65,5 +65,5 @@ html_theme = 'furo'
 html_static_path = ['_static']
 
 # Custom sidebar using the logo
-html_logo = "images/tandem_logo_final.png"
+html_logo = "images/tandem_logo_final_white_rim.png"
 html_theme_options = { "sidebar_hide_name": True }
