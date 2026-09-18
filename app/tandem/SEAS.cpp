@@ -94,6 +94,12 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
             comm));
     }
+    if (cfg.moment_rate_output) {
+        auto const& oc = *cfg.moment_rate_output;
+        monitor.add_writer(std::make_unique<seas::MomentRateWriter<DomainDimension>>(
+            oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
+            comm));
+    }
     if (cfg.fault_scalar_output) {
         auto const& oc = *cfg.fault_scalar_output;
         monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
