@@ -164,6 +164,8 @@ TensorBase<Vector<long int>> Curvilinear<D>::volumeTagsInfo(std::size_t numPoint
 
 template <std::size_t D>
 void Curvilinear<D>::setVolumeTags(std::size_t eleNo, Tensor<long int, 1u>& result) const {
+    // Each element has a single physical tag (one material region per element).
+    // The same tag is broadcast to all quadrature points within the element.
     for (std::ptrdiff_t i = 0; i < result.shape(0); ++i) {
         result(i) = volumeTags[eleNo];
     }
