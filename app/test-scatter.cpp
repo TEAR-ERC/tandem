@@ -1,7 +1,5 @@
 #include "io/GMSHParser.h"
 #include "io/GlobalSimplexMeshBuilder.h"
-#include "io/H5Parser.h"
-#include "io/meshParser.h"
 #include "mesh/LocalSimplexMesh.h"
 #include "parallel/SimpleScatter.h"
 #include "util/Stopwatch.h"
@@ -11,6 +9,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <memory>
 
 using namespace tndm;
 
@@ -59,8 +58,7 @@ template <std::size_t D> void test(std::string mesh_file, unsigned long overlap)
     bool ok = false;
     GlobalSimplexMeshBuilder<D> builder;
     if (rank == 0) {
-        std::unique_ptr<meshParser> parser; // Pointer to the base class
-        parser = std::make_unique<GMSHParser>(&builder);
+        auto parser = std::make_unique<GMSHParser>(&builder);
         ok = parser->parseFile(mesh_file);
         if (!ok) {
             std::cerr << mesh_file << std::endl << parser->getErrorMessage();
