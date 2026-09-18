@@ -35,7 +35,7 @@ HDF5Writer::HDF5Writer(std::string_view filename, MPI_Comm comm, bool checkpoint
 
     is_open_ = (file_ >= 0);
     if (!is_open_) {
-        std::cerr << "Error: Unable to open HDF5 file!" << std::endl;
+        throw std::runtime_error("HDF5Writer: Unable to open file: " + filepath);
     }
 }
 
@@ -47,9 +47,8 @@ HDF5Writer::~HDF5Writer() {
 hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t type,
                                           std::vector<hsize_t> dims, std::vector<hsize_t> max_dims,
                                           int glueDimension, bool isDistributed) {
-    if (rank_ == 0) {
-        std::cout << "Creating dataset: " << name << std::endl;
-    }
+    if (!is_open_)
+        throw std::runtime_error("HDF5Writer: file is not open");
     // Compute total number of faults and rank offsets
     auto [totalDataPoints, _] = calculateOffsets(dims[glueDimension]);
     dims[glueDimension] = isDistributed
@@ -69,8 +68,11 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 
     // Create the dataset
     hid_t dset = H5Dcreate(file_, name.data(), type, dataspace, H5P_DEFAULT, prop, H5P_DEFAULT);
-    if (dset < 0 && rank_ == 0) {
-        std::cerr << "Error: Failed to create dataset " << name << std::endl;
+    if (dset < 0) {
+        H5Pclose(prop);
+        H5Sclose(dataspace);
+        throw std::runtime_error("HDF5Writer: Failed to create dataset '" + std::string(name) +
+                                 "'");
     }
 
     // Clean up resources
@@ -82,6 +84,9 @@ hid_t HDF5Writer::createExtendibleDataset(const std::string_view name, hid_t typ
 void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const void* data,
                                 std::vector<hsize_t> dims, int glueDimension,
                                 int extensibleDimension, bool isDistributed) {
+
+    if (!is_open_)
+        throw std::runtime_error("HDF5Writer: file is not open");
 
     hid_t filespace = H5Dget_space(dset);
     int ndims = H5Sget_simple_extent_ndims(filespace);
@@ -105,8 +110,9 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
         new_dims[extensibleDimension] = timestep + 1;
         herr_t status = H5Dset_extent(dset, new_dims.data());
         if (status < 0) {
-            std::cerr << "Error extending dataset at timestep " << timestep << std::endl;
-            return;
+            H5Sclose(filespace);
+            throw std::runtime_error("HDF5Writer: Error extending dataset at timestep " +
+                                     std::to_string(timestep));
         }
         H5Sclose(filespace);
         filespace = H5Dget_space(dset); // Refresh dataset space after extension
@@ -117,8 +123,9 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     herr_t select_status =
         H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start.data(), NULL, count.data(), NULL);
     if (select_status < 0) {
-        std::cerr << "Error selecting hyperslab for timestep " << timestep << std::endl;
-        return;
+        H5Sclose(filespace);
+        throw std::runtime_error("HDF5Writer: Error selecting hyperslab for timestep " +
+                                 std::to_string(timestep));
     }
 
     // Create memory space matching the data layout
@@ -129,7 +136,11 @@ void HDF5Writer::writeToDataset(hid_t dset, hid_t type, hsize_t timestep, const 
     H5Pset_dxpl_mpio(plist, H5FD_MPIO_COLLECTIVE);
     herr_t status = H5Dwrite(dset, type, memspace, filespace, plist, data);
     if (status < 0) {
-        std::cerr << "Error writing timestep " << timestep << " on rank " << rank_ << std::endl;
+        H5Pclose(plist);
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+        throw std::runtime_error("HDF5Writer: Error writing timestep " + std::to_string(timestep) +
+                                 " on rank " + std::to_string(rank_));
     }
 
     // Cleanup
