@@ -238,20 +238,20 @@ TEST_CASE("H5Parser - Single tetrahedron, all faces tagged") {
     CHECK(builder.getVertexCount() == 4);
     CHECK(builder.getExpectedElements() == 1);
 
-    CHECK(parser.higherDimensionalElements.size() == 1);
-    CHECK(parser.higherDimensionalElements[0] == std::array<long, 4>{0, 1, 2, 3});
+    CHECK(parser.getHigherDimensionalElements().size() == 1);
+    CHECK(parser.getHigherDimensionalElements()[0] == std::array<long, 4>{0, 1, 2, 3});
 
-    CHECK(parser.boundaryData[0] == 0x03050301u);
+    CHECK(parser.getBoundaryData()[0] == 0x03050301u);
 
     // All 4 faces tagged -> 4 boundary triangles
-    CHECK(parser.lowerDimensionalElements.size() == 4);
-    CHECK(parser.boundary.size() == 4);
+    CHECK(parser.getLowerDimensionalElements().size() == 4);
+    CHECK(parser.getBoundary().size() == 4);
 
     // Tags must match the byte-by-byte decoding order
-    CHECK(parser.boundary == std::vector<uint8_t>{1, 3, 5, 3});
+    CHECK(parser.getBoundary() == std::vector<uint8_t>{1, 3, 5, 3});
 
     // Every face must have 3 distinct valid node indices
-    for (const auto& face : parser.lowerDimensionalElements) {
+    for (const auto& face : parser.getLowerDimensionalElements()) {
         CHECK(face[0] != face[1]);
         CHECK(face[1] != face[2]);
         CHECK(face[0] != face[2]);
@@ -273,13 +273,13 @@ TEST_CASE("H5Parser - Duplicate face deduplication (two tets sharing a face)") {
     REQUIRE(parser.parseFile(fname));
 
     // 4 faces per tet, 1 shared face tagged on both sides -> 7 unique boundary faces
-    CHECK(parser.lowerDimensionalElements.size() == 7);
-    CHECK(parser.boundary.size() == 7);
+    CHECK(parser.getLowerDimensionalElements().size() == 7);
+    CHECK(parser.getBoundary().size() == 7);
 
     // Shared face {0,1,2} must appear exactly once
     std::array<long, 3> sharedSorted = {0, 1, 2};
     int count = 0;
-    for (auto& face : parser.lowerDimensionalElements) {
+    for (auto& face : parser.getLowerDimensionalElements()) {
         std::array<long, 3> s = face;
         std::sort(s.begin(), s.end());
         if (s == sharedSorted)
@@ -299,11 +299,11 @@ TEST_CASE("H5Parser - Partial boundary (only some faces tagged)") {
     REQUIRE(parser.parseFile(fname));
 
     // Only 2 of the 4 faces are tagged
-    CHECK(parser.lowerDimensionalElements.size() == 2);
-    CHECK(parser.boundary.size() == 2);
+    CHECK(parser.getLowerDimensionalElements().size() == 2);
+    CHECK(parser.getBoundary().size() == 2);
 
     // Tags should be exactly the two non-zero ones, in face order
-    CHECK(parser.boundary == std::vector<uint8_t>{1, 5});
+    CHECK(parser.getBoundary() == std::vector<uint8_tt>{1, 5});
 
     std::remove(fname.c_str());
 }

@@ -24,6 +24,13 @@ public:
     static bool isH5Format(std::string const& fileName);
     static std::unique_ptr<MeshParser> create(std::string const& fileName, MeshBuilder* builder);
 
+    // Factory method with validation for dimension and HDF5 support.
+    // Returns a parser and an empty error string on success,
+    // or nullptr and an error message on failure.
+    template <std::size_t D>
+    static std::pair<std::unique_ptr<MeshParser>, std::string>
+    createWithValidation(std::string const& fileName, MeshBuilder* builder);
+
     static constexpr std::array<std::size_t, 128> NumNodes = {
         2,    // MSH_LIN_2
         3,    // MSH_TRI_3
