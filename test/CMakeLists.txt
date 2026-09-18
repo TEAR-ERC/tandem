@@ -194,6 +194,8 @@ if(RUN_CI_TESTS)
             "test_correctness_volume_tagging.py")
         add_pytest_test("volume-tagging-parallel-consistency-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_parallel_consistency_volume_tagging.py")
+        add_pytest_test("free-slip-bc-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_free_slip_bc.py")
     endif()
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 
