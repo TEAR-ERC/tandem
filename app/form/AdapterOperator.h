@@ -79,12 +79,22 @@ public:
         result.end_access(result_handle);
     }
 
-    void moment_rate(std::size_t faultNo, Matrix<double>& moment_rate_vector,
-                     Vector<double const>& slip_rate, std::size_t fctNo,
-                     FacetInfo const& info) override {
+    void compute_moment_rates(Matrix<const double> const& slip_rates,
+                              std::vector<double>& result) override {
         auto mu_field = Matrix<double>(mu_field_scratch_.data(), 1, mu_field_scratch_.size());
-        adapted_lop_->mu_avg(fctNo, info, mu_field);
-        lop_->moment_rate(faultNo, moment_rate_vector, slip_rate, mu_field);
+        auto moment_rate_q = Managed<Matrix<double>>(1, DomainDimension);
+
+        result.resize(num_local_elements() * (DomainDimension - 1));
+        for (std::size_t faultNo = 0; faultNo < num_local_elements(); ++faultNo) {
+            auto fctNo = fault_map_->fctNo(faultNo);
+            auto const& info = topo_->info(fctNo);
+            adapted_lop_->mu_avg(fctNo, info, mu_field);
+            auto slip_rate = slip_rates.subtensor(slice{}, faultNo);
+            lop_->moment_rate(faultNo, moment_rate_q, slip_rate, mu_field);
+            for (std::size_t i = 0; i < DomainDimension - 1; ++i) {
+                result[faultNo * (DomainDimension - 1) + i] = moment_rate_q(0, i);
+            }
+        }
     }
 
 private:
