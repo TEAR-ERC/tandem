@@ -28,10 +28,13 @@ Prerequisites
 Available Images
 ----------------
 
-The all-in-one image contains all 12 Tandem builds and exposes each as a
-named command alias (e.g. ``tandem_2d_6p_tandem``, ``tandem_3d_3p_tandem``,
-etc.). This lets you switch between configurations without pulling multiple
-images.
+A single image contains all 12 Tandem builds (2D/3D × degrees 1–6). Each
+configuration is available as two binaries on ``$PATH``:
+
+- ``tandem_Xd_Yp`` — the main Tandem solver
+- ``static_Xd_Yp`` — the static solver
+
+For example: ``tandem_2d_6p``, ``static_3d_3p``.
 
 .. list-table::
    :header-rows: 1
@@ -39,23 +42,23 @@ images.
 
    * - Tag
      - Description
-   * - ``ghcr.io/tear-erc/tandem:all``
-     - All 12 builds; use named aliases to select a configuration.
+   * - ``ghcr.io/tear-erc/tandem:latest``
+     - All 12 builds; always points to the latest release.
 
 Versioning
 ----------
 
 Image tags follow this strategy:
 
-- ``:all`` always points to the latest release.
-- ``:all-1.2.0`` pins to a specific release for reproducibility.
+- ``:latest`` always points to the latest release.
+- ``:1.2.0`` pins to a specific release for reproducibility.
 
 For research workflows or production runs, pin to a version tag so your
 results are not affected by future updates:
 
 .. code-block:: sh
 
-   docker pull ghcr.io/tear-erc/tandem:all-1.2.0
+   docker pull ghcr.io/tear-erc/tandem:1.2.0
 
 Mounting Input and Output Files
 --------------------------------
@@ -68,7 +71,7 @@ to a **different path** such as ``/host``:
 
    docker run --platform linux/amd64 -it --rm \
      -v $(pwd):/host \
-     ghcr.io/tear-erc/tandem:all
+     ghcr.io/tear-erc/tandem:latest
 
 Files written by Tandem under ``/host`` will appear in your current
 directory on the host after the run.
@@ -81,11 +84,7 @@ number of CPU cores available:
 
 .. code-block:: sh
 
-   mpirun -n 8 tandem_2d_6p_tandem simulation.toml
-
-.. note::
-
-   Tandem input files use the ``.toml`` format, not ``.lua``.
+   mpirun -n 8 tandem_2d_6p simulation.toml
 
 Examples
 --------
@@ -105,15 +104,17 @@ A typical workflow for running a bundled example:
    .. code-block:: sh
 
       # Inside the container:
-      cp /work/examples/tandem/2d/bp1_sym.toml /host/
-      cp /work/examples/tandem/2d/bp1_sym.geo  /host/
+      cd /host
+      cp /work/examples/tandem/2d/bp1_sym.toml .
+      cp /work/examples/tandem/2d/bp1_sym.geo  .
+      cp /work/examples/tandem/2d/bp1.lua .
 
 2. **Generate the mesh inside the container**:
 
    .. code-block:: sh
 
       # Inside the container:
-      gmsh -2 /host/bp1_sym.geo
+      gmsh -2 ./bp1_sym.geo
 
    This produces ``bp1_sym.msh`` in the same directory.
 
@@ -122,7 +123,7 @@ A typical workflow for running a bundled example:
    .. code-block:: sh
 
       # Inside the container:
-      mpirun -n 4 tandem_2d_3p_tandem /host/bp1_sym.toml
+      mpirun -n 4 tandem_2d_3p ./bp1_sym.toml
 
    .. warning::
 
