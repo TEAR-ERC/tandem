@@ -12,6 +12,7 @@ extern "C" {
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <variant>
 
 namespace tndm {
 
@@ -68,56 +69,18 @@ public:
         return ok;
     }
 
-    template <int Din, int Dout>
+    template <int Din, int Dout, bool WithTag = false>
     auto getMemberFunction(std::string const& table_name, char const* method_name) {
         lua_State* myL = L;
+
         return [myL, table_name,
-                method_name](std::array<double, Din> const& x) -> std::array<double, Dout> {
+                method_name](std::array<double, Din> const& x,
+                             // Conditionally add tag parameter via a lambda
+                             std::conditional_t<WithTag, long int, std::monostate> tag = {})
+                   -> std::array<double, Dout> {
             std::array<double, Dout> result;
             result.fill(std::numeric_limits<double>::signaling_NaN());
 
-            lua_getglobal(myL, table_name.c_str());
-            if (lua_istable(myL, -1) == 0) {
-                throw std::runtime_error(table_name + " is not a table.");
-            }
-            lua_getfield(myL, -1, method_name);
-            lua_insert(myL, -2); // swap object and method as first argument is "self"
-            for (int d = 0; d < Din; ++d) {
-                lua_pushnumber(myL, x[d]);
-            }
-            int error = lua_pcall(myL, 1 + Din, Dout, 0);
-            if (error) {
-                std::stringstream ss;
-                ss << "error running '" << table_name << "." << method_name
-                   << "': " << lua_tostring(myL, -1);
-                throw std::runtime_error(ss.str());
-            }
-
-            for (int d = 0; d < Dout; ++d) {
-                if (!lua_isnumber(myL, d - Dout)) {
-                    std::stringstream ss;
-                    ss << "'" << table_name << "." << method_name << "' returned not a number ("
-                       << d << ").";
-                    throw std::runtime_error(ss.str());
-                }
-                result[d] = lua_tonumber(myL, d - Dout);
-            }
-            lua_pop(myL, Dout);
-            return result;
-        };
-    }
-
-    template <int Din, int Dout>
-    auto getMemberFunctionTagged(std::string const& table_name, char const* method_name) {
-
-        lua_State* myL = L;
-
-        return [myL, table_name, method_name](std::array<double, Din> const& x,
-                                              long int tag) -> std::array<double, Dout> {
-            std::array<double, Dout> result;
-            result.fill(std::numeric_limits<double>::signaling_NaN());
-
-            // Get table from Lua
             lua_getglobal(myL, table_name.c_str());
             if (!lua_istable(myL, -1)) {
                 throw std::runtime_error(table_name + " " + method_name + " is not a table.");
@@ -132,11 +95,13 @@ public:
                 lua_pushnumber(myL, x[d]);
             }
 
-            // Push VolumeTag as integer
-            lua_pushinteger(myL, tag);
+            int num_inputs = 1 + Din;
+            // Push tag as integer
+            if constexpr (WithTag) {
+                lua_pushinteger(myL, tag);
+                num_inputs += 1;
+            }
 
-            // Call method: 1 (self) + Din + 1 (tag) = 1+Din+1
-            int num_inputs = 1 + Din + 1;
             int error = lua_pcall(myL, num_inputs, Dout, 0);
             if (error) {
                 std::stringstream ss;
