@@ -2,26 +2,29 @@
 #define MESHPARSER_H
 
 #include <array>
-#include <iostream>
-#include <optional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace tndm {
 
-class meshBuilder {
+class MeshBuilder {
 public:
-    virtual ~meshBuilder() {}
+    virtual ~MeshBuilder() {}
     virtual void setNumVertices(std::size_t numVertices) = 0;
     virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
     virtual void setNumElements(std::size_t numElements) = 0;
     virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
 };
 
-class meshParser {
+class MeshParser {
 public:
-    static constexpr std::size_t NumNodes[] = {
+    static bool isGMSHFormat(std::string const& fileName);
+    static bool isH5Format(std::string const& fileName);
+    static std::unique_ptr<MeshParser> create(std::string const& fileName, MeshBuilder* builder);
+
+    static constexpr std::array<std::size_t, 127> NumNodes = {
         2,    // MSH_LIN_2
         3,    // MSH_TRI_3
         4,    // MSH_QUA_4
@@ -152,8 +155,8 @@ public:
         69,   // MSH_PYR_69
     };
 
-    meshParser() { std::cout << "Mesh Parser Initialized." << std::endl; };
-    ~meshParser() = default;
+    MeshParser() = default;
+    ~MeshParser() = default;
     virtual std::string_view getErrorMessage() const = 0;
     virtual bool parseFile(std::string const& fileName) = 0;
 };
