@@ -725,8 +725,8 @@ void Poisson::mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& r
     double const* K1 = material[info.up[1]].get<K>().data();
     double* res = result.data();
     std::size_t nq = result.size();
-    
-    #pragma omp simd
+
+#pragma omp simd
     for (std::size_t q = 0; q < nq; ++q) {
         res[q] = 0.5 * (K0[q] + K1[q]);
     }
