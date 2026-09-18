@@ -9,9 +9,10 @@ namespace tndm {
 
 #ifdef ENABLE_HDF5
 
-template <typename T> T HDF5MeshParser::logError(std::string_view msg) {
+template <typename T> T HDF5MeshParser::logError(std::string_view prefix, std::string_view detail) {
     errorMsg_ += "H5 parser error:\n\t";
-    errorMsg_ += msg;
+    errorMsg_ += prefix;
+    errorMsg_ += detail;
     errorMsg_ += '\n';
     return {};
 }
@@ -25,13 +26,13 @@ template <typename T>
 bool HDF5MeshParser::readDataset(hid_t file, std::string_view name, std::vector<T>& data) {
     hid_t dataset = H5Dopen(file, std::string(name).c_str(), H5P_DEFAULT);
     if (dataset < 0) {
-        return logError<bool>("Failed to open dataset: " + std::string(name));
+        return logError<bool>("Failed to open dataset: ", name);
     }
 
     hid_t dataspace = H5Dget_space(dataset);
     if (dataspace < 0) {
         H5Dclose(dataset);
-        return logError<bool>("Failed to get dataset space: " + std::string(name));
+        return logError<bool>("Failed to get dataset space: ", name);
     }
 
     hsize_t dims[2];
@@ -39,12 +40,12 @@ bool HDF5MeshParser::readDataset(hid_t file, std::string_view name, std::vector<
     if (ndims < 0) {
         H5Sclose(dataspace);
         H5Dclose(dataset);
-        return logError<bool>("Unexpected dataset rank for: " + std::string(name));
+        return logError<bool>("Unexpected dataset rank for: ", name);
     }
     if (H5Sget_simple_extent_dims(dataspace, dims, nullptr) < 0) {
         H5Sclose(dataspace);
         H5Dclose(dataset);
-        return logError<bool>("Failed to read dataset dimensions: " + std::string(name));
+        return logError<bool>("Failed to read dataset dimensions: ", name);
     }
 
     std::size_t size = 1;
@@ -55,7 +56,7 @@ bool HDF5MeshParser::readDataset(hid_t file, std::string_view name, std::vector<
     if (H5Dread(dataset, nativeH5Type<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data()) < 0) {
         H5Sclose(dataspace);
         H5Dclose(dataset);
-        return logError<bool>("Failed to read dataset: " + std::string(name));
+        return logError<bool>("Failed to read dataset: ", name);
     }
 
     H5Sclose(dataspace);
