@@ -87,4 +87,4 @@ Compile Tandem:
 
 .. code-block:: bash
 
-   make -j20
+   make -j 20 tandem
