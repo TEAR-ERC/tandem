@@ -20,7 +20,7 @@ void Monitor::update_dt_limits(double time) {
 void MonitorQD::monitor(double time, BlockVector const& state) {
     if (!writers_.empty()) {
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
-        auto moment_rate =seasop_->friction().moment_rate_local();
+        auto moment_rate = seasop_->friction().moment_rate_local();
         bool require_traction = false;
         bool require_displacement = false;
         for (auto const& writer : writers_) {
@@ -48,7 +48,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     break;
                 }
                 case DataLevel::Heirarchichal: {
-                    writer->write(time,moment_rate);
+                    writer->write(time, moment_rate);
                     break;
                 }
                 };

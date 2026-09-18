@@ -224,7 +224,8 @@ void setConfigSchema(TableSchema<Config>& schema,
     GenMeshConfig<DomainDimension>::setSchema(genMeshSchema);
 
     auto& faultOutputSchema = schema.add_table("fault_output", &Config::fault_output);
-    auto& momentRateOutputSchema = schema.add_table("moment_rate_output", &Config::moment_rate_output);
+    auto& momentRateOutputSchema =
+        schema.add_table("moment_rate_output", &Config::moment_rate_output);
     detail::setOutputConfigSchema(faultOutputSchema);
     detail::setOutputConfigSchema(momentRateOutputSchema);
     auto& faultScalarOutputSchema =
