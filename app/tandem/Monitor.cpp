@@ -49,7 +49,14 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
 #ifdef ENABLE_HDF5
                 case DataLevel::Hierarchical: {
                     auto moment_rate = seasop_->friction().moment_rate_local();
-                    writer->write(time, moment_rate);
+                    std::vector<double> flat_mr;
+                    flat_mr.reserve(moment_rate.size() * (DomainDimension - 1));
+                    for (auto const& el : moment_rate) {
+                        for (auto v : el) {
+                            flat_mr.push_back(v);
+                        }
+                    }
+                    writer->write(time, flat_mr);
                     break;
                 }
 #endif
@@ -111,8 +118,15 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                 }
 #ifdef ENABLE_HDF5
                 case DataLevel::Hierarchical: {
-                    std::vector<double> moment_rate = seasop_->friction().moment_rate_local();
-                    writer->write(time, moment_rate);
+                    auto moment_rate = seasop_->friction().moment_rate_local();
+                    std::vector<double> flat_mr;
+                    flat_mr.reserve(moment_rate.size() * (DomainDimension - 1));
+                    for (auto const& el : moment_rate) {
+                        for (auto v : el) {
+                            flat_mr.push_back(v);
+                        }
+                    }
+                    writer->write(time, flat_mr);
                     break;
                 }
 #endif
