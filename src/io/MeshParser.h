@@ -24,7 +24,7 @@ public:
     static bool isH5Format(std::string const& fileName);
     static std::unique_ptr<MeshParser> create(std::string const& fileName, MeshBuilder* builder);
 
-    static constexpr std::array<std::size_t, 127> NumNodes = {
+    static constexpr std::array<std::size_t, 128> NumNodes = {
         2,    // MSH_LIN_2
         3,    // MSH_TRI_3
         4,    // MSH_QUA_4

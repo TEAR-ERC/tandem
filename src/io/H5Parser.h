@@ -28,13 +28,12 @@ private:
     template <typename T> T logErrorAnnotated(std::string_view msg);
 
 #ifdef ENABLE_HDF5
-    template <typename T, std::size_t Rank>
-    bool readDataset(hid_t file, std::string_view name, std::vector<T>& data);
+    template <typename T> bool readDataset(hid_t file, std::string_view name, std::vector<T>& data);
     bool parseNodes(hid_t file);
     bool parseElements(hid_t file);
     bool readBoundaryData(hid_t file);
-    bool retrieveLowerDimensionalElements(hid_t file);
-    bool addAllElements(std::string const& fileName);
+    bool retrieveLowerDimensionalElements();
+    bool addAllElements();
 #endif
 
 public:

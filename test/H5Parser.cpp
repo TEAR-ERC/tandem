@@ -5,11 +5,12 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
 
 using namespace tndm;
 
-class H5TestBuilder : public meshBuilder {
+class H5TestBuilder : public MeshBuilder {
 private:
     std::size_t elNo = 0;
     std::size_t vertexCount = 0;
@@ -68,6 +69,17 @@ public:
 
 #ifdef ENABLE_HDF5
 
+bool writeGroupDataset(hid_t file_id, uint32_t const* data, hsize_t count) {
+    hsize_t dims[1] = {count};
+    hid_t space = H5Screate_simple(1, dims, NULL);
+    hid_t dset = H5Dcreate2(file_id, "/group", H5T_NATIVE_UINT32, space, H5P_DEFAULT, H5P_DEFAULT,
+                            H5P_DEFAULT);
+    bool ok = H5Dwrite(dset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, data) >= 0;
+    H5Dclose(dset);
+    H5Sclose(space);
+    return ok;
+}
+
 // Helper function to create a simple test HDF5 file
 bool createTestHDF5File(const std::string& filename) {
     hid_t file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -100,6 +112,12 @@ bool createTestHDF5File(const std::string& filename) {
     H5Dwrite(conn_dset, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, connectivity_data);
     H5Dclose(conn_dset);
     H5Sclose(conn_space);
+
+    uint32_t group_data[1] = {7};
+    if (!writeGroupDataset(file_id, group_data, 1)) {
+        H5Fclose(file_id);
+        return false;
+    }
 
     // Create boundary dataset (1 element with boundary conditions)
     hsize_t bound_dims[1] = {1};
@@ -141,6 +159,12 @@ bool createTwoTetHDF5File(const std::string& filename) {
     H5Dclose(conn_dset);
     H5Sclose(conn_space);
 
+    uint32_t group_data[2] = {11, 12};
+    if (!writeGroupDataset(file_id, group_data, 2)) {
+        H5Fclose(file_id);
+        return false;
+    }
+
     hsize_t bound_dims[1] = {2};
     hid_t bound_space = H5Screate_simple(1, bound_dims, NULL);
     hid_t bound_dset = H5Dcreate2(file_id, "/boundary", H5T_NATIVE_UINT32, bound_space, H5P_DEFAULT,
@@ -179,6 +203,12 @@ bool createPartialBoundaryHDF5File(const std::string& filename) {
     H5Dwrite(conn_dset, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, connectivity_data);
     H5Dclose(conn_dset);
     H5Sclose(conn_space);
+
+    uint32_t group_data[1] = {9};
+    if (!writeGroupDataset(file_id, group_data, 1)) {
+        H5Fclose(file_id);
+        return false;
+    }
 
     hsize_t bound_dims[1] = {1};
     hid_t bound_space = H5Screate_simple(1, bound_dims, NULL);
@@ -299,7 +329,7 @@ TEST_CASE("H5Parser - Error handling") {
 TEST_CASE("H5Parser - no HDF5 support") {
     // Verify the stub throws the right exception if HDF5 support is
     // not enabled.
-    struct DummyBuilder : tndm::meshBuilder {
+    struct DummyBuilder : tndm::MeshBuilder {
         void setNumVertices(std::size_t) override {}
         void setVertex(long, std::array<double, 3> const&) override {}
         void setNumElements(std::size_t) override {}
