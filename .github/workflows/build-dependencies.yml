@@ -35,7 +35,8 @@ jobs:
       - name: Check if base image exists
         id: check-base
         run: |
-          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}" > /dev/null 2>&1; then
+          # Added the HDF5 version to the tag check
+          if docker manifest inspect "${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}" > /dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -55,9 +56,7 @@ jobs:
           context: .
           file: docker/base/Dockerfile
           push: true
-          tags: |
-            ${{ inputs.base_image }}:${{ inputs.petsc_version }}
-            ${{ inputs.base_image }}:latest
+          tags: ${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           platforms: linux/amd64
           build-args: |
             PETSC_VERSION=${{ inputs.petsc_version }}
@@ -126,7 +125,7 @@ jobs:
           tags: ${{ inputs.dependencies_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
           platforms: linux/amd64
           build-args: |
-            BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}
+            BASE_IMAGE=${{ inputs.base_image }}:${{ inputs.petsc_version }}-hdf5${{ inputs.hdf5_version }}
             PETSC_VERSION=${{ inputs.petsc_version }}
             HDF5_VERSION=${{ inputs.hdf5_version }}
             CC=gcc-13
