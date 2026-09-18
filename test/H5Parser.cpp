@@ -107,10 +107,8 @@ bool createTestHDF5File(const std::string& filename) {
     hid_t bound_dset = H5Dcreate2(file_id, "/boundary", H5T_NATIVE_UINT32, bound_space, H5P_DEFAULT,
                                   H5P_DEFAULT, H5P_DEFAULT);
 
-    // Boundary condition: All 4 faces have different tags
-    // Face 0: tag 1, Face 1: tag 2, Face 2: tag 3, Face 3: tag 4
-    // Format: 32-bit value with 8 bits per face (face3|face2|face1|face0)
-    uint32_t boundary_data[1] = {0x03050301}; // tags 1,2,3,4 for faces 0,1,2,3
+    // Boundary condition encoded as 0x03050301 -> faces (0..3) = {1,3,5,3}
+    uint32_t boundary_data[1] = {0x03050301u};
     H5Dwrite(bound_dset, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, boundary_data);
     H5Dclose(bound_dset);
     H5Sclose(bound_space);
@@ -156,18 +154,9 @@ TEST_CASE("H5Parser - Basic Functionality") {
         CHECK(parser.lowerDimensionalElements.size() == 4);
         CHECK(parser.boundary.size() == 4);
 
-        // Verify all 4 boundary tags are present (1, 2, 3, 4)
+        // Verify all 4 boundary tags are present and in the expected order
         std::vector<uint8_t> expectedTags = {1, 3, 5, 3};
-        for (uint8_t expectedTag : expectedTags) {
-            bool tagFound = false;
-            for (uint8_t actualTag : parser.boundary) {
-                if (actualTag == expectedTag) {
-                    tagFound = true;
-                    break;
-                }
-            }
-            CHECK(tagFound);
-        }
+        CHECK(parser.boundary == expectedTags);
 
         // Clean up
         std::remove(test_filename.c_str());
@@ -233,23 +222,16 @@ TEST_CASE("H5Parser - Data Structure Validation") {
             }
         }
 
-        std::vector<uint8_t> foundTags;
-        for (const auto& tag : parser.boundary) {
-            CHECK(tag > 0);
-            CHECK(tag <= 5);
-            foundTags.push_back(tag);
-        }
-
-        // Verify we have all 4 unique tags
+        // Verify tags sequence is exactly as encoded
         std::vector<uint8_t> expectedTags = {1, 3, 5, 3};
-        CHECK(foundTags == expectedTags);
+        CHECK(parser.boundary == expectedTags);
     }
 
     SUBCASE("Boundary Data Consistency") {
         REQUIRE(parser.boundaryData.size() > 0);
 
         // Our test data should have all 4 faces tagged
-        CHECK(parser.boundaryData[0] == 0x03050301);
+        CHECK(parser.boundaryData[0] == 0x03050301u);
 
         // Should have exactly 4 triangular boundary faces
         CHECK(parser.lowerDimensionalElements.size() == 4);
