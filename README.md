@@ -1,6 +1,6 @@
-<h1 align="center">
-  tandem
-</h1>
+<p align="center">
+	<img src="https://raw.githubusercontent.com/TEAR-ERC/tandem/main/docs/images/tandem_logo_final.png" alt="tandem"/>
+</p>
 
 <h4 align="center">
 	A scalable discontinuous Galerkin code on unstructured curvilinear grids
