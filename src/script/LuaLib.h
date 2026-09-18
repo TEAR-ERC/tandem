@@ -21,11 +21,11 @@ public:
     using functional_t = std::function<std::array<double, Dout>(std::array<double, Din> const& x)>;
     template <std::size_t Din, std::size_t Dout>
     using functional_t_region =
-        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int& tag)>;
+        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int tag)>;
 
     LuaLib();
     ~LuaLib();
-
+f
     void load(std::string const& code);
     void loadFile(std::string const& fileName);
 
@@ -115,7 +115,7 @@ public:
         lua_State* myL = L;
 
         return [myL, table_name, method_name](std::array<double, Din> const& x,
-                                              long int& tag) -> std::array<double, Dout> {
+                                              long int tag) -> std::array<double, Dout> {
             std::array<double, Dout> result;
             result.fill(std::numeric_limits<double>::signaling_NaN());
 
@@ -134,7 +134,7 @@ public:
                 lua_pushnumber(myL, x[d]);
             }
 
-            // Push physicalTag as integer
+            // Push VolumeTag as integer
             lua_pushinteger(myL, tag);
 
             // Call method: 1 (self) + Din + 1 (tag) = 1+Din+1
