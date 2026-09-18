@@ -1,4 +1,5 @@
 #include "SeasQDDiscreteGreenOperator.h"
+#include "common/PetscLoggingUtils.h"
 #include "common/PetscUtil.h"
 
 #include "form/RefElement.h"
@@ -516,10 +517,11 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
     double solve_time = 0.0;
     double solve_time_from_start = 0.0;
     for (PetscInt i = start; i < N; ++i) {
-
-        CHKERRTHROW(PetscPrintf(
-            PetscObjectComm((PetscObject)G_),
-            "Computing Green's function %" PetscInt_FMT " / %" PetscInt_FMT "\n", i, N));
+        std::string current_datetime = tndm::get_current_date_time_string();
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
+                                "%s Computing Green's function %" PetscInt_FMT " / %" PetscInt_FMT
+                                "\n",
+                                current_datetime.c_str(), i, N));
         sw.start();
         CHKERRTHROW(VecZeroEntries(S_->vec()));
         if (i >= ind.nb_offset && i < ind.nb_offset + ind.m) {
@@ -549,21 +551,13 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
         solve_time += step_time;
         solve_time_from_start += step_time;
 
-        if (rank == 0) {
-            constexpr double Days = 3600.0 * 24.0;
-            constexpr double Hours = 3600.0;
-            constexpr double Minutes = 60.0;
-            double avg_time = solve_time_from_start / (i + 1 - start);
-            double etl = avg_time * (N - i - 1);
-            double etl_d = std::floor(etl / Days);
-            etl -= etl_d * Days;
-            double etl_h = std::floor(etl / Hours);
-            etl -= etl_h * Hours;
-            double etl_m = std::floor(etl / Minutes);
-            etl -= etl_m * Minutes;
-            std::cout << " (" << etl_d << "d " << etl_h << "h " << etl_m << "m " << std::floor(etl)
-                      << "s left)" << std::endl;
-        }
+        double avg_time = solve_time_from_start / (i + 1 - start);
+        double etl = avg_time * (N - i - 1);
+        std::string remaining_time = tndm::format_time(etl);
+
+        current_datetime = tndm::get_current_date_time_string();
+        CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_), "%s (%s left)\n",
+                                current_datetime.c_str(), remaining_time.c_str()));
 
         current_gf = i + 1;
 
