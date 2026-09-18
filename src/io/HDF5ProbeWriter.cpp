@@ -127,6 +127,43 @@ void HDF5ProbeWriter<D, isBoundary>::initialize_datasets(mneme::span<ElementFunc
                                  probe_names_dims, glueDimension, extensibleDimension);
     hdf5_writer_->closeDataset(probeNameDataset_);
     H5Tclose(strtype); // Clean up type
+
+    // Cache field names (they never change) and write the probeFields dataset once.
+    auto numQuantities = functions[0].numQuantities();
+    cached_field_names_.resize(numQuantities);
+    cached_max_name_length_ = 1;
+    for (std::size_t q = 0; q < numQuantities; ++q) {
+        cached_field_names_[q] = functions[0].name(q);
+        cached_max_name_length_ =
+            std::max(int(cached_field_names_[q].length()), cached_max_name_length_);
+    }
+    std::vector<char> probe_field_names;
+    for (auto const& field : cached_field_names_) {
+        std::string padded_name = field;
+        padded_name.resize(cached_max_name_length_, ' ');
+        probe_field_names.insert(probe_field_names.end(), padded_name.begin(), padded_name.end());
+    }
+    int max_field_length_global = 0;
+    MPI_Allreduce(&cached_max_name_length_, &max_field_length_global, 1, MPI_INT, MPI_MAX,
+                  hdf5_writer_->comm());
+    auto fieldstrtype = H5Tcopy(H5T_C_S1);
+    H5Tset_size(fieldstrtype, max_field_length_global);
+    H5Tset_strpad(fieldstrtype, H5T_STR_NULLTERM);
+    probeFieldsDataset_ = hdf5_writer_->createExtendibleDataset(
+        "probeFields", fieldstrtype, {numQuantities}, {numQuantities}, 0, false);
+    hdf5_writer_->writeToDataset(probeFieldsDataset_, fieldstrtype, 0, probe_field_names.data(),
+                                 {numQuantities}, 0, 0, false);
+    hdf5_writer_->closeDataset(probeFieldsDataset_);
+    H5Tclose(fieldstrtype);
+
+    // Cache the per-probe evaluation matrices (they depend only on reference coordinates).
+    cached_eval_matrices_.clear();
+    cached_eval_matrices_.reserve(probes_.size());
+    for (std::size_t p = 0; p < probes_.size(); ++p) {
+        cached_eval_matrices_.push_back(functions[0].evaluationMatrix({probes_[p].chi}));
+    }
+
+    initialized_ = true;
 }
 
 template <std::size_t D, bool isBoundary> HDF5ProbeWriter<D, isBoundary>::~HDF5ProbeWriter() {
@@ -159,37 +196,8 @@ void HDF5ProbeWriter<D, isBoundary>::write(double time, mneme::span<ElementFunct
                                  {time_step + 1}, 0, 0, false);
 
     // Write probe data
-    auto numQuantities = functions[0].numQuantities();
+    auto numQuantities = cached_field_names_.size();
     auto numProbes = probes_.size();
-    std::vector<std::string> probeFields(numQuantities);
-    std::vector<char> probe_field_names;
-    for (std::size_t q = 0; q < numQuantities; ++q) {
-        probeFields[q] = functions[0].name(q);
-    }
-    int max_length_local = 1;
-    for (const auto& field : probeFields) {
-        max_length_local = std::max(int(field.length()), max_length_local);
-    }
-    for (auto& field : probeFields) {
-        std::string padded_name = field;
-        padded_name.resize(max_length_local, ' ');
-        probe_field_names.insert(probe_field_names.end(), padded_name.begin(), padded_name.end());
-    }
-    int max_length_global = 0;
-    MPI_Allreduce(&max_length_local, &max_length_global, 1, MPI_INT, MPI_MAX, hdf5_writer_->comm());
-    // Write probe field names (slip, slip rate, tractions etc.)
-    auto strtype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(strtype, max_length_global);
-    H5Tset_strpad(strtype, H5T_STR_NULLTERM);
-    if (!initialized_) {
-        // Create time dataset
-        probeFieldsDataset_ = hdf5_writer_->createExtendibleDataset(
-            "probeFields", strtype, {numQuantities}, {numQuantities}, 0, false);
-        hdf5_writer_->writeToDataset(probeFieldsDataset_, strtype, 0, probe_field_names.data(),
-                                     {numQuantities}, 0, 0, false);
-        hdf5_writer_->closeDataset(probeFieldsDataset_);
-        initialized_ = true;
-    }
 
     if (probe_dataset_ == -1) {
         // Create probe dataset
@@ -203,11 +211,10 @@ void HDF5ProbeWriter<D, isBoundary>::write(double time, mneme::span<ElementFunct
     std::vector<double> values;
     values.reserve(numProbes * numQuantities);
     for (const auto& function : functions) {
-        for (const auto& probe : probes_) {
+        for (std::size_t p = 0; p < probes_.size(); ++p) {
+            auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
+            function.map(probes_[p].no, cached_eval_matrices_[p], result);
             for (std::size_t q = 0; q < function.numQuantities(); ++q) {
-                auto result = Managed<Matrix<double>>(function.mapResultInfo(1));
-                auto E = function.evaluationMatrix({probe.chi});
-                function.map(probe.no, E, result);
                 values.push_back(result(0, q));
             }
         }
