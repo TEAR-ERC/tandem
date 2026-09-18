@@ -48,6 +48,8 @@ struct TabularOutputConfig : OutputConfig {
             return std::make_unique<CSVWriter>();
         case TableWriterType::Unknown:
             return nullptr;
+        case TableWriterType::HDF5:
+            return nullptr; // HDF5ProbeWriter does not use TableWriter 
         }
         return nullptr;
     }
