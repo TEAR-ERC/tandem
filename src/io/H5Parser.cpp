@@ -156,8 +156,6 @@ bool H5Parser::retrieveLowerOrderElements(hid_t file) {
             }
         }
     }
-    std::cout << "LOWER ORDER ELEMENT SIZE " << lowerOrderElements.size() << std::endl;
-    std::cout << " COUNT of face tags " << x << std::endl;
     return true;
 }
 
