@@ -1,63 +1,85 @@
-#include "HDF5BoundaryProbeWriter.h"
+#include "HDF5ProbeWriter.h"
 #include "geometry/PointLocator.h"
 #include "io/ProbeWriterUtil.h"
 #include "util/LinearAllocator.h"
 
 namespace tndm {
 
-template <std::size_t D>
-HDF5BoundaryProbeWriter<D>::HDF5BoundaryProbeWriter(std::string_view prefix,
-                                                    std::unique_ptr<TableWriter> table_writer,
-                                                    std::vector<Probe<D>> const& probes,
-                                                    LocalSimplexMesh<D> const& mesh,
-                                                    std::shared_ptr<Curvilinear<D>> cl,
-                                                    BoundaryMap const& bnd_map, MPI_Comm comm)
+template <std::size_t D, bool isBoundary>
+auto makeLocator(std::shared_ptr<Curvilinear<D>> cl, LocalSimplexMesh<D> const& mesh,
+                 BoundaryMap const& bnd_map) {
+    using LocatorType = std::conditional_t<isBoundary, BoundaryPointLocator<D>, PointLocator<D>>;
+
+    if constexpr (isBoundary) {
+        return LocatorType(std::make_shared<PointLocator<D>>(cl), mesh, bnd_map.localFctNos());
+    } else {
+        return LocatorType(cl);
+    }
+}
+
+template <std::size_t D, bool isBoundary>
+HDF5ProbeWriter<D, isBoundary>::HDF5ProbeWriter(std::string_view prefix,
+                                                std::unique_ptr<TableWriter> table_writer,
+                                                std::vector<Probe<D>> const& probes,
+                                                LocalSimplexMesh<D> const& mesh,
+                                                std::shared_ptr<Curvilinear<D>> cl,
+                                                BoundaryMap const& bnd_map, MPI_Comm comm)
     : hdf5_writer_(std::make_unique<HDF5Writer>(prefix, comm)) {
 
-    // Locate probes in the mesh
-    auto bpl =
-        BoundaryPointLocator<D>(std::make_shared<PointLocator<D>>(cl), mesh, bnd_map.localFctNos());
-
-    std::vector<std::pair<std::size_t, BoundaryPointLocatorResult<D>>> located_probes;
+    using ElementFunction = tndm::FiniteElementFunction<isBoundary ? D - 1 : D>;
+    using ResultType =
+        std::conditional_t<isBoundary, BoundaryPointLocatorResult<D>, PointLocatorResult<D>>;
+    auto locator = makeLocator<D, isBoundary>(cl, mesh, bnd_map);
+    auto range = Range<std::size_t>(0, mesh.elements().localSize());
+    std::vector<std::pair<std::size_t, ResultType>> located_probes;
     located_probes.reserve(probes.size());
     for (std::size_t p = 0; p < probes.size(); ++p) {
-        auto result = bpl.locate(probes[p].x);
+        auto result = [&]() {
+            if constexpr (isBoundary) {
+                return locator.locate(probes[p].x);
+            } else {
+                return locator.locate(probes[p].x, range.begin(), range.end());
+            }
+        }();
         located_probes.emplace_back(p, result);
     }
 
-    // Clean duplicate probes using MPI communicator from HDF5Writer
     clean_duplicate_probes(probes, located_probes, hdf5_writer_->comm());
 
-    // Collect unique facet numbers
-    std::unordered_set<std::size_t> myFctNos;
+    std::unordered_set<std::size_t> entityNos;
     for (auto const& [p, result] : located_probes) {
-        myFctNos.emplace(result.no);
+        entityNos.emplace(result.no);
     }
 
-    // Map facet numbers to boundary numbers
-    bndNos_.reserve(myFctNos.size());
-    std::unordered_map<std::size_t, std::size_t> fctNo2OutNo;
+    bndNos_.reserve(entityNos.size());
+    std::unordered_map<std::size_t, std::size_t> entityNo2OutNo;
     std::size_t outNo = 0;
-    for (auto const& fctNo : myFctNos) {
-        fctNo2OutNo[fctNo] = outNo++;
-        bndNos_.emplace_back(bnd_map.bndNo(fctNo));
+    for (auto const& no : entityNos) {
+        entityNo2OutNo[no] = outNo++;
+        bndNos_.emplace_back(isBoundary ? bnd_map.bndNo(no) : no);
     }
 
     // Store probe data
     probes_.reserve(located_probes.size());
     for (auto const& [p, result] : located_probes) {
+        auto const& refCoord = [&]() {
+            if constexpr (isBoundary) {
+                return result.chi;
+            } else {
+                return result.xi;
+            }
+        }();
         probes_.push_back({
-            fctNo2OutNo[result.no], // Local facet number
-            result.chi,             // Reference coordinates
+            entityNo2OutNo[result.no],    // Local facet number
+            refCoord,               // Reference coordinates
             result.x,               // Physical coordinates
             probes[p].name          // Probe name
         });
     }
 }
 
-template <std::size_t D>
-void HDF5BoundaryProbeWriter<D>::initialize_datasets(
-    mneme::span<FiniteElementFunction<D - 1>> functions) {
+template <std::size_t D, bool isBoundary>
+void HDF5ProbeWriter<D, isBoundary>::initialize_datasets(mneme::span<ElementFunction> functions) {
     // Create probe metadata
     std::vector<char> probe_names;
     std::vector<double> probe_coords;
@@ -103,7 +125,7 @@ void HDF5BoundaryProbeWriter<D>::initialize_datasets(
     H5Tclose(strtype); // Clean up type
 }
 
-template <std::size_t D> HDF5BoundaryProbeWriter<D>::~HDF5BoundaryProbeWriter() {
+template <std::size_t D, bool isBoundary> HDF5ProbeWriter<D, isBoundary>::~HDF5ProbeWriter() {
     // Close the time dataset
     if (timeStepDataset_ >= 0) {
         hdf5_writer_->closeDataset(timeStepDataset_);
@@ -114,10 +136,9 @@ template <std::size_t D> HDF5BoundaryProbeWriter<D>::~HDF5BoundaryProbeWriter() 
     }
 }
 
-template <std::size_t D>
-void HDF5BoundaryProbeWriter<D>::write(double time,
-                                       mneme::span<FiniteElementFunction<D - 1>> functions,
-                                       hsize_t time_step) {
+template <std::size_t D, bool isBoundary>
+void HDF5ProbeWriter<D, isBoundary>::write(double time, mneme::span<ElementFunction> functions,
+                                           hsize_t time_step) {
 
     if (timeStepDataset_ == -1) {
         // Create time dataset
@@ -191,7 +212,9 @@ void HDF5BoundaryProbeWriter<D>::write(double time,
                                  {numProbes, time_step + 1, numQuantities}, 0, 1);
 }
 
-template class HDF5BoundaryProbeWriter<2u>;
-template class HDF5BoundaryProbeWriter<3u>;
+template class HDF5ProbeWriter<2u, true>;
+template class HDF5ProbeWriter<3u, true>;
+template class HDF5ProbeWriter<2u, false>;
+template class HDF5ProbeWriter<3u, false>;
 
 } // namespace tndm

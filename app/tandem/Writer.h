@@ -7,7 +7,7 @@
 #include "geometry/Curvilinear.h"
 #include "io/BoundaryProbeWriter.h"
 #include "io/HDF5Adapter.h"
-#include "io/HDF5BoundaryProbeWriter.h"
+#include "io/HDF5ProbeWriter.h"
 #include "io/HDF5Writer.h"
 #include "io/PVDWriter.h"
 #include "io/ProbeWriter.h"
@@ -320,26 +320,33 @@ private:
     hid_t timeStepDataset_ = -1;
 };
 
-template <std::size_t D> class HDF5FaultProbeWriter : public Writer {
+template <std::size_t D, bool isBoundary> class HDF5CommonProbeWriter : public Writer {
 public:
-    HDF5FaultProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
+    HDF5CommonProbeWriter(std::string_view prefix, std::unique_ptr<TableWriter> table_writer,
                          std::vector<Probe<D>> const& probes, AdaptiveOutputInterval oi,
                          LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                          BoundaryMap const& bnd_map, MPI_Comm comm)
         : Writer(prefix, oi),
           writer_(prefix, std::move(table_writer), probes, mesh, std::move(cl), bnd_map, comm) {}
 
-    DataLevel level() const override { return DataLevel::Boundary; }
-    void write_static(mneme::span<FiniteElementFunction<D - 1u>> data) override {
+    DataLevel level() const override {
+        if constexpr (isBoundary) {
+            return DataLevel::Boundary;
+        } else {
+            return DataLevel::Volume;
+        }
+    }
+    void write_static(mneme::span<FiniteElementFunction<isBoundary ? D - 1u : D>> data) override {
         writer_.initialize_datasets(data);
     }
     std::vector<std::size_t> const* subset() const override { return &writer_.bndNos(); }
-    void write(double time, mneme::span<FiniteElementFunction<D - 1u>> data) override {
+    void write(double time,
+               mneme::span<FiniteElementFunction<isBoundary ? D - 1u : D>> data) override {
         writer_.write(time, std::move(data), output_step_);
     }
 
 private:
-    HDF5BoundaryProbeWriter<D> writer_;
+    HDF5ProbeWriter<D, isBoundary> writer_;
 };
 
 } // namespace tndm::seas
