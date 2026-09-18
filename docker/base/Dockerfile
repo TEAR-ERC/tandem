@@ -53,16 +53,20 @@ RUN echo "Using PETSc version $PETSC_VERSION" && \
 
 # Get and install HDF5
 RUN echo "Using HDF5 version $HDF5_VERSION" && \
-    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.gz && \
-    tar -xvzf hdf5-${HDF5_VERSION}.tar.gz && \
-    cd hdf5-${HDF5_VERSION} && \
-    ./configure --prefix=$HDF5_INSTALL_DIR \
-    --enable-parallel \
-    --enable-shared \
-    CC=mpicc CXX=mpicxx && \
-    make -j$(nproc) && \
-    make install && \
-    cd .. && rm -rf hdf5-${HDF5_VERSION}*
+    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-$(echo $HDF5_VERSION | cut -d. -f1,2)/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.gz && \
+    tar -xzf hdf5-${HDF5_VERSION}.tar.gz && \
+    rm -f hdf5-${HDF5_VERSION}.tar.gz && \
+    cmake -G Ninja -B hdf5-build -S hdf5-${HDF5_VERSION} \
+    -DCMAKE_INSTALL_PREFIX=$HDF5_INSTALL_DIR \
+    -DHDF5_ENABLE_PARALLEL=ON \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_CXX_COMPILER=mpicxx \
+    -DBUILD_TESTING=OFF \
+    -DHDF5_BUILD_EXAMPLES=OFF && \
+    ninja -C hdf5-build -j$(nproc) && \
+    ninja -C hdf5-build install && \
+    rm -rf hdf5-build hdf5-${HDF5_VERSION}
 
 # Save versions for reference
 RUN echo "$PETSC_VERSION" > /opt/petsc/version.txt
