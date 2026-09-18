@@ -36,7 +36,7 @@ enum class DataLevel {
     Volume
 #ifdef ENABLE_HDF5
     ,
-    Area // Fault surface data (moment rate) computed over fault area
+    BoundaryForMomentRate // Fault surface data (moment rate) computed over fault area
 #endif
 };
 
@@ -267,7 +267,7 @@ public:
         }
     }
 
-    DataLevel level() const override { return DataLevel::Area; }
+    DataLevel level() const override { return DataLevel::BoundaryForMomentRate; }
     bool has_static_writer() const override { return true; }
     void write(double time, std::vector<double> const& data) override {
         // Get the vertex data from the adapter
