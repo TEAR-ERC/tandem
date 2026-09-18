@@ -68,7 +68,12 @@ add_executable(test-HDF5MeshParser HDF5MeshParser.cpp)
 target_link_libraries(test-HDF5MeshParser test-runner-mpi)
 doctest_discover_tests(test-HDF5MeshParser)
 
-if(RUN_CI_TESTS)
+add_executable(test-HDF5Writer HDF5Writer.cpp)
+target_link_libraries(test-HDF5Writer test-runner-mpi)
+doctest_discover_tests(test-HDF5Writer)
+
+
+if(DEFINED RUN_CI_TESTS)
     find_package(Python COMPONENTS Interpreter Development REQUIRED)
     find_package(Git REQUIRED)
 
