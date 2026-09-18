@@ -7,7 +7,7 @@ Tandem simulation parameters are written in the toml script. Here are the key pa
 - **mesh_file**: Mesh file.
 - **lib**: Lua file containing material & frictional paramters.
 - **scenario**: Name of the specific scenario defined in the Lua library.
-- **Lua material functions**: When volume tagging is used, `mu`, `lam`, and `rho` Lua functions also receive the volume tag as the last argument.
+- **Lua material functions**: Note that the mu, lam, and rho Lua functions receive the volume tag as the last function argument. If region IDs are not set in the mesh, a value of -1 is assumed.
 - **type**: Type of problem. Available options: [poisson | elastic/elasticity].
 - **mode**: Mode of SEAS simulation. Available options: [QuasiDynamic/QD | QuasiDynamicDiscreteGreen/QDGreen | FullyDynamic/FD].
 - **ref_normal**: Define reference normal vector.
