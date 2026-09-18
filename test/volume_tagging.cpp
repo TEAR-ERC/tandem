@@ -63,7 +63,7 @@ TEST_CASE("Volume tagging") {
         long nodes0[] = {0, 1, 2};
         long nodes1[] = {0, 2, 3};
         long nodes2[] = {0, 1};
-        long nodes3[] = {1, 2}; // interface between two elements
+        long nodes3[] = {1, 2}; // boundary edge of element 0 (right side)
         long nodes4[] = {2, 3};
         long nodes5[] = {3, 0};
         builder.addElement(2, 1, nodes0, 3); // tag=1
