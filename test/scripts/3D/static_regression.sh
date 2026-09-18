@@ -14,7 +14,6 @@ cd "$CONFIG_DIR"
 # sym link to the mesh file
 ln -sf "$MESH_DIR/spherical_hole.msh" .
 
-gmsh -3 spherical_hole.geo
 ${EXECUTABLE_DIR}/app/static spherical_hole.toml \
 --matrix_free yes --mg_strategy twolevel \
 --mg_coarse_level 1 --output ${TEMP_TEST_RESULTS}/output3D \
