@@ -82,7 +82,11 @@ if(RUN_CI_TESTS)
         execute_process(
             COMMAND ${GIT_EXECUTABLE} fetch origin
             WORKING_DIRECTORY ${TEST_DATA_DIR}
+            RESULT_VARIABLE GIT_FETCH_RESULT
         )
+        if(NOT GIT_FETCH_RESULT EQUAL 0)
+            message(WARNING "Failed to fetch test data — using cached branch ${TEST_DATA_BRANCH}")
+        endif()
 
         execute_process(
             COMMAND ${GIT_EXECUTABLE} checkout -B ${TEST_DATA_BRANCH} origin/${TEST_DATA_BRANCH}
