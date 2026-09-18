@@ -248,8 +248,8 @@ public:
     MomentRateWriter(std::string_view prefix, AdaptiveOutputInterval oi,
                      LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
                      unsigned degree, BoundaryMap const& bnd_map, MPI_Comm comm,
-                     bool enable_checkpoint)
-        : Writer(prefix, oi), writer_(prefix, comm, enable_checkpoint),
+                     bool checkpoint_enabled)
+        : Writer(prefix, oi), writer_(prefix, comm, checkpoint_enabled),
           adapter_(mesh, std::move(cl), bnd_map.localFctNos(), degree) {
         // Check if time dataset exists from previous run (checkpoint restart)
         htri_t dataset_exists = H5Lexists(writer_.file(), "time", H5P_DEFAULT);
@@ -358,9 +358,9 @@ public:
     HDF5CommonProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
                           AdaptiveOutputInterval oi, LocalSimplexMesh<D> const& mesh,
                           std::shared_ptr<Curvilinear<D>> cl, BoundaryMap const& bnd_map,
-                          MPI_Comm comm, bool enable_checkpoint)
+                          MPI_Comm comm, bool checkpoint_enabled)
         : Writer(prefix, oi),
-          writer_(prefix, probes, mesh, std::move(cl), bnd_map, comm, enable_checkpoint) {}
+          writer_(prefix, probes, mesh, std::move(cl), bnd_map, comm, checkpoint_enabled) {}
 
     DataLevel level() const override {
         if constexpr (isBoundary) {

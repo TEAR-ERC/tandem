@@ -24,7 +24,7 @@ template <std::size_t D, bool isBoundary> class HDF5ProbeWriter {
 public:
     HDF5ProbeWriter(std::string_view prefix, std::vector<Probe<D>> const& probes,
                     LocalSimplexMesh<D> const& mesh, std::shared_ptr<Curvilinear<D>> cl,
-                    BoundaryMap const& bnd_map, MPI_Comm comm, bool enable_checkpoint);
+                    BoundaryMap const& bnd_map, MPI_Comm comm, bool checkpoint_enabled);
     ~HDF5ProbeWriter();
     using ElementFunction = tndm::FiniteElementFunction<isBoundary ? D - 1 : D>;
 
