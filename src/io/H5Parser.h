@@ -25,7 +25,6 @@ private:
     std::vector<uint8_t> boundary;
 
     template <typename T> T logError(std::string_view msg);
-    template <typename T> T logErrorAnnotated(std::string_view msg);
 
 #ifdef ENABLE_HDF5
     template <typename T> bool readDataset(hid_t file, std::string_view name, std::vector<T>& data);
@@ -41,6 +40,15 @@ public:
 
     bool parseFile(std::string const& fileName) override;
     std::string_view getErrorMessage() const override { return errorMsg; }
+
+    const std::vector<std::array<long, 4>>& getHigherDimensionalElements() const {
+        return higherDimensionalElements;
+    }
+    const std::vector<std::array<long, 3>>& getLowerDimensionalElements() const {
+        return lowerDimensionalElements;
+    }
+    const std::vector<uint32_t>& getBoundaryData() const { return boundaryData; }
+    const std::vector<uint8_t>& getBoundary() const { return boundary; }
 };
 
 } // namespace tndm
