@@ -60,7 +60,7 @@ auto PointLocator<D>::xInv(std::size_t elNo, point_t const& point, XInvTmp& tmp)
     auto F = EigenMap(X_0);
     for (std::size_t d = 0; d < D; ++d) {
         F(d) = point[d] - F(d);
-        residual2_0 = F(d) * F(d);
+        residual2_0 += F(d) * F(d);
     }
 
     while (it < max_its_) {
@@ -72,9 +72,9 @@ auto PointLocator<D>::xInv(std::size_t elNo, point_t const& point, XInvTmp& tmp)
         double residual2 = 0.0;
         for (std::size_t d = 0; d < D; ++d) {
             F(d) = point[d] - F(d);
-            residual2 = F(d) * F(d);
+            residual2 += F(d) * F(d);
         }
-        if (residual2 < atol_ + rtol_ * residual2 / residual2_0) {
+        if (residual2 <= atol_ + rtol_ * residual2_0) {
             break;
         }
 
