@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -95,6 +96,7 @@ struct Config {
     std::optional<std::string> mesh_file;
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::array<double, DomainDimension> up;
+    bool continuous_gf;
     std::optional<ReceiverProbeConfig> receiver_probe_output;
     std::optional<ReceiverGridConfig> receiver_grid_output;
     std::optional<DomainOutputConfig> domain_output;
@@ -128,8 +130,35 @@ template <> struct slip_traits<Poisson> {
 };
 
 /**
- * Put unit slip on every facet carrying gfTag, in the given fault-basis
- * direction, and assemble b for it.
+ * Coordinates of every node of every local fault facet, faultNo-major.
+ *
+ * Same mapping as RateAndStateBase::prepare, so node l of facet faultNo is
+ * the point where coefficient l of the slip block is interpolated.
+ */
+auto fault_node_coords(Curvilinear<DomainDimension> const& cl, DGOperatorTopo const& topo,
+                       BoundaryMap const& fault_map)
+    -> std::vector<std::array<double, DomainDimension>> {
+    auto space = RateAndStateBase::Space();
+    auto nbf = space.numBasisFunctions();
+
+    std::vector<Managed<Matrix<double>>> geoE;
+    for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
+        geoE.emplace_back(cl.evaluateBasisAt(cl.facetParam(f, space.refNodes())));
+    }
+
+    auto num = fault_map.local_size();
+    auto result = std::vector<std::array<double, DomainDimension>>(num * nbf);
+    for (std::size_t faultNo = 0; faultNo < num; ++faultNo) {
+        auto const& info = topo.info(fault_map.fctNo(faultNo));
+        auto coords = Tensor(result[faultNo * nbf].data(), cl.mapResultInfo(nbf));
+        cl.map(info.up[0], geoE[info.localNo[0]], coords);
+    }
+    return result;
+}
+
+/**
+ * Put slip_at_node(faultNo, l) on node l of every local fault facet, in the
+ * given fault-basis direction, and assemble b for it.
  *
  * Same sequence as SeasQDOperator::solve.
  */
@@ -159,25 +188,23 @@ void write_vtu(DGOp& dgop, PetscLinearSolver& solver, std::shared_ptr<Curvilinea
 }
 
 template <class LocalOperator>
-void set_slip_and_rhs(long int gfTag, std::size_t direction,
-                      std::vector<long int> const& faultNo2tag, std::size_t nbf_fault,
-                      PetscVector& S, Scatter& scatter, SparseBlockVector<double>& ghost,
+void set_slip_and_rhs(std::size_t direction,
+                      std::function<double(std::size_t, std::size_t)> const& slip_at_node,
+                      std::size_t num_faults, std::size_t nbf_fault, PetscVector& S, Scatter& scatter, SparseBlockVector<double>& ghost,
                       AdapterOperator<LocalOperator>& adapter, DGOperator<LocalOperator>& dgop,
                       PetscLinearSolver& solver) {
     /*
-     * The fault space is nodal, so setting all nbf coefficients of one
-     * direction to 1 is exactly unit slip over the patch. The block layout
-     * matches the yateto tensor slip(nbf_fault, D-1), first index fastest.
+     * The fault space is nodal, so the coefficients are the slip values at
+     * the nodes; setting them all to 1 is exactly unit slip over the facet.
+     * The block layout matches the yateto tensor slip(nbf_fault, D-1), first
+     * index fastest.
      */
     S.set_zero();
     {
         auto handle = S.begin_access();
-        for (std::size_t faultNo = 0; faultNo < faultNo2tag.size(); ++faultNo) {
-            if (faultNo2tag[faultNo] != gfTag) {
-                continue;
-            }
+        for (std::size_t faultNo = 0; faultNo < num_faults; ++faultNo) {
             for (std::size_t l = 0; l < nbf_fault; ++l) {
-                handle(l + direction * nbf_fault, faultNo) = 1.0;
+                handle(l + direction * nbf_fault, faultNo) = slip_at_node(faultNo, l);
             }
         }
         S.end_access(handle);
@@ -485,6 +512,22 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     
 
+    /*
+     * continuous_gf: the patch shape comes from the Lua
+     * slip(x, y, z, gfTag, direction) at the fault nodes of every facet, so a
+     * source may reach into its neighbours. Otherwise unit slip on the facets
+     * carrying gfTag.
+     */
+    std::vector<std::array<double, DomainDimension>> nodeCoords;
+    if (cfg.continuous_gf) {
+        if (!scenario.slip_direction()) {
+            throw std::runtime_error(
+                "continuous_gf = true (default) needs slip(x, y, z, gfTag, direction) in the "
+                "scenario; set continuous_gf = false for unit slip per tag");
+        }
+        nodeCoords = fault_node_coords(*cl, *topo, *fault_map);
+    }
+
     std::size_t numGfs = gfTags.size() * (DomainDimension - 1);
     std::size_t gfNo = 0;
 
@@ -497,8 +540,20 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
             sw.start();
 
-            set_slip_and_rhs(gfTag, direction, faultNo2tag, nbf_fault, S, scatter, ghost, adapter,
-                             dgop, solver);
+            auto slip_at_node = std::function<double(std::size_t, std::size_t)>();
+            if (cfg.continuous_gf) {
+                slip_at_node = [&](std::size_t faultNo, std::size_t l) {
+                    return (*scenario.slip_direction())(nodeCoords[faultNo * nbf_fault + l],
+                                                        gfTag,
+                                                        static_cast<long int>(direction))[0];
+                };
+            } else {
+                slip_at_node = [&](std::size_t faultNo, std::size_t) {
+                    return faultNo2tag[faultNo] == gfTag ? 1.0 : 0.0;
+                };
+            }
+            set_slip_and_rhs(direction, slip_at_node, faultNo2tag.size(), nbf_fault, S, scatter,
+                             ghost, adapter, dgop, solver);
             solver.solve();
 
             if (!solver.is_converged()) {
@@ -674,6 +729,10 @@ int main(int argc, char** argv) {
         .of_values()
         .help("Up direction, used to orient strike and dip in the fault basis.");
     }
+    schema.add_value("continuous_gf", &Config::continuous_gf)
+        .default_value(true)
+        .help("Take each GF's slip from the Lua slip(x, y, z, gfTag, direction), evaluated at "
+              "the fault nodes of all facets. false: unit slip on the gfTag facets.");
     
     auto& gridOutputSchema =
         schema.add_table("receiver_grid_output", &Config::receiver_grid_output);
@@ -764,11 +823,17 @@ int main(int argc, char** argv) {
     switch (cfg->type) {
     case LocalOpType::Poisson: {
         auto scenario = PoissonScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
+        if (cfg->continuous_gf) {
+            scenario.enable_directional_slip(cfg->scenario);
+        }
         static_problem(*mesh, scenario, *cfg);
         break;
     }
     case LocalOpType::Elasticity: {
         auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
+        if (cfg->continuous_gf) {
+            scenario.enable_directional_slip(cfg->scenario);
+        }
         static_problem(*mesh, scenario, *cfg);
         break;
     }

@@ -24,6 +24,9 @@ public:
         std::function<std::array<double, NumQuantities * DomainDimension>(Vector<double> const&)>;
     using transform_t = Curvilinear<DomainDimension>::transform_t;
     template <std::size_t Q> using functional_t = typename LocalOperator::template functional_t<Q>;
+    // Scalar slip amplitude for one GF source: slip(x, y, z, gfTag, direction)
+    using slip_direction_t = std::function<std::array<double, 1>(
+        std::array<double, DomainDimension> const& x, long int gfTag, long int direction)>;
 
     constexpr static char Warp[] = "warp";
     constexpr static char Force[] = "force";
@@ -79,6 +82,14 @@ public:
     auto const& force() const { return force_; }
     auto const& boundary() const { return boundary_; }
     auto const& slip() const { return slip_; }
+    auto const& slip_direction() const { return slip_direction_; }
+
+    void enable_directional_slip(std::string const& scenario) {
+        if (lib_.hasMember(scenario, Slip)) {
+            slip_direction_ =
+                lib_.getMemberFunction<DomainDimension, 1, true, true>(scenario, Slip);
+        }
+    }
     std::unique_ptr<SolutionInterface> solution() const {
         if (solution_) {
             return std::make_unique<LambdaSolution<decltype(*solution_)>>(*solution_);
@@ -112,6 +123,7 @@ protected:
     std::optional<functional_t<NumQuantities>> force_ = std::nullopt;
     std::optional<functional_t<NumQuantities>> boundary_ = std::nullopt;
     std::optional<functional_t<NumQuantities>> slip_ = std::nullopt;
+    std::optional<slip_direction_t> slip_direction_ = std::nullopt;
     std::optional<solution_t> solution_ = std::nullopt;
     std::optional<solution_jacobian_t> solution_jacobian_ = std::nullopt;
 };
