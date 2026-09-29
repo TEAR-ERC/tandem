@@ -97,7 +97,7 @@ void evaluate_receiver_displacement(FiniteElementFunction<DomainDimension> const
 class GfHDF5Writer {
 public:
     GfHDF5Writer(std::string const& prefix, ReceiverGrid const& grid, ReceiverSet const& receivers,
-                 std::size_t numDirections, MPI_Comm comm);
+                 std::vector<std::size_t> const& directions, MPI_Comm comm);
     ~GfHDF5Writer();
 
     GfHDF5Writer(GfHDF5Writer const&) = delete;
@@ -116,7 +116,7 @@ private:
     std::unique_ptr<HDF5Writer> h5_;
     std::size_t nx_;
     std::size_t ny_;
-    std::size_t numDirections_;
+    std::vector<std::size_t> directions_;
     hid_t xDset_ = -1;
     hid_t yDset_ = -1;
     hid_t directionDset_ = -1;

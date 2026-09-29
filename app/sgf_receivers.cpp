@@ -237,9 +237,10 @@ void evaluate_receiver_displacement(FiniteElementFunction<DomainDimension> const
  * ------------------------------------------------------------------------- */
 
 GfHDF5Writer::GfHDF5Writer(std::string const& prefix, ReceiverGrid const& grid,
-                           ReceiverSet const& receivers, std::size_t numDirections, MPI_Comm comm)
+                           ReceiverSet const& receivers,
+                           std::vector<std::size_t> const& directions, MPI_Comm comm)
     : h5_(std::make_unique<HDF5Writer>(prefix, comm)), nx_(grid.nx), ny_(grid.ny),
-      numDirections_(numDirections) {
+      directions_(directions) {
 
     int rank;
     MPI_Comm_rank(comm, &rank);
@@ -274,16 +275,19 @@ GfHDF5Writer::GfHDF5Writer(std::string const& prefix, ReceiverGrid const& grid,
         h5_->writeToDatasetPoints(yDset_, H5T_NATIVE_DOUBLE, coords, values.data());
     }
 
-    /* slip direction index: 0 = dip, 1 = strike */
-    directionDset_ =
-        h5_->createFixedDataset("direction", H5T_STD_I32LE, {static_cast<hsize_t>(numDirections_)});
+    /*
+     * Fault-basis slip direction of each slot: 0 = (up x n) x n, 1 = up x n.
+     * Only the selected directions get a slot.
+     */
+    directionDset_ = h5_->createFixedDataset("direction", H5T_STD_I32LE,
+                                             {static_cast<hsize_t>(directions_.size())});
     {
         std::vector<hsize_t> coords;
         std::vector<int> values;
         if (rank == 0) {
-            for (hsize_t d = 0; d < numDirections_; ++d) {
+            for (hsize_t d = 0; d < directions_.size(); ++d) {
                 coords.push_back(d);
-                values.push_back(static_cast<int>(d));
+                values.push_back(static_cast<int>(directions_[d]));
             }
         }
         h5_->writeToDatasetPoints(directionDset_, H5T_NATIVE_INT, coords, values.data());
@@ -335,11 +339,18 @@ void GfHDF5Writer::begin_source(long int gfTag) {
     }
     sourceDset_ = h5_->createFixedDataset(
         std::to_string(gfTag), H5T_IEEE_F64LE,
-        {ny_, nx_, static_cast<hsize_t>(numDirections_), static_cast<hsize_t>(DomainDimension)});
+        {ny_, nx_, static_cast<hsize_t>(directions_.size()), static_cast<hsize_t>(DomainDimension)});
 }
 
 void GfHDF5Writer::write_direction(std::size_t direction, ReceiverSet const& receivers,
                                    std::vector<double> const& displacement) {
+    auto it = std::find(directions_.begin(), directions_.end(), direction);
+    if (it == directions_.end()) {
+        throw std::logic_error("write_direction: direction " + std::to_string(direction) +
+                               " was not selected");
+    }
+    auto slot = static_cast<hsize_t>(it - directions_.begin());
+
     std::vector<hsize_t> coords;
     coords.reserve(receivers.points.size() * 4 * DomainDimension);
 
@@ -350,7 +361,7 @@ void GfHDF5Writer::write_direction(std::size_t direction, ReceiverSet const& rec
         for (hsize_t c = 0; c < DomainDimension; ++c) {
             coords.push_back(j);
             coords.push_back(i);
-            coords.push_back(static_cast<hsize_t>(direction));
+            coords.push_back(slot);
             coords.push_back(c);
         }
     }

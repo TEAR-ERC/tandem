@@ -42,6 +42,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -97,6 +98,8 @@ struct Config {
     std::optional<GenMeshConfig<DomainDimension>> generate_mesh;
     std::array<double, DomainDimension> up;
     bool continuous_gf;
+    std::optional<std::size_t> num_sources;
+    std::vector<std::size_t> directions;
     std::optional<ReceiverProbeConfig> receiver_probe_output;
     std::optional<ReceiverGridConfig> receiver_grid_output;
     std::optional<DomainOutputConfig> domain_output;
@@ -394,7 +397,18 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
 
     auto lop = scenario.make_local_operator(cl, cfg.method);
     auto topo = std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD);
-    auto gfTags = get_gf_tags(*topo);
+    /*
+     * Sources are the fault tags of the mesh, or with num_sources the labels
+     * 0..N-1, which only name the Lua slip functions.
+     */
+    auto gfTags = std::set<long int>();
+    if (cfg.num_sources) {
+        for (std::size_t i = 0; i < *cfg.num_sources; ++i) {
+            gfTags.insert(static_cast<long int>(i));
+        }
+    } else {
+        gfTags = get_gf_tags(*topo);
+    }
     auto dgop = DGOperator(topo, lop);   
 
     const auto reduce_number = [&topo](std::size_t number) {
@@ -497,7 +511,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
             grid.xy, surfacePoints, mesh, *topo, cl, lop->solution_prototype(1),
             gc.surface_tag, PETSC_COMM_WORLD);
         gridWriter = std::make_unique<GfHDF5Writer>(
-            gc.prefix, grid, gridReceivers, DomainDimension - 1, PETSC_COMM_WORLD);
+            gc.prefix, grid, gridReceivers, cfg.directions, PETSC_COMM_WORLD);
     }
 
     std::unique_ptr<HDF5ProbeWriter<DomainDimension, false>> probeWriter;
@@ -528,14 +542,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         nodeCoords = fault_node_coords(*cl, *topo, *fault_map);
     }
 
-    std::size_t numGfs = gfTags.size() * (DomainDimension - 1);
+    std::size_t numGfs = gfTags.size() * cfg.directions.size();
     std::size_t gfNo = 0;
 
     for (auto gfTag : gfTags) {
         if (gridWriter) {
             gridWriter->begin_source(gfTag);
         }
-        for (std::size_t direction = 0; direction < DomainDimension - 1; ++direction) {
+        for (auto direction : cfg.directions) {
             
 
             sw.start();
@@ -729,10 +743,37 @@ int main(int argc, char** argv) {
         .of_values()
         .help("Up direction, used to orient strike and dip in the fault basis.");
     }
+    schema.add_value("direction", &Config::directions)
+        .converter([](std::string_view value) {
+            if (iEquals(value, "both")) {
+                auto all = std::vector<std::size_t>(DomainDimension - 1);
+                std::iota(all.begin(), all.end(), std::size_t{0});
+                return all;
+            }
+            for (std::size_t d = 0; d < DomainDimension - 1; ++d) {
+                if (value == std::to_string(d)) {
+                    return std::vector<std::size_t>{d};
+                }
+            }
+            throw std::runtime_error("direction must be \"both\" or a fault-basis index \"0\"" +
+                                     std::string(DomainDimension == 3 ? " or \"1\"" : "") +
+                                     ", got \"" + std::string(value) + "\"");
+        })
+        .default_value([] {
+            auto all = std::vector<std::size_t>(DomainDimension - 1);
+            std::iota(all.begin(), all.end(), std::size_t{0});
+            return all;
+        }())
+        .help("Fault-basis slip directions to compute: \"0\" = (up x n) x n, \"1\" = up x n, "
+              "or \"both\" (default).");
     schema.add_value("continuous_gf", &Config::continuous_gf)
         .default_value(true)
         .help("Take each GF's slip from the Lua slip(x, y, z, gfTag, direction), evaluated at "
               "the fault nodes of all facets. false: unit slip on the gfTag facets.");
+    schema.add_value("num_sources", &Config::num_sources)
+        .validator([](auto&& x) { return x >= 1; })
+        .help("continuous_gf only: compute GFs for sources 0..N-1, passed to Lua as gfTag, "
+              "instead of one per fault tag in the mesh.");
     
     auto& gridOutputSchema =
         schema.add_table("receiver_grid_output", &Config::receiver_grid_output);
@@ -756,6 +797,12 @@ int main(int argc, char** argv) {
 
     std::optional<Config> cfg = readFromConfigurationFileAndCmdLine(schema, program, argc, argv);
     if (!cfg) {
+        return -1;
+    }
+    if (cfg->num_sources && !cfg->continuous_gf) {
+        std::cerr << "num_sources needs continuous_gf = true; unit slip GFs come from the mesh "
+                     "fault tags."
+                  << std::endl;
         return -1;
     }
 
