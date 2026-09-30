@@ -18,6 +18,15 @@ up = [0.0, 0.0, 1.0]
 # normal. These faults dip 30 to 60 degrees, so vertical works.
 ref_normal = [0.0, 0.0, 1.0]
 
+# true (default): slip from Lua slip(x, y, z, gfTag, direction); false: unit slip per fault tag.
+continuous_gf = false
+
+# Slip directions to compute: "0", "1" or "both" (default).
+direction = "both"
+
+# continuous_gf only: sources 0..N-1 passed to Lua as gfTag instead of the mesh fault tags.
+# num_sources = 10
+
 
 # ---------------------------------------------------------------------------
 # Outputs. Every table below is optional: delete one and that output is skipped.
