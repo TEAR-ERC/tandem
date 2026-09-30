@@ -27,6 +27,9 @@
 #include "util/SchemaHelper.h"
 #include "util/Stopwatch.h"
 
+#include <ctime>
+#include <cstdio>
+
 #include <argparse.hpp>
 #include <limits>
 #include <mpi.h>
@@ -380,6 +383,21 @@ void write_fault_vtu(LocalSimplexMesh<DomainDimension> const& mesh,
     writer.write(filename);
 }
 
+/* Time of the phase just measured by sw on the slowest rank (valid on rank 0). */
+double slowest(Stopwatch& sw, MPI_Comm comm) {
+    double t = sw.stop(), tmax = 0.0;
+    MPI_Reduce(&t, &tmax, 1, MPI_DOUBLE, MPI_MAX, 0, comm);
+    return tmax;
+}
+
+/* "1h02m03s" */
+std::string hms(double seconds) {
+    auto s = static_cast<long>(seconds + 0.5);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%ldh%02ldm%02lds", s / 3600, (s % 3600) / 60, s % 60);
+    return buf;
+}
+
 template <class Scenario>
 void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario const& scenario,
                     Config const& cfg) {
@@ -392,6 +410,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     int rank;
     MPI_Comm_rank(PETSC_COMM_WORLD, &rank);
 
+    sw.start();
     auto cl = std::make_shared<Curvilinear<DomainDimension>>(mesh, scenario.transform(),
                                                              PolynomialDegree);
 
@@ -410,6 +429,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         gfTags = get_gf_tags(*topo);
     }
     auto dgop = DGOperator(topo, lop);   
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0) {
+        std::cout << "Setup: geometry, local operator, topology: " << time << " s" << std::endl;
+    }
 
     const auto reduce_number = [&topo](std::size_t number) {
         std::size_t number_global;
@@ -472,6 +495,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         std::cout << "Solver warmup: " << time << " s" << std::endl;
     }
     
+    sw.start();
     using local_operator_t = typename decltype(lop)::element_type;
     constexpr std::size_t NumSlipComponents = slip_traits<local_operator_t>::NumSlipComponents;
 
@@ -497,6 +521,12 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     auto ghost = scatter.recv_prototype<double>(slip_block_size, ALIGNMENT);
 
 
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0) {
+        std::cout << "Setup: fault map, slip adapter: " << time << " s" << std::endl;
+    }
+
+    sw.start();
     std::unique_ptr<GfHDF5Writer> gridWriter;
     ReceiverGrid grid;
     ReceiverSet gridReceivers;
@@ -532,6 +562,12 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
      * source may reach into its neighbours. Otherwise unit slip on the facets
      * carrying gfTag.
      */
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0 && (cfg.receiver_grid_output || cfg.receiver_probe_output)) {
+        std::cout << "Setup: receivers (grid projection, HDF5 files): " << time << " s" << std::endl;
+    }
+
+    sw.start();
     std::vector<std::array<double, DomainDimension>> nodeCoords;
     if (cfg.continuous_gf) {
         if (!scenario.slip_direction()) {
@@ -541,9 +577,15 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         }
         nodeCoords = fault_node_coords(*cl, *topo, *fault_map);
     }
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0 && cfg.continuous_gf) {
+        std::cout << "Setup: fault node coordinates: " << time << " s" << std::endl;
+    }
 
     std::size_t numGfs = gfTags.size() * cfg.directions.size();
     std::size_t gfNo = 0;
+    Stopwatch swLoop, swPart;
+    swLoop.start();
 
     for (auto gfTag : gfTags) {
         if (gridWriter) {
@@ -566,9 +608,14 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                     return faultNo2tag[faultNo] == gfTag ? 1.0 : 0.0;
                 };
             }
+            swPart.start();
             set_slip_and_rhs(direction, slip_at_node, faultNo2tag.size(), nbf_fault, S, scatter,
                              ghost, adapter, dgop, solver);
+            double const tSlip = slowest(swPart, PETSC_COMM_WORLD);
+            swPart.start();
             solver.solve();
+            double const tSolve = slowest(swPart, PETSC_COMM_WORLD);
+            swPart.start();
 
             if (!solver.is_converged()) {
                 throw std::runtime_error("Solver did not converge for GF " + std::to_string(gfNo));
@@ -586,12 +633,24 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
             }
 
 
+            double const tRecv = slowest(swPart, PETSC_COMM_WORLD);
             time = sw.stop();
             ++gfNo;
 
             if (rank == 0) {
                 std::cout << "Computed " << gfNo << "/" << numGfs << " GF on tag " << gfTag
-                        << " in direction " << direction << " in " << time << " s" << std::endl;
+                          << " in direction " << direction << " in " << time << " s (slip + rhs "
+                          << tSlip << " s, solve " << tSolve << " s, receivers " << tRecv << " s)"
+                          << std::endl;
+                /* ETA from the mean wall time per GF so far (includes everything in the loop) */
+                double const elapsed = swLoop.split();
+                double const left = elapsed / gfNo * (numGfs - gfNo);
+                std::time_t done = std::time(nullptr) + static_cast<std::time_t>(left);
+                char when[32];
+                std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", std::localtime(&done));
+                std::cout << "ETA: " << numGfs - gfNo << " GFs left, " << hms(elapsed / gfNo)
+                          << " per GF -> " << hms(left) << ", done at about " << when
+                          << std::endl;
             }
 
             if (cfg.domain_output && cfg.domain_output->per_source) {
@@ -609,15 +668,30 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
     }
 
 
+    if (rank == 0) {
+        std::cout << "GF loop: " << numGfs << " GFs in " << hms(swLoop.split()) << std::endl;
+    }
+
+    sw.start();
     if (cfg.fault_output) {
         auto f = fault_angle_function(cl, lop, topo, fault_map, cfg.up, cfg.ref_normal);
         write_fault_vtu(mesh, cl, fault_map->localFctNos(), f, cfg.fault_output->prefix);
     }
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0 && cfg.fault_output) {
+        std::cout << "Output: fault VTU: " << time << " s" << std::endl;
+    }
 
+    sw.start();
     if (cfg.domain_output && cfg.domain_output->parameters) {
         write_vtu(dgop, solver, cl, cfg.domain_output->prefix, false, true);
     }
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0 && cfg.domain_output && cfg.domain_output->parameters) {
+        std::cout << "Output: domain VTU (lambda, mu): " << time << " s" << std::endl;
+    }
 
+    sw.start();
     if (gridWriter) {
         gridWriter->close();
         gridWriter.reset();
@@ -625,6 +699,10 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
         if (rank == 0) {
             add_hdf5_metadata(cfg.receiver_grid_output->prefix + ".h5", gfTags);
         }
+    }
+    time = slowest(sw, PETSC_COMM_WORLD);
+    if (rank == 0 && cfg.receiver_grid_output) {
+        std::cout << "Output: close receiver grid HDF5 + metadata: " << time << " s" << std::endl;
     }
     probeWriter.reset();
 
@@ -820,6 +898,10 @@ int main(int argc, char** argv) {
         Banner::standard(std::cout, affinity, node_mask);
     }
 
+    Stopwatch swTotal, swSetup;
+    swTotal.start();
+    swSetup.start();
+
     std::unique_ptr<GlobalSimplexMesh<DomainDimension>> globalMesh;
     if (cfg->mesh_file) {
         bool ok = false;
@@ -845,6 +927,11 @@ int main(int argc, char** argv) {
             PetscFinalize();
             return -1;
         }
+        double tRead = slowest(swSetup, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "Setup: mesh read (rank 0): " << tRead << " s" << std::endl;
+        }
+        swSetup.start();
         if (ok) {
             globalMesh = builder.create(PETSC_COMM_WORLD);
         }
@@ -852,6 +939,11 @@ int main(int argc, char** argv) {
             // ensure initial element distribution for metis
             globalMesh->repartitionByHash();
         }
+        double tDist = slowest(swSetup, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "Setup: mesh distribution: " << tDist << " s" << std::endl;
+        }
+        swSetup.start();
     } else if (cfg->generate_mesh && cfg->resolution) {
         auto meshGen = cfg->generate_mesh->create(*cfg->resolution, PETSC_COMM_WORLD);
         globalMesh = meshGen.uniformMesh();
@@ -866,20 +958,34 @@ int main(int argc, char** argv) {
     }
     globalMesh->repartition();
     auto mesh = globalMesh->getLocalMesh(1);
+    double tPart = slowest(swSetup, PETSC_COMM_WORLD);
+    if (rank == 0) {
+        std::cout << "Setup: partition + local mesh: " << tPart << " s" << std::endl;
+    }
 
     switch (cfg->type) {
     case LocalOpType::Poisson: {
+        swSetup.start();
         auto scenario = PoissonScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
         if (cfg->continuous_gf) {
             scenario.enable_directional_slip(cfg->scenario);
+        }
+        double tLua = slowest(swSetup, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "Setup: scenario (Lua): " << tLua << " s" << std::endl;
         }
         static_problem(*mesh, scenario, *cfg);
         break;
     }
     case LocalOpType::Elasticity: {
+        swSetup.start();
         auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
         if (cfg->continuous_gf) {
             scenario.enable_directional_slip(cfg->scenario);
+        }
+        double tLua = slowest(swSetup, PETSC_COMM_WORLD);
+        if (rank == 0) {
+            std::cout << "Setup: scenario (Lua): " << tLua << " s" << std::endl;
         }
         static_problem(*mesh, scenario, *cfg);
         break;
@@ -888,6 +994,12 @@ int main(int argc, char** argv) {
         std::cerr << "Unknown type. Should be either poisson or elasticity." << std::endl;
         break;
     };
+
+    double tTotal = slowest(swTotal, PETSC_COMM_WORLD);
+    if (rank == 0) {
+        std::cout << "Total: " << hms(tTotal) << " (" << tTotal << " s after PetscInitialize)"
+                  << std::endl;
+    }
 
     PetscErrorCode ierr = PetscFinalize();
 
