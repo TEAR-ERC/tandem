@@ -1,0 +1,4 @@
+mesh_file = "free_slip.msh"
+type = "elasticity"
+lib = "free_slip.lua"
+scenario = "free_slip_extension"

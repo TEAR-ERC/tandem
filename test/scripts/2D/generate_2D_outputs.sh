@@ -54,4 +54,7 @@ bash "$SCRIPT_DIR/volume_tagging_correctness.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_R
 echo "Parallel volume consistency test..."
 bash "$SCRIPT_DIR/volume_tagging_parallel_consistency.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
+echo "Free slip BC test (free_slip, extension and compression)..."
+bash "$SCRIPT_DIR/free_slip_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
 echo "2D reference outputs generated successfully."
