@@ -508,7 +508,7 @@ void static_problem(LocalSimplexMesh<DomainDimension> const& mesh, Scenario cons
                                                      gc.surface_tag);
         grid = make_regular_xy_grid(surfacePoints, gc.n, PETSC_COMM_WORLD);
         gridReceivers = project_grid_to_receiver_surface(
-            grid.xy, surfacePoints, mesh, *topo, cl, lop->solution_prototype(1),
+            grid.xy, mesh, *topo, cl, lop->solution_prototype(1),
             gc.surface_tag, PETSC_COMM_WORLD);
         gridWriter = std::make_unique<GfHDF5Writer>(
             gc.prefix, grid, gridReceivers, cfg.directions, PETSC_COMM_WORLD);
