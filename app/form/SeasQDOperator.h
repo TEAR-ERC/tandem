@@ -37,6 +37,8 @@ public:
     inline void warmup() { linear_solver_.warmup(); }
 
     virtual void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
+    virtual void set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
+    virtual void set_free_slip_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
 
     inline auto block_sizes() -> std::array<std::size_t, 1> const {
         return {friction_->block_size()};
@@ -104,6 +106,8 @@ private:
     SparseBlockVector<double> state_ghost_;
 
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_boundary_ = nullptr;
+    std::unique_ptr<AbstractFacetFunctionalFactory> fun_traction_boundary_ = nullptr;
+    std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;
 
 protected:
     PetscVector traction_;

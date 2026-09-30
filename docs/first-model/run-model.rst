@@ -34,3 +34,4 @@ where :code:`solver.cfg` becomes:
    -ts_adapt_wnormtype infinity
 
    -ts_dt 0.0001
+   -ts_monitor
