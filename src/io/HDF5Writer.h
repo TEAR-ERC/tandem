@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <mpi.h>
 #include <string>
+#include <optional>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -36,7 +37,9 @@ public:
     MPI_Comm comm() const { return comm_; }
     hid_t file() const { return file_; }
 
-    hid_t createFixedDataset(const std::string_view name, hid_t type, std::vector<hsize_t> dims);
+    /* fill: value of the elements nobody writes (a double dataset only), else HDF5's 0 */
+    hid_t createFixedDataset(const std::string_view name, hid_t type, std::vector<hsize_t> dims,
+                             std::optional<double> fill = std::nullopt);
     
     void writeToDatasetPoints(hid_t dset, hid_t type, std::vector<hsize_t> const& coords,
                               const void* data);

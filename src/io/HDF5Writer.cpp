@@ -163,13 +163,23 @@ std::tuple<hsize_t, hsize_t> HDF5Writer::calculateOffsets(hsize_t localElements)
     return {totalElements, offset};
 }
 hid_t HDF5Writer::createFixedDataset(const std::string_view name, hid_t type,
-                                     std::vector<hsize_t> dims) {
+                                     std::vector<hsize_t> dims, std::optional<double> fill) {
     if (!is_open_)
         throw std::runtime_error("HDF5Writer: file is not open");
 
     hid_t space = H5Screate_simple(static_cast<int>(dims.size()), dims.data(), nullptr);
-    hid_t dset = H5Dcreate(file_, std::string(name).c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT,
+    hid_t dcpl = H5P_DEFAULT;
+    if (fill) {
+        dcpl = H5Pcreate(H5P_DATASET_CREATE);
+        double value = *fill;
+        H5Pset_fill_value(dcpl, H5T_NATIVE_DOUBLE, &value);
+        H5Pset_fill_time(dcpl, H5D_FILL_TIME_ALLOC);
+    }
+    hid_t dset = H5Dcreate(file_, std::string(name).c_str(), type, space, H5P_DEFAULT, dcpl,
                            H5P_DEFAULT);
+    if (fill) {
+        H5Pclose(dcpl);
+    }
     H5Sclose(space);
 
     if (dset < 0)

@@ -46,14 +46,14 @@ struct ReceiverPoint {
     std::size_t gridIndex;                 // index into the global grid
     std::size_t outNo;
     std::array<double, DomainDimension> x; // projected point on the surface
-    double dist;                           // grid point to surface distance
+    double dist;                           // horizontal offset from the grid point (round-off)
     Managed<Matrix<double>> E;
 };
 
 struct ReceiverSet {
     std::vector<ReceiverPoint> points; // only the receivers this rank owns
     std::vector<std::size_t> elNos;    // element subset for dgop.solution
-    double maxDistance;                // worst projection distance, over all ranks
+    double maxDistance;                // largest dist, over all ranks
 };
 
 /* Vertices of every local facet carrying receiverSurfaceTag, after the scenario
@@ -70,12 +70,12 @@ ReceiverGrid
 make_regular_xy_grid(std::vector<std::array<double, DomainDimension>> const& surfacePoints,
                      std::size_t N, MPI_Comm comm);
 
-/* Drop each grid point onto the nearest point of the receiverSurfaceTag facets,
- * then locate that point in the volume so displacement can be evaluated there.
- * Each receiver ends up owned by exactly one rank. */
+/* Project each grid point vertically onto the receiverSurfaceTag facet that
+ * contains it in map view; the receiver is evaluated in that facet's element.
+ * Grid points outside the surface footprint get no receiver (NaN in the HDF5
+ * output). Each receiver ends up owned by exactly one rank. */
 ReceiverSet project_grid_to_receiver_surface(
     std::vector<std::array<double, 2>> const& receiverXY,
-    std::vector<std::array<double, DomainDimension>> const& surfacePoints,
     LocalSimplexMesh<DomainDimension> const& mesh, DGOperatorTopo const& topo,
     std::shared_ptr<Curvilinear<DomainDimension>> const& cl,
     FiniteElementFunction<DomainDimension> const& prototype, long int receiverSurfaceTag,
