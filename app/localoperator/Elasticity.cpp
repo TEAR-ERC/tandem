@@ -18,6 +18,9 @@
 #include <Eigen/LU>
 #include <cassert>
 
+// added for output of thetas
+#include <fstream>
+
 namespace tensor = tndm::elasticity::tensor;
 namespace init = tndm::elasticity::init;
 namespace kernel = tndm::elasticity::kernel;
@@ -101,6 +104,79 @@ void Elasticity::begin_preparation(std::size_t numElements, std::size_t numLocal
     cfl_dt_.resize(numLocalElements, 0.0);
 }
 
+// void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
+//     base::prepare_volume(elNo, scratch);
+
+//     alignas(ALIGNMENT) double lam_Q_raw[tensor::lam_Q::size()];
+//     auto lam_Q = Matrix<double>(lam_Q_raw, 1, volRule.size());
+//     fun_lam(elNo, lam_Q);
+
+//     alignas(ALIGNMENT) double mu_Q_raw[tensor::mu_Q::size()];
+//     auto mu_Q = Matrix<double>(mu_Q_raw, 1, volRule.size());
+//     fun_mu(elNo, mu_Q);
+
+//     alignas(ALIGNMENT) double rhoInv_Q_raw[tensor::rhoInv_Q::size()];
+//     auto rhoInv_Q = Matrix<double>(rhoInv_Q_raw, 1, volRule.size());
+//     fun_rho(elNo, rhoInv_Q);
+//     for (unsigned q = 0; q < tensor::rhoInv_Q::Shape[0]; ++q) {
+//         rhoInv_Q(0, q) = 1.0 / rhoInv_Q(0, q);
+//     }
+
+//     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
+//     kernel::project_material_lhs krnl_lhs;
+//     krnl_lhs.matE_Q_T = matE_Q_T.data();
+//     krnl_lhs.J = vol[elNo].get<AbsDetJ>().data();
+//     krnl_lhs.matM = Mmem;
+//     krnl_lhs.W = volRule.weights().data();
+//     krnl_lhs.execute();
+
+//     auto lam_field = material[elNo].get<lam>().data();
+//     auto mu_field = material[elNo].get<mu>().data();
+//     auto rhoInv_field = material[elNo].get<rhoInv>().data();
+//     kernel::project_material_rhs krnl_rhs;
+//     krnl_rhs.matE_Q_T = matE_Q_T.data();
+//     krnl_rhs.J = vol[elNo].get<AbsDetJ>().data();
+//     krnl_rhs.lam = lam_field;
+//     krnl_rhs.lam_Q = lam_Q_raw;
+//     krnl_rhs.mu = mu_field;
+//     krnl_rhs.mu_Q = mu_Q_raw;
+//     krnl_rhs.rhoInv = rhoInv_field;
+//     krnl_rhs.rhoInv_Q = rhoInv_Q_raw;
+//     krnl_rhs.W = volRule.weights().data();
+//     krnl_rhs.execute();
+
+//     using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
+//                             Eigen::Unaligned,
+//                             Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
+//     using LamMap = Eigen::Map<Eigen::Matrix<double, tensor::lam::Shape[0], 1>, Eigen::Unaligned,
+//                               Eigen::InnerStride<1>>;
+//     using MuMap = Eigen::Map<Eigen::Matrix<double, tensor::mu::Shape[0], 1>, Eigen::Unaligned,
+//                              Eigen::InnerStride<1>>;
+//     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
+//                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
+
+//     auto proj = MMap(Mmem).fullPivLu();
+
+//     auto lam_eigen = LamMap(lam_field);
+//     lam_eigen = proj.solve(lam_eigen);
+
+//     auto mu_eigen = MuMap(mu_field);
+//     mu_eigen = proj.solve(mu_eigen);
+
+//     auto rhoInv_eigen = RhoInvMap(rhoInv_field);
+//     rhoInv_eigen = proj.solve(rhoInv_eigen);
+
+//     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
+//     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
+//     for (std::ptrdiff_t q = 0; q < G_Q.shape(2); ++q) {
+//         for (std::ptrdiff_t i = 0; i < G_Q.shape(0); ++i) {
+//             for (std::ptrdiff_t j = 0; j < G_Q.shape(1); ++j) {
+//                 G_Q_T(i, j, q) = G_Q(j, i, q);
+//             }
+//         }
+//     }
+// }
+
 void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
@@ -119,6 +195,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         rhoInv_Q(0, q) = 1.0 / rhoInv_Q(0, q);
     }
 
+    // ---- projection pieces: unchanged (they fill Mmem and put b into the box) ----
     alignas(ALIGNMENT) double Mmem[tensor::matM::size()];
     kernel::project_material_lhs krnl_lhs;
     krnl_lhs.matE_Q_T = matE_Q_T.data();
@@ -152,17 +229,75 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
 
-    auto proj = MMap(Mmem).fullPivLu();
-
-    auto lam_eigen = LamMap(lam_field);
-    lam_eigen = proj.solve(lam_eigen);
-
+    // ================= P0 projection =================
+    auto lam_eigen = LamMap(lam_field);        // windows onto the box (they hold b right now)
     auto mu_eigen = MuMap(mu_field);
-    mu_eigen = proj.solve(mu_eigen);
-
     auto rhoInv_eigen = RhoInvMap(rhoInv_field);
-    rhoInv_eigen = proj.solve(rhoInv_eigen);
 
+    {   // DEBUG 2: compare kernel outputs with direct sums (box still holds b here)
+        auto J_dbg = vol[elNo].get<AbsDetJ>();
+        auto const& w_dbg = volRule.weights();
+        double vol_direct = 0.0, lam_direct = 0.0;
+        for (std::size_t q = 0; q < volRule.size(); ++q) {
+            vol_direct += w_dbg[q] * J_dbg[q];                       // true element volume
+            lam_direct += w_dbg[q] * J_dbg[q] * lam_Q(0, q);         // integral of your lambda
+        }
+        const double vol_kernel = MMap(Mmem).sum();                  // volume according to the kernel's matrix M
+        const double lam_kernel = lam_eigen.sum();                   // integral of lambda according to the kernel's b
+        const bool vol_ok = std::abs(vol_kernel - vol_direct) <= 1e-10 * std::abs(vol_direct);
+        const bool lam_ok = std::abs(lam_kernel - lam_direct) <= 1e-10 * std::abs(lam_direct) + 1e-300;
+        if (elNo < 3 || !vol_ok || !lam_ok) {                        // always print elements 0-2, plus any failure
+            std::fprintf(stderr, "DEBUG el %zu: volume %.12g (kernel) vs %.12g (direct)%s | "
+                                 "lambda integral %.12g (kernel) vs %.12g (direct)%s\n",
+                         elNo, vol_kernel, vol_direct, vol_ok ? "" : "  <-- MISMATCH",
+                         lam_kernel, lam_direct, lam_ok ? "" : "  <-- MISMATCH");
+        }
+    }
+
+    // ---- Method 1: explicit volume average (depends only on lam_Q, w, J: certain) ----
+    auto J_Q = vol[elNo].get<AbsDetJ>();
+    auto const& w = volRule.weights();
+
+    double vol_1 = 0.0;                                    // the 1x1 "mass matrix" = element volume
+    double lam_rhs = 0.0;                                 // integral of lambda
+    double mu_rhs = 0.0;                                  // integral of mu
+    double rhoInv_rhs = 0.0;                              // integral of 1/rho
+
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        const double wJ = w[q] * J_Q[q];
+        vol_1 += wJ;
+        lam_rhs += wJ * lam_Q(0, q);
+        mu_rhs += wJ * mu_Q(0, q);
+        rhoInv_rhs += wJ * rhoInv_Q(0, q);
+    }
+    const double lam_mean = lam_rhs / vol_1;
+    const double mu_mean = mu_rhs / vol_1;
+    const double rhoInv_mean = rhoInv_rhs / vol_1;
+
+    // ---- Method 2: shortcut from the kernel outputs (valid only under the two assumptions) ----
+    // MUST be computed before setConstant, while the box still holds b.
+    const double vol_2 = MMap(Mmem).sum();
+    const double lam_mean_2 = lam_eigen.sum() / vol_2;
+    const double mu_mean_2 = mu_eigen.sum() / vol_2;
+    const double rhoInv_mean_2 = rhoInv_eigen.sum() / vol_2;
+
+    // ---- Check: do the two methods agree? ----
+    auto close = [](double a, double b) { return std::abs(a - b) <= 1e-10 * std::abs(b) + 1e-300; };
+    if (!close(vol_2, vol_1) || !close(lam_mean_2, lam_mean) || !close(mu_mean_2, mu_mean) ||
+        !close(rhoInv_mean_2, rhoInv_mean)) {
+        std::fprintf(stderr,
+                     "P0 check FAILED, element %zu: volume %.12g vs %.12g, lam %.12g vs %.12g, "
+                     "mu %.12g vs %.12g, rhoInv %.12g vs %.12g\n",
+                     elNo, vol_1, vol_2, lam_mean, lam_mean_2, mu_mean, mu_mean_2, rhoInv_mean,
+                     rhoInv_mean_2);
+    }
+
+    // ---- Write the P0 values into the box (method 1's numbers) ----
+    lam_eigen.setConstant(lam_mean);
+    mu_eigen.setConstant(mu_mean);
+    rhoInv_eigen.setConstant(rhoInv_mean);
+
+    // ---- transposed inverse Jacobian: unchanged ----
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
     for (std::ptrdiff_t q = 0; q < G_Q.shape(2); ++q) {
@@ -173,6 +308,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         }
     }
 }
+
 
 void Elasticity::transpose_JInv(std::size_t fctNo, int side) {
     const auto G_q = (side == 1) ? fct[fctNo].get<JInv1>() : fct[fctNo].get<JInv0>();
