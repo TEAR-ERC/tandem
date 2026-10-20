@@ -17,7 +17,7 @@ template <class LocalOperator> struct VEMaterialParams {
 class Viscoelasticity;
 
 template <> struct VEMaterialParams<Viscoelasticity> {
-    using functional_t = LuaLib::functional_t<DomainDimension, 1>;
+    using functional_t_region = LuaLib::functional_t_region<DomainDimension, 1>;
 
     static constexpr char Mu0[] = "mu0";
     static constexpr char Mu1[] = "mu1";
@@ -28,16 +28,17 @@ template <> struct VEMaterialParams<Viscoelasticity> {
 
     void load(LuaLib& lib, std::string const& scenario) {
         if (lib.hasMember(scenario, Mu0)) {
-            mu0_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu0);
+            mu0_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu0);
         }
         if (lib.hasMember(scenario, Mu1)) {
-            mu1_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu1);
+            mu1_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu1);
         }
         if (lib.hasMember(scenario, Viscosity)) {
-            viscosity_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Viscosity);
+            viscosity_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Viscosity);
         }
         if (lib.hasMember(scenario, RelaxationTime)) {
-            relaxationTime_ = lib.getMemberFunction<DomainDimension, 1>(scenario, RelaxationTime);
+            relaxationTime_ =
+                lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, RelaxationTime);
         }
 
         if (!lib.hasMember(scenario, Theta)) {
@@ -68,16 +69,16 @@ template <> struct VEMaterialParams<Viscoelasticity> {
     double g_tol() const { return gTol_; }
 
 private:
-    static functional_t constant_functional(double v) {
-        return [v](std::array<double, DomainDimension> const&) -> std::array<double, 1> {
+    static functional_t_region constant_functional(double v) {
+        return [v](std::array<double, DomainDimension> const&, long int) -> std::array<double, 1> {
             return {v};
         };
     }
 
-    functional_t mu0_ = constant_functional(1.0);
-    functional_t mu1_ = constant_functional(1.0);
-    functional_t viscosity_ = constant_functional(1.0);
-    functional_t relaxationTime_ = constant_functional(1.0);
+    functional_t_region mu0_ = constant_functional(1.0);
+    functional_t_region mu1_ = constant_functional(1.0);
+    functional_t_region viscosity_ = constant_functional(1.0);
+    functional_t_region relaxationTime_ = constant_functional(1.0);
     double theta_ = 0.0;
     double gTol_ = 1.0e-8;
 };
@@ -90,7 +91,7 @@ class PoissonViscoelasticity;
 // same as VEMaterialParams<Viscoelasticity>::Mu0 -- it must NOT be read via
 // SeasScenario's generic mu() (that reads a "mu" field, not "mu0").
 template <> struct VEMaterialParams<PoissonViscoelasticity> {
-    using functional_t = LuaLib::functional_t<DomainDimension, 1>;
+    using functional_t_region = LuaLib::functional_t_region<DomainDimension, 1>;
 
     static constexpr char Mu0[] = "mu0";
     static constexpr char Mu1[] = "mu1";
@@ -99,13 +100,13 @@ template <> struct VEMaterialParams<PoissonViscoelasticity> {
 
     void load(LuaLib& lib, std::string const& scenario) {
         if (lib.hasMember(scenario, Mu0)) {
-            mu0_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu0);
+            mu0_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu0);
         }
         if (lib.hasMember(scenario, Mu1)) {
-            mu1_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Mu1);
+            mu1_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu1);
         }
         if (lib.hasMember(scenario, Viscosity)) {
-            viscosity_ = lib.getMemberFunction<DomainDimension, 1>(scenario, Viscosity);
+            viscosity_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Viscosity);
         }
         if (lib.hasMember(scenario, Theta)) {
             theta_ = lib.getMemberConstant(scenario, Theta);
@@ -122,15 +123,15 @@ template <> struct VEMaterialParams<PoissonViscoelasticity> {
     double theta() const { return theta_; }
 
 private:
-    static functional_t constant_functional(double v) {
-        return [v](std::array<double, DomainDimension> const&) -> std::array<double, 1> {
+    static functional_t_region constant_functional(double v) {
+        return [v](std::array<double, DomainDimension> const&, long int) -> std::array<double, 1> {
             return {v};
         };
     }
 
-    functional_t mu0_ = constant_functional(1.0);
-    functional_t mu1_ = constant_functional(1.0);
-    functional_t viscosity_ = constant_functional(1.0);
+    functional_t_region mu0_ = constant_functional(1.0);
+    functional_t_region mu1_ = constant_functional(1.0);
+    functional_t_region viscosity_ = constant_functional(1.0);
     double theta_ = 0.1;
 };
 

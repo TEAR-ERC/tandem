@@ -27,8 +27,10 @@ namespace kernel = tndm::poisson_viscoelasticity::kernel;
 namespace tndm {
 
 PoissonViscoelasticity::PoissonViscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                                               functional_t<1> mu0, functional_t<1> mu1,
-                                               functional_t<1> eta, double theta, DGMethod method)
+                                               functional_t_region<1> mu0,
+                                               functional_t_region<1> mu1,
+                                               functional_t_region<1> eta, double theta,
+                                               DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
@@ -299,6 +301,25 @@ void PoissonViscoelasticity::prepare_penalty(std::size_t fctNo, FacetInfo const&
     fctCache_[fctNo].up = {info.up[0], info.up[1]};
     fctCache_[fctNo].skeleton = info.up[0] != info.up[1];
     compute_penalty(fctNo);
+}
+
+void PoissonViscoelasticity::mu_avg(std::size_t fctNo, FacetInfo const& info,
+                                    Matrix<double>& result) const {
+    // mu_avg is only valid for interior fault facets (two adjacent elements).
+    // Boundary facets have no element on one side - info.up[1] would be invalid.
+    assert(info.up[0] != info.up[1] && "mu_avg called on a boundary facet");
+    // K holds mu0 and Mu1 holds mu1; their sum is the unrelaxed (g=1) modulus.
+    double const* mu0_0 = material[info.up[0]].get<K>().data();
+    double const* mu1_0 = material[info.up[0]].get<Mu1>().data();
+    double const* mu0_1 = material[info.up[1]].get<K>().data();
+    double const* mu1_1 = material[info.up[1]].get<Mu1>().data();
+    double* res = result.data();
+    std::size_t nq = result.size();
+
+    #pragma omp simd
+    for (std::size_t q = 0; q < nq; ++q) {
+        res[q] = 0.5 * ((mu0_0[q] + mu1_0[q]) + (mu0_1[q] + mu1_1[q]));
+    }
 }
 
 // time-dependent coefficients

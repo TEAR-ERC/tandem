@@ -37,10 +37,10 @@ public:
     constexpr static std::size_t NumQuantities = DomainDimension;
     constexpr static std::size_t ScalarQuantity = 1;
 
-    Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> lam,
-                    functional_t<1> mu0, functional_t<1> mu1, functional_t<1> viscosity,
-                    functional_t<1> relaxation_time, double theta,
-                    std::optional<functional_t<1>> rho = std::nullopt,
+    Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t_region<1> lam,
+                    functional_t_region<1> mu0, functional_t_region<1> mu1,
+                    functional_t_region<1> viscosity, functional_t_region<1> relaxation_time,
+                    double theta, std::optional<functional_t_region<1>> rho = std::nullopt,
                     DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
@@ -162,6 +162,10 @@ public:
         fun_slip = make_facet_functional(std::move(fun), refNormal);
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
+    // Facet-averaged unrelaxed (instantaneous) shear modulus, used by the moment rate
+    // output. Fault slip is fast compared with viscous relaxation, so the seismic
+    // moment uses the g=1 response mu0 + mu1 rather than the current effective modulus.
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
     void set_traction_boundary(functional_t<NumQuantities> fun) {
         fun_traction = make_facet_functional(std::move(fun));
     }

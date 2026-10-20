@@ -34,8 +34,9 @@ public:
     constexpr static std::size_t Dim = DomainDimension;
     constexpr static std::size_t NumQuantities = 1;
 
-    PoissonViscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t<1> mu0,
-                           functional_t<1> mu1, functional_t<1> eta, double theta = 0.1,
+    PoissonViscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
+                           functional_t_region<1> mu0, functional_t_region<1> mu1,
+                           functional_t_region<1> eta, double theta = 0.1,
                            DGMethod method = DGMethod::BR2);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
@@ -169,6 +170,10 @@ public:
     }
     void set_slip(facet_functional_t fun) { fun_slip = std::move(fun); }
     void set_traction_boundary(facet_functional_t fun) { fun_traction = std::move(fun); }
+    // Facet-averaged unrelaxed (instantaneous) shear modulus, used by the moment rate
+    // output. Fault slip is fast compared with viscous relaxation, so the seismic
+    // moment uses the g=1 response mu0 + mu1 rather than the current effective modulus.
+    void mu_avg(std::size_t fctNo, FacetInfo const& info, Matrix<double>& result) const;
 
 private:
     double penalty(std::size_t fctNo) const {

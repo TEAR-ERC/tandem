@@ -37,9 +37,10 @@ namespace tndm {
 
 // Constructor
 Viscoelasticity::Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
-                                 functional_t<1> lam, functional_t<1> mu0, functional_t<1> mu1,
-                                 functional_t<1> viscosity, functional_t<1> relaxation_time,
-                                 double theta, std::optional<functional_t<1>> rho, DGMethod method)
+                                 functional_t_region<1> lam, functional_t_region<1> mu0,
+                                 functional_t_region<1> mu1, functional_t_region<1> viscosity,
+                                 functional_t_region<1> relaxation_time, double theta,
+                                 std::optional<functional_t_region<1>> rho, DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
@@ -195,6 +196,24 @@ void Viscoelasticity::transpose_JInv(std::size_t fctNo, int side) {
 }
 
 // Stiffness / penalty helpers
+void Viscoelasticity::mu_avg(std::size_t fctNo, FacetInfo const& info,
+                             Matrix<double>& result) const {
+    // mu_avg is only valid for interior fault facets (two adjacent elements).
+    // Boundary facets have no element on one side - info.up[1] would be invalid.
+    assert(info.up[0] != info.up[1] && "mu_avg called on a boundary facet");
+    double const* mu0_0 = material[info.up[0]].get<mu0>().data();
+    double const* mu1_0 = material[info.up[0]].get<mu1>().data();
+    double const* mu0_1 = material[info.up[1]].get<mu0>().data();
+    double const* mu1_1 = material[info.up[1]].get<mu1>().data();
+    double* res = result.data();
+    std::size_t nq = result.size();
+
+    #pragma omp simd
+    for (std::size_t q = 0; q < nq; ++q) {
+        res[q] = 0.5 * ((mu0_0[q] + mu1_0[q]) + (mu0_1[q] + mu1_1[q]));
+    }
+}
+
 std::pair<double, double> Viscoelasticity::stiffness_tensor_bounds(std::size_t elNo) const {
     auto lam_field = material[elNo].get<lam>();
     auto mu0_field = material[elNo].get<mu0>();
