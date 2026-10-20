@@ -31,6 +31,14 @@ void SeasQDOperator::prepare_for_dt(double dt) {
     // Recompute dt-dependent coefficients; reassemble the matrix only if they
     // changed (viscoelasticity with a fault). No-op for elasticity and for
     // viscoelasticity without a fault.
+    if (deferred_dt_ > 0.0) {
+        // First call after initial_condition(), which assembled the unrelaxed operator for
+        // the t=0 solve: return to the step the operator was built for, so that from here
+        // on the coefficients evolve exactly as they would have without that solve.
+        double const restore_dt = deferred_dt_;
+        deferred_dt_ = 0.0;
+        prepare_for_dt(restore_dt);
+    }
     if (dgop_->update_time_step(dt)) {
         linear_solver_.reassemble(*dgop_);
         // The matrix changed, so whatever x() holds is no longer its solution.
@@ -48,6 +56,18 @@ void SeasQDOperator::initial_condition(BlockVector& state) {
     double const tau = dgop_->relaxation_time_global();
     double const init_dt = (tau > 0.0) ? tau * dgop_->viscoelastic_theta() : 1e-12;
     prepare_for_dt(init_dt);
+    if (tau > 0.0) {
+        // A load present at t=0 meets the unrelaxed moduli, because the dashpot cannot move
+        // instantaneously, so the initial solve must use g = 1 rather than g(init_dt). The
+        // step-sized operator gives the right u(0) only where u(0) does not depend on the
+        // moduli (e.g. an affine field under displacement control); under traction control,
+        // or across a material contrast, it yields the effective instead of the unrelaxed
+        // response, which q(0) = eps(0) below then locks in. Assemble for a vanishing step,
+        // where g = 1 - 5e-13 (dt must stay positive: g(dt <= 0) is 0, the relaxed limit),
+        // and restore init_dt in the first prepare_for_dt(), after the t=0 output.
+        prepare_for_dt(1e-12 * tau);
+        deferred_dt_ = init_dt;
+    }
     pre_step_update_strain_history();
 
     solve(0.0, make_state_view(state));

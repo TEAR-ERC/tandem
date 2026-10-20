@@ -186,6 +186,9 @@ private:
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;
 
     double last_time_ = 0.0;
+    // Step to restore on the first prepare_for_dt() after initial_condition(), which assembles
+    // the unrelaxed operator for the t=0 solve; 0 when nothing is pending.
+    double deferred_dt_ = 0.0;
 
     // Cache describing what linear_solver_.x() currently holds: the displacement
     // solved for solve_time_, valid until the operator itself changes.
