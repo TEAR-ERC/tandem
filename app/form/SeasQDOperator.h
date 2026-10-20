@@ -8,6 +8,7 @@
 #include "form/AbstractAdapterOperator.h"
 #include "form/AbstractFrictionOperator.h"
 #include "form/FacetFunctionalFactory.h"
+#include "form/VolumeFunctionalFactory.h"
 
 #include "form/AbstractDGOperator.h"
 #include "interface/BlockVector.h"
@@ -37,6 +38,7 @@ public:
 
     inline void warmup() { linear_solver_.warmup(); }
 
+    virtual void set_force(std::unique_ptr<AbstractTimeVolumeFunctionalFactory> fun);
     virtual void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
     virtual void set_traction_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
     virtual void set_free_slip_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun);
@@ -181,6 +183,7 @@ private:
     Scatter state_scatter_;
     SparseBlockVector<double> state_ghost_;
 
+    std::unique_ptr<AbstractTimeVolumeFunctionalFactory> fun_force_ = nullptr;
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_boundary_ = nullptr;
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_traction_boundary_ = nullptr;
     std::unique_ptr<AbstractFacetFunctionalFactory> fun_free_slip_boundary_ = nullptr;

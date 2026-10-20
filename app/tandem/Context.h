@@ -118,6 +118,10 @@ public:
             topo, fault_map);
     }
     void setup_seasop(SeasQDOperator& seasop) override {
+        if (scenario->force()) {
+            seasop.set_force(
+                std::make_unique<TimeVolumeFunctionalFactory<Type>>(dg_lop, *scenario->force()));
+        }
         if (scenario->boundary()) {
             seasop.set_boundary(std::make_unique<FacetFunctionalFactory<Type>>(
                 dg_lop, *scenario->boundary(), ref_normal));

@@ -33,6 +33,7 @@ public:
     constexpr static char Mu[] = "mu";
     constexpr static char Lam[] = "lam";
     constexpr static char Rho[] = "rho";
+    constexpr static char Force[] = "force";
     constexpr static char Boundary[] = "boundary";
     constexpr static char TractionBoundary[] = "traction_boundary";
     constexpr static char FreeSlipBoundary[] = "free_slip_boundary";
@@ -60,6 +61,10 @@ public:
                 std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Rho));
         }
 
+        if (lib_.hasMember(scenario, Force)) {
+            force_ = std::make_optional(
+                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Force));
+        }
         if (lib_.hasMember(scenario, Boundary)) {
             boundary_ = std::make_optional(
                 lib_.getMemberFunction<DomainDimension + 1u, NumQuantities>(scenario, Boundary));
@@ -98,6 +103,7 @@ public:
     auto const& mu() const { return mu_; }
     auto const& lam() const { return lam_; }
     auto const& rho() const { return rho_; }
+    auto const& force() const { return force_; }
     auto const& boundary() const { return boundary_; }
     auto const& traction_boundary() const { return traction_boundary_; }
     auto const& free_slip_boundary() const { return free_slip_boundary_; }
@@ -120,6 +126,7 @@ protected:
     functional_t_region lam_ = [](std::array<double, DomainDimension> const& v,
                                   long int) -> std::array<double, 1> { return {0.0}; };
     std::optional<functional_t_region> rho_ = std::nullopt;
+    std::optional<time_functional_t> force_ = std::nullopt;
     std::optional<time_functional_t> boundary_ = std::nullopt;
     std::optional<time_functional_t> traction_boundary_ = std::nullopt;
     using time_scalar_functional_t = LuaLib::functional_t<DomainDimension + 1, 1>;

@@ -17,6 +17,9 @@ SeasQDOperator::SeasQDOperator(std::unique_ptr<dg_t> dgop,
       traction_(adapter_->traction_block_size(), adapter_->num_local_elements(), adapter_->comm()) {
 }
 
+void SeasQDOperator::set_force(std::unique_ptr<AbstractTimeVolumeFunctionalFactory> fun) {
+    fun_force_ = std::move(fun);
+}
 void SeasQDOperator::set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) {
     fun_boundary_ = std::move(fun);
 }
@@ -176,6 +179,9 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
 
 void SeasQDOperator::solve(double time, BlockView const& state_view) {
     dgop_->set_slip(adapter_->slip_bc(state_view));
+    if (fun_force_) {
+        dgop_->set_force((*fun_force_)(time));
+    }
     if (fun_boundary_) {
         dgop_->set_dirichlet((*fun_boundary_)(time));
     }
