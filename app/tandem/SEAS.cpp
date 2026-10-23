@@ -375,6 +375,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
             // No fault: fixed viscoelastic step = theta * tau (constant, no adaptivity).
             ts.set_max_time_step(*effective_max_dt);
         }
+    } else if (cfl_time_step) {
+        ts.set_max_time_step(*cfl_time_step * cfg.cfl);
     }
 
     auto monitor =
