@@ -142,6 +142,56 @@ def viscoelastic_simple_shear_config():
 
 
 @pytest.fixture(scope="module")
+def viscoelastic_mms_config(polynomial_degree):
+    """
+    Expected convergence orders for the viscoelastic manufactured solution test
+    (test_viscoelastic_mms.py, examples/tandem/viscoelasticity/2d/mms.*).
+
+    - 'space': L2 error at t = 1 of the trigonometric field (scenario mms) at
+      theta = 0.01, resolutions 0.25, 0.125, 0.0625. Expected order p + 1.
+      Measured slopes 2.96 (p2) and 4.02 (p3) on 2026-10-20 (np = 1, direct LU),
+      i.e. on either side of p + 1, so the static convergence_config band
+      (p, p + 1) does not fit; 'order_tol' is a band centred on p + 1 instead.
+      The coarsest level 0.5 is left out because it is pre-asymptotic (local
+      orders 3.38 at p2, 2.22 at p3 from 0.5 to 0.25). A drop to order p
+      (an inconsistent assembly) fails the band by 0.75.
+      Measured L2 at p2: 0.0133013, 0.00170094, 0.000219658 (reproducing the
+      2026-09-29 sweep in /export/dump/pkarki/mms_ve_time on kernelpanic).
+    - 'time': L2 error at t = 1 of the polynomial field (scenario mms_poly) on
+      resolution 0.25, theta = 0.4, 0.2, 0.1, 0.05. Expected order 2 (the
+      recursion is second order for smooth strain histories). The field lies in
+      the discrete space for p >= 2, so there is no spatial floor: measured
+      6.17024e-05, 1.53701e-05, 3.83429e-06, 9.57459e-07 at p2 (local orders
+      2.005, 2.003, 2.002) and the same to 0.4% at p3. 'order_tol' bounds both
+      the fitted slope and every local order, so a floor appearing at the
+      finest theta (e.g. after a change that leaves the field out of the space)
+      fails on the last local order instead of quietly lowering the fit.
+      The same study with the trigonometric field needs resolution 0.03125 at
+      p2 and still has its finest point only 1.55x above the spatial floor.
+    - 'min_degree': the polynomial field needs p >= 2.
+    - 'rel_dt': max_time_step= must equal theta * tau, and time_steps= must be
+      final_time / (theta * tau), both to this relative tolerance.
+    """
+    return {
+        "tau": 0.5,
+        "final_time": 1.0,
+        "space": {
+            "expected_order": polynomial_degree + 1,
+            "order_tol": 0.25,
+            "theta": 0.01,
+            "num_levels": 3,
+        },
+        "time": {
+            "expected_order": 2.0,
+            "order_tol": 0.1,
+            "num_levels": 4,
+            "min_degree": 2,
+        },
+        "rel_dt": 1e-12,
+    }
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.

@@ -202,6 +202,8 @@ if(RUN_CI_TESTS)
         # Viscoelastic tests against closed-form / manufactured solutions: no reference data needed
         add_pytest_test("viscoelastic-simple-shear-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_viscoelastic_simple_shear.py")
+        add_pytest_test("viscoelastic-mms-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_viscoelastic_mms.py")
     endif()
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 
