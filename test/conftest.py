@@ -192,6 +192,65 @@ def viscoelastic_mms_config(polynomial_degree):
 
 
 @pytest.fixture(scope="module")
+def viscoelastic_cantilever_config():
+    """
+    Material, loading and pass/fail limits for the viscoelastic cantilever rod
+    creep-recovery test (test_viscoelastic_cantilever.py,
+    examples/tandem/viscoelasticity/3d/cantilever_rod.*, meshed with clamped = 0).
+
+    - Material and loading: copied from cantilever_rod.lua, which the test runs
+      unchanged. G0 in GPa, mu0 = (1 - r1) G0, mu1 = r1 G0, eta in GPa.s, so
+      tau = eta / mu1 = 100 s; K = lam + (2/3) G0 = 10 GPa; traction s0 = 0.01 GPa
+      on x = L for t <= t1 = 6000 s. The uniaxial response is a Zener solid with
+      E0 = 9 K G0 / (3 K + G0), Einf = 9 K mu0 / (3 K + mu0) and creep time
+      tau_c = tau G0 / mu0 = 1010 s (manuscript, Sec. 4.2).
+    - 'theta': dt/tau of cantilever_rod.lua; every step is theta * tau = 10 s.
+    - 'eps0_rel': limit on eps_xx(0) / (s0 / E0) - 1 at every probe. eps_xx is
+      u_x / x with x the probe position printed in the CSV header, which has 6
+      significant digits, so this cannot be tighter than ~1e-6; measured 2.9e-11
+      at the probe whose position prints exactly and <= 4e-7 at the others. A t = 0
+      solve with the step-sized instead of the unrelaxed moduli gives
+      eps_xx(0) = 0.010450, i.e. +4.5%.
+    - 'creep_abs': limit on max |eps_xx - exact| for t <= t1. Measured 2.4605e-6,
+      largest at t = tau_c, as in the manuscript (2.5e-6). The run is exact in
+      space, so this is the time integration of the creep alone.
+    - 'rebound': the step that removes the load uses the effective modulus
+      B(dt) = mu0 + mu1 g(dt) instead of mu0 + mu1, so the elastic rebound
+      overshoots by s0 (1/E_eff - 1/E0) = 4.5064e-4, E_eff = 9 K B / (3 K + B)
+      (manuscript, Sec. 4.2). Measured error at the first sample after t1:
+      -4.507446e-4, 1.00023 times that prediction. Limit: 'headroom' times the
+      prediction. This is a known first-order error of the scheme at a load jump,
+      not a bug; the limit catches it doubling, not it being there.
+    - 'recovery_rms': limit on the RMS of eps_xx - exact for t > t1. Measured
+      1.5957e-4, dominated by the decaying rebound error.
+    - 'headroom': limit = headroom * measured (or predicted), as for simple shear.
+    - 'stress_rel': limit on |stress_xx / s0 - 1| and on every other stress
+      component / s0 while loaded. The exact state is uniform uniaxial stress.
+      The output without the (2/3) mu1 tr(eps) I term of the Maxwell spring
+      (tandem afb4c3bb before the fix) gives 6.7e-3.
+    - 'rel_dt': max_time_step= must equal theta * tau to this relative tolerance.
+    """
+    return {
+        "g0": 0.337086226656778804,
+        "r1": 0.901,
+        "eta": 30.3714690218,
+        "bulk_modulus": 10.0,
+        "traction": 0.01,
+        "t_load": 6000.0,
+        "final_time": 10000.0,
+        "theta": 0.1,
+        "eps0_rel": 1e-4,
+        "measured": {
+            "creep_abs": 2.4605e-06,
+            "recovery_rms": 1.5957e-04,
+        },
+        "headroom": 1.25,
+        "stress_rel": 1e-8,
+        "rel_dt": 1e-12,
+    }
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.

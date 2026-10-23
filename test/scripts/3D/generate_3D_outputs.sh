@@ -1,7 +1,7 @@
 #!/bin/bash
 # Generate all 3D test outputs
 # Manages: static_regression, parallel_consistency, convergence, traction_bc,
-# free_slip_bc
+# free_slip_bc, viscoelastic_cantilever
 set -e
 
 EXECUTABLE_DIR=$1
@@ -34,5 +34,8 @@ bash "$SCRIPT_DIR/traction_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "Free slip BC test (free_slip, extension and compression)..."
 bash "$SCRIPT_DIR/free_slip_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
+echo "Viscoelastic cantilever rod (creep and recovery)..."
+bash "$SCRIPT_DIR/viscoelastic_cantilever.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "3D reference outputs generated successfully."

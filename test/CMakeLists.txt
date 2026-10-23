@@ -205,6 +205,10 @@ if(RUN_CI_TESTS)
         add_pytest_test("viscoelastic-mms-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_viscoelastic_mms.py")
     endif()
+    if(DOMAIN_DIMENSION EQUAL 3)
+        add_pytest_test("viscoelastic-cantilever-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_viscoelastic_cantilever.py")
+    endif()
     list(FIND ORDERS_WITH_REFERENCE_DATA "${POLYNOMIAL_DEGREE}" has_reference_data)
 
     if(${has_reference_data} GREATER -1)
