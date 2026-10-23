@@ -86,6 +86,7 @@ Comprehensive tests validating the physics, parallelism, and convergence of the 
 | `test_parallel_consistency_static.py` | **Parallel Consistency:** Executes static examples using 2^n processors (n ∈ [0,3]). Compares single vs multi-processor solutions to ensure MPI integrity. |
 | `test_probe_writer_consistency.py` | **HDF5 probe writer consistency:** Runs two bp1 simulations with the same probe locations but different probe writer formats (csv and h5) and compares that the two results are identical for moment rate, fault probes and domain probes. |
 | `test_free_slip_bc.py` | **Free slip BC (2D, 3D):** Static elastic block with free slip (tag 9, `u.n = g`) on the sides and bottom and a traction-free top, in extension and compression (`examples/elasticity/{2d,3d}/free_slip.*`). The exact solution is linear, so `L2 error` and `H1-semi error` must be below the static tolerance at any mesh and degree. |
+| `test_traction_patch_bc.py` | **Traction and traction-free BCs (2D):** Static elastic block in uniaxial tension and compression: Dirichlet (exact data) on the left, prescribed traction (tag 7) on the right, traction free (tag 1) top and bottom (`examples/elasticity/2d/traction_patch.*`). Exact linear solution; `L2 error` and `H1-semi error` below the static tolerance. Run with `ref_normal = [1, 0]` and `[-1, 0]`, which must agree. |
 
 ## Adding New Tests
 
