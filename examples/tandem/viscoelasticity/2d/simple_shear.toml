@@ -1,3 +1,6 @@
+# Simple shear of a standard linear solid, see simple_shear.lua. Choose the
+# imposed strain history with --scenario <case id>; the default is the original
+# constant strain with drop.
 final_time = 10000000000
 mesh_file = "simple_shear.msh"
 type = "viscoelasticity"
@@ -7,14 +10,21 @@ mode = "QD"
 
 ref_normal = [1, 0]
 
+[ts_checkpoint]
+storage_type = "none"
+
 [domain_output]
 prefix = "domain_"
+t_max = 1e9
 
 [stress_output]
 prefix = "stress_"
+t_max = 1e9
 
+# t_max = 1 writes every time step.
 [domain_probe_output]
 prefix = "blkst_"
+t_max = 1
 probes = [
     { name = "center", x = [0.5, 0.5] },
     { name = "bottom", x = [  0.5, 0] },
