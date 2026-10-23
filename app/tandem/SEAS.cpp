@@ -503,9 +503,8 @@ void check_viscoelastic_support(Config const& cfg) {
         // The Green's functions are computed once from the operator at setup, and the fault
         // traction is G * slip + t * boundary traction: the memory term and the step-sized
         // moduli never reach the fault.
-        throw std::runtime_error(
-            "The QDGreen mode is not implemented for the viscoelastic types "
-            "(viscoelasticity, poisson_viscoelasticity): use mode = \"QD\".");
+        throw std::runtime_error("The QDGreen mode is not implemented for the viscoelastic types "
+                                 "(viscoelasticity, poisson_viscoelasticity): use mode = \"QD\".");
     }
     if (cfg.type == LocalOpType::Viscoelasticity && cfg.matrix_free) {
         throw std::runtime_error(
