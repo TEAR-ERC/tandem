@@ -165,6 +165,9 @@ if(RUN_CI_TESTS)
         "test_parallel_consistency_static.py")
     add_pytest_test("convergence-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
         "test_convergence_static.py")
+    # Boundary condition tests with exact (linear) solutions: no reference data needed
+    add_pytest_test("free-slip-bc-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+        "test_free_slip_bc.py")
 
     # HDF5 mesh parser integration test - order-invariant, runs whenever HDF5 is on and dim=2
     if(ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 2)

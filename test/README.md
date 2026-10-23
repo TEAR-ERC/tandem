@@ -8,6 +8,8 @@ Test configurations and generator scripts are maintained directly within this re
 
 - **`reference_configs/`**: Contains simulation configurations (`.toml`, `.lua`, `.geo`) separated by dimension (`2D/`, `3D/`).
 
+- **`../examples/`**: Some tests (the boundary condition and viscoelastic tests below) run the documented examples directly instead of a copy in `reference_configs/`, so that the examples are what is verified. Their generator scripts copy the files into a work directory under `temp_test_results/` and run there, so nothing is written into `examples/`. Each such example says in its header which test uses it.
+
 - **`scripts/`**: Contains the individual shell scripts used to generate reference output data for each test.
 
 - **`test_data/`**: The destination folder where the external `tandem_test_data` repository is cloned (only when integration tests are enabled).
@@ -83,6 +85,7 @@ Comprehensive tests validating the physics, parallelism, and convergence of the 
 | `test_convergence_static.py` | **Convergence:** Runs hole examples with varying mesh sizes. Verifies the regression line slope (L2 vs mesh size log-log plot) matches precomputed values. |
 | `test_parallel_consistency_static.py` | **Parallel Consistency:** Executes static examples using 2^n processors (n ∈ [0,3]). Compares single vs multi-processor solutions to ensure MPI integrity. |
 | `test_probe_writer_consistency.py` | **HDF5 probe writer consistency:** Runs two bp1 simulations with the same probe locations but different probe writer formats (csv and h5) and compares that the two results are identical for moment rate, fault probes and domain probes. |
+| `test_free_slip_bc.py` | **Free slip BC (2D, 3D):** Static elastic block with free slip (tag 9, `u.n = g`) on the sides and bottom and a traction-free top, in extension and compression (`examples/elasticity/{2d,3d}/free_slip.*`). The exact solution is linear, so `L2 error` and `H1-semi error` must be below the static tolerance at any mesh and degree. |
 
 ## Adding New Tests
 

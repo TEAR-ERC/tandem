@@ -293,3 +293,29 @@ def compute_l2_error_with_reference_data():
         return L2_norm
 
     return _compute
+
+
+@pytest.fixture(scope="module")
+def extract_static_errors():
+    """
+    Return a helper that collects every value printed after '<label>:' in a log
+    of app/static, e.g. extract_static_errors(log, "L2 error") -> [1.3e-12].
+
+    app/static prints 'L2 error:' and 'H1-semi error:' when the scenario defines
+    'solution' and 'solution_jacobian'. An empty list usually means the solve
+    failed; the log then contains 'Solver did not converge.'
+    """
+
+    def _extract(log_file, label):
+        errors = []
+
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith(f"{label}:"):
+                    try:
+                        errors.append(float(line.split(":", 1)[1].strip()))
+                    except ValueError:
+                        pass
+        return errors
+
+    return _extract

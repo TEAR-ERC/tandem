@@ -1,6 +1,7 @@
 #!/bin/bash
 # Generate all 2D test outputs
-# Manages: static_regression, parallel_consistency, convergence, seas_regression
+# Manages: static_regression, parallel_consistency, convergence, seas_regression,
+# free_slip_bc
 set -e
 
 EXECUTABLE_DIR=$1
@@ -50,5 +51,8 @@ bash "$SCRIPT_DIR/volume_tagging_parallel_consistency.sh" "$EXECUTABLE_DIR" "$TE
 
 echo "Volume tagging correctness test..."
 bash "$SCRIPT_DIR/volume_tagging_correctness.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
+echo "Free slip BC test (free_slip, extension and compression)..."
+bash "$SCRIPT_DIR/free_slip_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "2D reference outputs generated successfully."
