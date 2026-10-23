@@ -7,25 +7,23 @@
 #include "kernels/viscoelasticity/tensor.h"
 #include "util/LinearAllocator.h"
 #include <cassert>
+#include <stdexcept>
 
 namespace tensor = tndm::viscoelasticity::tensor;
 
 namespace tndm {
 
-// Matrix-free apply (wave_rhs) — currently disabled, bodies commented out
+// Matrix-free apply, wave_rhs and project are not implemented. They throw instead of
+// returning an untouched output: matrix_free = true and the fully dynamic mode are also
+// rejected before setup (SEAS.cpp), this catches any other caller.
 
 template <bool WithRHS>
-void Viscoelasticity::apply_(std::size_t elNo, mneme::span<SideInfo> info,
-                             Vector<double const> const& x_0,
-                             std::array<Vector<double const>, NumFacets> const& x_n,
-                             Vector<double>& y_0) const {
+void Viscoelasticity::apply_(std::size_t, mneme::span<SideInfo>, Vector<double const> const&,
+                             std::array<Vector<double const>, NumFacets> const&,
+                             Vector<double>&) const {
     // TODO: implement matrix-free apply with effective VE params (A_dt_q, B_dt_q).
     // The elastic apply_ can be adapted by substituting A_dt/B_dt for lam/mu.
-    (void)elNo;
-    (void)info;
-    (void)x_0;
-    (void)x_n;
-    (void)y_0;
+    throw std::logic_error("Viscoelasticity: matrix-free apply is not implemented");
 }
 
 void Viscoelasticity::apply(std::size_t elNo, mneme::span<SideInfo> info,
@@ -40,12 +38,14 @@ void Viscoelasticity::wave_rhs(std::size_t elNo, mneme::span<SideInfo> info,
                                std::array<Vector<double const>, NumFacets> const& x_n,
                                Vector<double>& y_0) const {
     // TODO: implement wave_rhs with effective VE params (A_dt_q, B_dt_q).
+    throw std::logic_error("Viscoelasticity: wave_rhs (fully dynamic mode) is not implemented");
 }
 
 // Output and coefficient extraction
 
 void Viscoelasticity::project(std::size_t elNo, volume_functional_t x, Vector<double>& y) const {
     // TODO: implement projection of effective VE parameters.
+    throw std::logic_error("Viscoelasticity: project is not implemented");
 }
 
 std::size_t Viscoelasticity::flops_apply(std::size_t elNo, mneme::span<SideInfo> info) const {

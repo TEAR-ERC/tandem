@@ -46,6 +46,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -483,9 +484,42 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 
 } // namespace tndm::detail
 
+namespace tndm::detail {
+
+// Reject combinations the viscoelastic operators do not implement, before any setup, so
+// that they cannot run and return results computed from untouched output vectors.
+void check_viscoelastic_support(Config const& cfg) {
+    bool const is_viscoelastic =
+        cfg.type == LocalOpType::Viscoelasticity || cfg.type == LocalOpType::PoissonViscoelasticity;
+    if (!is_viscoelastic) {
+        return;
+    }
+    if (cfg.mode == SeasMode::FullyDynamic) {
+        throw std::runtime_error(
+            "The fully dynamic mode (FD) is not implemented for the viscoelastic types "
+            "(viscoelasticity, poisson_viscoelasticity): use mode = \"QD\".");
+    }
+    if (cfg.mode == SeasMode::QuasiDynamicDiscreteGreen) {
+        // The Green's functions are computed once from the operator at setup, and the fault
+        // traction is G * slip + t * boundary traction: the memory term and the step-sized
+        // moduli never reach the fault.
+        throw std::runtime_error(
+            "The QDGreen mode is not implemented for the viscoelastic types "
+            "(viscoelasticity, poisson_viscoelasticity): use mode = \"QD\".");
+    }
+    if (cfg.type == LocalOpType::Viscoelasticity && cfg.matrix_free) {
+        throw std::runtime_error(
+            "matrix_free = true is not implemented for type viscoelasticity: set "
+            "matrix_free = false.");
+    }
+}
+
+} // namespace tndm::detail
+
 namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+    detail::check_viscoelastic_support(cfg);
     std::unique_ptr<seas::ContextBase> ctx = nullptr;
     switch (cfg.type) {
     case LocalOpType::Poisson:
