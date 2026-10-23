@@ -87,6 +87,61 @@ def expected_moment_rate_sum_t0():
 
 
 @pytest.fixture(scope="module")
+def viscoelastic_simple_shear_config():
+    """
+    Material, loading and pass/fail limits for the viscoelastic simple shear test
+    (test_viscoelastic_simple_shear.py, examples/tandem/viscoelasticity/2d/simple_shear.*).
+
+    - Material and loading: copied from simple_shear.lua, which the test runs
+      unchanged. mu0, mu1 in GPa, eta in GPa.s (tau = eta/mu1 = 7.8894e8 s),
+      gamma(t) = 2*Umax/H * s(t), drop at t_hold_tau*tau, omega = omega_tau/tau.
+    - 'theta': dt/tau of simple_shear.lua. The time step is capped at theta*tau,
+      and every step of this run is that long except the last; checked against
+      max_time_step= to rel_dt.
+    - 'measured': relative MAE and RMSE of stress_xy at the center probe against
+      the closed form, each normalised by the mean / RMS of |sigma|. Measured on
+      2026-10-20 at np = 1, 2D p2, tandem afb4c3bb, direct LU solve. They agree
+      with the 2026-09 dt-convergence campaign at theta = 0.05 to 3-4 digits.
+      The error is the time integration alone: the field is linear in y, so the
+      14-triangle mesh is exact in space. The with-drop cases are first order
+      (the drop is a strain jump), the sinusoid second order.
+    - 'headroom': limit = headroom * measured. 1.25 passes today and fails on a
+      25% loss of accuracy, e.g. any change that turns a first-order error into
+      twice its size.
+    - 'exact': limit on the relative MAE and RMSE of the two cases whose strain
+      history is piecewise linear in time (constant strain, constant strain
+      rate). The exponential integrator is exact for them; measured 1.5e-15 and
+      1.4e-15. This holds only because the solve is direct: with GCR + multigrid
+      at ksp_rtol 1e-6 the floor is 6.6e-6 and tracks rtol, so a Krylov solver
+      here would need a limit of that size and would hide a real error.
+    - 'sigma0_rel': limit on sigma_xy(0) / ((mu0 + mu1) gamma(0)) - 1. The t = 0
+      solve uses the unrelaxed modulus mu0 + mu1 (SeasQDOperator::initial_condition);
+      measured 8.9e-16. Loadings with gamma(0) = 0 must give sigma_xy(0) = 0 to
+      the same limit relative to (mu0 + mu1) * 2*Umax/H.
+    """
+    return {
+        "mu0": 30.0,
+        "mu1": 30.0,
+        "eta": 2.36682e10,
+        "umax": 1.0e-3,
+        "height": 1.0,
+        "t_hold_tau": 6.0,
+        "omega_tau": 2.0,
+        "theta": 0.05,
+        "rel_dt": 1e-12,
+        "measured": {
+            "constant_strain_with_drop": {"rel_mae": 3.0779e-03, "rel_rmse": 5.8125e-03},
+            "constant_strain_rate_with_drop": {"rel_mae": 5.2963e-03, "rel_rmse": 9.4575e-03},
+            "sinusoidal_without_drop": {"rel_mae": 2.1127e-04, "rel_rmse": 2.1221e-04},
+            "sinusoidal_with_drop": {"rel_mae": 1.9180e-03, "rel_rmse": 2.8734e-03},
+        },
+        "headroom": 1.25,
+        "exact": 1e-10,
+        "sigma0_rel": 1e-12,
+    }
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.
@@ -319,3 +374,79 @@ def extract_static_errors():
         return errors
 
     return _extract
+
+
+@pytest.fixture(scope="module")
+def read_tandem_summary():
+    """
+    Return a helper that parses the '========= Summary =========' block that
+    app/tandem prints at the end of a run into a dict, e.g.
+    {'time_steps': 200.0, 'max_time_step': 0.005, 'L2_error_domain': 0.0133, ...}.
+
+    Numeric entries are floats, the rest (date_time, code_version) strings.
+    L2_error_domain= is only printed when the scenario defines 'solution'.
+    """
+
+    def _read(log_file):
+        log_file = Path(log_file)
+        if not log_file.exists():
+            raise FileNotFoundError(f"tandem log not found: {log_file}")
+
+        summary = {}
+        in_summary = False
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line == "========= Summary =========":
+                    in_summary = True
+                    summary = {}
+                elif in_summary and line.startswith("====="):
+                    in_summary = False
+                elif in_summary and "=" in line:
+                    key, value = line.split("=", 1)
+                    try:
+                        summary[key] = float(value)
+                    except ValueError:
+                        summary[key] = value
+
+        if not summary:
+            raise RuntimeError(f"No summary block in {log_file}; did the run finish?")
+        return summary
+
+    return _read
+
+
+@pytest.fixture(scope="module")
+def read_domain_probe():
+    """
+    Return a helper that reads a domain probe CSV written by tandem and returns
+    (data, x): a pandas DataFrame with the columns of the quoted header
+    ("Time", "u0", ..., "stress_xx", ...) and the probe position x as a list.
+
+    The position comes from the '# Station <name> (x = [...])' line. It is
+    where the probe was actually evaluated, which may differ from the position
+    requested in the .toml (the nearest point of a per-element sampling
+    lattice), and it is printed with 6 significant digits.
+    """
+    import re
+
+    import pandas as pd
+
+    def _read(csv_file):
+        csv_file = Path(csv_file)
+        if not csv_file.exists():
+            raise FileNotFoundError(f"Probe file not found: {csv_file}")
+
+        with open(csv_file, "r", encoding="utf-8") as f:
+            header = f.readline()
+        match = re.search(r"\(x = \[([^\]]*)\]\)", header)
+        if match is None:
+            raise ValueError(f"No station position in the first line of {csv_file}")
+        x = [float(v) for v in match.group(1).split(",")]
+
+        data = pd.read_csv(csv_file, comment="#")
+        if data.empty:
+            raise ValueError(f"Probe file contains no samples: {csv_file}")
+        return data, x
+
+    return _read

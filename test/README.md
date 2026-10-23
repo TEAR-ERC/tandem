@@ -87,6 +87,7 @@ Comprehensive tests validating the physics, parallelism, and convergence of the 
 | `test_probe_writer_consistency.py` | **HDF5 probe writer consistency:** Runs two bp1 simulations with the same probe locations but different probe writer formats (csv and h5) and compares that the two results are identical for moment rate, fault probes and domain probes. |
 | `test_free_slip_bc.py` | **Free slip BC (2D, 3D):** Static elastic block with free slip (tag 9, `u.n = g`) on the sides and bottom and a traction-free top, in extension and compression (`examples/elasticity/{2d,3d}/free_slip.*`). The exact solution is linear, so `L2 error` and `H1-semi error` must be below the static tolerance at any mesh and degree. |
 | `test_traction_patch_bc.py` | **Traction and traction-free BCs (2D):** Static elastic block in uniaxial tension and compression: Dirichlet (exact data) on the left, prescribed traction (tag 7) on the right, traction free (tag 1) top and bottom (`examples/elasticity/2d/traction_patch.*`). Exact linear solution; `L2 error` and `H1-semi error` below the static tolerance. Run with `ref_normal = [1, 0]` and `[-1, 0]`, which must agree. |
+| `test_viscoelastic_simple_shear.py` | **Viscoelastic simple shear (2D):** Standard linear solid under six imposed strain histories (constant strain, constant strain rate, sinusoid, each with and without a drop) at `theta = 0.05`, `app/tandem` QD (`examples/tandem/viscoelasticity/2d/simple_shear.*`). Compares `stress_xy` against the closed form: piecewise-linear histories exact to 1e-10, the others within 1.25x the measured error; `sigma(0)` must be the unrelaxed response; step equals `theta * tau`. |
 
 ## Adding New Tests
 
@@ -99,7 +100,7 @@ We encourage adding tests for new features! Follow these steps based on the type
 
 ### Adding an Integration Test
 
-1. **Add Configurations:** Place your simulation configuration files (`.toml`, `.lua`, `.geo`) into the appropriate dimensional folder (`reference_configs/2D/` or `reference_configs/3D/`).
+1. **Add Configurations:** Place your simulation configuration files (`.toml`, `.lua`, `.geo`) into the appropriate dimensional folder (`reference_configs/2D/` or `reference_configs/3D/`), or use an example under `../examples/` directly (copy it into a work directory under `temp_test_results/` in the generator script, as `scripts/2D/viscoelastic_simple_shear.sh` does) rather than keeping a second copy.
 
 2. **Write a Generator Script:** Create a shell script in the corresponding `scripts/2D/` or `scripts/3D/` folder to generate the output data.
    - **Crucial:** Ensure your script automatically cleans up any temporary test output files after execution to prevent local clutter.

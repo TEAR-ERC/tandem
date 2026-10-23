@@ -1,7 +1,7 @@
 #!/bin/bash
 # Generate all 2D test outputs
 # Manages: static_regression, parallel_consistency, convergence, seas_regression,
-# free_slip_bc, traction_patch_bc
+# free_slip_bc, traction_patch_bc, viscoelastic_simple_shear
 set -e
 
 EXECUTABLE_DIR=$1
@@ -57,5 +57,8 @@ bash "$SCRIPT_DIR/free_slip_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "Traction and traction-free BC test (traction_patch, tension and compression)..."
 bash "$SCRIPT_DIR/traction_patch_bc.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
+echo "Viscoelastic simple shear (six imposed strain histories)..."
+bash "$SCRIPT_DIR/viscoelastic_simple_shear.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "2D reference outputs generated successfully."
