@@ -99,8 +99,12 @@ function(generate_code APP)
         set(WITH_LIBXSMM "\'${LibxsmmGeneratorExecutable}\'")
     endif()
 
+    # generate.py imports every kernel module (kernels/Poisson, Elasticity,
+    # PoissonViscoelasticity, Viscoelasticity) whatever APP is, so each APP depends on
+    # all of them. kernels/${APP}/*.py matched nothing: APP is lower case, the
+    # directories are not, and editing a kernel never regenerated it.
     file(GLOB APP_KERNEL_SOURCES CONFIGURE_DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/kernels/${APP}/*.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/kernels/*/*.py
     )
 
     add_custom_command(
