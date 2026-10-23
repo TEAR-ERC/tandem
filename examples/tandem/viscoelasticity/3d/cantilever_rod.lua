@@ -1,5 +1,8 @@
 -- Adapted from Marques, S.P.C. & Creus, G.J., 2012. Computational Viscoelasticity, Springer
 -- and Gharti et. al. https://academic.oup.com/gji/article/216/2/1364/5199199
+--
+-- Used by test/test_viscoelastic_cantilever.py; the material constants and the load
+-- history are repeated in viscoelastic_cantilever_config in test/conftest.py.
 local CantileverRod = {}
 CantileverRod.E = 1.0 -- GPa (1000 MPa instantaneous)
 CantileverRod.nu = 0.4833
@@ -12,6 +15,11 @@ CantileverRod.T_load = 6000.0 -- seconds (as per Gharti/ Abaqus example)
 CantileverRod.Txx = 0.01 -- GPa = 10 MPa
 CantileverRod.theta = 0.1
 
+-- the QD driver asks for these even with no fault
+CantileverRod.f0 = 0
+CantileverRod.V0 = 0
+CantileverRod.b = 0
+
 function CantileverRod:new(o)
     o = o or {}
     setmetatable(o, self)
@@ -19,16 +27,23 @@ function CantileverRod:new(o)
     return o
 end
 
+-- Clamped end (tag 5, clamped = 1 in cantilever_rod.geo)
 function CantileverRod:boundary(x, y, z, t)
     if x < 1e-9 then
         return 0.0, 0.0, 0.0
     end
 end
 
+-- Symmetry planes x = 0, y = 0, z = 0 (tag 9, clamped = 0 in cantilever_rod.geo)
+function CantileverRod:free_slip_boundary(x, y, z, t)
+    return 0.0
+end
+
+-- The load is on at t = T_load and off after it.
 function CantileverRod:traction_boundary(x, y, z, t)
-    if t <= 6000 then
+    if t <= self.T_load then
         if x > 1e-9 then -- Apply at free end (x = L)
-            return 0.01, 0.0, 0.0
+            return self.Txx, 0.0, 0.0
         end
     else
         return 0.0, 0.0, 0.0
@@ -57,7 +72,8 @@ function CantileverRod:viscosity(x, y, z)
     return self.eta
 end
 
-function CantileverRod:relaxationTime(x, y, z)
+-- Must be spelled relaxation_time: a misspelt member is silently replaced by 1 s.
+function CantileverRod:relaxation_time(x, y, z)
     return self.eta / self:mu1(x, y, z)
 end
 

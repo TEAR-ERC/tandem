@@ -6,9 +6,26 @@ mesh_file = "cantilever_rod.msh"
 type = "viscoelasticity"
 lib = "cantilever_rod.lua"
 scenario = "cantilever_rod"
+mode = "QD"
+
+ref_normal = [1, 0, 0]
+
+[ts_checkpoint]
+storage_type = "none"
 
 [domain_output]
 prefix = "cantilever_rod_domain_"
 
 [stress_output]
 prefix = "cantilever_rod_stress_"
+
+# t_max = 1 writes every time step. Probes are evaluated at the nearest point of a
+# per-element sampling lattice, whose position is printed in each file header.
+[domain_probe_output]
+prefix = "cantilever_rod_probe_"
+t_max = 1
+probes = [
+    { name = "free_end", x = [1.0e-4, 1.5e-5, 1.5e-5] },
+    { name = "mid", x = [5.0e-5, 1.5e-5, 1.5e-5] },
+    { name = "near_fixed_end", x = [1.0e-5, 1.0e-5, 1.0e-5] },
+]
