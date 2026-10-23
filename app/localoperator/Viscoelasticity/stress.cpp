@@ -110,7 +110,7 @@ void Viscoelasticity::stress_volume(std::size_t elNo, Matrix<double>& stress_com
         kernel::computeTotalStress krnl;
         krnl.stress_total_Q = stress_total;
         krnl.A_dt_unscaled = lam_vol_Q; // (λ + (2/3)μ1) δ_ij ε_kk
-        krnl.B_dt_unscaled = mu0_Q; // 2 μ0 ε_ij    (instantaneous elastic shear)
+        krnl.B_dt_unscaled = mu0_Q;     // 2 μ0 ε_ij    (instantaneous elastic shear)
         krnl.strain_trace_Q = strain_trace;
         krnl.strain_tensor_Q = strain_tensor;
         krnl.mu1_Q = mu1_Q;
