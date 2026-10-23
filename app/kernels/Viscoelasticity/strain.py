@@ -36,11 +36,16 @@ def add(generator, t, dim):
 
     generator.add(
         "deviatoric_strain_tensor_Q",
-        # ε^{dev}_ij = ε_ij - (1/D) Tr(ε) δ_ij
-        # where D = dim. Note: 1/3 in 3D, 1/2 in 2D (from kernel param dim).
+        # ε^{dev}_ij = ε_ij - (1/3) Tr(ε) δ_ij, the deviator of the 3D strain in both 2D
+        # and 3D. In 2D the model is plane strain (ε_zz = 0): its deviator has
+        # e_zz = -Tr(ε)/3, so the in-plane components stored here are not traceless.
+        # They are all the in-plane stress needs, and they are what makes
+        # A(Δt) = λ + (2/3)μ₁(1 - g) consistent (K_eff = A + (2/3)B = K). A 1/dim
+        # deviator in 2D contradicts that A and leaves the in-plane mean stress
+        # without any relaxation.
         [
             t.deviatoric_strain_tensor_Q["Qij"]
-            <= t.strain_tensor_Q["Qij"] + (-1.0 / dim) * t.trace_tensor_Q["Qij"],
+            <= t.strain_tensor_Q["Qij"] + (-1.0 / 3.0) * t.trace_tensor_Q["Qij"],
         ],
     )
 
@@ -104,7 +109,7 @@ def add(generator, t, dim):
         simpleParameterSpace(2),
         lambda x: [
             t.deviatoric_strain_tensor_q[x]["Qij"]
-            <= t.strain_tensor_q[x]["Qij"] + (-1.0 / dim) * t.trace_tensor_q[x]["Qij"],
+            <= t.strain_tensor_q[x]["Qij"] + (-1.0 / 3.0) * t.trace_tensor_q[x]["Qij"],
         ],
     )
 

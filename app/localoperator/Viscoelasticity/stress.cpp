@@ -90,22 +90,26 @@ void Viscoelasticity::stress_volume(std::size_t elNo, Matrix<double>& stress_com
     // still-zero "old" buffers there under-predicts the instantaneous elastic stress by
     // μ1(1-g)ε(0) = O(Δt), the single t=0 output point that otherwise caps temporal
     // convergence at first order. The existing computeTotalStress kernel is reused by
-    // selecting effective coefficients A_dt->λ, B_dt->μ0, ratio->1, g->0,
+    // selecting effective coefficients A_dt->λ + (2/3)μ1, B_dt->μ0, ratio->1, g->0,
     // old_partial->new_partial (q^{n+1}). Requires the init patch so q(0) = ε(0).
+    // The (2/3)μ1 is the volumetric part of the Maxwell spring, which does not relax:
+    // it is A(Δt) at g = 0, and with it A_dt + (2/3)B_dt = K as in the operator.
     const double* new_partial_strain = hist.get<partial_strain_new_Q>().data()->data();
     const double* old_dev_strain = hist.get<deviatoric_strain_old_Q>().data()->data();
 
     alignas(ALIGNMENT) double ones_Q[numQuad];
     alignas(ALIGNMENT) double zeros_Q[numQuad];
+    alignas(ALIGNMENT) double lam_vol_Q[numQuad];
     for (std::size_t q = 0; q < numQuad; ++q) {
         ones_Q[q] = 1.0;
         zeros_Q[q] = 0.0;
+        lam_vol_Q[q] = lam_Q[q] + (2.0 / 3.0) * mu1_Q[q];
     }
 
     {
         kernel::computeTotalStress krnl;
         krnl.stress_total_Q = stress_total;
-        krnl.A_dt_unscaled = lam_Q; // λ δ_ij ε_kk  (volumetric; μ1 acts only deviatorically)
+        krnl.A_dt_unscaled = lam_vol_Q; // (λ + (2/3)μ1) δ_ij ε_kk
         krnl.B_dt_unscaled = mu0_Q; // 2 μ0 ε_ij    (instantaneous elastic shear)
         krnl.strain_trace_Q = strain_trace;
         krnl.strain_tensor_Q = strain_tensor;
