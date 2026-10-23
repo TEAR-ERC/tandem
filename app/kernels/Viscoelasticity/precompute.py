@@ -125,9 +125,9 @@ def add(generator, t):
             t.A_dt_q[x]["q"]
             <= (
                 t.lam_q[x]["q"]
-                + (2.0 / 3.0) * (t.mu1_q[x]["q"] - t.mu1_q[x]["q"] * t.g_dt_q["q"])
+                + (2.0 / 3.0) * (t.mu1_q[x]["q"] - t.mu1_q[x]["q"] * t.g_dt_q[x]["q"])
             ),
-            t.B_dt_q[x]["q"] <= t.mu0_q[x]["q"] + t.mu1_q[x]["q"] * t.g_dt_q["q"],
+            t.B_dt_q[x]["q"] <= t.mu0_q[x]["q"] + t.mu1_q[x]["q"] * t.g_dt_q[x]["q"],
         ],
     )
 

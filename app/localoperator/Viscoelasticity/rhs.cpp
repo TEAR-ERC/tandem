@@ -301,8 +301,11 @@ void Viscoelasticity::compute_traction_history_average(std::size_t fctNo, const 
                                                        const double* mu1_q1) const {
 
     kernel::tractionHistoryAverage krnl;
-    krnl.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
-    krnl.ratio_q = fctPre[fctNo].get<ratio_q>().data();
+    // On boundary facets both inputs carry side-0 data, and side 1 of g/ratio repeats side 0.
+    krnl.g_dt_q(0) = fctPre[fctNo].get<g_dt_q_0>().data();
+    krnl.ratio_q(0) = fctPre[fctNo].get<ratio_q_0>().data();
+    krnl.g_dt_q(1) = fctPre[fctNo].get<g_dt_q_1>().data();
+    krnl.ratio_q(1) = fctPre[fctNo].get<ratio_q_1>().data();
     krnl.n_q = fct[fctNo].get<Normal>().data()->data();
     krnl.tractionHistoryAverage = strainHistory_q[fctNo].get<average_traction>().data()->data();
     krnl.deviatoric_strain_tensor_q(0) = dev_q0;

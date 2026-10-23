@@ -14,6 +14,7 @@ time-dependent A(Δt)/B(Δt) updates, and skeleton/boundary preparation.
 #include "util/LinearAllocator.h"
 
 #include <Eigen/LU>
+#include <algorithm>
 #include <cmath>
 
 namespace tensor = tndm::viscoelasticity::tensor;
@@ -28,8 +29,9 @@ namespace tndm {
 // prepare_volume_post_skeleton: folded W*J arrays + A_dt/B_dt (time-dependent,
 //   called each step because g(Δt) and exp(-Δt/τ) change with dt)
 //
-// g_dt and ratio are computed per quad point from the local relaxation_time_local field.
-// This handles spatially varying viscosity.
+// g_dt and ratio are computed per quad point from the local relaxation time
+// tau = viscosity / mu1 of the projected material (relaxation_time_local), so materials
+// with different tau relax at their own rate.
 
 void Viscoelasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
@@ -131,6 +133,14 @@ void Viscoelasticity::prepare_volume_post_skeleton(std::size_t elNo,
         volPre[elNo].template get<negative_rhoInv_W_Jinv_Q>().data();
     krnl_pre.execute();
 
+    // tau = viscosity / mu1 at the quad points; the common factor W*J > 0 cancels.
+    auto const eta_WJ = volPre[elNo].get<viscosity_W_J_Q>().data();
+    auto const mu1_WJ = volPre[elNo].get<mu1_W_J_Q>().data();
+    auto tau = volPre[elNo].get<relaxation_time_local>().data();
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        tau[q] = relaxation_time_from(eta_WJ[q], mu1_WJ[q]);
+    }
+
     update_time_dependent_precomputation_volume(elNo); // g_dt, ratio, A_dt, B_dt
 }
 
@@ -164,6 +174,21 @@ void Viscoelasticity::precompute_facet_material(std::size_t fctNo, FacetInfo con
             krnl.viscosity_q(1) = fctPre[fctNo].get<viscosity_q_1>().data();
         }
         krnl.execute(side);
+
+        auto const eta = (side == 0) ? fctPre[fctNo].get<viscosity_q_0>().data()
+                                     : fctPre[fctNo].get<viscosity_q_1>().data();
+        auto const mu1 =
+            (side == 0) ? fctPre[fctNo].get<mu1_q_0>().data() : fctPre[fctNo].get<mu1_q_1>().data();
+        auto tau =
+            (side == 0) ? fctPre[fctNo].get<tau_q_0>().data() : fctPre[fctNo].get<tau_q_1>().data();
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            tau[q] = relaxation_time_from(eta[q], mu1[q]);
+        }
+    }
+    if (numSides == 1) {
+        // Boundary facets pass side-0 data for both sides of the history average.
+        std::copy_n(fctPre[fctNo].get<tau_q_0>().data(), fctRule.size(),
+                    fctPre[fctNo].get<tau_q_1>().data());
     }
 
     // Note: Time-dependent quantities (g_dt_q, ratio_q, A_dt_q, B_dt_q) are updated
@@ -195,7 +220,10 @@ void Viscoelasticity::prepare_boundary(std::size_t fctNo, FacetInfo const& info,
 
 void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t elNo) {
     auto g_dt_data = volPre[elNo].get<g_dt_Q>().data();
-    std::fill(g_dt_data, g_dt_data + volRule.size(), g_dt_);
+    auto const tau = volPre[elNo].get<relaxation_time_local>().data();
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        g_dt_data[q] = compute_g_dt(dt_g_, tau[q]);
+    }
     update_ratio_precomputation_volume(elNo);
 
     kernel::precomputeVolumeAB krnl_pre_ab;
@@ -210,12 +238,21 @@ void Viscoelasticity::update_time_dependent_precomputation_volume(std::size_t el
 
 void Viscoelasticity::update_time_dependent_precomputation_surface(std::size_t fctNo,
                                                                    int numSides) {
-    auto g_dt_data = fctPre[fctNo].get<g_dt_q>().data();
-    std::fill(g_dt_data, g_dt_data + fctRule.size(), g_dt_);
+    // Both sides always: on boundary facets side 1 repeats side 0 (see
+    // precompute_facet_material), and the history kernels read both.
+    for (int side = 0; side < 2; ++side) {
+        auto g_dt_data = (side == 0) ? fctPre[fctNo].get<g_dt_q_0>().data()
+                                     : fctPre[fctNo].get<g_dt_q_1>().data();
+        auto const tau =
+            (side == 0) ? fctPre[fctNo].get<tau_q_0>().data() : fctPre[fctNo].get<tau_q_1>().data();
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            g_dt_data[q] = compute_g_dt(dt_g_, tau[q]);
+        }
+    }
     update_ratio_precomputation_boundary(fctNo);
 
     kernel::precomputeSurfaceAB krnl_ab;
-    krnl_ab.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
+    krnl_ab.g_dt_q(0) = fctPre[fctNo].get<g_dt_q_0>().data();
     krnl_ab.lam_q(0) = fctPre[fctNo].get<lam_q_0>().data();
     krnl_ab.mu0_q(0) = fctPre[fctNo].get<mu0_q_0>().data();
     krnl_ab.mu1_q(0) = fctPre[fctNo].get<mu1_q_0>().data();
@@ -224,6 +261,7 @@ void Viscoelasticity::update_time_dependent_precomputation_surface(std::size_t f
     krnl_ab.execute(0);
 
     if (numSides == 2) {
+        krnl_ab.g_dt_q(1) = fctPre[fctNo].get<g_dt_q_1>().data();
         krnl_ab.lam_q(1) = fctPre[fctNo].get<lam_q_1>().data();
         krnl_ab.mu0_q(1) = fctPre[fctNo].get<mu0_q_1>().data();
         krnl_ab.mu1_q(1) = fctPre[fctNo].get<mu1_q_1>().data();
@@ -251,12 +289,22 @@ void Viscoelasticity::update_time_dependent_precomputation_boundary(std::size_t 
 
 void Viscoelasticity::update_ratio_precomputation_volume(std::size_t elNo) {
     auto ratio_data = volPre[elNo].get<ratio_Q>().data();
-    std::fill(ratio_data, ratio_data + volRule.size(), ratio_dt_);
+    auto const tau = volPre[elNo].get<relaxation_time_local>().data();
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        ratio_data[q] = compute_ratio(dt_viscoelastic_, tau[q]);
+    }
 }
 
 void Viscoelasticity::update_ratio_precomputation_boundary(std::size_t fctNo) {
-    auto ratio_data = fctPre[fctNo].get<ratio_q>().data();
-    std::fill(ratio_data, ratio_data + fctRule.size(), ratio_dt_);
+    for (int side = 0; side < 2; ++side) {
+        auto ratio_data = (side == 0) ? fctPre[fctNo].get<ratio_q_0>().data()
+                                      : fctPre[fctNo].get<ratio_q_1>().data();
+        auto const tau =
+            (side == 0) ? fctPre[fctNo].get<tau_q_0>().data() : fctPre[fctNo].get<tau_q_1>().data();
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            ratio_data[q] = compute_ratio(dt_viscoelastic_, tau[q]);
+        }
+    }
 }
 
 void Viscoelasticity::update_ratio_precomputation_skeleton(std::size_t fctNo) {

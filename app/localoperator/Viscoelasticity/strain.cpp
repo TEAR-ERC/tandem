@@ -223,9 +223,11 @@ void Viscoelasticity::compute_partial_strain_Q(std::size_t elNo) {
 void Viscoelasticity::compute_partial_strain_q(std::size_t fctNo, FacetInfo const& info) {
     auto& hist = strainHistory_q[fctNo];
     kernel::partialStrain_q ps;
-    ps.ratio_q = fctPre[fctNo].get<ratio_q>().data();
-    ps.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
     for (int side = 0; side < 2; ++side) {
+        ps.ratio_q(side) = (side == 0) ? fctPre[fctNo].get<ratio_q_0>().data()
+                                       : fctPre[fctNo].get<ratio_q_1>().data();
+        ps.g_dt_q(side) = (side == 0) ? fctPre[fctNo].get<g_dt_q_0>().data()
+                                      : fctPre[fctNo].get<g_dt_q_1>().data();
         ps.old_partial_strain_tensor_q(side) =
             (side == 0) ? hist.get<partial_strain_old_q_0>().data()->data()
                         : hist.get<partial_strain_old_q_1>().data()->data();

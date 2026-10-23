@@ -121,8 +121,8 @@ def add(generator, t, dim):
         lambda x: [
             t.new_partial_strain_tensor_q[x]["qij"]
             <= (
-                t.old_partial_strain_tensor_q[x]["qij"] * t.ratio_q["q"]
-                + t.g_dt_q["q"]
+                t.old_partial_strain_tensor_q[x]["qij"] * t.ratio_q[x]["q"]
+                + t.g_dt_q[x]["q"]
                 * (
                     t.new_deviatoric_strain_tensor_q[x]["qij"]
                     - t.old_deviatoric_strain_tensor_q[x]["qij"]

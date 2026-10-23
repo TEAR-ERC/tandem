@@ -39,8 +39,9 @@ namespace tndm {
 Viscoelasticity::Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                                  functional_t_region<1> lam, functional_t_region<1> mu0,
                                  functional_t_region<1> mu1, functional_t_region<1> viscosity,
-                                 functional_t_region<1> relaxation_time, double theta,
-                                 std::optional<functional_t_region<1>> rho, DGMethod method)
+                                 std::optional<functional_t_region<1>> relaxation_time,
+                                 double theta, std::optional<functional_t_region<1>> rho,
+                                 DGMethod method)
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
@@ -48,8 +49,10 @@ Viscoelasticity::Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> c
       fun_mu0(make_volume_functional(std::move(mu0))),
       fun_mu1(make_volume_functional(std::move(mu1))),
       fun_viscosity(make_volume_functional(std::move(viscosity))),
-      fun_relaxation_time(make_volume_functional(std::move(relaxation_time))), theta_(theta),
-      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
+      fun_relaxation_time(
+          relaxation_time ? std::make_optional(make_volume_functional(std::move(*relaxation_time)))
+                          : std::nullopt),
+      theta_(theta), fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
 
     // theta in (0,1]: fraction of relaxation time used as time-step upper bound.
     // 0 would freeze time; >1 would over-step the relaxation.
@@ -158,28 +161,99 @@ void Viscoelasticity::begin_preparation(std::size_t numElements, std::size_t num
 }
 
 /*
-Relaxation time: element-local CFL bound
+Relaxation time: range over the viscoelastic material
 
-Feeds into DGOperator's global MPI reduction to find the minimum τ across
-all processes. The result constrains Δt ≤ θ·τ_min for temporal accuracy.
+tau = viscosity / mu1, evaluated from the lua values at the volume quadrature
+points. Feeds into DGOperator's global MPI reductions of the minimum and maximum
+τ. The minimum constrains Δt ≤ θ·τ_min; the constitutive update uses the τ of each
+quadrature point (see update_time_dependent_precomputation_volume).
 
-The relaxation-time functional is evaluated at each volume quadrature point.
+Only points with μ₁ > 0 count: where the Maxwell branch is absent τ has no effect.
+A point with μ₁ > 0 and viscosity ≤ 0 is kept, so that the global minimum becomes
+≤ 0 and DGOperator rejects the input on every rank.
+
+relaxation_time is deprecated. If the scenario still defines it, it must agree with
+viscosity / mu1 wherever mu1 > 0; disagreeing points are counted and DGOperator
+rejects the input.
 */
 void Viscoelasticity::local_relaxation_time(std::size_t elNo, double& relaxation_time_global,
                                             LinearAllocator<double>& scratch) {
     base::prepare_volume(elNo, scratch);
 
-    alignas(ALIGNMENT) double tau_raw[tensor::mu1_Q::size()];
-    auto tau = Matrix<double>(tau_raw, 1, volRule.size());
-    fun_relaxation_time(elNo, tau);
-
-    // Store at all quad points and find element-local minimum
-    auto tau_field = volPre[elNo].get<relaxation_time_local>().data();
-    for (std::size_t q = 0; q < volRule.size(); ++q) {
-        tau_field[q] = tau(0, q);
+    alignas(ALIGNMENT) double eta_raw[tensor::mu1_Q::size()];
+    alignas(ALIGNMENT) double mu1_raw[tensor::mu1_Q::size()];
+    alignas(ALIGNMENT) double given_raw[tensor::mu1_Q::size()];
+    auto eta = Matrix<double>(eta_raw, 1, volRule.size());
+    auto mu1 = Matrix<double>(mu1_raw, 1, volRule.size());
+    auto given = Matrix<double>(given_raw, 1, volRule.size());
+    fun_viscosity(elNo, eta);
+    fun_mu1(elNo, mu1);
+    if (fun_relaxation_time) {
+        (*fun_relaxation_time)(elNo, given);
     }
-    relaxation_time_global =
-        std::min(relaxation_time_global, *std::min_element(tau_field, tau_field + volRule.size()));
+
+    constexpr double rel_tol = 1.0e-10;
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        if (mu1(0, q) > 0.0) {
+            double const tau = eta(0, q) / mu1(0, q);
+            relaxation_time_global = std::min(relaxation_time_global, tau);
+            relaxation_time_max_local_ = std::max(relaxation_time_max_local_, tau);
+            if (fun_relaxation_time && !(std::abs(given(0, q) - tau) <= rel_tol * std::abs(tau))) {
+                ++relaxation_time_mismatch_local_;
+            }
+        }
+    }
+}
+
+// tau = viscosity / mu1 at a quad point of the projected material. Where mu1 <= 0 there is
+// no Maxwell branch and tau is infinite: g = 1 and ratio = 1, both multiplied by mu1.
+double Viscoelasticity::relaxation_time_from(double viscosity, double mu1) {
+    if (mu1 <= 0.0) {
+        return std::numeric_limits<double>::infinity();
+    }
+    return viscosity / mu1;
+}
+
+void Viscoelasticity::set_relaxation_time_max_global(double relaxation_time) {
+    // Sample points for viscoelastic_g_change: |g(dt/tau) - g(dt_g/tau)| is a smooth bump in
+    // log(tau), so log-spaced samples between the extremes bound it closely.
+    constexpr int num_samples = 33;
+    double const tau_min = relaxation_time_global_;
+    double const tau_max = std::max(relaxation_time, tau_min);
+    tau_samples_.clear();
+    if (!(tau_min > 0.0) || tau_max <= tau_min * (1.0 + 1.0e-12)) {
+        tau_samples_.push_back(tau_min);
+        return;
+    }
+    double const log_ratio = std::log(tau_max / tau_min);
+    for (int i = 0; i < num_samples; ++i) {
+        tau_samples_.push_back(tau_min * std::exp(log_ratio * i / (num_samples - 1)));
+    }
+    tau_samples_.back() = tau_max;
+}
+
+double Viscoelasticity::viscoelastic_g_change(double dt) const {
+    double change = 0.0;
+    if (tau_samples_.empty()) {
+        return std::abs(compute_g_dt(dt, relaxation_time_global_) -
+                        compute_g_dt(dt_g_, relaxation_time_global_));
+    }
+    for (double tau : tau_samples_) {
+        change = std::max(change, std::abs(compute_g_dt(dt, tau) - compute_g_dt(dt_g_, tau)));
+    }
+    return change;
+}
+
+// exp(-dt/tau). tau <= 0 (only allowed where mu1 = 0) is the instant-relaxation limit 0,
+// consistent with g(dt, tau <= 0) = 0.
+double Viscoelasticity::compute_ratio(double dt, double tau) {
+    if (dt <= 0.0) {
+        return 1.0;
+    }
+    if (tau <= 0.0) {
+        return 0.0;
+    }
+    return std::exp(-dt / tau);
 }
 
 // Jacobian transpose utility (needed for matrix-free apply, facet metrics)

@@ -21,6 +21,8 @@
 #include <limits>
 #include <memory>
 #include <mpi.h>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace tndm {
@@ -85,9 +87,12 @@ public:
     template <class T>
     using update_time_dependent_precomputation_boundary_t =
         decltype(&T::update_time_dependent_precomputation_boundary);
-    // Operators that can report g(dt) separately from dt opt in to the g-based
+    // Operators that can report the change in g(dt) separately from dt opt in to the g-based
     // reassembly gate; the others keep the legacy gate on the relative change in dt.
-    template <class T> using viscoelastic_g_t = decltype(&T::viscoelastic_g);
+    template <class T> using viscoelastic_g_change_t = decltype(&T::viscoelastic_g_change);
+    template <class T> using relaxation_time_max_local_t = decltype(&T::relaxation_time_max_local);
+    template <class T>
+    using relaxation_time_mismatch_local_t = decltype(&T::relaxation_time_mismatch_local);
     template <class T>
     using update_ratio_precomputation_volume_t = decltype(&T::update_ratio_precomputation_volume);
     template <class T>
@@ -138,9 +143,38 @@ public:
             }
             MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
                           MPI_COMM_WORLD);
+            // Reduced values are the same on every rank, so every rank throws.
+            if (relaxation_time_global_ <= 0.0) {
+                throw std::runtime_error(
+                    "The relaxation time viscosity / mu1 must be positive wherever mu1 > 0 "
+                    "(minimum found: " +
+                    std::to_string(relaxation_time_global_) + ")");
+            }
+            if constexpr (std::experimental::is_detected_v<relaxation_time_mismatch_local_t,
+                                                           LocalOperator>) {
+                unsigned long mismatch_local = lop_->relaxation_time_mismatch_local();
+                unsigned long mismatch = 0;
+                MPI_Allreduce(&mismatch_local, &mismatch, 1, MPI_UNSIGNED_LONG, MPI_SUM,
+                              MPI_COMM_WORLD);
+                if (mismatch > 0) {
+                    throw std::runtime_error(
+                        "relaxation_time disagrees with viscosity / mu1 at " +
+                        std::to_string(mismatch) +
+                        " quadrature points with mu1 > 0. The relaxation time is now derived "
+                        "as viscosity / mu1; relaxation_time is deprecated and only checked: "
+                        "fix or remove it.");
+                }
+            }
             if constexpr (std::experimental::is_detected_v<set_relaxation_time_global_t,
                                                            LocalOperator>) {
                 lop_->set_relaxation_time_global(relaxation_time_global_);
+            }
+            if constexpr (std::experimental::is_detected_v<relaxation_time_max_local_t,
+                                                           LocalOperator>) {
+                double tau_max_local = lop_->relaxation_time_max_local();
+                double tau_max = 0.0;
+                MPI_Allreduce(&tau_max_local, &tau_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+                lop_->set_relaxation_time_max_global(tau_max);
             }
             lop_->set_viscoelastic_time_step(relaxation_time_global_);
         }
@@ -514,13 +548,14 @@ public:
                 if (dt <= 0.0) {
                     return false;
                 }
-                if constexpr (std::experimental::is_detected_v<viscoelastic_g_t, LocalOperator>) {
+                if constexpr (std::experimental::is_detected_v<viscoelastic_g_change_t,
+                                                               LocalOperator>) {
                     double const g_tol = lop_->viscoelastic_g_tol();
                     if (g_tol > 0.0) {
-                        double g_diff = lop_->viscoelastic_g(dt) - lop_->get_viscoelastic_g();
-                        if (g_diff < 0.0) {
-                            g_diff = -g_diff;
-                        }
+                        // Largest change in g over the relaxation times present: each
+                        // material has its own g(dt/tau), and the matrix must be rebuilt
+                        // as soon as any of them moves by more than g_tol.
+                        double const g_diff = lop_->viscoelastic_g_change(dt);
                         if (g_diff > g_tol) {
                             lop_->set_viscoelastic_time_step_value(dt);
                             update_time_dependent_precomputation();

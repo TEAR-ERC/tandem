@@ -39,8 +39,9 @@ public:
 
     Viscoelasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functional_t_region<1> lam,
                     functional_t_region<1> mu0, functional_t_region<1> mu1,
-                    functional_t_region<1> viscosity, functional_t_region<1> relaxation_time,
-                    double theta, std::optional<functional_t_region<1>> rho = std::nullopt,
+                    functional_t_region<1> viscosity,
+                    std::optional<functional_t_region<1>> relaxation_time, double theta,
+                    std::optional<functional_t_region<1>> rho = std::nullopt,
                     DGMethod method = DGMethod::IP);
 
     constexpr std::size_t alignment() const { return ALIGNMENT; }
@@ -186,36 +187,44 @@ public:
 
     void set_free_slip_boundary(facet_functional_t fun) { fun_free_slip = std::move(fun); }
 
+    // Global minimum of tau over the viscoelastic material (mu1 > 0): only the time step cap
+    // theta * tau and the no-fault fixed step use it. The constitutive update uses the
+    // relaxation time of each quadrature point.
     inline double relaxation_time_global() const { return relaxation_time_global_; }
     inline double viscoelastic_theta() const { return theta_; }
     void set_relaxation_time_global(double relaxation_time) {
         relaxation_time_global_ = relaxation_time;
     }
+    // Largest tau over the local viscoelastic material, reduced to the global maximum by
+    // DGOperator. Together with the minimum it bounds the change in g that decides when
+    // to reassemble (viscoelastic_g_change).
+    inline double relaxation_time_max_local() const { return relaxation_time_max_local_; }
+    // Number of local quad points where a given relaxation_time disagrees with
+    // viscosity / mu1; DGOperator sums it over the ranks and rejects the input if > 0.
+    inline std::size_t relaxation_time_mismatch_local() const {
+        return relaxation_time_mismatch_local_;
+    }
+    void set_relaxation_time_max_global(double relaxation_time);
     void set_viscoelastic_time_step(double relaxation_time) {
         set_viscoelastic_time_step_value(theta_ * relaxation_time);
     }
     // Set the viscoelastic time step directly to dt (used when it follows the
     // adaptive RSF/PETSc step rather than the fixed theta * tau cap).
-    // Refreshes both ratio = exp(-dt/tau) and the frozen g(dt).
+    // Refreshes both ratio = exp(-dt/tau) and the step g(dt) is frozen at; the
+    // per-point values follow in the next update_time_dependent_precomputation sweep.
     void set_viscoelastic_time_step_value(double dt) {
         set_viscoelastic_dt_keep_g(dt);
-        g_dt_ = viscoelastic_g(dt);
+        dt_g_ = dt;
     }
     // Advance dt (and hence ratio = exp(-dt/tau), which must always track the step
     // exactly or the memory variable decays at the wrong rate) while leaving the
     // frozen g(dt) -- and therefore A_dt/B_dt and the assembled matrix -- untouched.
-    void set_viscoelastic_dt_keep_g(double dt) {
-        dt_viscoelastic_ = dt;
-        ratio_dt_ = (dt > 0.0 && relaxation_time_global_ > 0.0)
-                        ? std::exp(-dt / relaxation_time_global_)
-                        : 1.0;
-    }
+    void set_viscoelastic_dt_keep_g(double dt) { dt_viscoelastic_ = dt; }
     inline double get_viscoelastic_time_step() const { return dt_viscoelastic_; }
 
-    // g(dt) at the *current* step, versus the value the coefficients are frozen at.
-    double viscoelastic_g(double dt) const { return compute_g_dt(dt, relaxation_time_global_); }
-    inline double get_viscoelastic_g() const { return g_dt_; }
-    inline double get_viscoelastic_ratio() const { return ratio_dt_; }
+    // Largest |g(dt/tau) - g(dt_g/tau)| over the relaxation times of the material, i.e. how
+    // far the effective moduli of the assembled matrix are from those for a step dt.
+    double viscoelastic_g_change(double dt) const;
 
     // Rebuild threshold on g. |dg| bounds the relative error introduced in the
     // effective moduli A(dt), B(dt) (see set_viscoelastic_g_tol callers).
@@ -253,6 +262,8 @@ private:
 
     void transpose_JInv(std::size_t fctNo, int side);
     double compute_g_dt(double dt, double tau) const;
+    static double compute_ratio(double dt, double tau);
+    static double relaxation_time_from(double viscosity, double mu1);
     void update_time_dependent_precomputation_surface(std::size_t fctNo, int numSides);
     void precompute_facet_material(std::size_t fctNo, FacetInfo const& info, int numSides);
     void compute_lift_boundary(std::size_t fctNo, FacetInfo const& info, double* L_q0) const;
@@ -294,15 +305,20 @@ private:
     volume_functional_t fun_mu0;
     volume_functional_t fun_mu1;
     volume_functional_t fun_viscosity;
-    volume_functional_t fun_relaxation_time;
+    // Optional, deprecated: only checked against viscosity / mu1.
+    std::optional<volume_functional_t> fun_relaxation_time;
     volume_functional_t fun_rho;
     double theta_ = 0.0;
     double relaxation_time_global_ = 0.0;
+    double relaxation_time_max_local_ = 0.0;
+    std::size_t relaxation_time_mismatch_local_ = 0;
+    // Relaxation times at which viscoelastic_g_change evaluates g: the global minimum and
+    // maximum and log-spaced values between them (one value for a uniform tau).
+    std::vector<double> tau_samples_;
+    // Current step (ratio = exp(-dt/tau) follows it exactly), and the step at which g, and
+    // hence A_dt/B_dt and the assembled matrix, are frozen.
     double dt_viscoelastic_ = 0.0;
-    // g(dt) the coefficients A_dt/B_dt and every history term are currently frozen at,
-    // and the exact exp(-dt/tau) for the current step.
-    double g_dt_ = 0.0;
-    double ratio_dt_ = 1.0;
+    double dt_g_ = 0.0;
     double g_tol_ = 1.0e-8;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
@@ -353,6 +369,8 @@ private:
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
+    // tau = viscosity / mu1 at the volume quad points, from the projected material
+    // (infinite where mu1 <= 0: no Maxwell branch)
     struct relaxation_time_local {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
@@ -438,12 +456,29 @@ private:
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
 
-    // Facet precomputed quantities — shared (not per-side)
-    struct g_dt_q {
+    // Facet tau, g(dt) and exp(-dt/tau) per side: the sides of an interior facet may have
+    // different relaxation times. On boundary facets side 1 repeats side 0.
+    struct tau_q_0 {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
-    struct ratio_q {
+    struct g_dt_q_0 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct ratio_q_0 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct tau_q_1 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct g_dt_q_1 {
+        using type = double;
+        using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
+    };
+    struct ratio_q_1 {
         using type = double;
         using allocator = mneme::AlignedAllocator<type, ALIGNMENT>;
     };
@@ -575,7 +610,8 @@ private:
     using fct_pre_t =
         mneme::MultiStorage<mneme::DataLayout::SoA, lam_q_0, mu0_q_0, mu1_q_0, viscosity_q_0,
                             A_dt_q_0, B_dt_q_0, JInvT0, lam_q_1, mu0_q_1, mu1_q_1, viscosity_q_1,
-                            A_dt_q_1, B_dt_q_1, JInvT1, g_dt_q, ratio_q>;
+                            A_dt_q_1, B_dt_q_1, JInvT1, tau_q_0, g_dt_q_0, ratio_q_0, tau_q_1,
+                            g_dt_q_1, ratio_q_1>;
     mneme::StridedView<fct_pre_t> fctPre;
 
     using strain_tensor_Q_t =

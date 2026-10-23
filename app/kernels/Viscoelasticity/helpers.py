@@ -100,11 +100,11 @@ def make_helpers(t):
         """
         return (
             t.mu1_q[side]["q"]
-            * t.ratio_q["q"]
+            * t.ratio_q[side]["q"]
             * t.partial_strain_tensor_q[side]["qpj"]
             * normal["jq"]
             - t.mu1_q[side]["q"]
-            * t.g_dt_q["q"]
+            * t.g_dt_q[side]["q"]
             * t.deviatoric_strain_tensor_q[side]["qpj"]
             * normal["jq"]
         )

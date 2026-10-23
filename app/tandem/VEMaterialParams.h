@@ -5,6 +5,7 @@
 #include "script/LuaLib.h"
 
 #include <array>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -36,6 +37,8 @@ template <> struct VEMaterialParams<Viscoelasticity> {
         if (lib.hasMember(scenario, Viscosity)) {
             viscosity_ = lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, Viscosity);
         }
+        // Deprecated: tau is derived as viscosity / mu1. If given, relaxation_time is only
+        // checked against it (Viscoelasticity::local_relaxation_time).
         if (lib.hasMember(scenario, RelaxationTime)) {
             relaxationTime_ =
                 lib.getMemberFunctionTagged<DomainDimension, 1>(scenario, RelaxationTime);
@@ -78,7 +81,7 @@ private:
     functional_t_region mu0_ = constant_functional(1.0);
     functional_t_region mu1_ = constant_functional(1.0);
     functional_t_region viscosity_ = constant_functional(1.0);
-    functional_t_region relaxationTime_ = constant_functional(1.0);
+    std::optional<functional_t_region> relaxationTime_ = std::nullopt;
     double theta_ = 0.0;
     double gTol_ = 1.0e-8;
 };

@@ -81,9 +81,10 @@ def make_tensors(dim, Nbf, nq, Nq, petsc_alignment):
     # Spatially varying if τ differs per element.
 
     t.g_dt_Q = Tensor("g_dt_Q", (Nq,))  # g(Δt) = (τ/Δt)(1 - exp(-Δt/τ))
-    t.g_dt_q = Tensor("g_dt_q", (nq,))
+    # Per side: the two sides of an interior facet may have different relaxation times.
+    t.g_dt_q = [Tensor("g_dt_q({})".format(x), (nq,)) for x in range(2)]
     t.ratio_Q = Tensor("ratio_Q", (Nq,))  # exp(-Δt/τ)
-    t.ratio_q = Tensor("ratio_q", (nq,))
+    t.ratio_q = [Tensor("ratio_q({})".format(x), (nq,)) for x in range(2)]
 
     # ====================================================================
     # SECTION 4 — BASIS FUNCTIONS

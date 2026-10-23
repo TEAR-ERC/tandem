@@ -50,8 +50,10 @@ void Viscoelasticity::traction_skeleton(std::size_t fctNo, FacetInfo const& info
     krnl.Dx_q(1) = Dx_q1;
     krnl.A_dt_q(1) = fctPre[fctNo].get<A_dt_q_1>().data();
     krnl.B_dt_q(1) = fctPre[fctNo].get<B_dt_q_1>().data();
-    krnl.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
-    krnl.ratio_q = fctPre[fctNo].get<ratio_q>().data();
+    krnl.g_dt_q(0) = fctPre[fctNo].get<g_dt_q_0>().data();
+    krnl.ratio_q(0) = fctPre[fctNo].get<ratio_q_0>().data();
+    krnl.g_dt_q(1) = fctPre[fctNo].get<g_dt_q_1>().data();
+    krnl.ratio_q(1) = fctPre[fctNo].get<ratio_q_1>().data();
     krnl.mu1_q(0) = fctPre[fctNo].get<mu1_q_0>().data();
     krnl.mu1_q(1) = fctPre[fctNo].get<mu1_q_1>().data();
     krnl.partial_strain_tensor_q(0) =
@@ -91,8 +93,8 @@ void Viscoelasticity::traction_boundary(std::size_t fctNo, FacetInfo const& info
     krnl.Dx_q(0) = Dx_q0;
     krnl.A_dt_q(0) = fctPre[fctNo].get<A_dt_q_0>().data();
     krnl.B_dt_q(0) = fctPre[fctNo].get<B_dt_q_0>().data();
-    krnl.g_dt_q = fctPre[fctNo].get<g_dt_q>().data();
-    krnl.ratio_q = fctPre[fctNo].get<ratio_q>().data();
+    krnl.g_dt_q(0) = fctPre[fctNo].get<g_dt_q_0>().data();
+    krnl.ratio_q(0) = fctPre[fctNo].get<ratio_q_0>().data();
     krnl.mu1_q(0) = fctPre[fctNo].get<mu1_q_0>().data();
     krnl.partial_strain_tensor_q(0) =
         strainHistory_q[fctNo].get<partial_strain_old_q_0>().data()->data();
