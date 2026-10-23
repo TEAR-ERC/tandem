@@ -1,0 +1,8 @@
+mesh_file = "traction_patch.msh"
+type = "elasticity"
+lib = "traction_patch.lua"
+scenario = "traction_patch_tension"
+# Passed to set_traction_boundary/set_dirichlet. On boundary facets it does not
+# change the sign of the prescribed data (see traction_patch.lua); the test
+# also runs with ref_normal = [-1, 0] to check exactly that.
+ref_normal = [1, 0]
