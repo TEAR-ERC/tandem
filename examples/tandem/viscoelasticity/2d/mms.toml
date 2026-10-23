@@ -1,0 +1,26 @@
+# Time-dependent viscoelastic manufactured solution on the unit square, see mms.lua.
+# Choose the field with --scenario mms (trigonometric) or --scenario mms_poly
+# (polynomial), and the mesh with --resolution. The L2 error against the
+# manufactured solution at final_time is printed as L2_error_domain= in the summary.
+final_time = 1.0
+resolution = 0.25
+
+type = "viscoelasticity"
+lib = "mms.lua"
+scenario = "mms"
+mode = "QD"
+
+ref_normal = [1, 0]
+
+[ts_checkpoint]
+storage_type = "none"
+
+[generate_mesh]
+intercepts = [
+    [0.0, 1.0],
+    [0.0, 1.0]
+]
+bcs = [
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}],
+    [{bc = "d", plane = 0}, {bc = "d", plane = 1}]
+]
