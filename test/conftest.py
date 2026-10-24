@@ -272,6 +272,7 @@ def pytest_addoption(parser):
 
     Adds --domain_dimension to select 2D or 3D test artifacts.
     Adds --polynomial_degree to specify the polynomial degree for tests.
+    Adds --plot_dir for the output directory of plot_test_results.py.
     """
     parser.addoption(
         "--domain_dimension", action="store", type=int, help="Domain dimension (2 or 3)"
@@ -281,6 +282,12 @@ def pytest_addoption(parser):
         action="store",
         type=int,
         help="Polynomial degree (integer)",
+    )
+    parser.addoption(
+        "--plot_dir",
+        action="store",
+        default="plots",
+        help="Directory for the PNGs of plot_test_results.py",
     )
 
 
@@ -294,6 +301,14 @@ def reference_results_path(polynomial_degree):
 def temp_results_path():
     """Path to the directory containing outputs produced by the current test run."""
     return Path("./temp_test_results")
+
+
+@pytest.fixture(scope="module")
+def plot_dir(request):
+    """Directory for the plots of plot_test_results.py, created if missing."""
+    path = Path(request.config.getoption("plot_dir"))
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @pytest.fixture(scope="module")

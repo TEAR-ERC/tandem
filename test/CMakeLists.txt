@@ -2,6 +2,7 @@ include(CTest)
 include(../cmake/doctest.cmake)
 
 option(RUN_CI_TESTS "Enable CI integration tests" OFF)
+option(PLOT_CI_TESTS "Plot the integration test results into Testing/Temporary/plots" ON)
 set(TEST_DATA_BRANCH "master" CACHE STRING "Branch of tandem_test_data to use")
 # Define the list of polynomial degrees that have reference data
 set(ORDERS_WITH_REFERENCE_DATA "2;3") # Use a semicolon-separated list for multiple, e.g., "3;4;5"
@@ -232,6 +233,23 @@ if(RUN_CI_TESTS)
     endif()
     if(DOMAIN_DIMENSION EQUAL 3)
         add_pytest_test("traction-bc-test-${DOMAIN_DIMENSION}D" "test_traction_bc.py")
+    endif()
+
+    # Plot the convergence, SEAS, BC and viscoelastic results for the CI artifacts.
+    # Reads the outputs of generate-test-outputs (so it runs before the cleanup) and
+    # never fails: a plot that cannot be made is skipped with the reason.
+    if(PLOT_CI_TESTS)
+        add_test(
+            NAME plot-test-results
+            COMMAND ${Python_EXECUTABLE} -m pytest plot_test_results.py -rs
+            --domain_dimension=${DOMAIN_DIMENSION}
+            --polynomial_degree=${POLYNOMIAL_DEGREE}
+            --plot_dir=${CMAKE_BINARY_DIR}/Testing/Temporary/plots
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+        set_tests_properties(plot-test-results PROPERTIES
+            FIXTURES_REQUIRED TestData
+        )
     endif()
 
     # Remove test outputs after all pytest tests finish

@@ -91,6 +91,10 @@ Comprehensive tests validating the physics, parallelism, and convergence of the 
 | `test_viscoelastic_mms.py` | **Viscoelastic manufactured solution (2D):** Time-dependent manufactured solution with a body force, `app/tandem` QD (`examples/tandem/viscoelasticity/2d/mms.*`). Spatial: L2 order `p + 1` over three resolutions. Temporal: order 2 in `theta` over four steps, on a field that lies in the discrete space so there is no spatial floor (needs `p >= 2`). |
 | `test_viscoelastic_cantilever.py` | **Viscoelastic rod creep and recovery (3D):** Rod under a traction history with symmetry planes (`examples/tandem/viscoelasticity/3d/cantilever_rod.*`, meshed with `clamped = 0`), compared against the Zener uniaxial closed form: `eps_xx(0)` from the unrelaxed solve, creep, the rebound overshoot of the unloading step, recovery, and the stress output (uniform `stress_xx = s0`). |
 
+#### Result plots
+
+`plot_test_results.py` plots the results of the static convergence, SEAS regression, boundary condition and viscoelastic tests: the L2 and H1-semi convergence against the allowed slope band, VMax of the QD and QDGreen runs over the stored reference with the detected events, the static BC errors against the tolerance, `stress_xy` against the closed form for simple shear, the convergence plots of the manufactured solution, and the rod strain and stress against the Zener solution. It runs as the ctest entry `plot-test-results` (on by default, `-DPLOT_CI_TESTS=OFF` to disable), reads only the outputs the tests already read, and writes small PNGs to `<build>/Testing/Temporary/plots/`, which CI uploads with the test logs. It never fails: a plot that cannot be made is skipped with the reason. The plots are also shown in the documentation (`docs/testing/results.rst`).
+
 ## Adding New Tests
 
 We encourage adding tests for new features! Follow these steps based on the type of test:
