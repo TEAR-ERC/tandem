@@ -27,3 +27,4 @@ Table of contents
    getting-started/index
    first-model/index
    reference/index
+   testing/index
