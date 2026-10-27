@@ -157,73 +157,92 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
 
-    // ================= P0 projection =================
-    auto lam_eigen = LamMap(lam_field);        // windows onto the box (they hold b right now)
-    auto mu_eigen = MuMap(mu_field);
-    auto rhoInv_eigen = RhoInvMap(rhoInv_field);
 
-    {   // DEBUG 2: compare kernel outputs with direct sums (box still holds b here)
-        auto J_dbg = vol[elNo].get<AbsDetJ>();
-        auto const& w_dbg = volRule.weights();
-        double vol_direct = 0.0, lam_direct = 0.0;
-        for (std::size_t q = 0; q < volRule.size(); ++q) {
-            vol_direct += w_dbg[q] * J_dbg[q];                       // true element volume
-            lam_direct += w_dbg[q] * J_dbg[q] * lam_Q(0, q);         // integral of your lambda
-        }
-        const double vol_kernel = MMap(Mmem).sum();                  // volume according to the kernel's matrix M
-        const double lam_kernel = lam_eigen.sum();                   // integral of lambda according to the kernel's b
-        const bool vol_ok = std::abs(vol_kernel - vol_direct) <= 1e-10 * std::abs(vol_direct);
-        const bool lam_ok = std::abs(lam_kernel - lam_direct) <= 1e-10 * std::abs(lam_direct) + 1e-300;
-        if (elNo < 3 || !vol_ok || !lam_ok) {                        // always print elements 0-2, plus any failure
-            std::fprintf(stderr, "DEBUG el %zu: volume %.12g (kernel) vs %.12g (direct)%s | "
-                                 "lambda integral %.12g (kernel) vs %.12g (direct)%s\n",
-                         elNo, vol_kernel, vol_direct, vol_ok ? "" : "  <-- MISMATCH",
-                         lam_kernel, lam_direct, lam_ok ? "" : "  <-- MISMATCH");
-        }
-    }
+    // Initialize mapping to Lam Mu and RhoInv
+    auto lam_eigen = LamMap(lam_field);                                 // window onto the box's lambda slots (holds b right now)
+    auto mu_eigen = MuMap(mu_field);                                    // window onto the mu slots
+    auto rhoInv_eigen = RhoInvMap(rhoInv_field);                        // window onto the 1/rho slots
 
-    // ---- Method 1: explicit volume average (depends only on lam_Q, w, J: certain) ----
-    auto J_Q = vol[elNo].get<AbsDetJ>();
-    auto const& w = volRule.weights();
 
-    double vol_1 = 0.0;                                    // the 1x1 "mass matrix" = element volume
-    double lam_rhs = 0.0;                                 // integral of lambda
-    double mu_rhs = 0.0;                                  // integral of mu
-    double rhoInv_rhs = 0.0;                              // integral of 1/rho
+    // ==================== 1. THE ORIGINAL PROJECTION (k_proj), kept in separate vectors ====================
+    auto proj = MMap(Mmem).fullPivLu();                                 // prepare to solve equations with M
+    
+    lam_proj = proj.solve(lam_eigen);                      // solve M c = b: the projected lambda coefficients (own vector)
+    mu_proj = proj.solve(mu_eigen);                         // the projected mu coefficients (own vector)
+    rhoInv_proj = proj.solve(rhoInv_eigen);             // the projected 1/rho coefficients (own vector)
 
+    // ==================== 2. P0 projection: replaces project_material_lhs/rhs, the Eigen aliases, proj and the solves ==================== 
+    auto J_Q = vol[elNo].get<AbsDetJ>();                  // |detJ| at each quad point
+    auto const& w = volRule.weights();                    // quadrature weights
+
+    double volume_total = 0.0;                            // will become the element volume
+    double lam_integral = 0.0;                            // will become the integral of lambda
+    double mu_integral = 0.0;
+    double rhoInv_integral = 0.0;
     for (std::size_t q = 0; q < volRule.size(); ++q) {
-        const double wJ = w[q] * J_Q[q];
-        vol_1 += wJ;
-        lam_rhs += wJ * lam_Q(0, q);
-        mu_rhs += wJ * mu_Q(0, q);
-        rhoInv_rhs += wJ * rhoInv_Q(0, q);
+        const double wJ = w[q] * J_Q[q];                  // this point's share of the element
+        volume_total += wJ;
+        lam_integral += wJ * lam_Q(0, q);
+        mu_integral += wJ * mu_Q(0, q);
+        rhoInv_integral += wJ * rhoInv_Q(0, q);
     }
-    const double lam_mean = lam_rhs / vol_1;
-    const double mu_mean = mu_rhs / vol_1;
-    const double rhoInv_mean = rhoInv_rhs / vol_1;
+    const double lam_avg = lam_integral / volume_total;       // the averages (k_avg)
+    const double mu_avg = mu_integral / volume_total;   // not "mu_avg": that name is already a member function
+    const double rhoInv_avg = rhoInv_integral / volume_total;
 
-    // ---- Method 2: shortcut from the kernel outputs (valid only under the two assumptions) ----
-    // MUST be computed before setConstant, while the box still holds b.
-    const double vol_2 = MMap(Mmem).sum();
-    const double lam_mean_2 = lam_eigen.sum() / vol_2;
-    const double mu_mean_2 = mu_eigen.sum() / vol_2;
-    const double rhoInv_mean_2 = rhoInv_eigen.sum() / vol_2;
+    // for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) lam_field[i] = lam_avg;
+    // for (std::size_t i = 0; i < tensor::mu::Shape[0]; ++i) mu_field[i] = mu_avg;
+    // for (std::size_t i = 0; i < tensor::rhoInv::Shape[0]; ++i) rhoInv_field[i] = rhoInv_avg;
 
-    // ---- Check: do the two methods agree? ----
-    auto close = [](double a, double b) { return std::abs(a - b) <= 1e-10 * std::abs(b) + 1e-300; };
-    if (!close(vol_2, vol_1) || !close(lam_mean_2, lam_mean) || !close(mu_mean_2, mu_mean) ||
-        !close(rhoInv_mean_2, rhoInv_mean)) {
-        std::fprintf(stderr,
-                     "P0 check FAILED, element %zu: volume %.12g vs %.12g, lam %.12g vs %.12g, "
-                     "mu %.12g vs %.12g, rhoInv %.12g vs %.12g\n",
-                     elNo, vol_1, vol_2, lam_mean, lam_mean_2, mu_mean, mu_mean_2, rhoInv_mean,
-                     rhoInv_mean_2);
+
+  // ==================== 3. RANGE OF THE UNPROJECTED QUAD POINTS AND THE PROJECTED POLYNOMIAL ====================
+    // Unprojected values
+    double lam_Q_min = lam_Q(0, 0), lam_Q_max = lam_Q(0, 0);            // start from the first value
+    double mu_Q_min = mu_Q(0, 0), mu_Q_max = mu_Q(0, 0);
+    double rhoInv_Q_min = rhoInv_Q(0, 0), rhoInv_Q_max = rhoInv_Q(0, 0);
+    for (std::size_t q = 1; q < volRule.size(); ++q) {
+        lam_Q_min = std::min(lam_Q_min, lam_Q(0, q));
+        lam_Q_max = std::max(lam_Q_max, lam_Q(0, q));
+        mu_Q_min = std::min(mu_Q_min, mu_Q(0, q));
+        mu_Q_max = std::max(mu_Q_max, mu_Q(0, q));
+        rhoInv_Q_min = std::min(rhoInv_Q_min, rhoInv_Q(0, q));
+        rhoInv_Q_max = std::max(rhoInv_Q_max, rhoInv_Q(0, q));
     }
 
-    // ---- Write the P0 values into the box (method 1's numbers) ----
-    lam_eigen.setConstant(lam_mean);
-    mu_eigen.setConstant(mu_mean);
-    rhoInv_eigen.setConstant(rhoInv_mean);
+    // Projected values
+    double lam_proj_min = lam_proj(0), lam_proj_max = lam_proj(0);      // start from the first value
+    double mu_proj_min = mu_proj(0), mu_proj_max = mu_proj(0);
+    double rhoInv_proj_min = rhoInv_proj(0), rhoInv_proj_max = rhoInv_proj(0);
+    for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) {
+        lam_proj_min = std::min(lam_proj_min, lam_proj[i]);
+        lam_proj_max = std::max(lam_proj_max, lam_proj[i]);
+        mu_proj_min  = std::min(mu_proj_min,  mu_proj[i]);
+        mu_proj_max  = std::max(mu_proj_max,  mu_proj[i]);
+        rhoInv_proj_min = std::min(rhoInv_proj_min, rhoInv_proj[i]);
+        rhoInv_proj_max = std::max(rhoInv_proj_max, rhoInv_proj[i]);
+    }
+
+  // ==================== 4. Compute theta per element ====================                                        // 1 = no shrinking
+    double theta_lam = 1.0;
+    theta_lam = std::min(theta_lam, (lam_Q_max - lam_avg) / (lam_proj_max - lam_avg)); //means it overshoots
+    theta_lam = std::min(theta_lam, (lam_avg - lam_Q_min) / (lam_avg - lam_proj_min)); // means it undershoots
+
+    double theta_rhoInv = 1.0;
+    theta_rhoInv = std::min(theta_rhoInv, (rhoInv_Q_max - rhoInv_avg) / (rhoInv_proj_max - rhoInv_avg)); //means it overshoots
+    theta_rhoInv = std::min(theta_rhoInv, (rhoInv_avg - rhoInv_Q_min) / (rhoInv_avg - rhoInv_proj_min)); // means it undershoots
+
+    double theta_mu = 1.0;
+    theta_mu = std::min(theta_mu, (mu_Q_max - mu_avg) / (mu_proj_max - mu_avg)); //means it overshoots
+    theta_mu = std::min(theta_mu, (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min)); // means it undershoots
+
+  // ==================== 5. Evaluate theta at each quad point ====================
+
+    // Limit the higher-order coefficients using our calculated theta values.
+    for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) {
+        lam_eigen(i) = theta_lam * (lam_proj(i) - lam_avg) + lam_avg;
+        mu_eigen(i) = theta_mu * (mu_proj(i) - mu_avg) + mu_avg;
+        rhoInv_eigen(i) = theta_rhoInv * (rhoInv_proj(i) - rhoInv_avg) + rhoInv_avg;
+    }
 
     // ---- transposed inverse Jacobian: unchanged ----
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
