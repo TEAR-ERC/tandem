@@ -157,6 +157,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
 
+    using LamVec = Eigen::Matrix<double, tensor::lam::Shape[0], 1>;      // vectors that OWN their numbers
+    using MuVec = Eigen::Matrix<double, tensor::mu::Shape[0], 1>;
+    using RhoInvVec = Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>;
 
     // Initialize mapping to Lam Mu and RhoInv
     auto lam_eigen = LamMap(lam_field);                                 // window onto the box's lambda slots (holds b right now)
@@ -167,10 +170,10 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     // ==================== 1. THE ORIGINAL PROJECTION (k_proj), kept in separate vectors ====================
     auto proj = MMap(Mmem).fullPivLu();                                 // prepare to solve equations with M
     
-    lam_proj = proj.solve(lam_eigen);                      // solve M c = b: the projected lambda coefficients (own vector)
-    mu_proj = proj.solve(mu_eigen);                         // the projected mu coefficients (own vector)
-    rhoInv_proj = proj.solve(rhoInv_eigen);             // the projected 1/rho coefficients (own vector)
-
+    const LamVec lam_proj = proj.solve(lam_eigen);
+    const MuVec mu_proj = proj.solve(mu_eigen);
+    const RhoInvVec rhoInv_proj = proj.solve(rhoInv_eigen);
+    
     // ==================== 2. P0 projection: replaces project_material_lhs/rhs, the Eigen aliases, proj and the solves ==================== 
     auto J_Q = vol[elNo].get<AbsDetJ>();                  // |detJ| at each quad point
     auto const& w = volRule.weights();                    // quadrature weights
