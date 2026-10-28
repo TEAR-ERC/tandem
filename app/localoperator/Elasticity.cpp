@@ -19,7 +19,8 @@
 #include <cassert>
 
 // added for output of thetas
-#include <fstream>
+#include <mutex>
+#include <sstream>
 
 namespace tensor = tndm::elasticity::tensor;
 namespace init = tndm::elasticity::init;
@@ -251,15 +252,53 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     }
 
     // ---------- log theta for this element ----------
+        // ---------- logs: projected values, average and final values; and the thetas ----------
     {
-        static std::ofstream theta_log("theta.log", std::ios::trunc); // opened once, emptied at program start
-        theta_log.precision(10);
-        theta_log << "element " << elNo
-                  << " theta_lam = " << theta_lam
-                  << " theta_mu = " << theta_mu
-                  << " theta_rhoInv = " << theta_rhoInv << '\n';
+        static std::FILE* lam_log = std::fopen("lam_log.txt", "w");             // opened once; "w" empties the file at program start
+        static std::FILE* mu_log = std::fopen("mu_log.txt", "w");
+        static std::FILE* rhoInv_log = std::fopen("rhoInv_log.txt", "w");
+        static std::FILE* theta_log = std::fopen("theta.log", "w");
+
+        // make log files
+        const std::size_t n_nodes = tensor::lam::Shape[0];                      // material nodes per element
+
+
+        if (lam_log) {                                                          // skip if the file could not be opened
+            flockfile(lam_log);                                                 // keep other threads out of this file until funlockfile
+            std::fprintf(lam_log, "element %zu avg = %.10g | proj:", elNo, lam_avg);
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(lam_log, " %.10g", lam_proj(i));   // projected values
+            std::fprintf(lam_log, " | final:");
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(lam_log, " %.10g", lam_field[i]);  // values after the limiter
+            std::fprintf(lam_log, "\n");
+            funlockfile(lam_log);
+        }
+
+        if (mu_log) {
+            flockfile(mu_log);
+            std::fprintf(mu_log, "element %zu avg = %.10g | proj:", elNo, mu_avg);
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(mu_log, " %.10g", mu_proj(i));
+            std::fprintf(mu_log, " | final:");
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(mu_log, " %.10g", mu_field[i]);
+            std::fprintf(mu_log, "\n");
+            funlockfile(mu_log);
+        }
+
+        if (rhoInv_log) {
+            flockfile(rhoInv_log);
+            std::fprintf(rhoInv_log, "element %zu avg = %.10g | proj:", elNo, rhoInv_avg);
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(rhoInv_log, " %.10g", rhoInv_proj(i));
+            std::fprintf(rhoInv_log, " | final:");
+            for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(rhoInv_log, " %.10g", rhoInv_field[i]);
+            std::fprintf(rhoInv_log, "\n");
+            funlockfile(rhoInv_log);
+        }
+
+        if (theta_log) {                                                        // one single call: the C library writes it whole
+            std::fprintf(theta_log, "element %zu theta_lam = %.10g theta_mu = %.10g theta_rhoInv = %.10g\n",
+                         elNo, theta_lam, theta_mu, theta_rhoInv);
+        }
     }
-    
+
     // ---- transposed inverse Jacobian: unchanged ----
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
