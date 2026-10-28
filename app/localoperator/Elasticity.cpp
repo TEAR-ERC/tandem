@@ -226,18 +226,21 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     }
 
   // ==================== 4. Compute theta per element ====================                                        // 1 = no shrinking
-    double theta_lam = 1.0;
-    theta_lam = std::min(theta_lam, (lam_Q_max - lam_avg) / (lam_proj_max - lam_avg)); //means it overshoots
-    theta_lam = std::min(theta_lam, (lam_avg - lam_Q_min) / (lam_avg - lam_proj_min)); // means it undershoots
+  // ==================== 4. Compute theta per element ====================
+    double theta_lam = 1.0;                                             // 1 = no shrinking
+    if (lam_proj_max > lam_avg) theta_lam = std::min(theta_lam, (lam_Q_max - lam_avg) / (lam_proj_max - lam_avg)); // overshoot
+    if (lam_proj_min < lam_avg) theta_lam = std::min(theta_lam, (lam_avg - lam_Q_min) / (lam_avg - lam_proj_min)); // undershoot
+    theta_lam = std::max(0.0, theta_lam);                               // never negative
 
     double theta_rhoInv = 1.0;
-    theta_rhoInv = std::min(theta_rhoInv, (rhoInv_Q_max - rhoInv_avg) / (rhoInv_proj_max - rhoInv_avg)); //means it overshoots
-    theta_rhoInv = std::min(theta_rhoInv, (rhoInv_avg - rhoInv_Q_min) / (rhoInv_avg - rhoInv_proj_min)); // means it undershoots
+    if (rhoInv_proj_max > rhoInv_avg) theta_rhoInv = std::min(theta_rhoInv, (rhoInv_Q_max - rhoInv_avg) / (rhoInv_proj_max - rhoInv_avg));
+    if (rhoInv_proj_min < rhoInv_avg) theta_rhoInv = std::min(theta_rhoInv, (rhoInv_avg - rhoInv_Q_min) / (rhoInv_avg - rhoInv_proj_min));
+    theta_rhoInv = std::max(0.0, theta_rhoInv);
 
     double theta_mu = 1.0;
-    theta_mu = std::min(theta_mu, (mu_Q_max - mu_avg) / (mu_proj_max - mu_avg)); //means it overshoots
-    theta_mu = std::min(theta_mu, (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min)); // means it undershoots
-
+    if (mu_proj_max > mu_avg) theta_mu = std::min(theta_mu, (mu_Q_max - mu_avg) / (mu_proj_max - mu_avg));
+    if (mu_proj_min < mu_avg) theta_mu = std::min(theta_mu, (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min));
+    theta_mu = std::max(0.0, theta_mu);
   // ==================== 5. Evaluate theta at each quad point ====================
 
     // Limit the higher-order coefficients using our calculated theta values.
@@ -247,6 +250,16 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         rhoInv_eigen(i) = theta_rhoInv * (rhoInv_proj(i) - rhoInv_avg) + rhoInv_avg;
     }
 
+    // ---------- log theta for this element ----------
+    {
+        static std::ofstream theta_log("theta.log", std::ios::trunc); // opened once, emptied at program start
+        theta_log.precision(10);
+        theta_log << "element " << elNo
+                  << " theta_lam = " << theta_lam
+                  << " theta_mu = " << theta_mu
+                  << " theta_rhoInv = " << theta_rhoInv << '\n';
+    }
+    
     // ---- transposed inverse Jacobian: unchanged ----
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
     auto G_Q_T = init::G_Q_T::view::create(volPre[elNo].get<JInvT>().data()->data());
