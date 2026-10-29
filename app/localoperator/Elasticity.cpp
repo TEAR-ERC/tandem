@@ -193,7 +193,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     const double lam_avg = lam_integral / volume_total;       // the averages (k_avg)
     const double mu_avg = mu_integral / volume_total;   // not "mu_avg": that name is already a member function
     const double rhoInv_avg = rhoInv_integral / volume_total;
-
+    
+    //if (use_p0) {
+        // ================= P0 =================
     // for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) lam_field[i] = lam_avg;
     // for (std::size_t i = 0; i < tensor::mu::Shape[0]; ++i) mu_field[i] = mu_avg;
     // for (std::size_t i = 0; i < tensor::rhoInv::Shape[0]; ++i) rhoInv_field[i] = rhoInv_avg;
@@ -214,16 +216,16 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     }
 
     // Projected values
-    double lam_proj_min = lam_proj(0), lam_proj_max = lam_proj(0);      // start from the first value
-    double mu_proj_min = mu_proj(0), mu_proj_max = mu_proj(0);
-    double rhoInv_proj_min = rhoInv_proj(0), rhoInv_proj_max = rhoInv_proj(0);
-    for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) {
-        lam_proj_min = std::min(lam_proj_min, lam_proj[i]);
-        lam_proj_max = std::max(lam_proj_max, lam_proj[i]);
-        mu_proj_min  = std::min(mu_proj_min,  mu_proj[i]);
-        mu_proj_max  = std::max(mu_proj_max,  mu_proj[i]);
-        rhoInv_proj_min = std::min(rhoInv_proj_min, rhoInv_proj[i]);
-        rhoInv_proj_max = std::max(rhoInv_proj_max, rhoInv_proj[i]);
+    for (std::size_t q = 0; q < volRule.size(); ++q) {
+        double lam_v = 0.0, mu_v = 0.0, rhoInv_v = 0.0;
+        for (std::size_t i = 0; i < nodes; ++i) {
+            lam_v += matE_Q_T(q, i) * lam_proj(i);
+            mu_v += matE_Q_T(q, i) * mu_proj(i);
+            rhoInv_v += matE_Q_T(q, i) * rhoInv_proj(i);
+        }
+        lam_proj_min = std::min(lam_proj_min, lam_v);       lam_proj_max = std::max(lam_proj_max, lam_v);
+        mu_proj_min = std::min(mu_proj_min, mu_v);          mu_proj_max = std::max(mu_proj_max, mu_v);
+        rhoInv_proj_min = std::min(rhoInv_proj_min, rhoInv_v); rhoInv_proj_max = std::max(rhoInv_proj_max, rhoInv_v);
     }
 
   // ==================== 4. Compute theta per element ====================                                        // 1 = no shrinking
