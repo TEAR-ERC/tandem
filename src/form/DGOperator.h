@@ -142,7 +142,7 @@ public:
                 lop_->local_relaxation_time(elNo, dt_local, scratch_);
             }
             MPI_Allreduce(&dt_local, &relaxation_time_global_, 1, MPI_DOUBLE, MPI_MIN,
-                          MPI_COMM_WORLD);
+                          topo_->comm());
             // Reduced values are the same on every rank, so every rank throws.
             if (relaxation_time_global_ <= 0.0) {
                 throw std::runtime_error(
@@ -155,7 +155,7 @@ public:
                 unsigned long mismatch_local = lop_->relaxation_time_mismatch_local();
                 unsigned long mismatch = 0;
                 MPI_Allreduce(&mismatch_local, &mismatch, 1, MPI_UNSIGNED_LONG, MPI_SUM,
-                              MPI_COMM_WORLD);
+                              topo_->comm());
                 if (mismatch > 0) {
                     throw std::runtime_error(
                         "relaxation_time disagrees with viscosity / mu1 at " +
@@ -173,7 +173,7 @@ public:
                                                            LocalOperator>) {
                 double tau_max_local = lop_->relaxation_time_max_local();
                 double tau_max = 0.0;
-                MPI_Allreduce(&tau_max_local, &tau_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+                MPI_Allreduce(&tau_max_local, &tau_max, 1, MPI_DOUBLE, MPI_MAX, topo_->comm());
                 lop_->set_relaxation_time_max_global(tau_max);
             }
             lop_->set_viscoelastic_time_step(relaxation_time_global_);
