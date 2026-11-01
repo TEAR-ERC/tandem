@@ -99,8 +99,11 @@ g(Δt) = (τ/Δt)(1 − exp(−Δt/τ)) = (1 − exp(−r))/r,  r = Δt/τ
 Uses expm1 for stable evaluation when r is small.
 */
 double Viscoelasticity::compute_g_dt(double dt, double tau) const {
-    if (dt <= 0.0 || tau <= 0.0) {
-        return 0.0;
+    if (tau <= 0.0) {
+        return 0.0; // instant relaxation
+    }
+    if (dt <= 0.0) {
+        return 1.0; // zero-duration stage: unrelaxed, g(0) = 1
     }
     double const r = dt / tau;
     if (r == 0.0) { // r underflowed; g(0) = 1

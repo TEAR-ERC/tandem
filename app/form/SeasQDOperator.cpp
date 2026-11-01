@@ -30,6 +30,10 @@ void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunction
     fun_traction_boundary_ = std::move(fun);
 }
 
+void SeasQDOperator::prepare_for_stage_dt(double stage_dt, double full_dt) {
+    prepare_for_dt(dgop_->fault_present() ? stage_dt : full_dt);
+}
+
 void SeasQDOperator::prepare_for_dt(double dt) {
     // Recompute dt-dependent coefficients and reassemble the matrix only if they
     // changed (viscoelasticity only, see the header). No-op for other operators.
@@ -170,20 +174,28 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
     // solve is therefore a round-off-level change, not a bit-identical one.
     //
     // Without FSAL, Y[s-1] != y_{n+1} and the solve here is mandatory.
-    if (!solution_is_current(time)) {
-        update_ghost_state(state);
-        solve(time, make_state_view(state));
-    }
-    accepted_solve_ = num_linear_solves_;
-    accepted_time_ = time;
-
-    // Calculate and set the actual dt for this timestep
+    // Under stage-time reconstruction the final stage is evaluated with its own
+    // elapsed duration, which equals h only because this tableau ends with c = 1.
+    // Prepare the accepted full-step coefficients BEFORE the endpoint solve and the
+    // memory commit so that neither relies on that coincidence.  If the coefficients
+    // move, prepare_for_dt() invalidates the cached solve and the branch below
+    // re-solves, which is the required behaviour.
     double dt = time - last_time_;
     if (dt < 0.0)
         dt = 0.0;
     if (dt > 0.0) {
         prepare_for_dt(dt);
     }
+
+    if (!solution_is_current(time)) {
+        update_ghost_state(state);
+        solve(time, make_state_view(state));
+    }
+    // Recorded AFTER the endpoint solve: prepare_for_dt() above may have invalidated
+    // a cached stage solve, in which case the branch just re-solved and this is the
+    // solve the monitor may reuse.
+    accepted_solve_ = num_linear_solves_;
+    accepted_time_ = time;
     last_time_ = time;
 
     // Endpoint traction for the monitor, evaluated before compute_partial_strain() commits the

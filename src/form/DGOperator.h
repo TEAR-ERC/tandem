@@ -558,7 +558,19 @@ public:
                 // the same frozen g feeds the matrix, the history right-hand side and the
                 // partial-strain update alike, so the scheme stays the intended one --
                 // exp-integrator with parameter g_asm -- rather than an inconsistent mix.
-                if (dt <= 0.0) {
+                // Stage-time reconstruction: a zero-duration stage (an RK abscissa with
+                // c_i = 0) is a legitimate request and must give ratio = g = 1, the
+                // unrelaxed operator -- not whatever the previous stage left behind.
+                // Returning early here would leave stale coefficients on stage 0.
+                if (dt < 0.0) {
+                    return false;
+                }
+                if (dt == 0.0) {
+                    if (lop_->get_viscoelastic_time_step() != 0.0) {
+                        lop_->set_viscoelastic_time_step_value(0.0);
+                        update_time_dependent_precomputation();
+                        return true;
+                    }
                     return false;
                 }
                 if constexpr (std::experimental::is_detected_v<viscoelastic_g_change_t,
@@ -618,6 +630,7 @@ public:
     }
 
     void set_fault_present(bool present) override { fault_present_ = present; }
+    bool fault_present() const override { return fault_present_; }
 
     bool is_viscoelastic() const override {
         return std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>;

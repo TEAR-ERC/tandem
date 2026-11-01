@@ -58,6 +58,10 @@ public:
      * viscoelasticity without a fault, which use a fixed step).
      */
     virtual bool update_time_step(double) { return false; }
+    // True when a frictional fault is present, i.e. when PETSc integrates a fault
+    // state and the RHS is evaluated at Runge-Kutta stages.  Only then does a
+    // stage duration mean anything; without a fault the bulk is a direct march.
+    virtual bool fault_present() const { return false; }
     /*
      * @brief Declare whether the mesh contains a fault.
      *

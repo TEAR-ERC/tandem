@@ -101,6 +101,10 @@ public:
      * changes (a shortened step, e.g. the last). For other operators it is a no-op.
      */
     void prepare_for_dt(double dt);
+    // Stage-time reconstruction, but only where it is defined: with a fault the
+    // stages are real RK stages and want their own elapsed duration; without one
+    // the run is a fixed-dt march and must keep the full step.
+    void prepare_for_stage_dt(double stage_dt, double full_dt);
     virtual void update_internal_state(double time, BlockVector const& state,
                                        bool state_changed_since_last_rhs, bool require_traction,
                                        bool require_displacement);

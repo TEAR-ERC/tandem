@@ -216,12 +216,26 @@ private:
             },
             x);
 
-        // TSGetTimeStep returns the step currently being attempted (updated by the
-        // adaptive controller, including on rejected-step retries), so this prepares
-        // the operator for the exact dt of the stages about to be evaluated.
-        PetscReal dt;
+        // Stage-time reconstruction.  TSGetTimeStep gives the attempted step h and
+        // TSGetTime the last ACCEPTED time t_n, so s = t - t_n is the elapsed
+        // duration of the stage about to be evaluated.  Preparing the constitutive
+        // coefficients with s rather than h is what makes the coupled scheme second
+        // order: with h at every stage the viscous strain advances by h*Lambda*q_n
+        // wherever the stage sits, instead of c_i*h*Lambda*q_n.
+        //
+        // Every stage reconstructs from the same accepted (q_n, eps_n); the 6vr
+        // abscissae are not monotonic (0, 0.18, 1/6, ...), so memory must never be
+        // marched from stage to stage.
+        PetscReal dt, t_accepted;
         CHKERRTHROW(TSGetTimeStep(ts, &dt));
-        self->prepare_for_dt(dt);
+        CHKERRTHROW(TSGetTime(ts, &t_accepted));
+        PetscReal s = t - t_accepted;
+        if (!(s > 0.0)) {
+            s = 0.0;
+        } else if (s > dt) {
+            s = dt;
+        }
+        self->prepare_for_stage_dt(s, dt);
 
         std::apply([&self, &t](auto&... xv) { self->rhs(t, xv...); }, x_view);
         return 0;
