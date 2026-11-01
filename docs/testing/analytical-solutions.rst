@@ -280,6 +280,32 @@ The solution must start from rest. The code starts :math:`\varepsilon^{dev,n}` a
 non-zero at :math:`t = 0` is seen as a jump, and the first step puts :math:`q = g\,\varepsilon(0)` into the memory.
 A manufactured solution with :math:`q(0) = 0` then disagrees with the code at every later time.
 
+.. _as-two-layer:
+
+Two layers in creep
+^^^^^^^^^^^^^^^^^^^
+
+Used by: viscoelastic two-layer test. Closed form: ``exact_ux`` in
+``test/test_viscoelastic_two_layer.py``.
+
+Under a constant shear stress :math:`s` applied at :math:`t = 0`, an SLS in shear creeps as
+
+.. math::
+
+   \gamma(t;\tau) = \frac{s}{\mu_0} - \left(\frac{s}{\mu_0} - \frac{s}{\mu_0 + \mu_1}\right)
+   e^{-t/\tau_c}, \qquad \tau_c = \tau\,\frac{\mu_0 + \mu_1}{\mu_0}.
+
+The stress is the same in both layers, so each layer creeps on its own, and with the bottom fixed
+
+.. math::
+
+   u_x(y, t) = \begin{cases}
+     \gamma(t;\tau_{low})\,y, & y < 0.5, \\
+     0.5\,\gamma(t;\tau_{low}) + \gamma(t;\tau_{high})\,(y - 0.5), & y > 0.5,
+   \end{cases} \qquad u_y = 0.
+
+The field is piecewise linear in :math:`y` and the mesh conforms to :math:`y = 0.5`, so it is exact in space.
+
 .. _as-zener:
 
 Rod creep and recovery (Zener solid)

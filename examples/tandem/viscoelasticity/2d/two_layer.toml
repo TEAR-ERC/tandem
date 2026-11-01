@@ -1,0 +1,21 @@
+# Two-layer creep under uniform shear stress, see two_layer.lua.
+final_time = 30.0
+mesh_file = "two_layer.msh"
+type = "viscoelasticity"
+lib = "two_layer.lua"
+scenario = "two_layer"
+mode = "QD"
+
+ref_normal = [1, 0]
+
+[ts_checkpoint]
+storage_type = "none"
+
+# t_max = 1 writes every time step.
+[domain_probe_output]
+prefix = "two_layer_"
+t_max = 1
+probes = [
+    { name = "low", x = [0.5, 0.25] },
+    { name = "high", x = [0.5, 0.75] },
+]

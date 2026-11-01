@@ -87,6 +87,18 @@ Pass criteria
    * -
      - temporal L2 order, fit and every local order (4 levels, :math:`p \ge 2`)
      - :math:`2 \pm 0.1`
+   * - VE two-layer creep
+     - time step, number of steps, reassemblies
+     - ``rel`` 1e-12, 300, exactly 2
+   * -
+     - :math:`\max|u_x - u_{ex}| / \max|u_x|`, 2 probes
+     - < 1.25 x 3.8267e-5 (low), 2.6568e-5 (high)
+   * -
+     - :math:`u_x(0)`, :math:`u_y`, stress components
+     - 1e-10
+   * -
+     - inconsistent ``relaxation_time``
+     - rejected
    * - VE rod
      - time step and number of steps
      - ``rel`` 1e-12

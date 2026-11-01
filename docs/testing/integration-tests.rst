@@ -400,6 +400,40 @@ with a body force and a time-dependent solution.
    Skipped for :math:`p < 2`, because the polynomial field needs :math:`p \ge 2`.
 
 
+Viscoelastic two-layer creep (2D)
+---------------------------------
+
+:pytest: ``test_viscoelastic_two_layer.py``, 4 tests (6 cases)
+:ctest: ``viscoelastic-two-layer-test-2D-p<deg>`` (2D, any degree)
+:generator: ``scripts/2D/viscoelastic_two_layer.sh``
+:configuration: ``examples/tandem/viscoelasticity/2d/two_layer.{geo,lua,toml}``
+:ground truth: closed form per layer, :ref:`as-two-layer`
+
+**Objective.** Materials with different relaxation times must each relax at their own rate:
+the relaxation time enters :math:`g(\Delta t/\tau)` and :math:`e^{-\Delta t/\tau}` at every
+quadrature point, and only the step cap uses the smallest one.
+
+**Setup.** The unit square split at :math:`y = 0.5` with a conforming mesh: :math:`\tau = 1` below,
+:math:`\tau = 10` above, :math:`\mu_0 = \mu_1 = \lambda = 1`. The bottom is fixed; the sides and
+the top carry the traction of a uniform shear stress :math:`s = 0.01` from :math:`t = 0`.
+:math:`\theta = 0.1`, ``final_time = 30``, direct solve. Probes at :math:`y = 0.25` and :math:`0.75`.
+A second run gives the deprecated ``relaxation_time`` with a value that contradicts
+``viscosity / mu1`` in the upper layer.
+
+**Checks.**
+
+``test_time_step``
+   Every step is :math:`\theta\tau_{min} = 0.1`, 300 steps, and the operator is reassembled exactly twice.
+``test_creep`` (2 probes)
+   :math:`u_x(0)` is the unrelaxed response to ``1e-10``, :math:`\max|u_x - u_{ex}| / \max|u_x|` is
+   below ``1.25`` x the measured error (``3.8e-5`` and ``2.7e-5``), and :math:`u_y = 0`.
+   One relaxation time for both layers (the smallest) gives ``12 %`` at the upper probe.
+``test_stress`` (2 probes)
+   :math:`\sigma_{xy} = s` and the other components 0, to ``1e-10``.
+``test_inconsistent_relaxation_time_rejected``
+   The second run stops with ``relaxation_time disagrees with viscosity / mu1``.
+
+
 Viscoelastic rod creep and recovery (3D)
 ----------------------------------------
 

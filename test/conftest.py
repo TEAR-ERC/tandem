@@ -251,6 +251,45 @@ def viscoelastic_cantilever_config():
 
 
 @pytest.fixture(scope="module")
+def viscoelastic_two_layer_config():
+    """
+    Material, loading and pass/fail limits for the viscoelastic two-layer creep test
+    (test_viscoelastic_two_layer.py, examples/tandem/viscoelasticity/2d/two_layer.*).
+
+    - Material and loading: copied from two_layer.lua, which the test runs unchanged.
+      Lower layer (y < 0.5) tau = 1, upper layer tau = 10, mu0 = mu1 = lam = 1, uniform
+      shear stress s = 0.01 from t = 0. Each layer creeps as an SLS in shear with
+      tau_c = tau (mu0 + mu1) / mu0; u_x is the integral of the strain over y.
+    - 'theta': dt/tau_min of two_layer.lua; every step is theta * tau_min = 0.1 and
+      final_time = 30 is a multiple of it, so the operator is reassembled exactly twice
+      (unrelaxed t = 0, then theta * tau).
+    - 'measured': max |u_x - exact| over the run, relative to max |u_x|, at each probe.
+      Measured on 2026-10-24 at np = 1, 2D p2, direct solve. The mesh is exact in space
+      (u is piecewise linear in y and the mesh conforms to the interface), so this is the
+      time integration alone. One relaxation time for both layers (the smallest, as before
+      the per-point fix) makes the upper probe 12 % off.
+    - 'headroom': limit = headroom * measured, as for simple shear.
+    - 'exact': limit on the t = 0 displacement (relative), on stress_xy / s - 1 and the other
+      stress components / s, and on |u_y| / max |u_x|. Measured <= 1.6e-13.
+    - 'rel_dt': max_time_step= and min_time_step= must equal theta * tau_min.
+    """
+    return {
+        "mu0": 1.0,
+        "mu1": 1.0,
+        "traction": 0.01,
+        "tau_low": 1.0,
+        "tau_high": 10.0,
+        "interface": 0.5,
+        "theta": 0.1,
+        "final_time": 30.0,
+        "measured": {"low": 3.8267e-05, "high": 2.6568e-05},
+        "headroom": 1.25,
+        "exact": 1e-10,
+        "rel_dt": 1e-12,
+    }
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.

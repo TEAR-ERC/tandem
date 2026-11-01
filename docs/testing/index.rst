@@ -201,6 +201,11 @@ Which tests run where
      -
      - any (time part: p >= 2)
      - manufactured solution
+   * - ``viscoelastic-two-layer-test``
+     - yes
+     -
+     - any
+     - closed form per layer
    * - ``viscoelastic-cantilever-test``
      -
      - yes
