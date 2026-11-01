@@ -134,6 +134,7 @@ public:
             PetscObjectCompose((PetscObject)ts_, "_PreStepHandler", (PetscObject)container));
         CHKERRTHROW(PetscObjectDereference((PetscObject)container));
 
+        compose_self();
         CHKERRTHROW(TSSetPreStep(ts_, &PreStepFunction<PreStepHandler>));
     }
 
@@ -155,10 +156,51 @@ public:
             PetscObjectCompose((PetscObject)ts_, "_PostStepHandler", (PetscObject)container));
         CHKERRTHROW(PetscObjectDereference((PetscObject)container));
 
+        compose_self();
         CHKERRTHROW(TSSetPostStep(ts_, &PostStepFunction<PostStepHandler>));
     }
 
 private:
+    // Lets the static step callbacks find this solver (and its state vectors).
+    void compose_self() {
+        PetscContainer container;
+        CHKERRTHROW(PetscContainerCreate(comm, &container));
+        CHKERRTHROW(PetscContainerSetPointer(container, this));
+        CHKERRTHROW(
+            PetscObjectCompose((PetscObject)ts_, "_PetscTimeSolver", (PetscObject)container));
+        CHKERRTHROW(PetscObjectDereference((PetscObject)container));
+    }
+
+    /*
+     * The blocks of the TS solution u for the pre- and post-step callbacks.
+     *
+     * VecNestGetSubVec increases the object state of the nest, because the caller may write
+     * through the block. TSPreStep and TSPostStep compare that state before and after the
+     * callback and call TSRestartStep when it changed; a restart disables FSAL, so an FSAL
+     * scheme (e.g. 5dp) re-evaluated its first stage, one extra linear solve per step.
+     * The callbacks only read u, and u is the nest of state_, so take the blocks from state_.
+     */
+    static std::array<Vec, NumStateVecs> solution_blocks(TS ts, Vec u) {
+        PetscContainer container = nullptr;
+        CHKERRTHROW(
+            PetscObjectQuery((PetscObject)ts, "_PetscTimeSolver", (PetscObject*)&container));
+        std::array<Vec, NumStateVecs> x;
+        if (container) {
+            PetscTimeSolver* self;
+            CHKERRTHROW(PetscContainerGetPointer(container, (void**)&self));
+            if (u == self->ts_state_) {
+                for (std::size_t n = 0; n < NumStateVecs; ++n) {
+                    x[n] = self->state_[n]->vec();
+                }
+                return x;
+            }
+        }
+        for (std::size_t n = 0; n < NumStateVecs; ++n) {
+            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
+        }
+        return x;
+    }
+
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
         TimeOp* self = reinterpret_cast<TimeOp*>(ctx);
@@ -217,11 +259,8 @@ private:
         CHKERRTHROW(TSGetTime(ts, &time));
         CHKERRTHROW(TSGetSolution(ts, &u));
 
-        // Extract state vectors and invoke handler
-        std::array<Vec, NumStateVecs> x;
-        for (std::size_t n = 0; n < NumStateVecs; ++n) {
-            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
-        }
+        // Extract state vectors (read only, see solution_blocks) and invoke handler
+        auto x = solution_blocks(ts, u);
         auto x_view = std::apply(
             [](auto&... x) -> std::array<PetscVectorView, NumStateVecs> {
                 return {PetscVectorView(x)...};
@@ -247,11 +286,8 @@ private:
         CHKERRTHROW(TSGetTime(ts, &time));
         CHKERRTHROW(TSGetSolution(ts, &u));
 
-        // Extract state vectors and invoke handler
-        std::array<Vec, NumStateVecs> x;
-        for (std::size_t n = 0; n < NumStateVecs; ++n) {
-            CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));
-        }
+        // Extract state vectors (read only, see solution_blocks) and invoke handler
+        auto x = solution_blocks(ts, u);
         auto x_view = std::apply(
             [](auto&... x) -> std::array<PetscVectorView, NumStateVecs> {
                 return {PetscVectorView(x)...};
