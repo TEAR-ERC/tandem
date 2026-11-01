@@ -67,6 +67,9 @@ Pass criteria
      - time step equals :math:`\theta\tau`
      - ``rel`` 1e-12, no rejections
    * -
+     - operator reassemblies
+     - exactly 3
+   * -
      - :math:`\sigma_{xy}(0) = (\mu_0+\mu_1)\gamma(0)`
      - 1e-12 relative
    * -

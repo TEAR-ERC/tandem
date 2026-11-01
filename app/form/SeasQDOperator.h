@@ -87,14 +87,18 @@ public:
      */
     inline void set_fsal(bool fsal) { fsal_ = fsal; }
 
+    // Run counters for the summary: global linear solves and operator reassemblies.
+    std::size_t num_linear_solves() const { return num_linear_solves_; }
+    std::size_t num_operator_reassemblies() const { return num_operator_reassemblies_; }
+
     /*
      * @brief Prepare the operator for a step of size dt before its RHS is evaluated.
      *
      * Called from the time integrator for every RK stage with the step currently
-     * being attempted. For viscoelasticity with a fault it recomputes the
-     * dt-dependent coefficients and reassembles the stiffness matrix when dt
-     * changes; otherwise (elasticity, or viscoelasticity without a fault) it is a
-     * no-op.
+     * being attempted. For viscoelasticity it recomputes the dt-dependent
+     * coefficients and reassembles the stiffness matrix when they change: with a
+     * fault when g(dt) moves by more than g_tol, without a fault whenever dt
+     * changes (a shortened step, e.g. the last). For other operators it is a no-op.
      */
     void prepare_for_dt(double dt);
     virtual void update_internal_state(double time, BlockVector const& state,
@@ -198,6 +202,9 @@ private:
     bool fsal_ = false;
     bool solution_valid_ = false;
     double solve_time_ = 0.0;
+
+    std::size_t num_linear_solves_ = 0;
+    std::size_t num_operator_reassemblies_ = 0;
 
 protected:
     PetscVector traction_;

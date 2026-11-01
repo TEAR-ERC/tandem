@@ -472,6 +472,12 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
         if (cfl_time_step) {
             std::cout << "dt_cfl=" << *cfl_time_step << std::endl;
         }
+        if constexpr (std::is_base_of_v<SeasQDOperator, seas_t>) {
+            // Every rank takes part in each solve and reassembly, so rank 0's count is global.
+            std::cout << "linear_solves=" << seasop->num_linear_solves() << std::endl;
+            std::cout << "operator_reassemblies=" << seasop->num_operator_reassemblies()
+                      << std::endl;
+        }
         if (L2_error_domain) {
             std::cout << "L2_error_domain=" << *L2_error_domain << std::endl;
         }

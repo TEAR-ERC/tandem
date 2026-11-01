@@ -584,12 +584,11 @@ public:
                 }
                 return false;
             }
-            // Viscoelasticity without a fault: normally a fixed step = theta * tau,
-            // but PETSc may truncate the last step to hit final_time exactly.
-            // Use the same change-detection logic as the fault path so the
-            // truncated last step gets correct g_dt, ratio, and B_dt.
+            // Viscoelasticity without a fault: normally a fixed step = theta * tau, but a
+            // step can be shorter (e.g. the last one, truncated to hit final_time). Rebuild
+            // only when dt actually changes; an unchanged dt, which every stage and the
+            // post-step pass again, leaves the stored step and its coefficients alone.
             {
-                double const theta_dt = lop_->viscoelastic_theta() * relaxation_time_global_;
                 double const current = lop_->get_viscoelastic_time_step();
                 double diff = dt - current;
                 if (diff < 0.0)
@@ -599,10 +598,6 @@ public:
                     lop_->set_viscoelastic_time_step_value(dt);
                     update_time_dependent_precomputation();
                     return true;
-                }
-                // dt unchanged — ensure pinned to theta*tau on the first call.
-                if (current != theta_dt) {
-                    lop_->set_viscoelastic_time_step(relaxation_time_global_);
                 }
             }
         }

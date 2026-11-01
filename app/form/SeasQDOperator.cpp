@@ -31,9 +31,8 @@ void SeasQDOperator::set_traction_boundary(std::unique_ptr<AbstractFacetFunction
 }
 
 void SeasQDOperator::prepare_for_dt(double dt) {
-    // Recompute dt-dependent coefficients; reassemble the matrix only if they
-    // changed (viscoelasticity with a fault). No-op for elasticity and for
-    // viscoelasticity without a fault.
+    // Recompute dt-dependent coefficients and reassemble the matrix only if they
+    // changed (viscoelasticity only, see the header). No-op for other operators.
     if (deferred_dt_ > 0.0) {
         // First call after initial_condition(), which assembled the unrelaxed operator for
         // the t=0 solve: return to the step the operator was built for, so that from here
@@ -44,6 +43,7 @@ void SeasQDOperator::prepare_for_dt(double dt) {
     }
     if (dgop_->update_time_step(dt)) {
         linear_solver_.reassemble(*dgop_);
+        ++num_operator_reassemblies_;
         // The matrix changed, so whatever x() holds is no longer its solution.
         solution_valid_ = false;
     }
@@ -193,6 +193,7 @@ void SeasQDOperator::solve(double time, BlockView const& state_view) {
     }
     linear_solver_.update_rhs(*dgop_);
     linear_solver_.solve();
+    ++num_linear_solves_;
     dgop_->set_slip(invalid_slip_bc());
     disp_scatter_.begin_scatter(linear_solver_.x(), disp_ghost_);
     disp_scatter_.wait_scatter();

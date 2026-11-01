@@ -118,24 +118,53 @@ def relative_errors(sig_num, sig_ana):
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_time_step(case, temp_results_path, read_tandem_summary, viscoelastic_simple_shear_config):
+def test_time_step(
+    case, temp_results_path, read_tandem_summary, viscoelastic_simple_shear_config
+):
     """
     The step is capped at theta * tau and nothing else limits it here, so every
     step but the last is exactly theta * tau. The tolerances below assume the
     theta of simple_shear.lua; this fails first if that changes.
     """
     conf = viscoelastic_simple_shear_config
-    summary = read_tandem_summary(temp_results_path / f"viscoelastic_simple_shear_{case}.log")
+    summary = read_tandem_summary(
+        temp_results_path / f"viscoelastic_simple_shear_{case}.log"
+    )
     tau = conf["eta"] / conf["mu1"]
     expected = conf["theta"] * tau
-    assert summary["max_time_step"] == pytest.approx(expected, rel=conf["rel_dt"]), (
-        f"max_time_step {summary['max_time_step']:.10e} != theta * tau = {expected:.10e}"
-    )
+    assert summary["max_time_step"] == pytest.approx(
+        expected, rel=conf["rel_dt"]
+    ), f"max_time_step {summary['max_time_step']:.10e} != theta * tau = {expected:.10e}"
     assert summary["step_rejections"] == 0
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_initial_stress(case, temp_results_path, read_domain_probe, viscoelastic_simple_shear_config):
+def test_operator_reassemblies(case, temp_results_path, read_tandem_summary):
+    """
+    Without a fault the operator is rebuilt only when dt changes: for the unrelaxed
+    t = 0 solve, back to theta * tau for the first step, and for the last step, which
+    PETSc shortens to end at final_time (final_time / (theta tau) = 253.5). That last
+    step is then prepared again with the same dt by every RK stage and by the
+    post-step; none of these may rebuild. An unchanged dt used to reset the stored step
+    to theta * tau, so the next preparation saw a "new" dt and reassembled (and
+    refactored) again.
+    """
+    summary = read_tandem_summary(
+        temp_results_path / f"viscoelastic_simple_shear_{case}.log"
+    )
+    assert (
+        summary["min_time_step"] < summary["max_time_step"]
+    ), "expected one shortened step (the last); if the run no longer has one, update this test"
+    assert summary["operator_reassemblies"] == 3, (
+        f"operator_reassemblies = {summary['operator_reassemblies']:.0f}, expected 3 "
+        "(unrelaxed t = 0, theta * tau, shortened last step)"
+    )
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_initial_stress(
+    case, temp_results_path, read_domain_probe, viscoelastic_simple_shear_config
+):
     """
     sigma_xy(0) must be the unrelaxed response (mu0 + mu1) gamma(0): at t = 0 the
     dashpot cannot move. Guards the unrelaxed t = 0 solve and q(0) = eps(0) in
@@ -156,7 +185,9 @@ def test_initial_stress(case, temp_results_path, read_domain_probe, viscoelastic
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_stress_history(case, temp_results_path, read_domain_probe, viscoelastic_simple_shear_config):
+def test_stress_history(
+    case, temp_results_path, read_domain_probe, viscoelastic_simple_shear_config
+):
     """
     Relative MAE and RMSE of sigma_xy(t) against the closed form. The two cases
     with a piecewise linear strain history must be exact to roundoff; the
@@ -172,9 +203,9 @@ def test_stress_history(case, temp_results_path, read_domain_probe, viscoelastic
     else:
         limits = {k: conf["headroom"] * v for k, v in conf["measured"][case].items()}
 
-    assert rel_mae < limits["rel_mae"], (
-        f"{case}: relative MAE {rel_mae:.4e} >= {limits['rel_mae']:.4e}"
-    )
-    assert rel_rmse < limits["rel_rmse"], (
-        f"{case}: relative RMSE {rel_rmse:.4e} >= {limits['rel_rmse']:.4e}"
-    )
+    assert (
+        rel_mae < limits["rel_mae"]
+    ), f"{case}: relative MAE {rel_mae:.4e} >= {limits['rel_mae']:.4e}"
+    assert (
+        rel_rmse < limits["rel_rmse"]
+    ), f"{case}: relative RMSE {rel_rmse:.4e} >= {limits['rel_rmse']:.4e}"

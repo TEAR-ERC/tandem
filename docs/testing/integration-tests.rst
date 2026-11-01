@@ -293,7 +293,7 @@ This is a coarse check, see :ref:`results-observations`.
 Viscoelastic simple shear (2D)
 ------------------------------
 
-:pytest: ``test_viscoelastic_simple_shear.py``, 3 tests x 6 cases
+:pytest: ``test_viscoelastic_simple_shear.py``, 4 tests x 6 cases
 :ctest: ``viscoelastic-simple-shear-test-2D-p<deg>`` (2D, any degree)
 :generator: ``scripts/2D/viscoelastic_simple_shear.sh``
 :configuration: ``examples/tandem/viscoelasticity/2d/simple_shear.{geo,lua,toml}``
@@ -323,6 +323,11 @@ and the stress at :math:`t = 0`.
 ``test_time_step``
    ``max_time_step`` in the summary equals :math:`\theta\tau` (``rel = 1e-12``),
    and there are no step rejections.
+``test_operator_reassemblies``
+   ``operator_reassemblies`` in the summary is exactly 3: the unrelaxed :math:`t = 0` solve,
+   back to :math:`\theta\tau`, and the last step, which PETSc shortens to end at ``final_time``.
+   Every RK stage and the post-step prepare that last step again with the same step size,
+   and none of them may rebuild the operator (and refactor the LU).
 ``test_initial_stress``
    :math:`\sigma_{xy}(0) = (\mu_0 + \mu_1)\,\gamma(0)`, the unrelaxed response, to
    ``1e-12`` relative to :math:`(\mu_0+\mu_1)\,2U_{max}/H`.
