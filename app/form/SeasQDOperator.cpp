@@ -100,15 +100,23 @@ void SeasQDOperator::rhs(double time, BlockVector const& state, BlockVector& res
 void SeasQDOperator::update_internal_state(double time, BlockVector const& state,
                                            bool state_changed_since_last_rhs, bool require_traction,
                                            bool require_displacement) {
-    bool require_solve = state_changed_since_last_rhs && (require_traction || require_displacement);
-    if (!require_solve) {
+    bool require_update =
+        state_changed_since_last_rhs && (require_traction || require_displacement);
+    if (!require_update) {
         return;
     }
 
-    update_ghost_state(state);
-    solve(time, make_state_view(state));
-    if (require_traction) {
-        update_traction(make_state_view(state));
+    // Without FSAL the viscoelastic post-step has already solved at this accepted state and
+    // evaluated the traction there (it runs before the monitor); reuse both unless something
+    // solved since. The traction must not be evaluated here in that case: the post-step has
+    // committed the history, and the traction would combine the step's coefficients with the
+    // history at the end of the step.
+    if (!solved_at_accepted_state(time)) {
+        update_ghost_state(state);
+        solve(time, make_state_view(state));
+        if (require_traction) {
+            update_traction(make_state_view(state));
+        }
     }
 
     // For stress output: store displacement and compute current strain state
@@ -166,6 +174,8 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
         update_ghost_state(state);
         solve(time, make_state_view(state));
     }
+    accepted_solve_ = num_linear_solves_;
+    accepted_time_ = time;
 
     // Calculate and set the actual dt for this timestep
     double dt = time - last_time_;
@@ -175,6 +185,14 @@ void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector c
         prepare_for_dt(dt);
     }
     last_time_ = time;
+
+    // Endpoint traction for the monitor, evaluated before compute_partial_strain() commits the
+    // history: the traction adds the history term of the step (step coefficients g, ratio and
+    // the history at the start of the step) to the accepted displacement. Under FSAL the final
+    // stage has already evaluated exactly this traction.
+    if (!fsal_) {
+        update_traction(make_state_view(state));
+    }
 
     dgop_->store_displacement_field(linear_solver_.x());
     dgop_->compute_deviatoric_strain();

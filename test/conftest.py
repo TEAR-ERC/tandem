@@ -290,6 +290,32 @@ def viscoelastic_two_layer_config():
 
 
 @pytest.fixture(scope="module")
+def viscoelastic_fault_traction_config():
+    """
+    Material, loading and pass/fail limits for the viscoelastic fault traction test
+    (test_viscoelastic_fault_traction.py, examples/tandem/viscoelasticity/2d/fault_shear.*).
+
+    - Material and loading: copied from fault_shear.lua, which the test runs unchanged.
+      mu0 = mu1 = 30, tau_relax = viscosity / mu1, shear strain gamma = 2 Umax / H held
+      from t = 0; the fault traction is (mu0 + mu1 exp(-t / tau_relax)) gamma.
+    - 'exact': limit on |traction - exact| / exact at every written step. The strain is
+      constant, which the exponential integrator integrates exactly, and the fault does
+      not slip, so the field is affine and the mesh exact. Measured on 2026-10-25 at
+      np = 1, 2D p2, direct solve: 6.7e-13 (antiplane), 1.1e-11 (inplane). With the
+      history advanced before the traction is written the antiplane RK4 run is 2.4e-2 off.
+    - 'max_slip': limit on |slip| [m]; measured 2.6e-23 (Umax = 1e-3).
+    """
+    return {
+        "mu0": 30.0,
+        "mu1": 30.0,
+        "viscosity": 2.36682e10,
+        "gamma": 2.0e-3,
+        "exact": 1e-10,
+        "max_slip": 1e-18,
+    }
+
+
+@pytest.fixture(scope="module")
 def domain_dim(request):
     """
     Fixture that exposes the requested domain dimension CLI option.

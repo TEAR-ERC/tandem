@@ -174,6 +174,11 @@ protected:
     inline bool solution_is_current(double time) const {
         return fsal_ && solution_valid_ && solve_time_ == time;
     }
+    // True when the post-step made linear_solver_.x() the solve at the accepted state for
+    // `time`, and traction_ the traction there, and nothing has solved since.
+    inline bool solved_at_accepted_state(double time) const {
+        return solution_valid_ && accepted_time_ == time && accepted_solve_ == num_linear_solves_;
+    }
 
 private:
     std::unique_ptr<dg_t> dgop_;
@@ -205,6 +210,9 @@ private:
 
     std::size_t num_linear_solves_ = 0;
     std::size_t num_operator_reassemblies_ = 0;
+    // Solve count and time at which the post-step left x() at the accepted state.
+    std::size_t accepted_solve_ = std::numeric_limits<std::size_t>::max();
+    double accepted_time_ = -1.0;
 
 protected:
     PetscVector traction_;

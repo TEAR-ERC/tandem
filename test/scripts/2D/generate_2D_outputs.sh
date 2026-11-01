@@ -2,7 +2,7 @@
 # Generate all 2D test outputs
 # Manages: static_regression, parallel_consistency, convergence, seas_regression, qd_solve_count,
 # free_slip_bc, traction_patch_bc, viscoelastic_simple_shear, viscoelastic_mms,
-# viscoelastic_two_layer
+# viscoelastic_two_layer, viscoelastic_fault_traction
 set -e
 
 EXECUTABLE_DIR=$1
@@ -70,5 +70,8 @@ bash "$SCRIPT_DIR/viscoelastic_mms.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "Viscoelastic two-layer creep (relaxation time per layer)..."
 bash "$SCRIPT_DIR/viscoelastic_two_layer.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
+
+echo "Viscoelastic fault traction (simple shear across a locked fault)..."
+bash "$SCRIPT_DIR/viscoelastic_fault_traction.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "2D reference outputs generated successfully."

@@ -99,6 +99,12 @@ Pass criteria
    * -
      - inconsistent ``relaxation_time``
      - rejected
+   * - VE fault traction
+     - :math:`|\tau - \tau_{ex}| / \tau_{ex}` at every step, 3 runs
+     - 1e-10
+   * -
+     - slip; linear solves (RK4)
+     - < 1e-18 m; exactly :math:`3 + 5\,n_{steps}`
    * - VE rod
      - time step and number of steps
      - ``rel`` 1e-12

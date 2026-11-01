@@ -209,6 +209,8 @@ if(RUN_CI_TESTS)
             "test_viscoelastic_mms.py")
         add_pytest_test("viscoelastic-two-layer-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_viscoelastic_two_layer.py")
+        add_pytest_test("viscoelastic-fault-traction-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_viscoelastic_fault_traction.py")
     endif()
     if(DOMAIN_DIMENSION EQUAL 3)
         add_pytest_test("viscoelastic-cantilever-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"

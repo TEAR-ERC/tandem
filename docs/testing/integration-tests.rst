@@ -434,6 +434,43 @@ A second run gives the deprecated ``relaxation_time`` with a value that contradi
    The second run stops with ``relaxation_time disagrees with viscosity / mu1``.
 
 
+Viscoelastic fault traction (2D)
+--------------------------------
+
+:pytest: ``test_viscoelastic_fault_traction.py``, 3 tests (8 cases)
+:ctest: ``viscoelastic-fault-traction-test-2D-p<deg>`` (2D, any degree)
+:generator: ``scripts/2D/viscoelastic_fault_traction.sh``
+:configuration: ``examples/tandem/viscoelasticity/2d/fault_shear.{geo,lua,toml}``
+:ground truth: closed form, :ref:`as-fault-shear`
+
+**Objective.** The fault traction written after a step must combine the accepted displacement with
+the viscoelastic history of that step. Without FSAL the post-step solves at the accepted state and
+then commits the history, so the traction has to be evaluated before the commit; evaluated after it,
+the history term belongs to the end of the step and the traction is off by
+:math:`\mu_1 (1 - e^{-\Delta t/\tau}) q`.
+
+**Setup.** The unit square cut from side to side by a fault at :math:`y = 0.5`, under Dirichlet
+control on all four sides with the displacement linear in :math:`y` (:math:`U_{max} = 10^{-3}` m),
+held from :math:`t = 0`. :math:`\mu_0 = \mu_1 = 30`, :math:`\tau = 7.9 \times 10^8` s,
+:math:`\theta = 0.05`, ``final_time = 1e10``, direct solve. Rate-and-state friction with
+:math:`V_{init} = 10^{-32}` m/s keeps the fault practically locked. Three runs: antiplane
+(``poisson_viscoelasticity``) with classic RK4 at the fixed step :math:`\theta\tau` and with 5dp
+(FSAL), inplane (``viscoelasticity``) with RK4. One fault probe at the centre.
+
+**Checks.**
+
+``test_fault_traction`` (3 runs)
+   The shear traction matches the closed form to ``1e-10`` at every step (measured ``6.7e-13``
+   antiplane, ``1.1e-11`` inplane). With the traction evaluated after the commit, the antiplane RK4
+   run is ``2.4e-2`` off; ``PoissonViscoelasticity`` reads the history from the buffers the commit
+   writes, ``Viscoelasticity`` does not.
+``test_fault_locked`` (3 runs)
+   :math:`|slip| < 10^{-18}` m, which the closed form assumes.
+``test_linear_solves`` (2 RK4 runs)
+   Exactly :math:`3 + 5\,n_{steps}` linear solves: one per stage and one in the post-step, the
+   monitor reusing the post-step solve, plus two for the initial condition and one for the output
+   at :math:`t = 0`.
+
 Viscoelastic rod creep and recovery (3D)
 ----------------------------------------
 

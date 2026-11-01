@@ -306,6 +306,25 @@ The stress is the same in both layers, so each layer creeps on its own, and with
 
 The field is piecewise linear in :math:`y` and the mesh conforms to :math:`y = 0.5`, so it is exact in space.
 
+.. _as-fault-shear:
+
+Simple shear across a locked fault
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Used by: viscoelastic fault traction test. Closed form: ``exact_traction`` in
+``test/test_viscoelastic_fault_traction.py``.
+
+A shear strain :math:`\gamma` imposed at :math:`t = 0` and held gives the SLS shear stress
+
+.. math::
+
+   \sigma_{xy}(t) = \left(\mu_0 + \mu_1 e^{-t/\tau}\right)\gamma.
+
+The fault at :math:`y = 0.5` is practically locked (slip below :math:`10^{-22}` m against a
+boundary displacement of :math:`10^{-3}` m), so the field stays affine and the shear traction on
+the fault is :math:`\sigma_{xy}`. The strain is constant after :math:`t = 0`, which the exponential
+integrator integrates exactly, so the traction is exact to roundoff at every step.
+
 .. _as-zener:
 
 Rod creep and recovery (Zener solid)

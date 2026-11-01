@@ -206,6 +206,11 @@ Which tests run where
      -
      - any
      - closed form per layer
+   * - ``viscoelastic-fault-traction-test``
+     - yes
+     -
+     - any
+     - closed form
    * - ``viscoelastic-cantilever-test``
      -
      - yes

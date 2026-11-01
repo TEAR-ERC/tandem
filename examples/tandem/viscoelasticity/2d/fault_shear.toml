@@ -1,0 +1,22 @@
+# Simple shear across a locked fault, see fault_shear.lua. The in-plane variant
+# runs with --type viscoelasticity --scenario inplane.
+final_time = 10000000000
+mesh_file = "fault_shear.msh"
+type = "poisson_viscoelasticity"
+lib = "fault_shear.lua"
+scenario = "antiplane"
+mode = "QD"
+
+up = [1, 0]
+ref_normal = [0, 1]
+
+[ts_checkpoint]
+storage_type = "none"
+
+# t_max = 1 writes every time step.
+[fault_probe_output]
+prefix = "fault_shear_"
+t_max = 1
+probes = [
+    { name = "mid", x = [0.5, 0.5] },
+]
