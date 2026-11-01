@@ -113,8 +113,8 @@ void SeasQDOperator::update_internal_state(double time, BlockVector const& state
 
     // For stress output: store displacement and compute current strain state
     // This is needed before stress_volume() can read the correct values.
-    // Note: The PostStep callback will also call update_strain_history() which
-    // does similar work, but the Monitor callback runs first.
+    // Note: PETSc runs the PostStep callback (post_step_compute_strain_history) before
+    // the Monitor, so for an accepted step the history is already up to date here.
     if (require_displacement) {
         // Update time-dependent coefficients (g_dt, ratio) for partial strain computation
         double dt = time - last_time_;
@@ -131,8 +131,12 @@ void SeasQDOperator::pre_step_update_strain_history() {
 }
 
 void SeasQDOperator::post_step_compute_strain_history(double time, BlockVector const& state) {
-    // Update viscoelastic strain history after an accepted timestep.
-    // For non-VE operators, these are no-ops.
+    // Update viscoelastic strain history after an accepted timestep. Operators without
+    // strain history need none of this, in particular not the solve below, which would
+    // add a global linear solve per step for non-FSAL schemes.
+    if (!dgop_->is_viscoelastic()) {
+        return;
+    }
 
     // The post-step sequence is:
     //   1. Compute dt and update time-dependent coefficients (g_dt, ratio)

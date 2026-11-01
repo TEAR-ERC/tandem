@@ -200,6 +200,8 @@ if(RUN_CI_TESTS)
             "test_parallel_consistency_volume_tagging.py")
         add_pytest_test("traction-patch-bc-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_traction_patch_bc.py")
+        add_pytest_test("qd-solve-count-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
+            "test_qd_solve_count.py")
         # Viscoelastic tests against closed-form / manufactured solutions: no reference data needed
         add_pytest_test("viscoelastic-simple-shear-test-${DOMAIN_DIMENSION}D-p${POLYNOMIAL_DEGREE}"
             "test_viscoelastic_simple_shear.py")

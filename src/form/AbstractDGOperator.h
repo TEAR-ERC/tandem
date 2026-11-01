@@ -66,6 +66,13 @@ public:
      * no-op for non-viscoelastic operators.
      */
     virtual void set_fault_present(bool) {}
+    /*
+     * @brief Whether the operator carries viscoelastic strain history.
+     *
+     * True for Viscoelasticity and PoissonViscoelasticity. The history updates after
+     * each accepted step (and the solve they need) are skipped when it is false.
+     */
+    virtual bool is_viscoelastic() const { return false; }
     virtual double relaxation_time_global() const { return 0.0; }
     virtual double viscoelastic_theta() const { return 0.0; }
     virtual void initialize_strain_tensor() {}

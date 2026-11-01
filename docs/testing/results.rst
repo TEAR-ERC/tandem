@@ -63,6 +63,9 @@ Pass criteria
    * - traction BC (3D rod)
      - L2 norm of ``u0 - 5e-9`` on the end face
      - < 1e-8
+   * - QD solve count
+     - linear solves of a non-viscoelastic RK4 run, ``N`` steps
+     - :math:`2 + 4N` exactly, no reassembly
    * - VE simple shear
      - time step equals :math:`\theta\tau`
      - ``rel`` 1e-12, no rejections

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate all 2D test outputs
-# Manages: static_regression, parallel_consistency, convergence, seas_regression,
+# Manages: static_regression, parallel_consistency, convergence, seas_regression, qd_solve_count,
 # free_slip_bc, traction_patch_bc, viscoelastic_simple_shear, viscoelastic_mms
 set -e
 
@@ -39,6 +39,9 @@ bash "$SCRIPT_DIR/convergence.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 echo "SEAS regression (bp1_ref with tandem solver)..."
 bash "$SCRIPT_DIR/seas_regression.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS" "$POLYNOMIAL_DEGREE"
+
+echo "QD solve count (bp1_ref, RK4 without FSAL, no output)..."
+bash "$SCRIPT_DIR/qd_solve_count.sh" "$EXECUTABLE_DIR" "$TEMP_TEST_RESULTS"
 
 if [[ "$ENABLE_HDF5" == "ON" ]]; then
     echo "HDF5 Probe writers (bp1_ref_QDGreen_probe_comparison with tandem solver)..."

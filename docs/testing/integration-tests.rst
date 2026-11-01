@@ -290,6 +290,28 @@ All displacements are zero at ``x = 0`` (tag 5), the end ``x = L`` carries the t
 This is a coarse check, see :ref:`results-observations`.
 
 
+QD solve count
+--------------
+
+:pytest: ``test_qd_solve_count.py::test_qd_solve_count``
+:ctest: ``qd-solve-count-test-2D-p<deg>`` (2D, any degree)
+:generator: ``scripts/2D/qd_solve_count.sh``
+:configuration: ``test/reference_configs/2D/bp1_ref_QD_no_output.toml``, ``rk4_fixed.cfg``
+:ground truth: the number of linear solves the scheme needs
+
+**Objective.** A QD run of a non-viscoelastic operator must not pay for the viscoelastic strain
+history: no extra linear solve after an accepted step.
+
+**Setup.** ``bp1_ref`` (Poisson, QD) with classic RK4 (``-ts_rk_type 4``, a scheme without FSAL),
+a fixed step of ``1e6`` s (``-ts_adapt_type none``), ``final_time = 1e7`` s (10 steps), and no output at all,
+so the monitor needs no solve.
+
+**Check.** ``linear_solves`` in the summary equals :math:`2 + 4 N` for :math:`N` steps
+(two solves for the initial condition, one per RK stage), there are no step rejections,
+and ``operator_reassemblies`` is 0. Before the fix the post-step solved once more per step
+(:math:`2 + 5 N`).
+
+
 Viscoelastic simple shear (2D)
 ------------------------------
 

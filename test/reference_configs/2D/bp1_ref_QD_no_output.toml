@@ -1,0 +1,14 @@
+# bp1_ref in QD mode with no output at all, for test_qd_solve_count.py: with no
+# writer the monitor needs no solve, so the run's linear solves are the RK stages
+# and the two of the initial condition, and nothing else.
+final_time = 10000000
+mesh_file = "bp1_ref.msh"
+mode = "QD"
+type = "poisson"
+lib = "bp1_ref.lua"
+scenario = "bp1_ref"
+ref_normal = [-1, 0]
+boundary_linear = true
+
+[ts_checkpoint]
+storage_type="none"

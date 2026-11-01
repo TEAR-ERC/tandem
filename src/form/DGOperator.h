@@ -606,6 +606,10 @@ public:
 
     void set_fault_present(bool present) override { fault_present_ = present; }
 
+    bool is_viscoelastic() const override {
+        return std::experimental::is_detected_v<local_relaxation_time_t, LocalOperator>;
+    }
+
     double relaxation_time_global() const override { return relaxation_time_global_; }
 
     double viscoelastic_theta() const override {

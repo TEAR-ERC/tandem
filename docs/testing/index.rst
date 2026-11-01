@@ -186,6 +186,11 @@ Which tests run where
      - yes
      - any
      - closed-form end displacement
+   * - ``qd-solve-count-test``
+     - yes
+     -
+     - any
+     - solve count (``linear_solves`` in the summary)
    * - ``viscoelastic-simple-shear-test``
      - yes
      -
