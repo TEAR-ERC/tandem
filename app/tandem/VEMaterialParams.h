@@ -26,6 +26,7 @@ template <> struct VEMaterialParams<Viscoelasticity> {
     static constexpr char RelaxationTime[] = "relaxation_time";
     static constexpr char Theta[] = "theta";
     static constexpr char GTol[] = "g_tol";
+    static constexpr char AllowNonpositiveTau[] = "allow_nonpositive_projected_relaxation_time";
 
     void load(LuaLib& lib, std::string const& scenario) {
         if (lib.hasMember(scenario, Mu0)) {
@@ -62,6 +63,11 @@ template <> struct VEMaterialParams<Viscoelasticity> {
                                          scenario);
             }
         }
+        // Compatibility mode: run with a projected material that has viscosity / mu1 <= 0
+        // somewhere (see DGOperator::check_projected_relaxation_times). Off by default.
+        if (lib.hasMember(scenario, AllowNonpositiveTau)) {
+            allowNonpositiveTau_ = lib.getMemberBoolean(scenario, AllowNonpositiveTau);
+        }
     }
 
     auto const& mu0() const { return mu0_; }
@@ -70,6 +76,7 @@ template <> struct VEMaterialParams<Viscoelasticity> {
     auto const& relaxation_time() const { return relaxationTime_; }
     double theta() const { return theta_; }
     double g_tol() const { return gTol_; }
+    bool allow_nonpositive_projected_relaxation_time() const { return allowNonpositiveTau_; }
 
 private:
     static functional_t_region constant_functional(double v) {
@@ -84,6 +91,7 @@ private:
     std::optional<functional_t_region> relaxationTime_ = std::nullopt;
     double theta_ = 0.0;
     double gTol_ = 1.0e-8;
+    bool allowNonpositiveTau_ = false;
 };
 
 class PoissonViscoelasticity;
@@ -100,6 +108,7 @@ template <> struct VEMaterialParams<PoissonViscoelasticity> {
     static constexpr char Mu1[] = "mu1";
     static constexpr char Viscosity[] = "viscosity";
     static constexpr char Theta[] = "theta";
+    static constexpr char AllowNonpositiveTau[] = "allow_nonpositive_projected_relaxation_time";
 
     void load(LuaLib& lib, std::string const& scenario) {
         if (lib.hasMember(scenario, Mu0)) {
@@ -118,12 +127,17 @@ template <> struct VEMaterialParams<PoissonViscoelasticity> {
                                          scenario);
             }
         }
+        // See VEMaterialParams<Viscoelasticity>.
+        if (lib.hasMember(scenario, AllowNonpositiveTau)) {
+            allowNonpositiveTau_ = lib.getMemberBoolean(scenario, AllowNonpositiveTau);
+        }
     }
 
     auto const& mu0() const { return mu0_; }
     auto const& mu1() const { return mu1_; }
     auto const& viscosity() const { return viscosity_; }
     double theta() const { return theta_; }
+    bool allow_nonpositive_projected_relaxation_time() const { return allowNonpositiveTau_; }
 
 private:
     static functional_t_region constant_functional(double v) {
@@ -136,6 +150,7 @@ private:
     functional_t_region mu1_ = constant_functional(1.0);
     functional_t_region viscosity_ = constant_functional(1.0);
     double theta_ = 0.1;
+    bool allowNonpositiveTau_ = false;
 };
 
 } // namespace tndm

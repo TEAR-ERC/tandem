@@ -36,9 +36,12 @@ template <> struct make_lop<Poisson> {
 template <> struct make_lop<PoissonViscoelasticity> {
     static auto dg(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                    SeasScenario<PoissonViscoelasticity> const& scenario) {
-        return std::make_shared<PoissonViscoelasticity>(std::move(cl), scenario.mu0(),
-                                                        scenario.mu1(), scenario.viscosity(),
-                                                        scenario.theta(), DGMethod::IP);
+        auto lop = std::make_shared<PoissonViscoelasticity>(std::move(cl), scenario.mu0(),
+                                                            scenario.mu1(), scenario.viscosity(),
+                                                            scenario.theta(), DGMethod::IP);
+        lop->set_allow_nonpositive_projected_relaxation_time(
+            scenario.allow_nonpositive_projected_relaxation_time());
+        return lop;
     }
 };
 template <> struct make_lop<Elasticity> {
@@ -55,6 +58,8 @@ template <> struct make_lop<Viscoelasticity> {
             std::move(cl), scenario.lam(), scenario.mu0(), scenario.mu1(), scenario.viscosity(),
             scenario.relaxation_time(), scenario.theta(), scenario.rho(), DGMethod::IP);
         lop->set_viscoelastic_g_tol(scenario.g_tol());
+        lop->set_allow_nonpositive_projected_relaxation_time(
+            scenario.allow_nonpositive_projected_relaxation_time());
         return lop;
     }
 };

@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -99,6 +100,25 @@ public:
 
     void local_relaxation_time(std::size_t elNo, double& dt_min, LinearAllocator<double>& scratch);
     void set_relaxation_time_global(double tau) { relaxation_time_global_ = tau; }
+    // Smallest and largest finite nodal relaxation time of the projected material, which the
+    // coefficients are built from, over the local elements; the number of nodes where
+    // mu1 > 0 but tau = eta / mu1 <= 0 (the projection of eta undershooting); and the number
+    // of nodes with a non-finite mu0, mu1 or eta. The bound from local_relaxation_time uses
+    // the raw functionals and only estimates these.
+    std::tuple<double, double, std::size_t, std::size_t>
+    projected_relaxation_time_bounds(std::size_t numLocalElements,
+                                     std::size_t numLocalFacets) const;
+    // What a node with tau <= 0 does here, for messages: compute_time_coefficients gives it
+    // g = ratio = 1, the unrelaxed limit.
+    static constexpr char const* nonpositive_relaxation_time_effect() {
+        return "never relax (g = exp(-dt/tau) = 1 there: the Maxwell branch acts as an "
+               "elastic spring)";
+    }
+    // Run although the projected material has tau <= 0 somewhere (warning instead of error).
+    void set_allow_nonpositive_projected_relaxation_time(bool allow) {
+        allow_nonpositive_tau_ = allow;
+    }
+    bool allow_nonpositive_projected_relaxation_time() const { return allow_nonpositive_tau_; }
     double viscoelastic_theta() const { return theta_; }
     void set_viscoelastic_theta(double theta) { theta_ = theta; }
 
@@ -362,6 +382,7 @@ private:
     double theta_ = 0.1;
     double dt_ = 0.0;
     double relaxation_time_global_ = 0.0;
+    bool allow_nonpositive_tau_ = false;
 
     // Options
     constexpr static double epsilon = -1.0;

@@ -180,6 +180,22 @@ public:
         return result;
     }
 
+    bool getMemberBoolean(std::string const& table_name, std::string const& member_name) {
+        lua_getglobal(L, table_name.c_str());
+        if (lua_istable(L, -1) == 0) {
+            throw std::runtime_error(table_name + " is not a table.");
+        }
+        lua_getfield(L, -1, member_name.c_str());
+        if (!lua_isboolean(L, -1)) {
+            std::stringstream ss;
+            ss << "'" << table_name << "." << member_name << "' is not a boolean.";
+            throw std::runtime_error(ss.str());
+        }
+        bool result = lua_toboolean(L, -1) != 0;
+        lua_pop(L, 2); // Remove table and field
+        return result;
+    }
+
 private:
     lua_State* L;
 };

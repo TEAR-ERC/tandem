@@ -249,10 +249,14 @@ void PoissonViscoelasticity::prepare_volume(std::size_t elNo, LinearAllocator<do
     project(fun_mu1, mu1);
     project(fun_eta, tau); // holds eta for now
 
-    // tau = eta / mu_1.  mu_1 == 0 marks a purely elastic node: tau = infinity.
+    // tau = eta / mu_1.  mu_1 == 0 marks a purely elastic node: tau = infinity. A NaN mu_1
+    // keeps tau = NaN, which projected_relaxation_time_bounds reports, instead of being
+    // clamped to an elastic node.
     for (std::size_t i = 0; i < matNbf; ++i) {
         if (mu1[i] > 0.0) {
             tau[i] = tau[i] / mu1[i];
+        } else if (std::isnan(mu1[i])) {
+            tau[i] = std::numeric_limits<double>::quiet_NaN();
         } else {
             mu1[i] = 0.0;
             tau[i] = std::numeric_limits<double>::infinity();
@@ -468,6 +472,40 @@ void PoissonViscoelasticity::local_relaxation_time(std::size_t elNo, double& dt_
             }
         }
     }
+}
+
+std::tuple<double, double, std::size_t, std::size_t>
+PoissonViscoelasticity::projected_relaxation_time_bounds(std::size_t numLocalElements,
+                                                         std::size_t) const {
+    double tau_min = std::numeric_limits<double>::infinity();
+    double tau_max = 0.0;
+    std::size_t nonpositive = 0;
+    std::size_t nonfinite = 0;
+    auto const matNbf = materialSpace_.numBasisFunctions();
+    for (std::size_t elNo = 0; elNo < numLocalElements; ++elNo) {
+        auto const mu0 = material[elNo].get<K>().data();
+        auto const mu1 = material[elNo].get<Mu1>().data();
+        auto const tau = material[elNo].get<Tau>().data();
+        for (std::size_t i = 0; i < matNbf; ++i) {
+            // tau is NaN for a NaN mu1 or eta, and infinite with mu1 > 0 for an infinite eta.
+            if (!std::isfinite(mu0[i]) || !std::isfinite(mu1[i]) || std::isnan(tau[i]) ||
+                (mu1[i] > 0.0 && !std::isfinite(tau[i]))) {
+                ++nonfinite;
+                continue;
+            }
+            // mu1 was clamped to 0 (tau = infinity) where its projection is not positive.
+            if (mu1[i] <= 0.0) {
+                continue;
+            }
+            if (!(tau[i] > 0.0)) {
+                ++nonpositive;
+            } else if (std::isfinite(tau[i])) {
+                tau_min = std::min(tau_min, tau[i]);
+                tau_max = std::max(tau_max, tau[i]);
+            }
+        }
+    }
+    return {tau_min, tau_max, nonpositive, nonfinite};
 }
 
 // viscoelastic state

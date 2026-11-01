@@ -16,11 +16,15 @@
 #include "tensor/Tensor.h"
 #include "util/Scratch.h"
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <experimental/type_traits>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <mpi.h>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -91,6 +95,10 @@ public:
     // reassembly gate; the others keep the legacy gate on the relative change in dt.
     template <class T> using viscoelastic_g_change_t = decltype(&T::viscoelastic_g_change);
     template <class T> using relaxation_time_max_local_t = decltype(&T::relaxation_time_max_local);
+    template <class T>
+    using projected_relaxation_time_bounds_t = decltype(&T::projected_relaxation_time_bounds);
+    template <class T>
+    using set_relaxation_time_sample_range_t = decltype(&T::set_relaxation_time_sample_range);
     template <class T>
     using relaxation_time_mismatch_local_t = decltype(&T::relaxation_time_mismatch_local);
     template <class T>
@@ -207,6 +215,11 @@ public:
             }
         }
         lop_->end_preparation(topo_->elementScatterPlan());
+
+        if constexpr (std::experimental::is_detected_v<projected_relaxation_time_bounds_t,
+                                                       LocalOperator>) {
+            check_projected_relaxation_times();
+        }
 
         if constexpr (std::experimental::is_detected_v<prepare_penalty_t, LocalOperator>) {
             for (std::size_t fctNo = 0; fctNo < topo_->numLocalFacets(); ++fctNo) {
@@ -746,6 +759,88 @@ public:
     }
 
 private:
+    /*
+     * The relaxation times found before the material is projected come from the raw
+     * functionals; the coefficients g(dt / tau) and exp(-dt / tau) are built from the
+     * projected material. Where the material varies within an element (an interface that
+     * cuts elements), the projection over- and undershoots, so the two ranges differ.
+     *
+     * - The step cap stays theta * the raw minimum: projected values below it are
+     *   projection artifacts, and capping on them could shrink the step without bound.
+     * - The reassembly gate samples g over both ranges, so it covers every coefficient that
+     *   is actually built.
+     * - A projected viscosity / mu1 <= 0 where mu1 > 0 is treated as instant relaxation
+     *   (g = 0, exp(-dt / tau) = 0), as before; this is reported, since it means the
+     *   viscosity is not resolved there.
+     */
+    // The coefficients are built from the L2 projection of the material, which undershoots
+    // where the material varies within an element. A non-finite material is always rejected.
+    // tau = viscosity / mu1 <= 0 where mu1 > 0 changes the constitutive model at those points
+    // (see nonpositive_relaxation_time_effect of the local operator) and is rejected unless the
+    // scenario sets allow_nonpositive_projected_relaxation_time = true, which keeps the
+    // historical behaviour with a warning. Projected relaxation times below the input minimum
+    // are reported but not resolved: the step cap stays at theta times the input minimum,
+    // because the projected minimum has no lower bound.
+    void check_projected_relaxation_times() {
+        auto [tau_min_local, tau_max_local, nonpositive_local, nonfinite_local] =
+            lop_->projected_relaxation_time_bounds(topo_->numLocalElements(),
+                                                   topo_->numLocalFacets());
+        double tau_min = 0.0;
+        double tau_max = 0.0;
+        unsigned long counts_local[2] = {nonpositive_local, nonfinite_local};
+        unsigned long counts[2] = {0, 0};
+        MPI_Allreduce(&tau_min_local, &tau_min, 1, MPI_DOUBLE, MPI_MIN, topo_->comm());
+        MPI_Allreduce(&tau_max_local, &tau_max, 1, MPI_DOUBLE, MPI_MAX, topo_->comm());
+        MPI_Allreduce(counts_local, counts, 2, MPI_UNSIGNED_LONG, MPI_SUM, topo_->comm());
+        auto const nonpositive = counts[0];
+        auto const nonfinite = counts[1];
+        int rank = 0;
+        MPI_Comm_rank(topo_->comm(), &rank);
+        if (nonfinite > 0) {
+            std::stringstream ss;
+            ss << "The projected material is not finite at " << nonfinite
+               << " nodes; check the material functions of the scenario for NaN or infinite "
+                  "values.";
+            throw std::runtime_error(ss.str());
+        }
+        if (nonpositive > 0) {
+            bool const allow = lop_->allow_nonpositive_projected_relaxation_time();
+            std::stringstream ss;
+            ss << "projected material has viscosity / mu1 <= 0 at " << nonpositive
+               << " points where mu1 > 0 (the L2 projection of the viscosity undershoots where "
+                  "the material varies within an element). These points "
+               << (allow ? "" : "would ") << LocalOperator::nonpositive_relaxation_time_effect()
+               << ". Align material interfaces with element boundaries";
+            if (!allow) {
+                ss << ", or set allow_nonpositive_projected_relaxation_time = true in the "
+                      "scenario to run anyway.";
+                throw std::runtime_error("The " + ss.str());
+            }
+            if (rank == 0) {
+                std::cerr << "Warning (allow_nonpositive_projected_relaxation_time): the "
+                          << ss.str() << " to avoid this." << std::endl;
+            }
+        }
+        if (!std::isfinite(tau_min)) {
+            return; // no point with a Maxwell branch and a positive relaxation time
+        }
+        if (rank == 0 && tau_min < relaxation_time_global_ * (1.0 - 1.0e-6)) {
+            std::cerr << "Warning: the projected material reaches relaxation times down to "
+                      << tau_min << ", below the smallest of the input (" << relaxation_time_global_
+                      << "). The step cap stays at theta times the input value and does not "
+                         "resolve these."
+                      << std::endl;
+        }
+        if constexpr (std::experimental::is_detected_v<set_relaxation_time_sample_range_t,
+                                                       LocalOperator>) {
+            double raw_max_local = lop_->relaxation_time_max_local();
+            double raw_max = 0.0;
+            MPI_Allreduce(&raw_max_local, &raw_max, 1, MPI_DOUBLE, MPI_MAX, topo_->comm());
+            lop_->set_relaxation_time_sample_range(std::min(tau_min, relaxation_time_global_),
+                                                   std::max(tau_max, raw_max));
+        }
+    }
+
     void update_time_dependent_precomputation() {
         if constexpr (std::experimental::is_detected_v<
                           update_time_dependent_precomputation_volume_t, LocalOperator>) {

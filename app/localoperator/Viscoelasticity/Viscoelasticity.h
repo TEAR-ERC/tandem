@@ -25,6 +25,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -199,12 +200,36 @@ public:
     // DGOperator. Together with the minimum it bounds the change in g that decides when
     // to reassemble (viscoelastic_g_change).
     inline double relaxation_time_max_local() const { return relaxation_time_max_local_; }
+    // Smallest and largest finite relaxation time of the projected material, which g and ratio
+    // are built from, over the points of the local elements and facets; the number of those
+    // points where mu1 > 0 but tau = viscosity / mu1 <= 0 (the projection of the viscosity
+    // undershooting); and the number of material nodes of the local elements with a
+    // non-finite lam, mu0, mu1, viscosity or 1/rho. The bounds from local_relaxation_time use
+    // the raw functionals and only estimate these: they differ where the material varies
+    // within an element.
+    std::tuple<double, double, std::size_t, std::size_t>
+    projected_relaxation_time_bounds(std::size_t numLocalElements,
+                                     std::size_t numLocalFacets) const;
+    // What a point with tau <= 0 does here, for messages: compute_g_dt and compute_ratio give
+    // it g = ratio = 0, the instantly relaxed limit.
+    static constexpr char const* nonpositive_relaxation_time_effect() {
+        return "relax instantly (g = exp(-dt/tau) = 0 there: the Maxwell branch carries no "
+               "stress)";
+    }
+    // Run although the projected material has tau <= 0 somewhere (warning instead of error).
+    void set_allow_nonpositive_projected_relaxation_time(bool allow) {
+        allow_nonpositive_tau_ = allow;
+    }
+    bool allow_nonpositive_projected_relaxation_time() const { return allow_nonpositive_tau_; }
     // Number of local quad points where a given relaxation_time disagrees with
     // viscosity / mu1; DGOperator sums it over the ranks and rejects the input if > 0.
     inline std::size_t relaxation_time_mismatch_local() const {
         return relaxation_time_mismatch_local_;
     }
     void set_relaxation_time_max_global(double relaxation_time);
+    // Range of relaxation times over which viscoelastic_g_change looks for the largest
+    // change of g (by default the global minimum to the maximum of the input).
+    void set_relaxation_time_sample_range(double tau_min, double tau_max);
     void set_viscoelastic_time_step(double relaxation_time) {
         set_viscoelastic_time_step_value(theta_ * relaxation_time);
     }
@@ -320,6 +345,7 @@ private:
     double dt_viscoelastic_ = 0.0;
     double dt_g_ = 0.0;
     double g_tol_ = 1.0e-8;
+    bool allow_nonpositive_tau_ = false;
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
     std::optional<facet_functional_t> fun_slip = std::nullopt;

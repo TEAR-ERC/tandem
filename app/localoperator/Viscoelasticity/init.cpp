@@ -215,11 +215,15 @@ double Viscoelasticity::relaxation_time_from(double viscosity, double mu1) {
 }
 
 void Viscoelasticity::set_relaxation_time_max_global(double relaxation_time) {
+    set_relaxation_time_sample_range(relaxation_time_global_, relaxation_time);
+}
+
+void Viscoelasticity::set_relaxation_time_sample_range(double tau_min, double tau_max_in) {
     // Sample points for viscoelastic_g_change: |g(dt/tau) - g(dt_g/tau)| is a smooth bump in
-    // log(tau), so log-spaced samples between the extremes bound it closely.
+    // log(tau), so log-spaced samples between the extremes bracket its maximum, which
+    // viscoelastic_g_change then refines.
     constexpr int num_samples = 33;
-    double const tau_min = relaxation_time_global_;
-    double const tau_max = std::max(relaxation_time, tau_min);
+    double const tau_max = std::max(tau_max_in, tau_min);
     tau_samples_.clear();
     if (!(tau_min > 0.0) || tau_max <= tau_min * (1.0 + 1.0e-12)) {
         tau_samples_.push_back(tau_min);
@@ -232,16 +236,101 @@ void Viscoelasticity::set_relaxation_time_max_global(double relaxation_time) {
     tau_samples_.back() = tau_max;
 }
 
+std::tuple<double, double, std::size_t, std::size_t>
+Viscoelasticity::projected_relaxation_time_bounds(std::size_t numLocalElements,
+                                                  std::size_t numLocalFacets) const {
+    double tau_min = std::numeric_limits<double>::infinity();
+    double tau_max = 0.0;
+    std::size_t nonpositive = 0;
+    std::size_t nonfinite = 0;
+    // The quad point values are finite combinations of the nodal coefficients, so checking
+    // the coefficients covers every point.
+    auto const matNbf = materialSpace_.numBasisFunctions();
+    for (std::size_t elNo = 0; elNo < numLocalElements; ++elNo) {
+        auto const& m = material[elNo];
+        auto const lam_ = m.get<lam>().data();
+        auto const mu0_ = m.get<mu0>().data();
+        auto const mu1_ = m.get<mu1>().data();
+        auto const eta_ = m.get<viscosity>().data();
+        auto const rhoInv_ = m.get<rhoInv>().data();
+        for (std::size_t i = 0; i < matNbf; ++i) {
+            if (!std::isfinite(lam_[i]) || !std::isfinite(mu0_[i]) || !std::isfinite(mu1_[i]) ||
+                !std::isfinite(eta_[i]) || !std::isfinite(rhoInv_[i])) {
+                ++nonfinite;
+            }
+        }
+    }
+    // tau is infinite where mu1 <= 0 (no Maxwell branch) and does not bound anything there.
+    auto const visit = [&](double const* tau, std::size_t n) {
+        for (std::size_t q = 0; q < n; ++q) {
+            if (!(tau[q] > 0.0)) {
+                ++nonpositive;
+            } else if (std::isfinite(tau[q])) {
+                tau_min = std::min(tau_min, tau[q]);
+                tau_max = std::max(tau_max, tau[q]);
+            }
+        }
+    };
+    for (std::size_t elNo = 0; elNo < numLocalElements; ++elNo) {
+        visit(volPre[elNo].get<relaxation_time_local>().data(), volRule.size());
+    }
+    for (std::size_t fctNo = 0; fctNo < numLocalFacets; ++fctNo) {
+        visit(fctPre[fctNo].get<tau_q_0>().data(), fctRule.size());
+        visit(fctPre[fctNo].get<tau_q_1>().data(), fctRule.size());
+    }
+    return {tau_min, tau_max, nonpositive, nonfinite};
+}
+
 double Viscoelasticity::viscoelastic_g_change(double dt) const {
-    double change = 0.0;
+    auto const change_at = [this, dt](double tau) {
+        return std::abs(compute_g_dt(dt, tau) - compute_g_dt(dt_g_, tau));
+    };
     if (tau_samples_.empty()) {
-        return std::abs(compute_g_dt(dt, relaxation_time_global_) -
-                        compute_g_dt(dt_g_, relaxation_time_global_));
+        return change_at(relaxation_time_global_);
     }
-    for (double tau : tau_samples_) {
-        change = std::max(change, std::abs(compute_g_dt(dt, tau) - compute_g_dt(dt_g_, tau)));
+    std::size_t best = 0;
+    double change = 0.0;
+    for (std::size_t i = 0; i < tau_samples_.size(); ++i) {
+        double const c = change_at(tau_samples_[i]);
+        if (c > change) {
+            change = c;
+            best = i;
+        }
     }
-    return change;
+    if (tau_samples_.size() < 3) {
+        return change;
+    }
+    // |g(dt/tau) - g(dt_g/tau)| vanishes for tau -> 0 and tau -> infinity and has a single
+    // maximum in log(tau) in between, so the best sample and its neighbours bracket the
+    // maximum over [tau_min, tau_max]. Refine there by golden-section search: the samples
+    // alone can miss the peak (by up to 1.4 % of it with 33 samples). The single maximum is
+    // a numerical observation, not a proof (checked above roundoff for dt / dt_g between
+    // e^-14 and e^14), and 40 iterations shrink the bracket by 0.618^40 ~ 4e-9, so this is a
+    // numerically refined maximum, accurate to roundoff under that observation, not a
+    // certified bound.
+    double lo = std::log(tau_samples_[best > 0 ? best - 1 : 0]);
+    double hi = std::log(tau_samples_[std::min(best + 1, tau_samples_.size() - 1)]);
+    constexpr double inv_phi = 0.6180339887498949;
+    double a = hi - inv_phi * (hi - lo);
+    double b = lo + inv_phi * (hi - lo);
+    double fa = change_at(std::exp(a));
+    double fb = change_at(std::exp(b));
+    for (int it = 0; it < 40; ++it) {
+        if (fa > fb) {
+            hi = b;
+            b = a;
+            fb = fa;
+            a = hi - inv_phi * (hi - lo);
+            fa = change_at(std::exp(a));
+        } else {
+            lo = a;
+            a = b;
+            fa = fb;
+            b = lo + inv_phi * (hi - lo);
+            fb = change_at(std::exp(b));
+        }
+    }
+    return std::max(change, std::max(fa, fb));
 }
 
 // exp(-dt/tau). tau <= 0 (only allowed where mu1 = 0) is the instant-relaxation limit 0,
