@@ -3,6 +3,8 @@
 #include "geometry/PointLocator.h"
 #include "io/ProbeWriterUtil.h"
 
+#include "io/TableTruncate.h"
+
 #include <filesystem>
 #include <mpi.h>
 #include <sstream>
@@ -73,6 +75,12 @@ void ProbeWriter<D>::write_header(ProbeMeta const& p,
         }
     }
     *out_ << endheader;
+}
+
+template <std::size_t D> void ProbeWriter<D>::truncate_after_restart(std::size_t p) {
+    for (auto const& probe : probes_) {
+        truncate_table_file(probe.file_name, p);
+    }
 }
 
 template <std::size_t D>

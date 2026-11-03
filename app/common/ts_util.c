@@ -1,4 +1,4 @@
-
+#include "ts_util.h"
 #include "vecnest_util.h"
 #include <petsc.h>
 #include <petsc/private/tsimpl.h>
@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /*
 https://stackoverflow.com/questions/2336242/recursive-mkdir-system-call-on-unix
@@ -663,6 +664,8 @@ const char* TSCheckPointStorageTypes[] = {
 struct _TSCheckPoint {
     char path_prefix[PETSC_MAX_PATH_LEN];
     char path_step[PETSC_MAX_PATH_LEN];
+    TSCheckPointInfoFn info_fn; /* optional: appends application info to last_checkpoint.txt */
+    void* info_ctx;
     PetscInt checkpoint_frequency_step;
     PetscReal checkpoint_frequency_cputime_minutes;
     PetscReal checkpoint_frequency_time_physical;
@@ -816,16 +819,50 @@ static PetscErrorCode ts_checkpoint_write(TS ts, TSCheckPoint cp) {
             /* Write a helper file that enables restating from the last checkpoint written */
             PetscSNPrintf(infoname, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.txt",
                           cp->path_prefix);
+
+            if (cp->mode == TSCP_STORAGE_LIMITED) {
+                // Rotate existing checkpoint files
+                char old_filename[PETSC_MAX_PATH_LEN];
+                char new_filename[PETSC_MAX_PATH_LEN];
+
+                // Rotate from the highest number down to 0
+                for (int k = cp->limited_size - 1; k > 0; --k) {
+                    if (k == 1) {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.txt", cp->path_prefix);
+                    } else {
+                        PetscSNPrintf(old_filename, PETSC_MAX_PATH_LEN - 1,
+                                      "%s/last_checkpoint.%d.txt", cp->path_prefix, k - 1);
+                    }
+                    PetscSNPrintf(new_filename, PETSC_MAX_PATH_LEN - 1, "%s/last_checkpoint.%d.txt",
+                                  cp->path_prefix, k);
+
+                    if (access(old_filename, F_OK) != -1) { // Check if file exists
+                        if (rename(old_filename, new_filename) != 0) {
+                            PetscPrintf(PETSC_COMM_SELF, "Error renaming %s to %s: %s\n",
+                                        old_filename, new_filename, strerror(errno));
+                        }
+                    }
+                }
+            }
+
             ierr = PetscViewerASCIIOpen(PETSC_COMM_SELF, infoname, &viewer);
             CHKERRQ(ierr);
             PetscViewerASCIIPrintf(viewer, "%s\n", cp->path_step);
+
+            /* Application-specific info (e.g. output writer states), one entry per line */
+            if (cp->info_fn != NULL) {
+                ierr = cp->info_fn(viewer, cp->info_ctx);
+                CHKERRQ(ierr);
+            }
+
             PetscViewerASCIIPrintf(viewer, "# is the last written checkpoint file\n");
             PetscViewerASCIIPrintf(viewer,
                                    "# time, time_step, step_number, checkpoint_number, path\n");
             PetscViewerASCIIPrintf(viewer, "# %1.18e,%1.18e,%ld,%d,%s\n", (double)time, (double)dt,
                                    (long int)step, (int)cp->n, cp->path_step);
 
-            PetscViewerASCIIPrintf(viewer, "\n# Previously used checkpoint options\n");
+            PetscViewerASCIIPrintf(viewer, "#\n# Previously used checkpoint options\n");
             PetscViewerASCIIPrintf(viewer, "#ts_checkpoint.save_directory %s\n", cp->path_prefix);
             PetscViewerASCIIPrintf(viewer, "#ts_checkpoint.freq_step %d\n",
                                    (int)cp->checkpoint_frequency_step);
@@ -979,6 +1016,24 @@ PetscErrorCode ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirect
         PetscFree(tsc);
     }
 
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+PetscErrorCode ts_checkpoint_set_info_callback(TS ts, TSCheckPointInfoFn fn, void* ctx) {
+    PetscContainer container = NULL;
+    TSCheckPoint tsc = NULL;
+    PetscErrorCode ierr;
+
+    PetscFunctionBeginUser;
+    ierr = PetscObjectQuery((PetscObject)ts, "_TSCheckPoint", (PetscObject*)&container);
+    CHKERRQ(ierr);
+    /* No container means checkpointing is disabled: nothing to do */
+    if (container) {
+        ierr = PetscContainerGetPointer(container, (void**)&tsc);
+        CHKERRQ(ierr);
+        tsc->info_fn = fn;
+        tsc->info_ctx = ctx;
+    }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 

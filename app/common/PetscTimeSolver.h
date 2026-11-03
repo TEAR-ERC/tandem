@@ -28,6 +28,8 @@ public:
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
     void set_max_time_step(double dt);
+    /// Register a callback that adds application info to last_checkpoint.txt (see ts_util.h)
+    void set_checkpoint_info_callback(TSCheckPointInfoFn fn, void* ctx);
     static PetscErrorCode customized_ts_monitor(TS ts, PetscInt step, PetscReal time, Vec u,
                                                 void* ctx);
 
