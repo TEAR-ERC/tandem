@@ -1,4 +1,5 @@
 #include "ts_util.h"
+
 #include "vecnest_util.h"
 #include <petsc.h>
 #include <petsc/private/tsimpl.h>
@@ -1040,6 +1041,7 @@ PetscErrorCode ts_checkpoint_set_info_callback(TS ts, TSCheckPointInfoFn fn, voi
 PetscErrorCode ts_checkpoint_restart(TS ts, const char* tsCheckpointLoadDirectory) {
     PetscBool found = PETSC_FALSE;
     char load_path_prefix[PETSC_MAX_PATH_LEN];
+    PetscReal dt_checkpoint;
     PetscErrorCode ierr;
 
     PetscFunctionBeginUser;
@@ -1047,7 +1049,17 @@ PetscErrorCode ts_checkpoint_restart(TS ts, const char* tsCheckpointLoadDirector
     PetscSNPrintf(load_path_prefix, PETSC_MAX_PATH_LEN, "%s", tsCheckpointLoadDirectory);
     ierr = ts_checkpoint_load(ts, load_path_prefix);
     CHKERRQ(ierr);
+
+    /* TSSetFromOptions() re-applies -ts_dt, which would replace the time step stored in the
+       checkpoint by the initial one (e.g. 1e-8). Keep the checkpointed step. */
+    ierr = TSGetTimeStep(ts, &dt_checkpoint);
+    CHKERRQ(ierr);
     ierr = TSSetFromOptions(ts);
     CHKERRQ(ierr);
+    ierr = TSSetTimeStep(ts, dt_checkpoint);
+    CHKERRQ(ierr);
+    PetscPrintf(PetscObjectComm((PetscObject)ts),
+                "[TSCheckpoint]   restarting with checkpointed time step dt = %g\n",
+                (double)dt_checkpoint);
     PetscFunctionReturn(PETSC_SUCCESS);
 }
