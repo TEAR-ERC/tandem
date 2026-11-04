@@ -24,6 +24,9 @@ public:
 
     void write(double time, mneme::span<double> scalars) const;
 
+    /// Drop all records but the first p (used after a checkpoint restart)
+    void truncate_after_restart(std::size_t p) const;
+
 private:
     void write_header() const;
 

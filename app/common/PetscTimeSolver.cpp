@@ -78,6 +78,10 @@ std::size_t PetscTimeSolverBase::get_step_rejections() const {
     return rejects;
 }
 
+void PetscTimeSolverBase::set_checkpoint_info_callback(TSCheckPointInfoFn fn, void* ctx) {
+    CHKERRTHROW(ts_checkpoint_set_info_callback(ts_, fn, ctx));
+}
+
 void PetscTimeSolverBase::set_max_time_step(double dt) {
     TSAdapt adapt;
     CHKERRTHROW(TSGetAdapt(ts_, &adapt));

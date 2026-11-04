@@ -30,6 +30,8 @@ public:
 
     void add_writer(std::unique_ptr<Writer> writer) { writers_.emplace_back(std::move(writer)); }
 
+    auto const& writers() const { return writers_; }
+
     auto min_time_step() const { return dt_min_; }
     auto max_time_step() const { return dt_max_; }
 

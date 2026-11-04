@@ -1,7 +1,13 @@
 #include "PVDWriter.h"
 #include "io/Endianness.h"
 #include "tinyxml2.h"
+#include <cstdio>
+#include <fcntl.h> // For O_WRONLY
 #include <filesystem>
+#include <iostream>
+#include <stdexcept>
+#include <unistd.h> // For open(), fsync(), close()
+#include <vector>
 
 namespace tndm {
 PVDWriter::PVDWriter(std::string_view baseName) : base_(baseName) {
@@ -28,10 +34,88 @@ void PVDWriter::addTimestep(double time, std::string_view fileName) {
     d->SetAttribute("file", relpath.string().c_str());
 }
 
-bool PVDWriter::write() {
+void PVDWriter::load_from_file() {
     std::string fileName = base_.string() + ".pvd";
-    auto success = doc_.SaveFile(fileName.c_str());
-    return success == tinyxml2::XML_SUCCESS;
+    doc_.Clear(); // Clear any previously loaded XML content
+    auto result = doc_.LoadFile(fileName.c_str());
+    if (result != tinyxml2::XML_SUCCESS) {
+        throw std::runtime_error("Error loading PVD file: " + fileName);
+    }
+    // Find the root element and the collection
+    auto root = doc_.FirstChildElement("VTKFile");
+    if (!root) {
+        throw std::runtime_error("Missing root <VTKFile> element in " + fileName);
+    }
+
+    collection_ = root->FirstChildElement("Collection");
+    if (!collection_) {
+        throw std::runtime_error("Missing <Collection> element in " + fileName);
+    }
+}
+
+void PVDWriter::truncate_after_restart(std::size_t lastTimestepIndex) {
+    std::string fileName = base_.string() + ".pvd";
+    if (!std::filesystem::exists(fileName)) {
+        // Nothing has been written yet: the fresh document is already correct
+        std::cout << "Not truncating " << fileName << ": file does not exist yet.\n";
+        return;
+    }
+    load_from_file();
+
+    if (!collection_) {
+        throw std::runtime_error("Error: No Collection element found in " + fileName + "\n");
+    }
+
+    // Create a copy of the elements for safe iteration
+    std::vector<tinyxml2::XMLElement*> datasets;
+    for (tinyxml2::XMLElement* dataset = collection_->FirstChildElement("DataSet");
+         dataset != nullptr; dataset = dataset->NextSiblingElement("DataSet")) {
+        datasets.push_back(dataset);
+    }
+
+    std::size_t index = 0;
+    for (auto* dataset : datasets) {
+        if (index >= lastTimestepIndex) {
+            collection_->DeleteChild(dataset);
+        }
+        index++;
+    }
+
+    if (index < lastTimestepIndex) {
+        std::cerr << lastTimestepIndex << " datasets expected in " << fileName
+                  << " when truncating (checkpoint restart), but read only " << index << "\n";
+    }
+
+    std::size_t const removed = index > lastTimestepIndex ? index - lastTimestepIndex : 0;
+    std::cout << ("Truncated " + fileName + " to " + std::to_string(lastTimestepIndex) +
+                  " records, removed " + std::to_string(removed) + " records\n");
+    // Save the truncated XML
+    write();
+}
+
+bool PVDWriter::write() {
+    std::string tempFileName = base_.string() + ".pvd.tmp";
+    std::string finalFileName = base_.string() + ".pvd";
+
+    // Attempt to save to temporary file
+    if (doc_.SaveFile(tempFileName.c_str()) != tinyxml2::XML_SUCCESS) {
+        return false; // Saving failed
+    }
+
+    // Ensure data is flushed to disk (POSIX only)
+#ifdef __linux__
+    int fd = open(tempFileName.c_str(), O_WRONLY);
+    if (fd >= 0) {
+        if (fsync(fd) != 0) {
+            close(fd);
+            return false; // fsync failed
+        }
+        close(fd);
+    }
+#endif
+
+    // Rename temporary file to final file
+    return (std::rename(tempFileName.c_str(), finalFileName.c_str()) == 0);
 }
 
 } // namespace tndm

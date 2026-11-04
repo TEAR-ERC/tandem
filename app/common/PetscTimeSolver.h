@@ -14,6 +14,7 @@ extern "C" {
 
 #include <array>
 #include <cassert>
+#include <limits>
 #include <memory>
 #include <tuple>
 
@@ -28,6 +29,8 @@ public:
     std::size_t get_step_rejections() const;
     inline bool fsal() const { return fsal_; }
     void set_max_time_step(double dt);
+    /// Register a callback that adds application info to last_checkpoint.txt (see ts_util.h)
+    void set_checkpoint_info_callback(TSCheckPointInfoFn fn, void* ctx);
     static PetscErrorCode customized_ts_monitor(TS ts, PetscInt step, PetscReal time, Vec u,
                                                 void* ctx);
 
@@ -93,6 +96,12 @@ public:
             }
             const char* loadDirectory = sload.c_str();
             CHKERRTHROW(ts_checkpoint_restart(ts_, loadDirectory));
+
+            // PETSc calls the monitor once at the restored time. At that point the right-hand
+            // side has not been evaluated yet, so the internal state of the operator (traction,
+            // slip rate) is stale, and the checkpointed state was already output before the
+            // restart. Hence monitor calls up to the restored time are skipped.
+            CHKERRTHROW(TSGetTime(ts_, &skip_monitor_until_));
         }
 
         CHKERRTHROW(TSSetMaxTime(ts_, upcoming_time));
@@ -109,10 +118,18 @@ public:
     }
 
     template <class Monitor> void set_monitor(Monitor& monitor) {
-        CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, &monitor, nullptr));
+        auto ctx = std::make_shared<MonitorContext<Monitor>>(
+            MonitorContext<Monitor>{&monitor, &skip_monitor_until_});
+        monitor_ctx_ = ctx;
+        CHKERRTHROW(TSMonitorSet(ts_, &MonitorFunction<Monitor>, ctx.get(), nullptr));
     }
 
 private:
+    template <class Monitor> struct MonitorContext {
+        Monitor* monitor;
+        double const* skip_until;
+    };
+
     template <typename TimeOp>
     static PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec u, Vec F, void* ctx) {
         TimeOp* self = reinterpret_cast<TimeOp*>(ctx);
@@ -134,7 +151,11 @@ private:
 
     template <class Monitor>
     static PetscErrorCode MonitorFunction(TS ts, PetscInt steps, PetscReal time, Vec u, void* ctx) {
-        Monitor* self = reinterpret_cast<Monitor*>(ctx);
+        auto* mctx = reinterpret_cast<MonitorContext<Monitor>*>(ctx);
+        if (time <= *mctx->skip_until) {
+            return 0;
+        }
+        Monitor* self = mctx->monitor;
 
         std::array<Vec, NumStateVecs> x;
         for (std::size_t n = 0; n < NumStateVecs; ++n) {
@@ -154,6 +175,9 @@ private:
     Vec ts_state_ = nullptr;
     std::optional<std::string> ts_checkpoint_load_directory;
     MPI_Comm comm;
+    // Monitor calls with time <= skip_monitor_until_ are ignored (set after a checkpoint restart)
+    double skip_monitor_until_ = std::numeric_limits<double>::lowest();
+    std::shared_ptr<void> monitor_ctx_;
 };
 
 } // namespace tndm

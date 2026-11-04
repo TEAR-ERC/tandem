@@ -1,4 +1,5 @@
 #include "ScalarWriter.h"
+#include "io/TableTruncate.h"
 
 #include <filesystem>
 #include <iomanip>
@@ -34,6 +35,10 @@ void ScalarWriter::write(double time, mneme::span<double> scalars) const {
     }
     *out_ << endrow;
     out_->close();
+}
+
+void ScalarWriter::truncate_after_restart(std::size_t p) const {
+    truncate_table_file(file_name_, p);
 }
 
 } // namespace tndm

@@ -4,6 +4,8 @@
 #include "io/ProbeWriterUtil.h"
 #include "util/LinearAllocator.h"
 
+#include "io/TableTruncate.h"
+
 #include <filesystem>
 #include <mpi.h>
 #include <sstream>
@@ -74,6 +76,12 @@ void BoundaryProbeWriter<D>::write_header(
         }
     }
     *out_ << endheader;
+}
+
+template <std::size_t D> void BoundaryProbeWriter<D>::truncate_after_restart(std::size_t p) {
+    for (auto const& probe : probes_) {
+        truncate_table_file(probe.file_name, p);
+    }
 }
 
 template <std::size_t D>

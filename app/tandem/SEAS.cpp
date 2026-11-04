@@ -40,10 +40,17 @@
 #include <algorithm>
 #include <array>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -67,6 +74,87 @@ auto make_state_vecs(std::array<std::size_t, N> const& block_sizes,
     return state;
 }
 
+/// State of an output writer as stored in last_checkpoint.txt: output step, time and VMax of the
+/// last output
+using WriterState = std::tuple<std::size_t, double, double>;
+using WriterStates = std::map<std::string, WriterState>;
+
+/**
+ * @brief Read the writer states from last_checkpoint.txt
+ *
+ * Lines have the form "<writer key> <step> <time> <VMax>"; the first line (checkpoint path) and
+ * lines starting with '#' are skipped. Returns an empty map if load_path is not a regular file
+ * (e.g. if the checkpoint directory itself was given) or if the file holds no writer states, in
+ * which case the writers start from scratch as before.
+ */
+WriterStates read_writer_states(std::string const& load_path, MPI_Comm comm) {
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+
+    // Rank 0 reads the file, all ranks parse the same content
+    std::string content;
+    int ok = 1;
+    if (rank == 0) {
+        if (std::filesystem::is_regular_file(load_path)) {
+            std::ifstream file(load_path);
+            std::stringstream ss;
+            ss << file.rdbuf();
+            content = ss.str();
+            std::cout << "Retrieving writer states from " << load_path << std::endl;
+        } else {
+            ok = 0;
+        }
+    }
+    int size = static_cast<int>(content.size());
+    MPI_Bcast(&ok, 1, MPI_INT, 0, comm);
+    if (!ok) {
+        return {};
+    }
+    MPI_Bcast(&size, 1, MPI_INT, 0, comm);
+    content.resize(size);
+    MPI_Bcast(content.data(), size, MPI_CHAR, 0, comm);
+
+    WriterStates states;
+    std::istringstream in(content);
+    std::string line;
+    std::getline(in, line); // checkpoint path
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        std::istringstream ls(line);
+        std::string key;
+        std::size_t step;
+        double time, VMax;
+        if (!(ls >> key >> step >> time >> VMax)) {
+            throw std::runtime_error("Malformed writer state in " + load_path + ": " + line);
+        }
+        states[key] = WriterState{step, time, VMax};
+        if (rank == 0) {
+            std::cout << "Loaded " << key << " state: step=" << step << ", time=" << time
+                      << ", VMax=" << VMax << std::endl;
+        }
+    }
+    return states;
+}
+
+/// Writes "<key> <step> <time> <VMax>" for every writer that takes part in checkpointing.
+/// Called by the checkpoint code on rank 0 (writer states are identical on all ranks).
+PetscErrorCode write_writer_states(PetscViewer viewer, void* ctx) {
+    auto const& monitor = *static_cast<seas::Monitor const*>(ctx);
+    for (auto const& writer : monitor.writers()) {
+        if (writer->checkpoint_key().empty()) {
+            continue;
+        }
+        // %.17g round-trips doubles exactly (VMax is often ~1e-9 and must not be rounded)
+        PetscErrorCode ierr = PetscViewerASCIIPrintf(
+            viewer, "%s %zu %.17g %.17g\n", writer->checkpoint_key().c_str(), writer->output_step(),
+            writer->last_output_time(), writer->last_output_VMax());
+        CHKERRQ(ierr);
+    }
+    return 0;
+}
+
 auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mesh,
                  std::shared_ptr<Curvilinear<DomainDimension>> cl, BoundaryMap const& fault_map,
                  seas::Monitor& monitor, MPI_Comm comm) {
@@ -80,61 +168,89 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
                 "Fault output prefix and domain output prefix must not be identical");
         }
     }
+
+    WriterStates writer_states;
+    if (cfg.ts_checkpoint_config.load_directory.has_value()) {
+        writer_states = read_writer_states(*cfg.ts_checkpoint_config.load_directory, comm);
+    }
+    // Name the writer for checkpoint bookkeeping, restore its state after a restart (this also
+    // truncates its files back to the checkpoint), and hand it over to the monitor.
+    auto register_writer = [&](std::unique_ptr<seas::Writer> writer, std::string key) {
+        writer->set_checkpoint_key(key);
+        if (auto it = writer_states.find(key); it != writer_states.end()) {
+            auto const& [step, time, VMax] = it->second;
+            writer->set_state(step, time, VMax);
+        }
+        monitor.add_writer(std::move(writer));
+    };
+
     if (cfg.fault_probe_output && !cfg.fault_probe_output->probes.empty()) {
         auto const& oc = *cfg.fault_probe_output;
+        std::unique_ptr<seas::Writer> writer;
         switch (oc.type) {
 #ifdef ENABLE_HDF5
         case TableWriterType::HDF5:
-            monitor.add_writer(std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
+            writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, true>>(
                 oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
-                checkpoint_enabled));
+                checkpoint_enabled);
             break;
 #endif
         default:
             // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
             // so this default handles only CSV and Tecplot.
-            monitor.add_writer(std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
+            writer = std::make_unique<seas::FaultProbeWriter<DomainDimension>>(
                 oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
-                cl, fault_map, comm));
+                cl, fault_map, comm);
             break;
         }
+
+        register_writer(std::move(writer), "fault_probe_output");
     }
+
     if (cfg.domain_probe_output && !cfg.domain_probe_output->probes.empty()) {
         auto const& oc = *cfg.domain_probe_output;
+        std::unique_ptr<seas::Writer> writer;
         switch (oc.type) {
 #ifdef ENABLE_HDF5
         case TableWriterType::HDF5:
-            monitor.add_writer(
-                std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
-                    oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map,
-                    comm, checkpoint_enabled));
+            writer = std::make_unique<seas::HDF5CommonProbeWriter<DomainDimension, false>>(
+                oc.prefix, oc.probes, oc.make_adaptive_output_interval(), mesh, cl, fault_map, comm,
+                checkpoint_enabled);
             break;
 #endif
         default:
             // TableWriterType::HDF5 is rejected at parse time in non-HDF5 builds (SeasConfig.cpp)
             // so this default handles only CSV and Tecplot.
-            monitor.add_writer(std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
+            writer = std::make_unique<seas::DomainProbeWriter<DomainDimension>>(
                 oc.prefix, oc.make_writer(), oc.probes, oc.make_adaptive_output_interval(), mesh,
-                cl, comm));
+                cl, comm);
             break;
         }
+
+        register_writer(std::move(writer), "domain_probe_output");
     }
+
     if (cfg.fault_output) {
         auto const& oc = *cfg.fault_output;
-        monitor.add_writer(std::make_unique<seas::FaultWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::FaultWriter<DomainDimension>>(
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, fault_map,
-            comm));
+            comm);
+        register_writer(std::move(writer), "fault_output");
     }
+
     if (cfg.fault_scalar_output) {
         auto const& oc = *cfg.fault_scalar_output;
-        monitor.add_writer(std::make_unique<seas::FaultScalarWriter>(
-            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm));
+        auto writer = std::make_unique<seas::FaultScalarWriter>(
+            oc.prefix, oc.make_writer(), oc.make_adaptive_output_interval(), comm);
+        register_writer(std::move(writer), "fault_scalar_output");
     }
+
     if (cfg.domain_output) {
         auto const& oc = *cfg.domain_output;
-        monitor.add_writer(std::make_unique<seas::DomainWriter<DomainDimension>>(
+        auto writer = std::make_unique<seas::DomainWriter<DomainDimension>>(
             oc.prefix, oc.make_adaptive_output_interval(), mesh, cl, PolynomialDegree, oc.jacobian,
-            comm));
+            comm);
+        register_writer(std::move(writer), "domain_output");
     }
 #ifdef ENABLE_HDF5
     if (cfg.moment_rate_output) {
@@ -265,6 +381,7 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
     monitor->write_static();
 
     ts.set_monitor(*monitor);
+    ts.set_checkpoint_info_callback(write_writer_states, monitor.get());
 
     int rank;
     MPI_Comm comm = seasop->comm();

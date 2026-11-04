@@ -63,6 +63,24 @@ public:
         last_output_VMax_ = VMax;
     }
 
+    virtual void set_state(std::size_t step, double time, double VMax) {
+        output_step_ = step;
+        last_output_time_ = time;
+        last_output_VMax_ = VMax;
+    }
+
+    /**
+     * @brief Key under which this writer's state is stored in last_checkpoint.txt.
+     *
+     * Empty means the writer takes no part in checkpoint/restart bookkeeping.
+     */
+    std::string const& checkpoint_key() const { return checkpoint_key_; }
+    void set_checkpoint_key(std::string key) { checkpoint_key_ = std::move(key); }
+
+    std::size_t output_step() const { return output_step_; }
+    double last_output_time() const { return last_output_time_; }
+    double last_output_VMax() const { return last_output_VMax_; }
+
     virtual void write_static() {}
     virtual void write_static(mneme::span<double> data) {}
     virtual void write_static(mneme::span<FiniteElementFunction<1u>> data) {}
@@ -77,6 +95,7 @@ protected:
     }
 
     std::string prefix_;
+    std::string checkpoint_key_;
     AdaptiveOutputInterval oi_;
 
     std::size_t output_step_ = 0;
@@ -100,6 +119,10 @@ public:
             writer_.write(time, std::move(data));
         }
     }
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        writer_.truncate_after_restart(step);
+    }
 
 private:
     BoundaryProbeWriter<D> writer_;
@@ -120,6 +143,10 @@ public:
         if (writer_.num_probes() > 0) {
             writer_.write(time, std::move(data));
         }
+    }
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        writer_.truncate_after_restart(step);
     }
 
 private:
@@ -163,6 +190,15 @@ public:
         writer.write(prefix_ + "-static");
     }
 
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            pvd_.truncate_after_restart(step);
+        }
+    }
+
 private:
     PVDWriter pvd_;
     CurvilinearBoundaryVTUAdapter<D> adapter_;
@@ -184,6 +220,15 @@ public:
 
         if (rank == 0) {
             writer_.write(time, std::move(data));
+        }
+    }
+
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            writer_.truncate_after_restart(step);
         }
     }
 
@@ -229,6 +274,15 @@ public:
             piece.addPointData(fun);
         }
         writer.write(prefix_ + "-static");
+    }
+
+    inline void set_state(std::size_t step, double time, double VMax) override {
+        Writer::set_state(step, time, VMax);
+        int rank;
+        MPI_Comm_rank(comm_, &rank);
+        if (rank == 0) {
+            pvd_.truncate_after_restart(step);
+        }
     }
 
 private:
