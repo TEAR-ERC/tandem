@@ -33,6 +33,7 @@ inline void truncate_table_file(std::string const& file_name, std::size_t num_re
     std::size_t const keep = num_header_lines + num_records;
     std::string const tmp_name = file_name + ".tmp";
     std::size_t lines_read = 0;
+    std::size_t lines_dropped = 0;
     {
         std::ifstream in(file_name);
         if (!in.is_open()) {
@@ -48,6 +49,10 @@ inline void truncate_table_file(std::string const& file_name, std::size_t num_re
         while (lines_read < keep && std::getline(in, line)) {
             out << line << '\n';
             ++lines_read;
+        }
+        // Count what is dropped
+        while (std::getline(in, line)) {
+            ++lines_dropped;
         }
         out.flush();
         if (!out) {
@@ -66,7 +71,9 @@ inline void truncate_table_file(std::string const& file_name, std::size_t num_re
         throw std::runtime_error("Failed to replace " + file_name +
                                  " by truncated copy: " + ec.message());
     }
-    std::cout << "Done truncating " << file_name << " to " << num_records << " records.\n";
+    // Single insertion so that output of different ranks does not interleave within a message
+    std::cout << ("Truncated " + file_name + " to " + std::to_string(num_records) +
+                  " records, removed " + std::to_string(lines_dropped) + " records\n");
 }
 
 } // namespace tndm

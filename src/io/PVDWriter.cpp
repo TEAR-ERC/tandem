@@ -86,7 +86,9 @@ void PVDWriter::truncate_after_restart(std::size_t lastTimestepIndex) {
                   << " when truncating (checkpoint restart), but read only " << index << "\n";
     }
 
-    std::cout << "Done truncating " << fileName << " to " << lastTimestepIndex << " records.\n";
+    std::size_t const removed = index > lastTimestepIndex ? index - lastTimestepIndex : 0;
+    std::cout << ("Truncated " + fileName + " to " + std::to_string(lastTimestepIndex) +
+                  " records, removed " + std::to_string(removed) + " records\n");
     // Save the truncated XML
     write();
 }
