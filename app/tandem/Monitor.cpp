@@ -23,7 +23,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
         bool require_traction = false;
         bool require_displacement = false;
         for (auto const& writer : writers_) {
-            if (writer->is_write_required(time, VMax)) {
+            if (writer->is_write_required(time, VMax, step_)) {
                 require_traction = require_traction || writer->level() == DataLevel::Boundary;
                 require_displacement = require_displacement || writer->level() == DataLevel::Volume;
             }
@@ -31,7 +31,7 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
         seasop_->update_internal_state(time, state, !fsal_, require_traction, require_displacement);
 
         for (auto const& writer : writers_) {
-            if (writer->is_write_required(time, VMax)) {
+            if (writer->is_write_required(time, VMax, step_)) {
                 switch (writer->level()) {
                 case DataLevel::Scalar:
                     writer->write(time, mneme::span(&VMax, 1));
@@ -93,7 +93,7 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
         double VMax = reduce_VMax(seasop_->friction().VMax_local(), seasop_->comm());
 
         for (auto const& writer : writers_) {
-            if (writer->is_write_required(time, VMax)) {
+            if (writer->is_write_required(time, VMax, step_)) {
                 switch (writer->level()) {
                 case DataLevel::Scalar:
                     writer->write(time, mneme::span(&VMax, 1));

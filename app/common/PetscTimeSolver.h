@@ -136,6 +136,7 @@ private:
     static PetscErrorCode MonitorFunction(TS ts, PetscInt steps, PetscReal time, Vec u, void* ctx) {
         Monitor* self = reinterpret_cast<Monitor*>(ctx);
 
+        self->set_step(static_cast<std::size_t>(steps));
         std::array<Vec, NumStateVecs> x;
         for (std::size_t n = 0; n < NumStateVecs; ++n) {
             CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));

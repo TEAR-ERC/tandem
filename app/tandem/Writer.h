@@ -46,9 +46,9 @@ public:
     virtual std::vector<std::size_t> const* subset() const { return nullptr; }
     virtual bool has_static_writer() const { return false; }
 
-    inline bool is_write_required(double time, double VMax) const {
+    inline bool is_write_required(double time, double VMax, std::size_t step) const {
         double delta_time = time - last_output_time_;
-        return oi_(delta_time, last_output_VMax_, VMax);
+        return oi_(delta_time, last_output_VMax_, VMax, step);
     }
 
     virtual void write(double time, mneme::span<double> data) {}
