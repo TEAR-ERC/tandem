@@ -157,6 +157,7 @@ private:
         }
         Monitor* self = mctx->monitor;
 
+        self->set_step(static_cast<std::size_t>(steps));
         std::array<Vec, NumStateVecs> x;
         for (std::size_t n = 0; n < NumStateVecs; ++n) {
             CHKERRTHROW(VecNestGetSubVec(u, n, &x[n]));

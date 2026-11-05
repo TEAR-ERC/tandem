@@ -54,6 +54,7 @@ Common options:
 - **rtol**: Relative tolerance for VMax. Default = 0.01.
 - **t_min**: Minimum time difference between samples. Default = 0.0.
 - **t_max**: Maximum time difference between samples. Default = 365 * 24 * 3600.
+- **v_th**, **freq**: Optional, must be given together. While the maximum slip rate VMax is at or above **v_th**, the VMax-based sampling (**atol**, **rtol**) is switched off and the output is written at every **freq**-th time step instead (plus once at the first time step above **v_th**). **freq** must be a positive integer. This keeps sampling a seismic event during which VMax is nearly constant, where the default rule would write almost nothing. Because the time step is adapted to the solution, the sampling is denser where the solution changes quickly. Output is written at the time steps whose number is a multiple of **freq**, so the first interval after the first sample can be shorter than **freq** steps. **t_min** and **t_max** still apply. When VMax drops below **v_th**, the default sampling resumes. Both options are set per output, so a large output (e.g. domain output) can use a larger **freq** than a small one (e.g. fault scalar output).
 
 For domain output:
 

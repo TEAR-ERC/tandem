@@ -31,6 +31,14 @@ template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& out
         .validator([](auto&& x) { return x > 0; })
         .default_value(365 * 24 * 3600)
         .help("Maximum time difference between samples.");
+    outputSchema.add_value("v_th", up_cast<Derived>(&Derived::v_th))
+        .validator([](auto&& x) { return x > 0; })
+        .help("Velocity threshold (optional, requires freq). While VMax >= v_th, the VMax-based "
+              "sampling (atol, rtol) is replaced by one sample every freq time steps.");
+    outputSchema.add_value("freq", up_cast<Derived>(&Derived::freq))
+        .validator([](auto&& x) { return x > 0; })
+        .help("Time step interval between samples while VMax >= v_th (optional, requires v_th). "
+              "Must be a positive integer.");
 }
 
 template <typename Derived>

@@ -34,6 +34,8 @@ public:
 
     auto min_time_step() const { return dt_min_; }
     auto max_time_step() const { return dt_max_; }
+    /// Number of the current time step; set by the time solver before monitor() is called
+    void set_step(std::size_t step) { step_ = step; }
 
 protected:
     double reduce_VMax(double VMax_local, MPI_Comm comm);
@@ -42,6 +44,7 @@ protected:
 
     std::vector<std::unique_ptr<Writer>> writers_;
     bool fsal_;
+    std::size_t step_ = 0;
 
 private:
     double last_time_ = std::numeric_limits<double>::lowest();
