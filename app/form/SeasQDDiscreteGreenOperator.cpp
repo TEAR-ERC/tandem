@@ -198,6 +198,23 @@ void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
     }
 }
 
+void SeasQDDiscreteGreenOperator::set_viewer_mpiio(PetscViewer v, Mat mat) {
+    PetscInt M, N;
+    CHKERRTHROW(MatGetSize(mat, &M, &N));
+    PetscInt64 total_entries = (PetscInt64)M * (PetscInt64)N;
+
+    // Automatically disable MPI-IO if total entries exceed the 32-bit signed int limit
+    PetscBool use_mpiio = (total_entries <= 2147483647LL) ? PETSC_TRUE : PETSC_FALSE;
+
+    PetscMPIInt rank;
+    CHKERRTHROW(MPI_Comm_rank(PetscObjectComm((PetscObject)mat), &rank));
+    if (rank == 0) {
+        std::cout << "GF binary I/O: matrix " << M << " x " << N << " (entries = " << total_entries
+                  << "), MPI-IO automatically "
+                  << (use_mpiio ? "enabled" : "disabled (exceeds 32-bit limit)") << std::endl;
+    }
+}
+
 void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     LocalSimplexMesh<DomainDimension> const& mesh, PetscInt current_gf, PetscInt n_gf) {
     PetscViewer v;
@@ -210,7 +227,7 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     std::string new_filename = gf_operator_filename_ + ".tmp";
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
-    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    set_viewer_mpiio(v, G_);
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
@@ -446,7 +463,7 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
     CHKERRTHROW(PetscTime(&t0));
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
                                       gf_operator_filename_.c_str(), FILE_MODE_READ, &v));
-    CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    set_viewer_mpiio(v, G_);
 
     CHKERRTHROW(PetscViewerBinaryRead(v, &commsize_checkpoint, 1, NULL, PETSC_INT));
     MPI_Comm_size(comm, &commsize);

@@ -87,6 +87,8 @@ private:
     // all logic associated with matix craetion, loading / partial assembly is done here
     void get_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh);
     void back_up_file(std::string file_to_backup);
+    // Helper to automatically configure MPI-IO based on matrix size limits
+    void set_viewer_mpiio(PetscViewer v, Mat mat);
     void write_discrete_greens_traction();
     void load_discrete_greens_traction();
     void get_boundary_traction();
