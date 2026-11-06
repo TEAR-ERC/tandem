@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
+#include <limits>
 
 namespace tndm {
 
@@ -25,6 +26,13 @@ public:
         double V0;
         double b;
         double f0;
+        /// Bounds for the absolute effective normal stress (positive in compression).
+        /// Defaults: no bounds (upstream behaviour).
+        double sn_min = -std::numeric_limits<double>::infinity();
+        double sn_max = std::numeric_limits<double>::infinity();
+        /// Activates the Maxwell relaxation of the transient normal stress. This adds one
+        /// internal variable per fault node to the state vector.
+        bool relaxation = false;
     };
     struct Params {
         double a;
@@ -34,6 +42,9 @@ public:
         std::array<double, TangentialComponents> tau_pre;
         std::array<double, TangentialComponents> Vinit;
         std::array<double, TangentialComponents> Sinit;
+        /// Inverse of the Maxwell relaxation time of the transient normal stress, 1 / T_r.
+        /// Zero (i.e. T_r = infinity) disables the relaxation.
+        double relax_rate;
     };
 
     void set_num_nodes(std::size_t num_nodes) { p_.resize(num_nodes); }
@@ -46,11 +57,12 @@ public:
         p_[index].get<TauPre>() = params.tau_pre;
         p_[index].get<Vinit>() = params.Vinit;
         p_[index].get<Sinit>() = params.Sinit;
+        p_[index].get<RelaxRate>() = params.relax_rate;
     }
 
     double psi_init(std::size_t index, double sn,
                     std::array<double, TangentialComponents> const& tau) const {
-        double snAbs = -sn + p_[index].get<SnPre>();
+        double snAbs = sn_hat(index, sn);
         double tauAbs = norm(tau + p_[index].get<TauPre>());
         auto Vi = norm(p_[index].get<Vinit>());
         if (Vi == 0.0) {
@@ -65,8 +77,36 @@ public:
 
     /**
      * @brief Absolute normal stress on fault (positive in compression)
+     *
+     * sn is the effective transient normal stress (elastic part plus relaxation correction).
+     * The result is clamped to [sn_min, sn_max] (see ConstantParams) to keep the rate-and-state
+     * friction well conditioned: a lower bound > 0 avoids (near-)zero normal stress, where the
+     * friction law degenerates and the slip rate solve loses convergence; an upper bound avoids
+     * excessive compression.
      */
-    double sn_hat(std::size_t index, double sn) const { return -sn + p_[index].get<SnPre>(); }
+    double sn_hat(std::size_t index, double sn) const {
+        return std::clamp(-sn + p_[index].get<SnPre>(), cp_.sn_min, cp_.sn_max);
+    }
+    /**
+     * @brief Maxwell-type relaxation of the transient normal stress.
+     *
+     * The elastic solve provides the instantaneous (elastic) normal stress change sn. The
+     * effective transient normal stress seen by the friction law is
+     *
+     *     sn_eff = sn + q,
+     *
+     * where q is an additional state variable (initially zero) that evolves according to
+     *
+     *     dq/dt = -(sn + q) / T_r,
+     *
+     * which is equivalent to the Maxwell relaxation law d(sn_eff)/dt = d(sn)/dt - sn_eff / T_r.
+     * Limits: T_r -> infinity gives q = 0 (purely elastic, no relaxation); T_r -> 0 gives
+     * q = -sn, i.e. sn_eff = 0 (transient normal stress removed completely).
+     * Only sn is needed, not its time derivative.
+     */
+    double sn_relax_rhs(std::size_t index, double sn, double q) const {
+        return -p_[index].get<RelaxRate>() * (sn + q);
+    }
     /**
      * @brief Absolute shear stress on fault.
      *
@@ -84,7 +124,7 @@ public:
         -> std::array<double, TangentialComponents> {
         auto eta = p_[index].get<Eta>();
         auto tauAbsVec = tau + p_[index].get<TauPre>();
-        double snAbs = -sn + p_[index].get<SnPre>();
+        double snAbs = sn_hat(index, sn);
         double tauAbs = norm(tauAbsVec);
         double V = 0.0, Ve = 0.0;
         double Va = -32.0;
@@ -177,7 +217,7 @@ public:
     virtual double state_rhs(std::size_t index, double V, double psi) const = 0;
 
     auto param_names() const {
-        auto names = std::vector<std::string>(4 + TangentialComponents);
+        auto names = std::vector<std::string>(5 + TangentialComponents);
         char buf[100];
 
         std::size_t i = 0;
@@ -189,11 +229,12 @@ public:
             snprintf(buf, sizeof(buf), "tau_pre%lu", t);
             names[i++] = buf;
         }
+        names[i++] = "relax_rate";
         return names;
     }
 
     template <typename VecT> void params(std::size_t index, VecT& result) const {
-        assert(result.shape(0) == 4 + TangentialComponents);
+        assert(result.shape(0) == 5 + TangentialComponents);
         std::ptrdiff_t i = 0;
         result(i++) = p_[index].get<A>();
         result(i++) = p_[index].get<Eta>();
@@ -203,6 +244,7 @@ public:
         for (auto const& t : tau_pre) {
             result(i++) = t;
         }
+        result(i++) = p_[index].get<RelaxRate>();
     }
 
 protected:
@@ -246,7 +288,11 @@ protected:
     struct Sinit {
         using type = std::array<double, TangentialComponents>;
     };
-    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit> p_;
+    struct RelaxRate {
+        using type = double;
+    };
+    mneme::MultiStorage<mneme::DataLayout::SoA, SnPre, TauPre, A, Eta, L, Vinit, Sinit, RelaxRate>
+        p_;
 };
 
 } // namespace tndm

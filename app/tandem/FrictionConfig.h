@@ -13,7 +13,9 @@
 
 #include <array>
 #include <functional>
+#include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
 
 namespace tndm {
@@ -38,6 +40,9 @@ public:
     constexpr static char TauPre[] = "tau_pre";
     constexpr static char Vinit[] = "Vinit";
     constexpr static char Sinit[] = "Sinit";
+    constexpr static char TRelax[] = "t_relax";
+    constexpr static char SnMin[] = "sn_min";
+    constexpr static char SnMax[] = "sn_max";
     constexpr static char Source[] = "source";
     constexpr static char DeltaTau[] = "delta_tau";
     constexpr static char DeltaSn[] = "delta_sn";
@@ -64,6 +69,10 @@ public:
                 lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents>(
                     scenario, Sinit);
         }
+        if (lib_.hasMember(scenario, TRelax)) {
+            t_relax_ = lib_.getMemberFunction<DomainDimension, 1>(scenario, TRelax);
+            cp_.relaxation = true; // adds one internal state variable per fault node
+        }
         if (lib_.hasMember(scenario, Source)) {
             source_ = std::make_optional(
                 lib_.getMemberFunction<DomainDimension + 1, 1>(scenario, Source));
@@ -82,6 +91,15 @@ public:
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
         cp_.b = lib_.getMemberConstant(scenario, B);
         cp_.f0 = lib_.getMemberConstant(scenario, F0);
+        if (lib_.hasMember(scenario, SnMin)) {
+            cp_.sn_min = lib_.getMemberConstant(scenario, SnMin);
+        }
+        if (lib_.hasMember(scenario, SnMax)) {
+            cp_.sn_max = lib_.getMemberConstant(scenario, SnMax);
+        }
+        if (!(cp_.sn_min <= cp_.sn_max)) {
+            throw std::invalid_argument("sn_min must not exceed sn_max.");
+        }
 
         if (lib_.hasMember(scenario, FaultSolution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
@@ -101,6 +119,12 @@ public:
             p.tau_pre = this->tau_pre_(x);
             p.Vinit = this->Vinit_(x);
             p.Sinit = this->Sinit_(x);
+            double t_relax = this->t_relax_(x)[0];
+            if (!(t_relax > 0.0)) {
+                throw std::invalid_argument("t_relax must be positive (use math.huge or omit it "
+                                            "to disable the normal stress relaxation).");
+            }
+            p.relax_rate = 1.0 / t_relax; // = 0 for t_relax = infinity
             return p;
         };
     }
@@ -127,6 +151,11 @@ protected:
     vector_functional_t<DomainDimension> Vinit_;
     vector_functional_t<DomainDimension> Sinit_ = [](std::array<double, DomainDimension> const& x)
         -> std::array<double, DieterichRuinaBase::TangentialComponents> { return {}; };
+    // Maxwell relaxation time of the transient normal stress; infinity = no relaxation
+    functional_t<DomainDimension> t_relax_ =
+        [](std::array<double, DomainDimension> const& x) -> std::array<double, 1> {
+        return {std::numeric_limits<double>::infinity()};
+    };
     std::optional<functional_t<DomainDimension + 1>> source_ = std::nullopt;
     std::optional<vector_functional_t<DomainDimension + 1>> delta_tau_ = std::nullopt;
     std::optional<functional_t<DomainDimension + 1>> delta_sn_ = std::nullopt;

@@ -142,8 +142,16 @@ public:
 
             auto value_matrix = values.subtensor(slice{}, slice{}, out_no++);
             auto state_block = in_handle.subtensor(slice{}, faultNo);
-            auto state_matrix = reshape(state_block, value_matrix.shape(0), value_matrix.shape(1));
-            value_matrix.copy_values(state_matrix);
+            // The state block may carry additional internal variables after the leading
+            // NumQuantities columns (e.g. the normal stress relaxation variable); only the
+            // leading columns are exported here.
+            auto nbf = value_matrix.shape(0);
+            auto state_matrix = reshape(state_block, nbf, state_block.shape(0) / nbf);
+            for (std::ptrdiff_t q = 0; q < value_matrix.shape(1); ++q) {
+                for (std::ptrdiff_t n = 0; n < nbf; ++n) {
+                    value_matrix(n, q) = state_matrix(n, q);
+                }
+            }
         }
         state.end_access_readonly(in_handle);
         return soln;

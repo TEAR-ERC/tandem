@@ -31,7 +31,13 @@ public:
 
     RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>> cl);
 
-    std::size_t block_size() const { return space_.numBasisFunctions() * NumQuantities; }
+    // Number of values per fault node in the state vector. This is NumQuantities, plus one
+    // internal variable q (viscous correction of the transient normal stress) only if the
+    // Maxwell relaxation is activated. q is stored after slip and state, so the slip kernels,
+    // which only read the leading D-1 columns of the state block, are unaffected.
+    std::size_t num_state_quantities() const { return NumQuantities + (relaxation_ ? 1u : 0u); }
+    bool relaxation() const { return relaxation_; }
+    std::size_t block_size() const { return space_.numBasisFunctions() * num_state_quantities(); }
     std::size_t slip_block_size() const {
         return space_.numBasisFunctions() * TangentialComponents;
     }
@@ -44,6 +50,7 @@ public:
     auto const& space() const { return space_; }
 
 protected:
+    bool relaxation_ = false;
     std::shared_ptr<Curvilinear<DomainDimension>> cl_;
 
     // Basis

@@ -36,6 +36,16 @@ Material and frictional parameters used in Tandem simulation are written in Lua 
 +--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
 | **delta_tau**      | Functional (space, time)  | (Optional) Time-dependent change in shear traction              | MPa     | 0.0     |
 +--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
+| **sn_min**         | Constant                  | (Optional) Lower bound of the absolute normal stress            | MPa     | none    |
+|                    |                           | (positive in compression). See normal stress relaxation.        |         |         |
++--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
+| **sn_max**         | Constant                  | (Optional) Upper bound of the absolute normal stress            | MPa     | none    |
+|                    |                           | (positive in compression). See normal stress relaxation.        |         |         |
++--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
+| **t_relax**        | Functional (space)        | (Optional) Maxwell relaxation time of the transient normal      | s       | inf     |
+|                    |                           | stress. If present, one extra state variable per fault node     |         |         |
+|                    |                           | is used. See :doc:`../reference/normal-stress-relaxation`       |         |         |
++--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+
 | **source**         | Functional (space, time)  | (Optional) Defines an additional source term :math:`s` to the   |         |         |
 |                    |                           | state evolution equation :math:`\psi_{,t} = G(V,\psi) + s(x,t)` |         |         |
 +--------------------+---------------------------+-----------------------------------------------------------------+---------+---------+

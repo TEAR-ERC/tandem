@@ -21,6 +21,8 @@ template <class Law> class RateAndState : public RateAndStateBase {
 public:
     using RateAndStateBase::RateAndStateBase;
     static constexpr std::size_t PsiIndex = TangentialComponents;
+    // Viscous correction of the transient normal stress, see DieterichRuinaBase::sn_relax_rhs
+    static constexpr std::size_t QIndex = PsiIndex + 1u;
 
     using param_fun_t =
         std::function<typename Law::Params(std::array<double, DomainDimension> const&)>;
@@ -33,6 +35,8 @@ public:
 
     void set_constant_params(typename Law::ConstantParams const& cps) {
         law_.set_constant_params(cps);
+        // Must be called before any state vector is allocated (block_size() depends on it).
+        relaxation_ = cps.relaxation;
     }
     void set_params(param_fun_t pfun) {
         auto num_nodes = fault_.storage().size();
@@ -68,7 +72,7 @@ public:
 private:
     template <typename T> auto state_mat(Vector<T>& state) const {
         std::size_t nbf = space_.numBasisFunctions();
-        return reshape(state, nbf, NumQuantities);
+        return reshape(state, nbf, num_state_quantities());
     }
     template <typename T> auto traction_mat(Vector<T> const& traction) const {
         std::size_t nbf = space_.numBasisFunctions();
@@ -117,6 +121,9 @@ void RateAndState<Law>::pre_init(std::size_t faultNo, Vector<double>& state,
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             s_mat(node, t) = Sini[t];
         }
+        if (relaxation_) {
+            s_mat(node, QIndex) = 0.0;
+        }
     }
 }
 
@@ -148,6 +155,9 @@ double RateAndState<Law>::init(double time, std::size_t faultNo,
         }
         VMax = std::max(VMax, V);
         s_mat(node, PsiIndex) = psi;
+        if (relaxation_) {
+            s_mat(node, QIndex) = 0.0; // no relaxation yet, hence sn_eff = sn above
+        }
     }
     *_ierr = ierr_max;
     return VMax;
@@ -173,12 +183,15 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
             sn = sn + get_delta_sn(time, faultNo, node);
         }
         auto psi = s_mat(node, PsiIndex);
+        double q = relaxation_ ? s_mat(node, QIndex) : 0.0;
         auto tau = get_tau(node, t_mat);
         if (delta_tau_) {
             tau = tau + get_delta_tau(time, faultNo, node);
         }
 
-        auto Vi = law_.slip_rate(index + node, faultNo, sn, tau, psi, x, &ierr);
+        // Maxwell relaxation: the friction law sees the relaxed transient normal stress
+        auto sn_eff = sn + q;
+        auto Vi = law_.slip_rate(index + node, faultNo, sn_eff, tau, psi, x, &ierr);
         if (ierr > ierr_max) {
             ierr_max = ierr;
         }
@@ -189,6 +202,9 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
             r_mat(node, t) = Vi[t];
         }
         r_mat(node, PsiIndex) = law_.state_rhs(index + node, V, psi);
+        if (relaxation_) {
+            r_mat(node, QIndex) = law_.sn_relax_rhs(index + node, sn, q);
+        }
     }
     if (source_) {
         std::array<double, DomainDimension + 1> xt;
@@ -246,7 +262,8 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
             tau = tau + get_delta_tau(time, faultNo, node);
         }
         auto psi = s_mat(node, PsiIndex);
-        auto V = law_.slip_rate(index + node, faultNo, sn, tau, psi, x, &ierr);
+        auto sn_eff = sn + (relaxation_ ? s_mat(node, QIndex) : 0.0);
+        auto V = law_.slip_rate(index + node, faultNo, sn_eff, tau, psi, x, &ierr);
         auto tau_hat = law_.tau_hat(index + node, tau, V);
         std::size_t out = 0;
         result(node, out++) = psi;
@@ -259,7 +276,7 @@ void RateAndState<Law>::state(double time, std::size_t faultNo,
         for (std::size_t t = 0; t < TangentialComponents; ++t) {
             result(node, out++) = V[t];
         }
-        result(node, out++) = law_.sn_hat(index + node, sn);
+        result(node, out++) = law_.sn_hat(index + node, sn_eff);
     }
 }
 
