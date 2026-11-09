@@ -30,11 +30,11 @@ jobs:
       tandem_image: ${{ steps.check-version.outputs.tandem_image }}
       base_image: ${{ steps.check-version.outputs.base_image }}
     steps:
-      - name: Get the latest PETSc 3.22 patch version
+      - name: Get the latest PETSc 3.26 patch version
         id: get-petsc-version
         run: |
           MAJOR_VERSION=3
-          MINOR_VERSION=22
+          MINOR_VERSION=26
           VERSION=$(curl -sf https://web.cels.anl.gov/projects/petsc/download/release-snapshots/ \
             | grep -oP "petsc-${MAJOR_VERSION}\.${MINOR_VERSION}\.\d+\.tar\.gz" \
             | sed 's/[^0-9]*\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/' \
