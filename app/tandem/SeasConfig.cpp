@@ -13,8 +13,8 @@ template <typename T, typename P> auto up_cast(P ptr) {
 
 template <typename Derived> void setOutputConfigSchema(TableSchema<Derived>& outputSchema) {
     outputSchema.add_value("prefix", up_cast<Derived>(&Derived::prefix))
-        .validator(ParentPathExists())
-        .help("Output file name prefix.");
+        .validator(ParentPathExistsOrCreatable())
+        .help("Output file name prefix. Missing parent directories are created.");
     outputSchema.add_value("atol", up_cast<Derived>(&Derived::atol))
         .validator([](auto&& x) { return x >= 0; })
         .default_value(1e-50)
@@ -54,8 +54,9 @@ void setTsCheckpointConfigSchema(TableSchema<Derived>& tsCheckpointSchema) {
 
     tsCheckpointSchema.add_value("save_directory", up_cast<Derived>(&Derived::save_directory))
         .default_value("checkpoint")
-        .validator(ParentPathExists())
-        .help("directory from which a checkpoint is saved");
+        .validator(ParentPathExistsOrCreatable())
+        .help("directory from which a checkpoint is saved. Missing parent directories are "
+              "created.");
 
     tsCheckpointSchema.add_value("freq_step", up_cast<Derived>(&Derived::frequency_step))
         .default_value(1000)
