@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <filesystem>
 #include <stdexcept>
 #include <unordered_map>
@@ -68,10 +69,10 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<AbstractFrictionOperator> friction,
     LocalSimplexMesh<DomainDimension> const& mesh, std::optional<std::string> prefix,
     double gf_checkpoint_every_nmins, bool matrix_free, MGConfig const& mg_config,
-    GfWorkerFactory worker_factory, unsigned gf_groups, bool balance_rows)
+    GfWorkerFactory worker_factory, unsigned gf_groups, bool balance_rows, bool single_precision)
     : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config),
       worker_factory_(std::move(worker_factory)), gf_groups_(gf_groups),
-      balance_rows_(balance_rows) {
+      balance_rows_(balance_rows), single_precision_(single_precision) {
 
     int rank;
 
@@ -112,11 +113,16 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
         checkpoint_enabled_ = true;
     }
     get_discrete_greens_function(mesh);
+    if (single_precision_) {
+        convert_to_single_precision();
+    }
     // Only needed for the computation above (and refers to objects that may not live on)
     worker_factory_ = nullptr;
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
+    VecScatterDestroy(&gather_slip_);
+    VecDestroy(&slip_all_);
     VecScatterDestroy(&to_fault_layout_);
     VecDestroy(&y_balanced_);
     MatDestroy(&G_);
@@ -163,7 +169,15 @@ void SeasQDDiscreteGreenOperator::update_traction(double time, BlockVector const
     S_->begin_assembly();
     S_->end_assembly();
 
-    if (balance_rows_) {
+    if (single_precision_) {
+        matmult_single_precision(balance_rows_ ? y_balanced_ : base::traction_.vec());
+        if (balance_rows_) {
+            CHKERRTHROW(VecScatterBegin(to_fault_layout_, y_balanced_, base::traction_.vec(),
+                                        INSERT_VALUES, SCATTER_FORWARD));
+            CHKERRTHROW(VecScatterEnd(to_fault_layout_, y_balanced_, base::traction_.vec(),
+                                      INSERT_VALUES, SCATTER_FORWARD));
+        }
+    } else if (balance_rows_) {
         CHKERRTHROW(MatMult(G_, S_->vec(), y_balanced_));
         CHKERRTHROW(VecScatterBegin(to_fault_layout_, y_balanced_, base::traction_.vec(),
                                     INSERT_VALUES, SCATTER_FORWARD));
@@ -247,6 +261,83 @@ void SeasQDDiscreteGreenOperator::setup_row_redistribution() {
     CHKERRTHROW(ISCreateStride(comm, last - first, first, 1, &is));
     CHKERRTHROW(VecScatterCreate(y_balanced_, is, base::traction_.vec(), is, &to_fault_layout_));
     CHKERRTHROW(ISDestroy(&is));
+}
+
+void SeasQDDiscreteGreenOperator::convert_to_single_precision() {
+    MPI_Comm comm = base::comm();
+    PetscInt m, N, lda;
+    CHKERRTHROW(MatGetLocalSize(G_, &m, nullptr));
+    CHKERRTHROW(MatGetSize(G_, nullptr, &N));
+    CHKERRTHROW(MatDenseGetLDA(G_, &lda));
+
+    // The local part of a parallel dense matrix holds the local rows and all columns,
+    // column major with leading dimension lda.
+    G_single_.resize(static_cast<std::size_t>(m) * static_cast<std::size_t>(N));
+    PetscScalar const* a;
+    CHKERRTHROW(MatDenseGetArrayRead(G_, &a));
+    for (PetscInt j = 0; j < N; ++j) {
+        for (PetscInt i = 0; i < m; ++i) {
+            G_single_[static_cast<std::size_t>(j) * m + i] =
+                static_cast<float>(a[static_cast<std::size_t>(j) * lda + i]);
+        }
+    }
+    CHKERRTHROW(MatDenseRestoreArrayRead(G_, &a));
+    single_m_ = m;
+    single_N_ = N;
+    CHKERRTHROW(VecScatterCreateToAll(S_->vec(), &gather_slip_, &slip_all_));
+
+    // Accuracy check on a smooth test vector: compare with the double precision product.
+    // (S_ is overwritten in every update, so it can be used as scratch space here.)
+    PetscInt first, last;
+    CHKERRTHROW(VecGetOwnershipRange(S_->vec(), &first, &last));
+    PetscScalar* x;
+    CHKERRTHROW(VecGetArray(S_->vec(), &x));
+    for (PetscInt i = 0; i < last - first; ++i) {
+        x[i] = std::sin(0.37 * static_cast<double>(first + i));
+    }
+    CHKERRTHROW(VecRestoreArray(S_->vec(), &x));
+    Vec y_ref, y_sp;
+    CHKERRTHROW(MatCreateVecs(G_, nullptr, &y_ref));
+    CHKERRTHROW(VecDuplicate(y_ref, &y_sp));
+    CHKERRTHROW(MatMult(G_, S_->vec(), y_ref));
+    matmult_single_precision(y_sp);
+    PetscReal norm_ref, norm_diff;
+    CHKERRTHROW(VecNorm(y_ref, NORM_2, &norm_ref));
+    CHKERRTHROW(VecAXPY(y_sp, -1.0, y_ref));
+    CHKERRTHROW(VecNorm(y_sp, NORM_2, &norm_diff));
+    CHKERRTHROW(VecDestroy(&y_ref));
+    CHKERRTHROW(VecDestroy(&y_sp));
+    CHKERRTHROW(PetscPrintf(comm,
+                            "Green's function operator stored in single precision: relative "
+                            "error of G * x for a test vector %.2e\n",
+                            norm_ref > 0.0 ? norm_diff / norm_ref : norm_diff));
+
+    // The double precision matrix is not needed any more
+    CHKERRTHROW(MatDestroy(&G_));
+}
+
+void SeasQDDiscreteGreenOperator::matmult_single_precision(Vec y) {
+    CHKERRTHROW(
+        VecScatterBegin(gather_slip_, S_->vec(), slip_all_, INSERT_VALUES, SCATTER_FORWARD));
+    CHKERRTHROW(VecScatterEnd(gather_slip_, S_->vec(), slip_all_, INSERT_VALUES, SCATTER_FORWARD));
+    PetscScalar const* x;
+    PetscScalar* result;
+    CHKERRTHROW(VecGetArrayRead(slip_all_, &x));
+    CHKERRTHROW(VecGetArray(y, &result));
+
+    PetscInt const m = single_m_;
+    std::fill(result, result + m, 0.0);
+    float const* A = G_single_.data();
+    for (PetscInt j = 0; j < single_N_; ++j) {
+        double const xj = x[j];
+        float const* column = A + static_cast<std::size_t>(j) * m;
+        for (PetscInt i = 0; i < m; ++i) {
+            result[i] += xj * static_cast<double>(column[i]);
+        }
+    }
+
+    CHKERRTHROW(VecRestoreArray(y, &result));
+    CHKERRTHROW(VecRestoreArrayRead(slip_all_, &x));
 }
 
 void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
@@ -459,14 +550,18 @@ SeasQDDiscreteGreenOperator ::create_row_col_permutation_matrices(bool create_ro
 
     MPI_Allreduce(&num_local_elements, &num_global_elements, 1, MPIU_INT, MPI_SUM, comm);
 
-    CHKERRTHROW(MatGetSize(G_, &M, &N));
-    CHKERRTHROW(MatGetLocalSize(G_, &m, &n));
-
-    br = M / num_global_elements;
-    bc = N / num_global_elements;
-
-    assert(M % num_global_elements == 0);
-    assert(N % num_global_elements == 0);
+    // G_ may already have been converted to single precision and destroyed, in which case only
+    // the layout of the fault elements is needed (to permute vectors)
+    br = base::adapter().traction_block_size();
+    bc = base::friction().slip_block_size();
+    M = num_global_elements * br;
+    N = num_global_elements * bc;
+    n = num_local_elements * bc;
+    if (G_ && row_layout_of_G) {
+        CHKERRTHROW(MatGetLocalSize(G_, &m, nullptr));
+    } else {
+        m = num_local_elements * br;
+    }
 
     // G = Rperm G_ Cperm
     // Rperm is the transpose of Cperm just with a different block size
@@ -497,8 +592,7 @@ SeasQDDiscreteGreenOperator ::create_row_col_permutation_matrices(bool create_ro
     };
 
     if (create_row) {
-        PetscInt const m_row = row_layout_of_G ? m : num_local_elements * br;
-        Rperm = create_permutation_matrix(m_row, M, br, false);
+        Rperm = create_permutation_matrix(m, M, br, false);
     }
 
     if (create_col) {
@@ -900,13 +994,13 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_traction() {
     PetscLogDouble t0, t1;
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
-                                      gf_traction_filename_.c_str(), FILE_MODE_WRITE, &v));
+    CHKERRTHROW(
+        PetscViewerBinaryOpen(base::comm(), gf_traction_filename_.c_str(), FILE_MODE_WRITE, &v));
     CHKERRTHROW(VecView(t_boundary_->vec(), v));
     CHKERRTHROW(PetscViewerDestroy(&v));
     CHKERRTHROW(PetscTime(&t1));
-    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                            "write_discrete_greens_traction() %1.2e (sec)\n", (double)(t1 - t0)));
+    CHKERRTHROW(PetscPrintf(base::comm(), "write_discrete_greens_traction() %1.2e (sec)\n",
+                            (double)(t1 - t0)));
 }
 
 void SeasQDDiscreteGreenOperator::load_discrete_greens_traction() {
@@ -914,13 +1008,13 @@ void SeasQDDiscreteGreenOperator::load_discrete_greens_traction() {
     PetscLogDouble t0, t1;
 
     CHKERRTHROW(PetscTime(&t0));
-    CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_),
-                                      gf_traction_filename_.c_str(), FILE_MODE_READ, &v));
+    CHKERRTHROW(
+        PetscViewerBinaryOpen(base::comm(), gf_traction_filename_.c_str(), FILE_MODE_READ, &v));
     CHKERRTHROW(VecLoad(base::traction_.vec(), v));
     CHKERRTHROW(PetscViewerDestroy(&v));
     CHKERRTHROW(PetscTime(&t1));
-    CHKERRTHROW(PetscPrintf(PetscObjectComm((PetscObject)G_),
-                            "load_discrete_greens_operator() %1.2e (sec)\n", (double)(t1 - t0)));
+    CHKERRTHROW(PetscPrintf(base::comm(), "load_discrete_greens_operator() %1.2e (sec)\n",
+                            (double)(t1 - t0)));
 
     if (repartition_gfs_) {
         Vec tmp;

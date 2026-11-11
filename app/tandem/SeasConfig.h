@@ -107,6 +107,7 @@ struct Config {
     bool boundary_linear;
     unsigned gf_groups;
     bool gf_balance_rows;
+    bool gf_single_precision;
 
     bool matrix_free;
     MGStrategy mg_strategy;

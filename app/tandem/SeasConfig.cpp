@@ -233,6 +233,11 @@ void setConfigSchema(TableSchema<Config>& schema,
         .help("QDGreen only: distribute the rows of the Green's function operator evenly over all "
               "MPI ranks (instead of following the partition of the fault), which balances the "
               "work and the memory of the matrix-vector product in the time stepping.");
+    schema.add_value("gf_single_precision", &Config::gf_single_precision)
+        .default_value(false)
+        .help("QDGreen only: store the Green's function operator in single precision for the "
+              "time stepping (products are accumulated in double precision). Halves the memory "
+              "traffic of the matrix-vector product, which limits the time stepping.");
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
         .help("Use matrix-free operators.");

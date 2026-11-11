@@ -35,6 +35,8 @@ Distribution of the Green's function operator
 
 - **gf_balance_rows**: Default = true. In :code:`mode=QDGreen` every evaluation of the right-hand side multiplies the dense Green's function operator with the slip. By default the rows of the operator follow the partition of the fault, which concentrates the matrix (and the work of the product) on the ranks that own fault elements, while the other ranks idle. With :code:`gf_balance_rows = true` the rows are distributed evenly over all ranks and the result of the product is sent to the ranks that own the fault elements. This changes only the distribution in memory, not the result or the checkpoint files. Set it to false to recover the previous behaviour.
 
+- **gf_single_precision**: Default = false. The time stepping is limited by the memory bandwidth of the product of the dense Green's function operator with the slip. With :code:`gf_single_precision = true`, the operator is converted to single precision once it is computed or loaded (the checkpoint files stay in double precision) and the double precision copy is freed, which halves the memory traffic and the memory used by the operator. The products are accumulated in double precision, so only the entries of the operator are rounded (relative error about 6e-8). The relative error of a product with a test vector is printed at start-up. Compare with a double precision run before relying on it, in particular if :code:`ts_rtol` is of the order of 1e-7 or smaller.
+
 Green's function operator checkpointing
 ---------------------------------------
 

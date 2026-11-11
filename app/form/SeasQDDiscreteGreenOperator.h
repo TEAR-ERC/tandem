@@ -87,7 +87,7 @@ public:
                                 std::optional<std::string> prefix, double gf_checkpoint_every_nmins,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig(),
                                 GfWorkerFactory worker_factory = nullptr, unsigned gf_groups = 1,
-                                bool balance_rows = true);
+                                bool balance_rows = true, bool single_precision = false);
     ~SeasQDDiscreteGreenOperator();
 
     void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
@@ -124,6 +124,11 @@ private:
     // Spread the rows of G_ evenly over all ranks (see balance_rows) and set up the scatter that
     // moves the result of G_ * S_ to the layout of the traction vector.
     void setup_row_redistribution();
+    // Replace the double precision G_ by a single precision copy of the local rows (see
+    // single_precision_) and check the accuracy of the matrix-vector product.
+    void convert_to_single_precision();
+    // y = G * slip with the single precision copy; y has the row layout of G_.
+    void matmult_single_precision(Vec y);
     void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh,
                                                    PetscInt current_gf_, PetscInt n_gf_);
     // Same as above, but the ranks are split into groups that solve different Green's functions
@@ -164,6 +169,15 @@ private:
     bool balance_rows_ = true;
     Vec y_balanced_ = nullptr;
     VecScatter to_fault_layout_ = nullptr;
+    // The time stepping is limited by the memory bandwidth of the dense matrix-vector product.
+    // With single_precision_, the local rows of G are stored as float (accumulated in double),
+    // which halves the memory traffic and the memory used by G.
+    bool single_precision_ = false;
+    std::vector<float> G_single_; // local rows, column major (single_m_ x single_N_)
+    PetscInt single_m_ = 0;
+    PetscInt single_N_ = 0;
+    VecScatter gather_slip_ = nullptr; // slip vector -> full copy on every rank
+    Vec slip_all_ = nullptr;
 };
 
 } // namespace tndm
