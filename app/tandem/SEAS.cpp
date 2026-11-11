@@ -307,7 +307,7 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
         auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
             std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh, prefix,
             freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy),
-            std::move(worker_factory), cfg.gf_groups);
+            std::move(worker_factory), cfg.gf_groups, cfg.gf_balance_rows, cfg.gf_single_precision);
         ctx.setup_seasop(*seasop);
         seasop->warmup();
         return seasop;
