@@ -222,6 +222,12 @@ void setConfigSchema(TableSchema<Config>& schema,
         .default_value(false)
         .help("Assert that boundary is a linear function of time (i.e. boundary(x, t) = f(x) t).");
 
+    schema.add_value("gf_groups", &Config::gf_groups)
+        .default_value(1)
+        .validator([](unsigned groups) { return groups >= 1; })
+        .help("QDGreen only: number of groups the MPI ranks are split into to compute Green's "
+              "functions concurrently (each group solves different Green's functions). 1 = all "
+              "ranks work on one Green's function at a time.");
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
         .help("Use matrix-free operators.");
