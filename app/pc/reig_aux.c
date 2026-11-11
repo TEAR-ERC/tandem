@@ -68,8 +68,10 @@ PetscErrorCode MatDenseOrthonormalize(Mat Q) {
     CHKERRQ(ierr);
     for (j = 0; j < N; j++) {
         PetscScalar* array_j = array + j * m;
-        ierr =
-            VecCreateMPIWithArray(PETSC_COMM_WORLD, bs, m, M, (const PetscScalar*)array_j, &q[j]);
+        // Use the communicator of Q (not PETSC_COMM_WORLD) so that this also works when the
+        // solver runs on a sub-communicator.
+        ierr = VecCreateMPIWithArray(PetscObjectComm((PetscObject)Q), bs, m, M,
+                                     (const PetscScalar*)array_j, &q[j]);
         CHKERRQ(ierr);
     }
 

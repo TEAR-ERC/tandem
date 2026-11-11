@@ -24,11 +24,16 @@ public:
 
     virtual ~ContextBase() {}
 
-    ContextBase(LocalSimplexMesh<DomainDimension> const& mesh, transform_t transform)
+    /**
+     * @param comm Communicator the mesh is distributed over. This is PETSC_COMM_WORLD, except for
+     *             the workers that compute Green's functions on a sub-communicator.
+     */
+    ContextBase(LocalSimplexMesh<DomainDimension> const& mesh, transform_t transform,
+                MPI_Comm comm = PETSC_COMM_WORLD)
         : cl(std::make_shared<Curvilinear<DomainDimension>>(mesh, std::move(transform),
                                                             PolynomialDegree)),
-          fault_map(std::make_shared<BoundaryMap>(mesh, BC::Fault, PETSC_COMM_WORLD)),
-          topo(std::make_shared<DGOperatorTopo>(mesh, PETSC_COMM_WORLD)) {}
+          fault_map(std::make_shared<BoundaryMap>(mesh, BC::Fault, comm)),
+          topo(std::make_shared<DGOperatorTopo>(mesh, comm)) {}
 
     virtual auto dg() -> std::unique_ptr<AbstractDGOperator<DomainDimension>> = 0;
     virtual auto friction() -> std::unique_ptr<AbstractFrictionOperator> = 0;

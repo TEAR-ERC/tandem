@@ -74,7 +74,7 @@ BoundaryMap::BoundaryMap(LocalSimplexMesh<D> const& mesh, BC bc, MPI_Comm comm) 
         }
     }
 
-    scatter_plan_ = std::make_shared<ScatterPlan>(send_map, recv_map);
+    scatter_plan_ = std::make_shared<ScatterPlan>(send_map, recv_map, comm);
 }
 
 template BoundaryMap::BoundaryMap(LocalSimplexMesh<1> const&, BC, MPI_Comm);
