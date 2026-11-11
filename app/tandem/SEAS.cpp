@@ -29,6 +29,10 @@
 #include "form/DGOperatorTopo.h"
 #include "form/Error.h"
 #include "geometry/Curvilinear.h"
+#include "io/GlobalSimplexMeshBuilder.h"
+#include "io/MeshParser.h"
+#include "mesh/GenMesh.h"
+#include "mesh/GlobalSimplexMesh.h"
 #include "parallel/MPITraits.h"
 #include "tensor/Managed.h"
 #include "util/Stopwatch.h"
@@ -51,10 +55,98 @@
 namespace tndm::detail {
 
 template <typename Type>
-auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
+                  MPI_Comm comm = PETSC_COMM_WORLD) {
     return std::make_unique<seas::Context<Type>>(
         mesh, std::make_unique<SeasScenario<Type>>(cfg.lib, cfg.scenario),
-        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up, cfg.ref_normal);
+        std::make_unique<DieterichRuinaScenario>(cfg.lib, cfg.scenario), cfg.up, cfg.ref_normal,
+        comm);
+}
+
+/**
+ * @brief Mesh, context and solver of one group of ranks that computes Green's functions.
+ *
+ * Everything is distributed over the given (sub-)communicator, the mesh is read/generated and
+ * partitioned again for it. The members are declared in the order of their dependencies, so
+ * that they are destroyed in the right order.
+ */
+template <typename Type> class GfWorkerImpl : public GfWorker {
+public:
+    GfWorkerImpl(Config const& cfg, MPI_Comm comm) {
+        int rank, procs;
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &procs);
+
+        // Same as in the main program, but on the sub-communicator
+        if (cfg.mesh_file) {
+            bool ok = false;
+            GlobalSimplexMeshBuilder<DomainDimension> builder;
+            std::string error;
+            if (rank == 0) {
+                auto [parser, parser_error] =
+                    MeshParser::createWithValidation<DomainDimension>(*cfg.mesh_file, &builder);
+                if (!parser) {
+                    error = parser_error;
+                } else {
+                    ok = parser->parseFile(*cfg.mesh_file);
+                    if (!ok) {
+                        error = *cfg.mesh_file + "\n" + std::string(parser->getErrorMessage());
+                    }
+                }
+            }
+            MPI_Bcast(&ok, 1, MPI_CXX_BOOL, 0, comm);
+            if (!ok) {
+                throw std::runtime_error("Could not read the mesh for the Green's function "
+                                         "group: " +
+                                         error);
+            }
+            global_mesh_ = builder.create(comm);
+            if (procs > 1) {
+                global_mesh_->repartitionByHash();
+            }
+        } else if (cfg.generate_mesh && cfg.resolution) {
+            auto meshGen = cfg.generate_mesh->create(*cfg.resolution, comm);
+            global_mesh_ = meshGen.uniformMesh();
+        } else {
+            throw std::runtime_error("No mesh available for the Green's function group.");
+        }
+        global_mesh_->repartition();
+        mesh_ = global_mesh_->getLocalMesh(1);
+
+        ctx_ = make_context<Type>(*mesh_, cfg, comm);
+        solver_ = std::make_unique<GfSolver>(
+            ctx_->dg(), ctx_->adapter(), ctx_->friction(), cfg.matrix_free,
+            MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+
+        auto const& fault_map = solver_->adapter().fault_map();
+        facets_.reserve(fault_map.local_size());
+        for (std::size_t bndNo = 0; bndNo < fault_map.local_size(); ++bndNo) {
+            facets_.push_back(mesh_->facets()[fault_map.fctNo(bndNo)]);
+        }
+    }
+
+    GfSolver& solver() override { return *solver_; }
+    std::vector<Simplex<DomainDimension - 1u>> const& fault_facets() const override {
+        return facets_;
+    }
+
+private:
+    std::unique_ptr<GlobalSimplexMesh<DomainDimension>> global_mesh_;
+    std::unique_ptr<LocalSimplexMesh<DomainDimension>> mesh_;
+    std::unique_ptr<seas::Context<Type>> ctx_;
+    std::vector<Simplex<DomainDimension - 1u>> facets_;
+    std::unique_ptr<GfSolver> solver_;
+};
+
+inline std::unique_ptr<GfWorker> make_gf_worker(Config const& cfg, MPI_Comm comm) {
+    switch (cfg.type) {
+    case LocalOpType::Poisson:
+        return std::make_unique<GfWorkerImpl<Poisson>>(cfg, comm);
+    case LocalOpType::Elasticity:
+        return std::make_unique<GfWorkerImpl<Elasticity>>(cfg, comm);
+    default:
+        throw std::runtime_error("Unknown seas type");
+    }
 }
 
 template <std::size_t N>
@@ -206,9 +298,16 @@ struct operator_specifics<SeasQDDiscreteGreenOperator>
             freq_cputime = cfgcp->frequency_cputime_minutes;
         }
 
+        // The factory is only used while the operator is constructed (cfg outlives that)
+        GfWorkerFactory worker_factory = nullptr;
+        if (cfg.gf_groups > 1) {
+            worker_factory = [&cfg](MPI_Comm comm) { return make_gf_worker(cfg, comm); };
+        }
+
         auto seasop = std::make_shared<SeasQDDiscreteGreenOperator>(
             std::move(ctx.dg()), std::move(ctx.adapter()), std::move(ctx.friction()), mesh, prefix,
-            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy));
+            freq_cputime, cfg.matrix_free, MGConfig(cfg.mg_coarse_level, cfg.mg_strategy),
+            std::move(worker_factory), cfg.gf_groups);
         ctx.setup_seasop(*seasop);
         seasop->warmup();
         return seasop;

@@ -59,8 +59,9 @@ public:
     Context(LocalSimplexMesh<DomainDimension> const& mesh,
             std::unique_ptr<SeasScenario<Type>> seas_sc,
             std::unique_ptr<DieterichRuinaScenario> friction_sc,
-            std::array<double, DomainDimension> up, std::array<double, DomainDimension> ref_normal)
-        : ContextBase(mesh, seas_sc->transform()), scenario(std::move(seas_sc)),
+            std::array<double, DomainDimension> up, std::array<double, DomainDimension> ref_normal,
+            MPI_Comm comm = PETSC_COMM_WORLD)
+        : ContextBase(mesh, seas_sc->transform(), comm), scenario(std::move(seas_sc)),
           friction_scenario(std::move(friction_sc)),
           dg_lop(detail::make_lop<Type>::dg(cl, *scenario)), up(up), ref_normal(ref_normal) {}
 

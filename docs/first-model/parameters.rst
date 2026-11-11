@@ -19,6 +19,17 @@ Tandem simulation parameters are written in the toml script. Here are the key pa
 - **mg_strategy**: MG level selection strategy. Available options: [TwoLevel | Logarithmic | Full]. Default = TwoLevel.
 
 
+Computing Green's functions in parallel groups
+----------------------------------------------
+
+When using :code:`mode=QDGreen`, every column of the Green's function operator is the traction response to a unit slip and is computed by an independent linear solve. By default all MPI ranks work on one solve at a time. If a single solve no longer scales to the number of ranks in use, the ranks can be split into groups that solve different Green's functions concurrently:
+
+- **gf_groups**: Number of groups the MPI ranks are split into (groups of consecutive ranks). Default = 1, i.e. all ranks work on one Green's function at a time.
+
+For example, running on 144 ranks with :code:`gf_groups = 3` computes three Green's functions at a time, each with 48 ranks.
+
+Every group builds its own copy of the mesh partition, operators and multigrid hierarchy on its sub-communicator, so the memory for these is multiplied by :code:`gf_groups`. The Green's function operator itself is stored only once, distributed over all ranks. The groups work in lock-step and the operator is assembled after every round, so the checkpoints (see below) are the same as without groups. In particular, a run can be restarted with a different value of :code:`gf_groups`. The number of groups must not exceed the number of ranks, and the best value should be found by measuring the time per Green's function for different values.
+
 Green's function operator checkpointing
 ---------------------------------------
 
