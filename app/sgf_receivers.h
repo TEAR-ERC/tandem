@@ -25,6 +25,8 @@ namespace tndm {
  * Regular grid in the horizontal plane, before projection onto the surface.
  * xy is stored j outer, i inner, so index = j * nx + i. That matches the HDF5
  * dimension order (y, x, direction, component).
+ * 2D: a line along x with ny = 1, y empty, xy = (x, 0), and HDF5 dimensions
+ * (x, direction, component).
  */
 struct ReceiverGrid {
     std::size_t nx;
@@ -65,13 +67,15 @@ receiver_surface_points(LocalSimplexMesh<DomainDimension> const& mesh, DGOperato
 
 /* Bounding box of the receiver surface, reduced across ranks, filled with a
  * regular grid of roughly square cells. N is the point count along the longer
- * side. Throws if N < 2 or the surface has zero extent. */
+ * side. Throws if N < 2 or the surface has zero extent.
+ * 2D: N points along x over the x-range of the surface. */
 ReceiverGrid
 make_regular_xy_grid(std::vector<std::array<double, DomainDimension>> const& surfacePoints,
                      std::size_t N, MPI_Comm comm);
 
 /* Project each grid point vertically onto the receiverSurfaceTag facet that
- * contains it in map view; the receiver is evaluated in that facet's element.
+ * contains it in map view (2D: the surface segment whose x-range contains it);
+ * the receiver is evaluated in that facet's element.
  * Grid points outside the surface footprint get no receiver (NaN in the HDF5
  * output). Each receiver ends up owned by exactly one rank. */
 ReceiverSet project_grid_to_receiver_surface(

@@ -5,7 +5,6 @@
 #include "common/MeshConfig.h"
 #include "common/PetscLinearSolver.h"
 #include "common/PetscUtil.h"
-#include "common/PoissonScenario.h"
 #include "common/Type.h"
 #include "config.h"
 #include "form/DGCurvilinearCommon.h"
@@ -131,9 +130,6 @@ template <class LocalOperator> struct slip_traits;
 template <> struct slip_traits<Elasticity> {
     static constexpr std::size_t NumSlipComponents = DomainDimension - 1u;
 };
-template <> struct slip_traits<Poisson> {
-    static constexpr std::size_t NumSlipComponents = 1u;
-};
 
 /**
  * Coordinates of every node of every local fault facet, faultNo-major.
@@ -234,6 +230,88 @@ void set_slip_and_rhs(std::size_t direction,
         throw std::logic_error("Slip boundary condition not set");
     });
 }
+/* Field names written by fault_angle_function, in column order. */
+template <std::size_t D> std::vector<std::string> fault_angle_names() {
+    if constexpr (D == 2u) {
+        return {"dip", "tag", "nx", "ny", "dip_dir_x", "dip_dir_y"};
+    } else {
+        return {"strike",    "dip",       "tag",       "nx",           "ny",
+                "nz",        "dip_dir_x", "dip_dir_y", "dip_dir_z",    "strike_dir_x",
+                "strike_dir_y", "strike_dir_z"};
+    }
+}
+
+/*
+ * Fault frame at one node from the raw mesh normal n_raw (column 0 of the
+ * stored fault basis), written to column block (l, :, faultNo) of v.
+ *
+ * prepare() flips the normal against ref_normal, builds the basis, then negates
+ * the whole basis again, so the stored columns carry the uncorrected
+ * orientation. Redo the correction and rebuild the frame the way
+ * Curvilinear::facetBasis does.
+ */
+template <std::size_t D, class NormalT, class ValuesT>
+void fault_angles_at_node(NormalT const& n_raw, std::array<double, D> const& up,
+                          std::array<double, D> const& ref_normal, double tag, ValuesT& v,
+                          std::size_t l, std::size_t faultNo) {
+    auto n = std::array<double, D>{};
+    double dot_ref = 0.0;
+    for (std::size_t i = 0; i < D; ++i) {
+        n[i] = n_raw[i];
+        dot_ref += n[i] * ref_normal[i];
+    }
+    if (dot_ref < 0.0) {
+        for (auto& ni : n) {
+            ni = -ni;
+        }
+    }
+
+    if constexpr (D == 2u) {
+        /* facetBasis in 2D: s = sgn(up x n), slip direction d = s * (-n_y, n_x) */
+        double const s = (up[0] * n[1] - up[1] * n[0]) < 0.0 ? -1.0 : 1.0;
+        auto d = std::array<double, 2>{-s * n[1], s * n[0]};
+
+        v(l, 0, faultNo) = std::acos(std::clamp(std::fabs(n[1]), 0.0, 1.0)) * 180.0 / M_PI;
+        v(l, 1, faultNo) = tag;
+        v(l, 2, faultNo) = n[0];
+        v(l, 3, faultNo) = n[1];
+        v(l, 4, faultNo) = d[0];
+        v(l, 5, faultNo) = d[1];
+    } else {
+        auto cross = [](std::array<double, 3> const& a, std::array<double, 3> const& b) {
+            auto c = std::array<double, 3>{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                                           a[0] * b[1] - a[1] * b[0]};
+            auto len = std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+            return std::array<double, 3>{c[0] / len, c[1] / len, c[2] / len};
+        };
+
+        auto s = cross(up, n); // strike direction
+        auto d = cross(s, n);  // dip direction
+
+        auto az = std::atan2(s[0], s[1]) * 180.0 / M_PI;
+        if (az < 0.0) {
+            az += 360.0;
+        }
+        if (az > 360.0 - 1e-9) {
+            az = 0.0;
+        }
+
+        v(l, 0, faultNo) = az;
+        v(l, 1, faultNo) = std::acos(std::clamp(std::fabs(n[2]), 0.0, 1.0)) * 180.0 / M_PI;
+        v(l, 2, faultNo) = tag;
+        v(l, 3, faultNo) = n[0];
+        v(l, 4, faultNo) = n[1];
+        v(l, 5, faultNo) = n[2];
+        v(l, 6, faultNo) = d[0];
+        v(l, 7, faultNo) = d[1];
+        v(l, 8, faultNo) = d[2];
+        v(l, 9, faultNo) = s[0];
+        v(l, 10, faultNo) = s[1];
+        v(l, 11, faultNo) = s[2];
+    }
+}
+
+/* 3D: strike, dip, normal, dip and strike directions. 2D: dip, normal, slip direction. */
 template <class LocalOperator>
 auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                           std::shared_ptr<LocalOperator> lop,
@@ -242,18 +320,9 @@ auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
                           std::array<double, DomainDimension> const& up,
                           std::array<double, DomainDimension> const& ref_normal)
     -> FiniteElementFunction<DomainDimension - 1u> {
-    static_assert(DomainDimension == 3u, "strike and dip are 3D only");
-
-    auto cross = [](std::array<double, 3> const& a, std::array<double, 3> const& b) {
-        auto c = std::array<double, 3>{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
-                                       a[0] * b[1] - a[1] * b[0]};
-        auto l = std::sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
-        return std::array<double, 3>{c[0] / l, c[1] / l, c[2] / l};
-    };
-
     auto space = RateAndStateBase::Space();
     auto rule = nodal_sampling_rule();
-    
+
     auto probe = AdapterOperator<LocalOperator>(
         lop, std::make_unique<Adapter<LocalOperator>>(cl, space, rule, up, ref_normal), topo,
         fault_map);
@@ -263,53 +332,14 @@ auto fault_angle_function(std::shared_ptr<Curvilinear<DomainDimension>> cl,
     auto num = fault_map->local_size();
 
     auto f = FiniteElementFunction<DomainDimension - 1u>(
-        space.clone(),
-        std::vector<std::string>{"strike", "dip", "tag", "nx", "ny", "nz", "dip_dir_x",
-                                 "dip_dir_y", "dip_dir_z", "strike_dir_x", "strike_dir_y",
-                                 "strike_dir_z"},
-        num);
+        space.clone(), fault_angle_names<DomainDimension>(), num);
     auto& v = f.values();
 
     for (std::size_t faultNo = 0; faultNo < num; ++faultNo) {
         auto tag = static_cast<double>(topo->info(fault_map->fctNo(faultNo)).facetTag);
-
         for (std::size_t l = 0; l < nbf; ++l) {
-            auto const& B = a.fault_basis(faultNo, l);
-
-            /*
-             * Column 0 is the raw mesh normal. prepare() flips it against
-             * ref_normal, builds the basis, then negates the whole basis again,
-             * so the stored columns carry the uncorrected orientation. Redo the
-             * correction and rebuild the frame the way facetBasis does.
-             */
-            std::array<double, 3> n{B[0], B[1], B[2]};
-            if (n[0] * ref_normal[0] + n[1] * ref_normal[1] + n[2] * ref_normal[2] < 0.0) {
-                n = {-n[0], -n[1], -n[2]};
-            }
-
-            auto s = cross(up, n); // strike direction
-            auto d = cross(s, n);  // dip direction
-
-            auto az = std::atan2(s[0], s[1]) * 180.0 / M_PI;
-            if (az < 0.0) {
-                az += 360.0;
-            }
-            if (az > 360.0 - 1e-9) {
-                az = 0.0;
-            }
-
-            v(l, 0, faultNo) = az;
-            v(l, 1, faultNo) = std::acos(std::clamp(std::fabs(n[2]), 0.0, 1.0)) * 180.0 / M_PI;
-            v(l, 2, faultNo) = tag;
-            v(l, 3, faultNo) = n[0];
-            v(l, 4, faultNo) = n[1];
-            v(l, 5, faultNo) = n[2];
-            v(l, 6, faultNo) = d[0];
-            v(l, 7, faultNo) = d[1];
-            v(l, 8, faultNo) = d[2];
-            v(l, 9, faultNo) = s[0];
-            v(l, 10, faultNo) = s[1];
-            v(l, 11, faultNo) = s[2];
+            fault_angles_at_node<DomainDimension>(a.fault_basis(faultNo, l), up, ref_normal, tag,
+                                                  v, l, faultNo);
         }
     }
     return f;
@@ -748,7 +778,8 @@ int main(int argc, char** argv) {
     schema.add_value("type", &Config::type)
         .converter([](std::string_view value) {
             if (iEquals(value, "poisson")) {
-                return LocalOpType::Poisson;
+                throw std::runtime_error(
+                    "sgf does not support type = \"poisson\"; use \"elasticity\"");
             } else if (iEquals(value, "elastic") || iEquals(value, "elasticity")) {
                 return LocalOpType::Elasticity;
             } else {
@@ -842,8 +873,9 @@ int main(int argc, char** argv) {
             std::iota(all.begin(), all.end(), std::size_t{0});
             return all;
         }())
-        .help("Fault-basis slip directions to compute: \"0\" = (up x n) x n, \"1\" = up x n, "
-              "or \"both\" (default).");
+        .help("Fault-basis slip directions to compute. 3D: \"0\" = (up x n) x n, \"1\" = up x n, "
+              "or \"both\" (default). 2D: only \"0\", the in-plane slip sgn(up x n) * "
+              "(-n_y, n_x).");
     schema.add_value("continuous_gf", &Config::continuous_gf)
         .default_value(true)
         .help("Take each GF's slip from the Lua slip(x, y, z, gfTag, direction), evaluated at "
@@ -862,7 +894,7 @@ int main(int argc, char** argv) {
     gridOutputSchema.add_value("n", &ReceiverGridConfig::n)
         .default_value(std::size_t(100))
         .validator([](auto&& x) { return x >= 2; })
-        .help("Grid points along the longer horizontal side");
+        .help("Grid points along the longer horizontal side (2D: along x)");
     
     auto& probeOutputSchema =
         schema.add_table("receiver_probe_output", &Config::receiver_probe_output);
@@ -964,19 +996,6 @@ int main(int argc, char** argv) {
     }
 
     switch (cfg->type) {
-    case LocalOpType::Poisson: {
-        swSetup.start();
-        auto scenario = PoissonScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
-        if (cfg->continuous_gf) {
-            scenario.enable_directional_slip(cfg->scenario);
-        }
-        double tLua = slowest(swSetup, PETSC_COMM_WORLD);
-        if (rank == 0) {
-            std::cout << "Setup: scenario (Lua): " << tLua << " s" << std::endl;
-        }
-        static_problem(*mesh, scenario, *cfg);
-        break;
-    }
     case LocalOpType::Elasticity: {
         swSetup.start();
         auto scenario = ElasticityScenario(cfg->lib, cfg->scenario, cfg->ref_normal);
@@ -991,7 +1010,7 @@ int main(int argc, char** argv) {
         break;
     }
     default:
-        std::cerr << "Unknown type. Should be either poisson or elasticity." << std::endl;
+        std::cerr << "Unknown type. sgf supports only elasticity." << std::endl;
         break;
     };
 

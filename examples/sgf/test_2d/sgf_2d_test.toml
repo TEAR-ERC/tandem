@@ -1,0 +1,46 @@
+# 2D sgf test: unit slip on each of the four fault patches (tags 10-13).
+#
+#   gmsh -2 sgf_2d_test.geo -o sgf_2d_test.msh
+#   (sgf binary from a DOMAIN_DIMENSION=2 build)
+#   mpirun --mca btl_vader_single_copy_mechanism none -n 4 \
+#       <build_2d>/app/sgf sgf_2d_test.toml --petsc \
+#       -ksp_type cg -pc_type gamg -ksp_rtol 1e-10 -ksp_converged_reason
+
+type = "elasticity"
+lib = "sgf_2d_test.lua"
+scenario = "half"
+mesh_file = "sgf_2d_test.msh"
+
+# 2D: one slip direction, d = sgn(up x n) * (-n_y, n_x).
+up = [0.0, 1.0]
+# The fault dips 60 deg, so a vertical ref_normal is far from perpendicular.
+ref_normal = [0.0, 1.0]
+
+# unit slip on the facets of each tag
+continuous_gf = false
+
+# Displacement along the surface, dims (x, direction, component).
+# n = 801 gives 5 km spacing over the 2000 km box (1 km for d = 400).
+[receiver_grid_output]
+prefix = "sgf_2d_test_grid"
+surface_tag = 100001
+n = 801
+
+[receiver_probe_output]
+prefix = "sgf_2d_test_probes"
+probes = [
+    { name = "m20", x = [-20.0, 0.0] },
+    { name = "m5",  x = [ -5.0, 0.0] },
+    { name = "p5",  x = [  5.0, 0.0] },
+    { name = "p20", x = [ 20.0, 0.0] },
+    { name = "p50", x = [ 50.0, 0.0] },
+]
+
+[domain_output]
+prefix = "sgf_2d_test_domain"
+parameters = true
+per_source = false
+
+# dip, tag, normal and slip direction at every fault node
+[fault_output]
+prefix = "sgf_2d_test_faults"

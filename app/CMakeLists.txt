@@ -229,9 +229,9 @@ add_executable(static static.cpp)
 target_link_libraries(static PRIVATE app-common)
 target_include_directories(static PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
-## sgf solver
+## sgf solver (2D and 3D, elasticity only)
 
-if (ENABLE_HDF5 AND DOMAIN_DIMENSION EQUAL 3)
+if (ENABLE_HDF5)
     set(HDF5_PREFER_PARALLEL True)
     find_package(HDF5 REQUIRED COMPONENTS C HL)
 
