@@ -68,9 +68,10 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<AbstractFrictionOperator> friction,
     LocalSimplexMesh<DomainDimension> const& mesh, std::optional<std::string> prefix,
     double gf_checkpoint_every_nmins, bool matrix_free, MGConfig const& mg_config,
-    GfWorkerFactory worker_factory, unsigned gf_groups)
+    GfWorkerFactory worker_factory, unsigned gf_groups, bool balance_rows)
     : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config),
-      worker_factory_(std::move(worker_factory)), gf_groups_(gf_groups) {
+      worker_factory_(std::move(worker_factory)), gf_groups_(gf_groups),
+      balance_rows_(balance_rows) {
 
     int rank;
 
@@ -116,6 +117,8 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
+    VecScatterDestroy(&to_fault_layout_);
+    VecDestroy(&y_balanced_);
     MatDestroy(&G_);
     ISDestroy(&is_perm_);
 }
@@ -160,7 +163,15 @@ void SeasQDDiscreteGreenOperator::update_traction(double time, BlockVector const
     S_->begin_assembly();
     S_->end_assembly();
 
-    CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
+    if (balance_rows_) {
+        CHKERRTHROW(MatMult(G_, S_->vec(), y_balanced_));
+        CHKERRTHROW(VecScatterBegin(to_fault_layout_, y_balanced_, base::traction_.vec(),
+                                    INSERT_VALUES, SCATTER_FORWARD));
+        CHKERRTHROW(VecScatterEnd(to_fault_layout_, y_balanced_, base::traction_.vec(),
+                                  INSERT_VALUES, SCATTER_FORWARD));
+    } else {
+        CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
+    }
     CHKERRTHROW(VecAXPY(base::traction_.vec(), time, t_boundary_->vec()));
 }
 
@@ -196,7 +207,18 @@ PetscInt SeasQDDiscreteGreenOperator::create_discrete_greens_function() {
     CHKERRTHROW(PetscPrintf(comm, "create_discrete_greens_function()\n"));
     MPI_Comm_rank(comm, &rank);
 
-    CHKERRTHROW(MatCreateDense(comm, ind.m, ind.n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
+    // Rows are distributed in units of fault elements (the row block size). If balanced, every
+    // rank gets about the same number of rows. Otherwise the rows live on the rank that owns the
+    // fault element, which leaves ranks without fault elements idle in G_ * S_.
+    PetscInt m_local = ind.m;
+    if (balance_rows_) {
+        PetscInt num_elements = 0;
+        int size;
+        MPI_Comm_size(comm, &size);
+        MPI_Allreduce(&ind.num_local_elements, &num_elements, 1, MPIU_INT, MPI_SUM, comm);
+        m_local = (num_elements / size + (rank < num_elements % size ? 1 : 0)) * ind.m_bs;
+    }
+    CHKERRTHROW(MatCreateDense(comm, m_local, ind.n, PETSC_DECIDE, PETSC_DECIDE, nullptr, &G_));
     CHKERRTHROW(MatSetBlockSizes(G_, ind.m_bs, ind.n_bs));
     CHKERRTHROW(MatGetSize(G_, &M, &N));
     CHKERRTHROW(PetscPrintf(
@@ -206,7 +228,25 @@ PetscInt SeasQDDiscreteGreenOperator::create_discrete_greens_function() {
     t_boundary_ = std::make_unique<PetscVector>(ind.m_bs, ind.num_local_elements, comm);
 
     CHKERRTHROW(VecGetSize(S_->vec(), &n_gf));
+    if (balance_rows_) {
+        setup_row_redistribution();
+    }
     return n_gf;
+}
+
+void SeasQDDiscreteGreenOperator::setup_row_redistribution() {
+    MPI_Comm comm = base::comm();
+    CHKERRTHROW(MatCreateVecs(G_, nullptr, &y_balanced_));
+
+    // Row i of G_ and entry i of the traction vector have the same global index, only the
+    // distribution over the ranks differs: every rank gets the entries of the traction vector
+    // that it owns.
+    PetscInt first, last;
+    CHKERRTHROW(VecGetOwnershipRange(base::traction_.vec(), &first, &last));
+    IS is;
+    CHKERRTHROW(ISCreateStride(comm, last - first, first, 1, &is));
+    CHKERRTHROW(VecScatterCreate(y_balanced_, is, base::traction_.vec(), is, &to_fault_layout_));
+    CHKERRTHROW(ISDestroy(&is));
 }
 
 void SeasQDDiscreteGreenOperator::back_up_file(std::string file_to_backup) {
@@ -401,8 +441,8 @@ void SeasQDDiscreteGreenOperator::create_permutation_redundant_IS(
 }
 
 std::tuple<Mat, Mat>
-SeasQDDiscreteGreenOperator ::create_row_col_permutation_matrices(bool create_row,
-                                                                  bool create_col) {
+SeasQDDiscreteGreenOperator ::create_row_col_permutation_matrices(bool create_row, bool create_col,
+                                                                  bool row_layout_of_G) {
     MPI_Comm comm = base::comm();
     PetscInt num_local_elements = base::adapter().num_local_elements();
     PetscInt num_global_elements;
@@ -457,7 +497,8 @@ SeasQDDiscreteGreenOperator ::create_row_col_permutation_matrices(bool create_ro
     };
 
     if (create_row) {
-        Rperm = create_permutation_matrix(m, M, br, false);
+        PetscInt const m_row = row_layout_of_G ? m : num_local_elements * br;
+        Rperm = create_permutation_matrix(m_row, M, br, false);
     }
 
     if (create_col) {
@@ -885,7 +926,7 @@ void SeasQDDiscreteGreenOperator::load_discrete_greens_traction() {
         Vec tmp;
 
         CHKERRTHROW(VecDuplicate(base::traction_.vec(), &tmp));
-        auto [Rperm, Cperm] = create_row_col_permutation_matrices(true, false);
+        auto [Rperm, Cperm] = create_row_col_permutation_matrices(true, false, false);
         CHKERRTHROW(MatMult(Rperm, base::traction_.vec(), tmp));
         CHKERRTHROW(MatDestroy(&Rperm));
         CHKERRTHROW(VecCopy(tmp, base::traction_.vec()));

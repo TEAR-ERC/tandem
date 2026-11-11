@@ -86,7 +86,8 @@ public:
                                 LocalSimplexMesh<DomainDimension> const& mesh,
                                 std::optional<std::string> prefix, double gf_checkpoint_every_nmins,
                                 bool matrix_free = false, MGConfig const& mg_config = MGConfig(),
-                                GfWorkerFactory worker_factory = nullptr, unsigned gf_groups = 1);
+                                GfWorkerFactory worker_factory = nullptr, unsigned gf_groups = 1,
+                                bool balance_rows = true);
     ~SeasQDDiscreteGreenOperator();
 
     void set_boundary(std::unique_ptr<AbstractFacetFunctionalFactory> fun) override;
@@ -120,6 +121,9 @@ protected:
 private:
     void compute_boundary_traction();
     PetscInt create_discrete_greens_function();
+    // Spread the rows of G_ evenly over all ranks (see balance_rows) and set up the scatter that
+    // moves the result of G_ * S_ to the layout of the traction vector.
+    void setup_row_redistribution();
     void partial_assemble_discrete_greens_function(LocalSimplexMesh<DomainDimension> const& mesh,
                                                    PetscInt current_gf_, PetscInt n_gf_);
     // Same as above, but the ranks are split into groups that solve different Green's functions
@@ -141,7 +145,10 @@ private:
     void write_facet_labels_IS(LocalSimplexMesh<DomainDimension> const& mesh);
     IS load_facet_labels_seq_IS(void);
     void create_permutation_redundant_IS(LocalSimplexMesh<DomainDimension> const& mesh, IS is);
-    std::tuple<Mat, Mat> create_row_col_permutation_matrices(bool create_row, bool create_col);
+    // row_layout_of_G: the rows of Rperm are distributed like the rows of G_ (to permute G_) or
+    // like the traction vector (to permute vectors in the layout of the fault elements)
+    std::tuple<Mat, Mat> create_row_col_permutation_matrices(bool create_row, bool create_col,
+                                                             bool row_layout_of_G = true);
 
     bool checkpoint_enabled_ = false;
     Mat G_ = nullptr;
@@ -151,6 +158,12 @@ private:
     IS is_perm_ = nullptr;
     GfWorkerFactory worker_factory_;
     unsigned gf_groups_ = 1;
+    // The rows of G_ are distributed evenly over all ranks, instead of following the partition of
+    // the fault elements (which leaves most ranks without rows). The matrix-vector product then
+    // gives a vector in the balanced layout, which is scattered to the traction vector.
+    bool balance_rows_ = true;
+    Vec y_balanced_ = nullptr;
+    VecScatter to_fault_layout_ = nullptr;
 };
 
 } // namespace tndm

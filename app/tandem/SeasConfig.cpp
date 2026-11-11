@@ -228,6 +228,11 @@ void setConfigSchema(TableSchema<Config>& schema,
         .help("QDGreen only: number of groups the MPI ranks are split into to compute Green's "
               "functions concurrently (each group solves different Green's functions). 1 = all "
               "ranks work on one Green's function at a time.");
+    schema.add_value("gf_balance_rows", &Config::gf_balance_rows)
+        .default_value(true)
+        .help("QDGreen only: distribute the rows of the Green's function operator evenly over all "
+              "MPI ranks (instead of following the partition of the fault), which balances the "
+              "work and the memory of the matrix-vector product in the time stepping.");
     schema.add_value("matrix_free", &Config::matrix_free)
         .default_value(false)
         .help("Use matrix-free operators.");
