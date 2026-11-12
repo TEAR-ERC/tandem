@@ -23,7 +23,7 @@ class VolumeFunctionalFactory : public AbstractVolumeFunctionalFactory {
 public:
     static constexpr std::size_t NumQuantities = LocalOperator::NumQuantities;
     using functional_t = std::function<std::array<double, NumQuantities>(
-        std::array<double, LocalOperator::Dim> const&)>;
+        std::array<double, LocalOperator::Dim> const&, long int&)>;
 
     VolumeFunctionalFactory(std::shared_ptr<LocalOperator> lop, functional_t function)
         : lop_(std::move(lop)), function_(std::move(function)) {}
