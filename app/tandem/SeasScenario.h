@@ -43,39 +43,37 @@ public:
             warp_ = lib_.getMemberFunction<DomainDimension, DomainDimension>(scenario, Warp);
         }
         if (lib_.hasMember(scenario, Mu)) {
-            // Lua function receives the volume tag as the last argument.
-            mu_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu);
+            mu_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
-            // Lua function receives the volume tag as the last argument.
-            lam_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Lam);
+            lam_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Lam);
         }
         if (lib_.hasMember(scenario, Rho)) {
             rho_ =
-                std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Rho));
+                std::make_optional(lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Rho));
         }
 
         if (lib_.hasMember(scenario, Boundary)) {
             boundary_ = std::make_optional(
-                lib_.getMemberFunctionTagged<DomainDimension + 1u, NumQuantities>(scenario,
+                lib_.getMemberFunction<DomainDimension + 1u, NumQuantities, true>(scenario,
                                                                                   Boundary));
         }
 
         if (lib_.hasMember(scenario, Solution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
-                lib_.getMemberFunctionTagged<DomainDimension + 1, NumQuantities>(scenario,
+                lib_.getMemberFunction<DomainDimension + 1, NumQuantities, true>(scenario,
                                                                                  Solution)));
         }
 
         if (lib_.hasMember(scenario, InitialDisplacement)) {
             u_ini_ =
-                std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, NumQuantities>(
+                std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities, true>(
                     scenario, InitialDisplacement));
         }
 
         if (lib_.hasMember(scenario, InitialVelocity)) {
             v_ini_ =
-                std::make_optional(lib_.getMemberFunctionTagged<DomainDimension, NumQuantities>(
+                std::make_optional(lib_.getMemberFunction<DomainDimension, NumQuantities, true>(
                     scenario, InitialVelocity));
         }
     }

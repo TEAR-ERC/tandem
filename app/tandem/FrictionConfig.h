@@ -47,38 +47,38 @@ public:
     DieterichRuinaScenario(std::string const& lib, std::string const& scenario) {
         lib_.loadFile(lib);
 
-        a_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, A);
-        eta_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Eta);
-        L_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, L);
+        a_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, A);
+        eta_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Eta);
+        L_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, L);
         if (lib_.hasMember(scenario, SnPre)) {
-            sn_pre_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, SnPre);
+            sn_pre_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, SnPre);
         }
         if (lib_.hasMember(scenario, TauPre)) {
-            tau_pre_ = lib_.getMemberFunctionTagged<DomainDimension,
-                                                    DieterichRuinaBase::TangentialComponents>(
-                scenario, TauPre);
+            tau_pre_ =
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents,
+                                       true>(scenario, TauPre);
         }
         Vinit_ =
-            lib_.getMemberFunctionTagged<DomainDimension, DieterichRuinaBase::TangentialComponents>(
+            lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents, true>(
                 scenario, Vinit);
         if (lib_.hasMember(scenario, Sinit)) {
-            Sinit_ = lib_.getMemberFunctionTagged<DomainDimension,
-                                                  DieterichRuinaBase::TangentialComponents>(
-                scenario, Sinit);
+            Sinit_ =
+                lib_.getMemberFunction<DomainDimension, DieterichRuinaBase::TangentialComponents,
+                                       true>(scenario, Sinit);
         }
         if (lib_.hasMember(scenario, Source)) {
             source_ = std::make_optional(
-                lib_.getMemberFunctionTagged<DomainDimension + 1, 1>(scenario, Source));
+                lib_.getMemberFunction<DomainDimension + 1, 1, true>(scenario, Source));
         }
         if (lib_.hasMember(scenario, DeltaTau)) {
             delta_tau_ = std::make_optional(
-                lib_.getMemberFunctionTagged<DomainDimension + 1,
-                                             DieterichRuinaBase::TangentialComponents>(scenario,
+                lib_.getMemberFunction<DomainDimension + 1,
+                                       DieterichRuinaBase::TangentialComponents, true>(scenario,
                                                                                        DeltaTau));
         }
         if (lib_.hasMember(scenario, DeltaSn)) {
             delta_sn_ = std::make_optional(
-                lib_.getMemberFunctionTagged<DomainDimension + 1, 1>(scenario, DeltaSn));
+                lib_.getMemberFunction<DomainDimension + 1, 1, true>(scenario, DeltaSn));
         }
 
         cp_.V0 = lib_.getMemberConstant(scenario, V0);
@@ -87,7 +87,7 @@ public:
 
         if (lib_.hasMember(scenario, FaultSolution)) {
             solution_ = std::make_optional(SeasSolution<NumQuantities>(
-                lib_.getMemberFunctionTagged<DomainDimension + 1, NumQuantities>(scenario,
+                lib_.getMemberFunction<DomainDimension + 1, NumQuantities, true>(scenario,
                                                                                  FaultSolution)));
         }
     }
