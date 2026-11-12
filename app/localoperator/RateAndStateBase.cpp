@@ -24,6 +24,7 @@ RateAndStateBase::RateAndStateBase(std::shared_ptr<Curvilinear<DomainDimension>>
 void RateAndStateBase::begin_preparation(std::size_t numFaultFaces) {
     auto nbf = space_.numBasisFunctions();
     fault_.setStorage(std::make_shared<fault_t>(numFaultFaces * nbf), 0u, numFaultFaces, nbf);
+    fault_tags_.resize(numFaultFaces);
 }
 
 void RateAndStateBase::prepare(std::size_t faultNo, FacetInfo const& info,
@@ -32,6 +33,8 @@ void RateAndStateBase::prepare(std::size_t faultNo, FacetInfo const& info,
     auto coords =
         Tensor(fault_[faultNo].template get<Coords>().data()->data(), cl_->mapResultInfo(nbf));
     cl_->map(info.up[0], geoE_q[info.localNo[0]], coords);
+
+    fault_tags_[faultNo] = info.facetTag;
 }
 
 } // namespace tndm

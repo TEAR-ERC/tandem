@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(tandem VERSION 1.1
+project(tandem VERSION 1.2.0
                LANGUAGES C CXX)
 
 include(cmake/user_options.cmake)

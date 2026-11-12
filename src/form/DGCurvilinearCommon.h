@@ -27,9 +27,7 @@ enum class DGMethod { IP, BR2, Unknown };
 template <std::size_t D> class DGCurvilinearCommon {
 public:
     template <std::size_t Q>
-    using functional_t = std::function<std::array<double, Q>(std::array<double, D> const&)>;
-    template <std::size_t Q>
-    using functional_t_region =
+    using functional_t =
         std::function<std::array<double, Q>(std::array<double, D> const&, long int)>;
     using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
     using facet_functional_t =
@@ -65,20 +63,6 @@ public:
         return [fun, this](std::size_t elNo, Matrix<double>& F) {
             assert(Q == F.shape(0));
             auto coords = this->vol[elNo].template get<Coords>();
-            for (std::size_t q = 0; q < F.shape(1); ++q) {
-                auto fx = fun(coords[q]);
-                for (std::size_t p = 0; p < F.shape(0); ++p) {
-                    F(p, q) = fx[p];
-                }
-            }
-        };
-    }
-
-    template <std::size_t Q>
-    auto make_volume_functional(functional_t_region<Q> fun) const -> volume_functional_t {
-        return [fun, this](std::size_t elNo, Matrix<double>& F) {
-            assert(Q == F.shape(0));
-            auto coords = this->vol[elNo].template get<Coords>();
             long int tag = cl_->getVolumeTag(elNo);
             for (std::size_t q = 0; q < F.shape(1); ++q) {
                 auto fx = fun(coords[q], tag);
@@ -94,8 +78,10 @@ public:
         return [fun, this](std::size_t fctNo, Matrix<double>& f, bool) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
+            auto tag = cl_->getFacetTag(fctNo);
+
             for (std::size_t q = 0; q < f.shape(1); ++q) {
-                auto fx = fun(coords[q]);
+                auto fx = fun(coords[q], tag);
                 for (std::size_t p = 0; p < f.shape(0); ++p) {
                     f(p, q) = fx[p];
                 }
@@ -108,8 +94,9 @@ public:
         return [fun, refNormal, this](std::size_t fctNo, Matrix<double>& f, bool is_boundary) {
             assert(Q == f.shape(0));
             auto coords = this->fct[fctNo].template get<Coords>();
+            auto tag = cl_->getFacetTag(fctNo);
             for (std::size_t q = 0; q < f.shape(1); ++q) {
-                auto fx = fun(coords[q]);
+                auto fx = fun(coords[q], tag);
                 if (!is_boundary) {
                     auto normal = this->fct[fctNo].template get<Normal>()[q];
                     if (dot(refNormal, normal) < 0) {

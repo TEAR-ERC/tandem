@@ -22,12 +22,10 @@ public:
                        std::array<double, DomainDimension> const& ref_normal)
         : Scenario(lib, scenario, ref_normal) {
         if (lib_.hasMember(scenario, Mu)) {
-            // Lua function receives the volume tag as the last argument.
-            mu_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Mu);
+            mu_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Mu);
         }
         if (lib_.hasMember(scenario, Lam)) {
-            // Lua function receives the volume tag as the last argument.
-            lam_ = lib_.getMemberFunctionTagged<DomainDimension, 1>(scenario, Lam);
+            lam_ = lib_.getMemberFunction<DomainDimension, 1, true>(scenario, Lam);
         }
     }
 
@@ -43,10 +41,10 @@ public:
     }
 
 private:
-    functional_t_region<1> lam_ = [](std::array<double, DomainDimension> const& v,
-                                     long int) -> std::array<double, 1> { return {1.0}; };
-    functional_t_region<1> mu_ = [](std::array<double, DomainDimension> const& v,
-                                    long int) -> std::array<double, 1> { return {1.0}; };
+    functional_t<1> lam_ = [](std::array<double, DomainDimension> const& v,
+                              long int) -> std::array<double, 1> { return {1.0}; };
+    functional_t<1> mu_ = [](std::array<double, DomainDimension> const& v,
+                             long int) -> std::array<double, 1> { return {1.0}; };
 };
 
 } // namespace tndm

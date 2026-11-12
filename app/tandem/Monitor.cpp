@@ -46,13 +46,13 @@ void MonitorQD::monitor(double time, BlockVector const& state) {
                     writer->write(time, mneme::span(&data, 1));
                     break;
                 }
-#ifdef ENABLE_HDF5
                 case DataLevel::BoundaryForMomentRate: {
+#ifdef ENABLE_HDF5
                     auto const& moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
+#endif
                     break;
                 }
-#endif
                 };
                 writer->increase_step(time, VMax);
             }
@@ -77,12 +77,12 @@ void MonitorQD::write_static() {
             writer->write_static(mneme::span(&data, 1));
             break;
         }
-#ifdef ENABLE_HDF5
         case DataLevel::BoundaryForMomentRate: {
+#ifdef ENABLE_HDF5
             writer->write_static();
+#endif
             break;
         }
-#endif
         };
     }
 }
@@ -109,13 +109,13 @@ void MonitorFD::monitor(double time, BlockVector const& v, BlockVector const& u,
                     writer->write(time, mneme::span(data.data(), 2));
                     break;
                 }
-#ifdef ENABLE_HDF5
                 case DataLevel::BoundaryForMomentRate: {
+#ifdef ENABLE_HDF5
                     auto const& moment_rate = seasop_->friction().moment_rate_local();
                     writer->write(time, moment_rate);
+#endif
                     break;
                 }
-#endif
                 };
                 writer->increase_step(time, VMax);
             }
@@ -138,6 +138,9 @@ void MonitorFD::write_static() {
         case DataLevel::Volume: {
             auto data = static_volume_data(writer->subset());
             writer->write_static(mneme::span(&data, 1));
+            break;
+        }
+        case DataLevel::BoundaryForMomentRate: {
             break;
         }
         };

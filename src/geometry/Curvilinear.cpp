@@ -43,9 +43,21 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
     if (!vertexData) {
         throw std::runtime_error("Expected vertex data");
     }
-    auto volumeTagData = dynamic_cast<VolumeTagData const*>(mesh.elements().getVolumeTagData());
-    if (volumeTagData) {
-        volumeTags_ = volumeTagData->getVolumeTags();
+    auto boundaryData = dynamic_cast<BoundaryData const*>(mesh.facets().data());
+    if (boundaryData) {
+        facetTags_ = boundaryData->getFacetTags();
+    } else {
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: Facet tags are not set in the mesh. Setting to a default of -1"
+                      << std::endl;
+        }
+        facetTags_.resize(mesh.facets().size(), -1);
+    }
+    auto volumeData = dynamic_cast<VolumeTagData const*>(mesh.elements().getVolumeTagData());
+    if (volumeData) {
+        volumeTags_ = volumeData->getVolumeTags();
     } else {
         int rank = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -164,11 +176,20 @@ TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) 
     return TensorBase<Matrix<double>>(D, numPoints);
 }
 
-template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
-    // volumeTags_ is sized to numElements() in constructor.
-    // In release builds, elNo must be a valid element index.
-    assert(elNo < volumeTags_.size());
-    return volumeTags_[elNo];
+template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t eleNo) const {
+    if (eleNo >= volumeTags_.size()) {
+        throw std::out_of_range("getVolumeTag: eleNo " + std::to_string(eleNo) + " out of range " +
+                                std::to_string(volumeTags_.size()));
+    }
+    return volumeTags_[eleNo];
+}
+
+template <std::size_t D> long int Curvilinear<D>::getFacetTag(std::size_t fctNo) const {
+    if (fctNo >= facetTags_.size()) {
+        throw std::out_of_range("getFacetTag: fctNo " + std::to_string(fctNo) + " out of range " +
+                                std::to_string(facetTags_.size()));
+    }
+    return facetTags_[fctNo];
 }
 
 template <std::size_t D>

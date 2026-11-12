@@ -43,7 +43,7 @@ jobs:
 
       - name: Check if base Dockerfile changed
         id: base-changed
-        uses: tj-actions/changed-files@v42
+        uses: tj-actions/changed-files@v46
         with:
           files: docker/base/Dockerfile
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Check if test Dockerfile changed
         id: test-changed
-        uses: tj-actions/changed-files@v42
+        uses: tj-actions/changed-files@v46
         with:
           files: docker/test/Dockerfile
 

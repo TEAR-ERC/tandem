@@ -22,8 +22,9 @@ public:
         for (std::size_t i = 0; i < DomainDimension; ++i) {
             xt[i] = v(i);
         }
+        long int noTag = NO_FACET_TAG;
         xt.back() = time_;
-        return solution_(xt);
+        return solution_(xt, noTag);
     }
 
     void set_time(double time) { time_ = time; }

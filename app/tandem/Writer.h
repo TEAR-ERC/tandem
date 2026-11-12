@@ -33,11 +33,8 @@ namespace tndm::seas {
 enum class DataLevel {
     Scalar,
     Boundary,
-    Volume
-#ifdef ENABLE_HDF5
-    ,
+    Volume,
     BoundaryForMomentRate // Fault surface data (moment rate) computed over fault area
-#endif
 };
 
 class Writer {
