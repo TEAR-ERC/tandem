@@ -179,12 +179,19 @@ template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo)
     return volumeTags_[elNo];
 }
 
-
 template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t eleNo) const {
+    if (eleNo >= volumeTags_.size()) {
+        throw std::out_of_range("getVolumeTag: eleNo " + std::to_string(eleNo) + " out of range " +
+                                std::to_string(volumeTags_.size()));
+    }
     return volumeTags_[eleNo];
 }
 
 template <std::size_t D> long int Curvilinear<D>::getFacetTag(std::size_t fctNo) const {
+    if (fctNo >= facetTags_.size()) {
+        throw std::out_of_range("getFacetTag: fctNo " + std::to_string(fctNo) + " out of range " +
+                                std::to_string(facetTags_.size()));
+    }
     return facetTags_[fctNo];
 }
 
