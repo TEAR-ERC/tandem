@@ -39,7 +39,7 @@ public:
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
             auto params = pfun(fault_.storage()[index].template get<Coords>(),
-                               fault_.storage()[index].template get<faultTag>());
+                               fault_.storage()[index].template get<FaultTag>());
             law_.set_params(index, params);
         }
     }
@@ -88,7 +88,7 @@ private:
     }
     auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
-        auto tag = fault_[faultNo].template get<faultTag>()[node];
+        auto tag = fault_[faultNo].template get<FaultTag>()[node];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
@@ -96,7 +96,7 @@ private:
     }
     auto get_delta_sn(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
-        auto tag = fault_[faultNo].template get<faultTag>()[node];
+        auto tag = fault_[faultNo].template get<FaultTag>()[node];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
@@ -167,7 +167,7 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto r_mat = state_mat(result);
     auto t_mat = traction_mat(traction);
     auto coords = fault_[faultNo].template get<Coords>();
-    auto tags = fault_[faultNo].template get<faultTag>();
+    auto tags = fault_[faultNo].template get<FaultTag>();
     int ierr = 0, ierr_max = 0;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];

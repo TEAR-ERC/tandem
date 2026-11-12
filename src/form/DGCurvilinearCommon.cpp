@@ -79,8 +79,8 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
                               cl_->normalResultInfo(fctRule.size()));
     auto coords = Tensor(facet_data.template get<Coords>().data()->data(),
                          cl_->mapResultInfo(fctRule.size()));
-    auto facetTags =
-        Tensor(facet_data.template get<facetTag>().data(), cl_->tagsInfo(fctRule.size()));
+    auto FacetTags =
+        Tensor(facet_data.template get<FacetTag>().data(), cl_->tagsInfo(fctRule.size()));
     cl_->jacobian(info.up[0], geoDxi_q[info.localNo[0]], J);
     cl_->detJ(info.up[0], J, detJ);
     cl_->jacobianInv(J, jInv0);
@@ -91,7 +91,7 @@ void DGCurvilinearCommon<D>::prepare_bndskl(std::size_t fctNo, FacetInfo const& 
     cl_->normal(info.localNo[0], detJ, jInv0, unit_normal);
     cl_->normalize(unit_normal);
     cl_->map(info.up[0], geoE_q[info.localNo[0]], coords);
-    cl_->setFacetTags(info, facetTags);
+    cl_->setFacetTags(info, FacetTags);
 
     double area = 0.0;
     for (std::ptrdiff_t i = 0; i < length_data.size(); ++i) {
