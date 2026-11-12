@@ -64,8 +64,12 @@ private:
 class BoundaryData : public MeshData {
 public:
     BoundaryData(std::vector<BC>&& BCs, std::vector<long int>&& tags)
-        : boundaryConditions(std::move(BCs)), FacetTags(std::move(tags)) {
-        assert(boundaryConditions.size() == FacetTags.size());
+        : boundaryConditions(std::move(BCs)), facetTags_(std::move(tags)) {
+        if (boundaryConditions.size() != facetTags_.size()) {
+            throw std::invalid_argument(
+                "BoundaryData: BC vector size (" + std::to_string(boundaryConditions.size()) +
+                ") must match facetTags_ size (" + std::to_string(facetTags_.size()) + ")");
+        }
     }
 
     virtual ~BoundaryData() {}
@@ -85,7 +89,7 @@ public:
                 requestedTags.emplace_back(-1);
             } else {
                 requestedBCs.emplace_back(boundaryConditions[lid]);
-                requestedTags.emplace_back(FacetTags[lid]);
+                requestedTags.emplace_back(facetTags_[lid]);
             }
         }
 
@@ -98,15 +102,15 @@ public:
 
     void permute(std::vector<std::size_t> const& permutation) override {
         apply_permutation(boundaryConditions, permutation);
-        apply_permutation(FacetTags, permutation);
+        apply_permutation(facetTags_, permutation);
     }
 
     std::vector<BC> const& getBoundaryConditions() const { return boundaryConditions; }
-    std::vector<long int> const& getFacetTags() const { return FacetTags; }
+    std::vector<long int> const& getFacetTags() const { return facetTags_; }
 
 private:
     std::vector<BC> boundaryConditions;
-    std::vector<long int> FacetTags;
+    std::vector<long int> facetTags_;
 };
 
 class ElementData : public MeshData {
