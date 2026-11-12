@@ -1,14 +1,15 @@
-final_time = 94608000000
+final_time = 0.1
 mesh_file = "bp1_sym.msh"
-mode = "QD"
+mode = "QDGreen"
 type = "poisson"
 lib = "bp1.lua"
 scenario = "bp1_sym"
 ref_normal = [-1, 0]
 boundary_linear = true
+gf_groups=4
 
 [fault_probe_output]
-prefix = "fltst_"
+prefix = "output/fltst_"
 t_max = 9460800
 probes = [
     { name = "dp000", x = [0.0, 0.0] },
@@ -24,3 +25,9 @@ probes = [
     { name = "dp300", x = [0.0, -30.0] },
     { name = "dp350", x = [0.0, -35.0] }
 ]
+
+[gf_checkpoint]
+freq_cputime = 3.0
+#prefix = "../sigmoid_clean2/GreenFunctions/gf_gofar32"
+prefix = "GreenFunctions/gf_p4_n2"
+

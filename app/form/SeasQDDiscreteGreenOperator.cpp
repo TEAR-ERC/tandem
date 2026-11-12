@@ -6,6 +6,8 @@
 #include "parallel/LocalGhostCompositeView.h"
 #include "util/Stopwatch.h"
 
+#include <petscsf.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -292,19 +294,60 @@ void SeasQDDiscreteGreenOperator::convert_to_single_precision() {
 
     // The local part of a parallel dense matrix holds the local rows and all columns,
     // column major with leading dimension lda.
-    G_single_.resize(static_cast<std::size_t>(m) * static_cast<std::size_t>(N));
+    // Keep only columns that contribute to these rows. This is exact (no tolerance):
+    // a dense GF normally retains every column. Ranks without rows request nothing.
+    // Test the original coefficients, so float underflow cannot remove a dependency.
+    G_single_.clear();
+    std::vector<PetscInt> needed;
     PetscScalar const* a;
     CHKERRTHROW(MatDenseGetArrayRead(G_, &a));
     for (PetscInt j = 0; j < N; ++j) {
+        bool contributes = false;
         for (PetscInt i = 0; i < m; ++i) {
-            G_single_[static_cast<std::size_t>(j) * m + i] =
-                static_cast<float>(a[static_cast<std::size_t>(j) * lda + i]);
+            if (a[static_cast<std::size_t>(j) * lda + i] != 0.0) {
+                contributes = true;
+                break;
+            }
+        }
+        if (contributes) {
+            needed.push_back(j);
+        }
+    }
+    G_single_.resize(static_cast<std::size_t>(m) * needed.size());
+    for (std::size_t k = 0; k < needed.size(); ++k) {
+        for (PetscInt i = 0; i < m; ++i) {
+            G_single_[k * m + i] =
+                static_cast<float>(a[static_cast<std::size_t>(needed[k]) * lda + i]);
         }
     }
     CHKERRTHROW(MatDenseRestoreArrayRead(G_, &a));
     single_m_ = m;
-    single_N_ = N;
-    CHKERRTHROW(VecScatterCreateToAll(S_->vec(), &gather_slip_, &slip_all_));
+    single_N_ = static_cast<PetscInt>(needed.size());
+
+    // Build the global-source -> compact-local map once, after checkpoint permutation.
+    // PETSc resolves owners, including ranks with zero local slip entries. Every rank
+    // participates in setup and updates, including ranks that request no values.
+    CHKERRTHROW(VecCreateSeq(PETSC_COMM_SELF, single_N_, &slip_all_));
+    IS from, to;
+    CHKERRTHROW(ISCreateGeneral(PETSC_COMM_SELF, single_N_, needed.data(),
+                                PETSC_COPY_VALUES, &from));
+    CHKERRTHROW(ISCreateStride(PETSC_COMM_SELF, single_N_, 0, 1, &to));
+    CHKERRTHROW(VecScatterCreate(S_->vec(), from, slip_all_, to, &gather_slip_));
+    CHKERRTHROW(ISDestroy(&from));
+    CHKERRTHROW(ISDestroy(&to));
+    // Force the reusable point-to-point SF implementation. Otherwise PETSc can
+    // recognize a full-copy graph and select its allgather/allgatherv backend.
+    CHKERRTHROW(PetscSFSetType(gather_slip_, PETSCSFBASIC));
+    CHKERRTHROW(PetscObjectSetOptionsPrefix((PetscObject)gather_slip_, "gf_slip_"));
+    CHKERRTHROW(PetscSFSetFromOptions(gather_slip_));
+    CHKERRTHROW(PetscSFSetUp(gather_slip_));
+    PetscInt min_needed, max_needed;
+    MPI_Allreduce(&single_N_, &min_needed, 1, MPIU_INT, MPI_MIN, comm);
+    MPI_Allreduce(&single_N_, &max_needed, 1, MPIU_INT, MPI_MAX, comm);
+    CHKERRTHROW(PetscPrintf(comm,
+                            "GF slip dependencies per rank: min %" PetscInt_FMT
+                            ", max %" PetscInt_FMT " of %" PetscInt_FMT "\n",
+                            min_needed, max_needed, N));
 
     // Accuracy check on a smooth test vector: compare with the double precision product.
     // (S_ is overwritten in every update, so it can be used as scratch space here.)
