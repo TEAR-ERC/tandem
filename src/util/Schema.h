@@ -305,22 +305,22 @@ public:
 template <typename T> class TableSchema : public SchemaCommon<TableSchema<T>> {
 public:
     template <typename U, template <typename> typename S>
-    auto& add(std::string&& name, U T::* member) {
+    auto& add(std::string&& name, U T::*member) {
         auto entry = std::make_unique<Model<U, S>>(member);
         auto& schema = entry->schema();
         entries_.emplace_back(std::make_pair(std::move(name), std::move(entry)));
         return schema;
     }
 
-    template <typename U> auto& add_value(std::string&& name, U T::* member) {
+    template <typename U> auto& add_value(std::string&& name, U T::*member) {
         return add<U, ValueSchema>(std::move(name), member);
     }
 
-    template <typename U> auto& add_array(std::string&& name, U T::* member) {
+    template <typename U> auto& add_array(std::string&& name, U T::*member) {
         return add<U, ArraySchema>(std::move(name), member);
     }
 
-    template <typename U> auto& add_table(std::string&& name, U T::* member) {
+    template <typename U> auto& add_table(std::string&& name, U T::*member) {
         return add<U, TableSchema>(std::move(name), member);
     }
 
@@ -415,7 +415,7 @@ private:
 
     template <typename U, template <typename> typename S> class Model : public ModelCommon<U, S> {
     public:
-        Model(U T::* member) : member_(member) {}
+        Model(U T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (!node) {
                 if (!this->schema_.get_default_value()) {
@@ -432,13 +432,13 @@ private:
         }
 
     private:
-        U T::* member_;
+        U T::*member_;
     };
 
     template <typename U, template <typename> typename S>
     class Model<std::optional<U>, S> : public ModelCommon<U, S> {
     public:
-        Model(std::optional<U> T::* member) : member_(member) {}
+        Model(std::optional<U> T::*member) : member_(member) {}
         void translate(T& table, toml::node_view<const toml::node> node) const override {
             if (node) {
                 table.*member_ = std::make_optional(this->schema_.translate(node));
@@ -449,7 +449,7 @@ private:
         }
 
     private:
-        std::optional<U> T::* member_;
+        std::optional<U> T::*member_;
     };
 
     std::string format_error(std::exception const& e, std::string_view key,

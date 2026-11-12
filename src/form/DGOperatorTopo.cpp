@@ -41,9 +41,9 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
     auto neigh_storage = std::make_shared<neighbour_t>(numLocalElems_ * num_facets);
     neighbourInfo.setStorage(neigh_storage, 0, numLocalElems_, num_facets);
 
-    #pragma omp parallel
+#pragma omp parallel
     {
-        #pragma omp for
+#pragma omp for
         for (std::size_t fctNo = 0; fctNo < numLocalFacets(); ++fctNo) {
             FacetInfo& info = fctInfo[fctNo];
 
@@ -90,12 +90,12 @@ DGOperatorTopo::DGOperatorTopo(LocalSimplexMesh<D> const& mesh, MPI_Comm comm)
             }
         }
 
-        #pragma omp for
+#pragma omp for
         for (std::size_t elNo = 0; elNo < numElements(); ++elNo) {
             volInfo[elNo].template get<GID>() = mesh.elements().l2cg(elNo);
         }
 
-        #pragma omp for
+#pragma omp for
         for (std::size_t elNo = 0; elNo < numLocalElements(); ++elNo) {
             auto dws = mesh.template downward<D - 1u, D>(elNo);
             unsigned numLocal = 1, numGhost = 0;

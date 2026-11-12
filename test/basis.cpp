@@ -79,11 +79,17 @@ TEST_CASE("Basis") {
 
     std::vector<std::pair<std::array<unsigned, 2>, GradTriBasisFunction>> gradTriBFs{
         {{0, 0},
-         [](std::array<double, 2> const& p) -> std::array<double, 2> { return {0.0, 0.0}; }},
+         [](std::array<double, 2> const& p) -> std::array<double, 2> {
+             return {0.0, 0.0};
+         }},
         {{1, 0},
-         [](std::array<double, 2> const& p) -> std::array<double, 2> { return {2.0, 1.0}; }},
+         [](std::array<double, 2> const& p) -> std::array<double, 2> {
+             return {2.0, 1.0};
+         }},
         {{0, 1},
-         [](std::array<double, 2> const& p) -> std::array<double, 2> { return {0.0, 3.0}; }},
+         [](std::array<double, 2> const& p) -> std::array<double, 2> {
+             return {0.0, 3.0};
+         }},
         {{2, 0},
          [](std::array<double, 2> const& p) -> std::array<double, 2> {
              return {-6.0 + 12.0 * p[0] + 6.0 * p[1], -2.0 + 6.0 * p[0] + 2.0 * p[1]};
@@ -158,13 +164,21 @@ TEST_CASE("Basis") {
 
     std::vector<std::pair<std::array<unsigned, 3>, GradTetraBasisFunction>> gradTetraBFs{
         {{0, 0, 0},
-         [](std::array<double, 3> const& p) -> std::array<double, 3> { return {0.0, 0.0, 0.0}; }},
+         [](std::array<double, 3> const& p) -> std::array<double, 3> {
+             return {0.0, 0.0, 0.0};
+         }},
         {{1, 0, 0},
-         [](std::array<double, 3> const& p) -> std::array<double, 3> { return {2.0, 1.0, 1.0}; }},
+         [](std::array<double, 3> const& p) -> std::array<double, 3> {
+             return {2.0, 1.0, 1.0};
+         }},
         {{0, 1, 0},
-         [](std::array<double, 3> const& p) -> std::array<double, 3> { return {0.0, 3.0, 1.0}; }},
+         [](std::array<double, 3> const& p) -> std::array<double, 3> {
+             return {0.0, 3.0, 1.0};
+         }},
         {{0, 0, 1},
-         [](std::array<double, 3> const& p) -> std::array<double, 3> { return {0.0, 0.0, 4.0}; }},
+         [](std::array<double, 3> const& p) -> std::array<double, 3> {
+             return {0.0, 0.0, 4.0};
+         }},
         {{2, 0, 0},
          [](std::array<double, 3> const& p) -> std::array<double, 3> {
              return {-6.0 + 12.0 * p[0] + 6.0 * p[1] + 6.0 * p[2],
