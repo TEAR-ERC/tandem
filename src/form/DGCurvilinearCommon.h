@@ -28,7 +28,7 @@ template <std::size_t D> class DGCurvilinearCommon {
 public:
     template <std::size_t Q>
     using functional_t =
-        std::function<std::array<double, Q>(std::array<double, D> const&, long int&)>;
+        std::function<std::array<double, Q>(std::array<double, D> const&, long int)>;
     using volume_functional_t = std::function<void(std::size_t elNo, Matrix<double>& F)>;
     using facet_functional_t =
         std::function<void(std::size_t fctNo, Matrix<double>& f, bool is_boundary)>;

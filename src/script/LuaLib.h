@@ -19,7 +19,7 @@ class LuaLib {
 public:
     template <std::size_t Din, std::size_t Dout>
     using functional_t =
-        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int& tag)>;
+        std::function<std::array<double, Dout>(std::array<double, Din> const& x, long int tag)>;
 
     LuaLib();
     ~LuaLib();
