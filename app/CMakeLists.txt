@@ -212,6 +212,16 @@ if(${LAPACK_FOUND})
     )
 endif()
 add_library(app-common ${APP_COMMON_SRCS})
+
+if(ARCH STREQUAL "skx" AND
+   CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|IntelLLVM)$")
+    set_property(
+        SOURCE form/SeasQDDiscreteGreenOperator.cpp
+        APPEND PROPERTY COMPILE_OPTIONS
+        -mprefer-vector-width=512
+    )
+endif()
+
 target_compile_definitions(app-common PUBLIC "ALIGNMENT=${ALIGNMENT}")
 target_link_libraries(app-common PUBLIC
     ${LAPACK_LIBRARIES}
