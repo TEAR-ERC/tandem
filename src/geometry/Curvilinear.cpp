@@ -55,7 +55,7 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
         }
         facetTags_.resize(mesh.facets().size(), -1);
     }
-    auto volumeData = dynamic_cast<VolumeData const*>(mesh.elements().getVolumeData());
+    auto volumeData = dynamic_cast<VolumeTagData const*>(mesh.elements().getVolumeTagData());
     if (volumeData) {
         volumeTags_ = volumeData->getVolumeTags();
     } else {
@@ -174,13 +174,6 @@ Curvilinear<D>::Curvilinear(LocalSimplexMesh<D> const& mesh, transform_t transfo
 template <std::size_t D>
 TensorBase<Matrix<double>> Curvilinear<D>::mapResultInfo(std::size_t numPoints) const {
     return TensorBase<Matrix<double>>(D, numPoints);
-}
-
-template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t elNo) const {
-    // volumeTags_ is sized to numElements() in constructor.
-    // In release builds, elNo must be a valid element index.
-    assert(elNo < volumeTags_.size());
-    return volumeTags_[elNo];
 }
 
 template <std::size_t D> long int Curvilinear<D>::getVolumeTag(std::size_t eleNo) const {

@@ -52,7 +52,6 @@ private:
     std::vector<std::array<double, D>> vertices;
     std::vector<Simplex<D>> elements;
     std::vector<Simplex<D - 1u>> facets;
-    std::vector<long> volume_tags;
     std::vector<BC> bcs;
     std::vector<long int> facet_tags;
     std::vector<long int> volume_tags;
