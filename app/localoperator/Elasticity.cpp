@@ -175,7 +175,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     const MuVec mu_proj = proj.solve(mu_eigen);
     const RhoInvVec rhoInv_proj = proj.solve(rhoInv_eigen);
     
-    // ==================== 2. P0 projection: replaces project_material_lhs/rhs, the Eigen aliases, proj and the solves ==================== 
+    // ==================== 2. P0 projection  ==================== 
     auto J_Q = vol[elNo].get<AbsDetJ>();                  // |detJ| at each quad point
     auto const& w = volRule.weights();                    // quadrature weights
 
@@ -191,21 +191,15 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         rhoInv_integral += wJ * rhoInv_Q(0, q);
     }
     const double lam_avg = lam_integral / volume_total;       // the averages (k_avg)
-    const double mu_avg = mu_integral / volume_total;   // not "mu_avg": that name is already a member function
+    const double mu_avg = mu_integral / volume_total;
     const double rhoInv_avg = rhoInv_integral / volume_total;
     
-    //if (use_p0) {
-        // ================= P0 =================
-    // for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) lam_field[i] = lam_avg;
-    // for (std::size_t i = 0; i < tensor::mu::Shape[0]; ++i) mu_field[i] = mu_avg;
-    // for (std::size_t i = 0; i < tensor::rhoInv::Shape[0]; ++i) rhoInv_field[i] = rhoInv_avg;
-
-
-  // ==================== 3. RANGE OF THE UNPROJECTED QUAD POINTS AND THE PROJECTED POLYNOMIAL ====================
+    // ==================== 3. RANGE OF THE UNPROJECTED QUAD POINTS AND THE PROJECTED POLYNOMIAL ====================
     // Unprojected values
-    double lam_Q_min = lam_Q(0, 0), lam_Q_max = lam_Q(0, 0);            // start from the first value
+    double lam_Q_min = lam_Q(0, 0), lam_Q_max = lam_Q(0, 0);            // start from the first value, then loop through to find the max/min
     double mu_Q_min = mu_Q(0, 0), mu_Q_max = mu_Q(0, 0);
     double rhoInv_Q_min = rhoInv_Q(0, 0), rhoInv_Q_max = rhoInv_Q(0, 0);
+    
     for (std::size_t q = 1; q < volRule.size(); ++q) {
         lam_Q_min = std::min(lam_Q_min, lam_Q(0, q));
         lam_Q_max = std::max(lam_Q_max, lam_Q(0, q));
@@ -223,45 +217,46 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
             mu_v += matE_Q_T(q, i) * mu_proj(i);
             rhoInv_v += matE_Q_T(q, i) * rhoInv_proj(i);
         }
-        lam_proj_min = std::min(lam_proj_min, lam_v);       lam_proj_max = std::max(lam_proj_max, lam_v);
-        mu_proj_min = std::min(mu_proj_min, mu_v);          mu_proj_max = std::max(mu_proj_max, mu_v);
-        rhoInv_proj_min = std::min(rhoInv_proj_min, rhoInv_v); rhoInv_proj_max = std::max(rhoInv_proj_max, rhoInv_v);
+
+        lam_proj_min = std::min(lam_proj_min, lam_v);
+	lam_proj_max = std::max(lam_proj_max, lam_v);
+        mu_proj_min = std::min(mu_proj_min, mu_v);
+	mu_proj_max = std::max(mu_proj_max, mu_v);
+        rhoInv_proj_min = std::min(rhoInv_proj_min, rhoInv_v);
+	rhoInv_proj_max = std::max(rhoInv_proj_max, rhoInv_v);
     }
 
-  // ==================== 4. Compute theta per element ====================                                        // 1 = no shrinking
-  // ==================== 4. Compute theta per element ====================
+    // ==================== 4. Compute theta per element ====================
     double theta_lam = 1.0;                                             // 1 = no shrinking
     if (lam_proj_max > lam_avg) theta_lam = std::min(theta_lam, (lam_Q_max - lam_avg) / (lam_proj_max - lam_avg)); // overshoot
     if (lam_proj_min < lam_avg) theta_lam = std::min(theta_lam, (lam_avg - lam_Q_min) / (lam_avg - lam_proj_min)); // undershoot
     theta_lam = std::max(0.0, theta_lam);                               // never negative
+
+    double theta_mu = 1.0;
+    if (mu_proj_max > mu_avg) theta_mu = std::min(theta_mu, (mu_Q_max - mu_avg) / (mu_proj_max - mu_avg));
+    if (mu_proj_min < mu_avg) theta_mu = std::min(theta_mu, (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min));
+    theta_mu = std::max(0.0, theta_mu);
 
     double theta_rhoInv = 1.0;
     if (rhoInv_proj_max > rhoInv_avg) theta_rhoInv = std::min(theta_rhoInv, (rhoInv_Q_max - rhoInv_avg) / (rhoInv_proj_max - rhoInv_avg));
     if (rhoInv_proj_min < rhoInv_avg) theta_rhoInv = std::min(theta_rhoInv, (rhoInv_avg - rhoInv_Q_min) / (rhoInv_avg - rhoInv_proj_min));
     theta_rhoInv = std::max(0.0, theta_rhoInv);
 
-    double theta_mu = 1.0;
-    if (mu_proj_max > mu_avg) theta_mu = std::min(theta_mu, (mu_Q_max - mu_avg) / (mu_proj_max - mu_avg));
-    if (mu_proj_min < mu_avg) theta_mu = std::min(theta_mu, (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min));
-    theta_mu = std::max(0.0, theta_mu);
-  // ==================== 5. Evaluate theta at each quad point ====================
-
-    // Limit the higher-order coefficients using our calculated theta values.
+    // ==================== 5. Evaluate theta at each quad point ====================
+    // ---------- Limit the higher-order coefficients using our calculated theta values ----------
     for (std::size_t i = 0; i < tensor::lam::Shape[0]; ++i) {
         lam_eigen(i) = theta_lam * (lam_proj(i) - lam_avg) + lam_avg;
         mu_eigen(i) = theta_mu * (mu_proj(i) - mu_avg) + mu_avg;
         rhoInv_eigen(i) = theta_rhoInv * (rhoInv_proj(i) - rhoInv_avg) + rhoInv_avg;
     }
 
-    // ---------- log theta for this element ----------
-        // ---------- logs: projected values, average and final values; and the thetas ----------
+    // ---------- log theta values for this element ----------
     {
-        static std::FILE* lam_log = std::fopen("lam_log.txt", "w");             // opened once; "w" empties the file at program start
+        static std::FILE* lam_log = std::fopen("lam_log.txt", "w"); 
         static std::FILE* mu_log = std::fopen("mu_log.txt", "w");
         static std::FILE* rhoInv_log = std::fopen("rhoInv_log.txt", "w");
         static std::FILE* theta_log = std::fopen("theta.log", "w");
 
-        // make log files
         const std::size_t n_nodes = tensor::lam::Shape[0];                      // material nodes per element
 
 
