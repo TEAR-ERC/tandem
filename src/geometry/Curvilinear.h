@@ -39,6 +39,7 @@ public:
     }
 
     TensorBase<Matrix<double>> mapResultInfo(std::size_t numPoints) const;
+    TensorBase<Vector<long int>> tagsInfo(std::size_t numPoints) const;
     void map(std::size_t eleNo, Matrix<double> const& E, Tensor<double, 2u>& result) const;
 
     TensorBase<Tensor<double, 3u>> jacobianResultInfo(std::size_t numPoints) const;
@@ -80,7 +81,8 @@ public:
      * the domain, thus, the maximum diameter of the "high-order" mesh might be larger.
      */
     double local_mesh_size() const { return local_mesh_size_; }
-    long int getVolumeTag(std::size_t elNo) const;
+    long int getVolumeTag(std::size_t eleNo) const;
+    long int getFacetTag(std::size_t fctNo) const;
 
 private:
     const unsigned N;
