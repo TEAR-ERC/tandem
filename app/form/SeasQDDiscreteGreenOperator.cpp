@@ -81,6 +81,8 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
 
     CHKERRTHROW(PetscLogEventRegister("GFGatherSlip", MAT_CLASSID, &ev_gather_));
     CHKERRTHROW(PetscLogEventRegister("GFMultLocal", MAT_CLASSID, &ev_mult_));
+    CHKERRTHROW(PetscLogEventRegister("GFMultOwned", MAT_CLASSID, &ev_owned_mult_));
+    CHKERRTHROW(PetscLogEventRegister("GFWaitSlip", MAT_CLASSID, &ev_wait_slip_));
     CHKERRTHROW(PetscLogEventRegister("GFRedistribute", MAT_CLASSID, &ev_redistribute_));
     CHKERRTHROW(PetscLogEventRegister("GFFrictionRhs", MAT_CLASSID, &ev_friction_));
 
@@ -324,6 +326,18 @@ void SeasQDDiscreteGreenOperator::convert_to_single_precision() {
     single_m_ = m;
     single_N_ = static_cast<PetscInt>(needed.size());
 
+    // needed is sorted. Locally owned columns form a contiguous compact interval.
+    PetscInt slip_first, slip_last;
+    CHKERRTHROW(VecGetOwnershipRange(S_->vec(), &slip_first, &slip_last));
+    single_local_begin_ = static_cast<PetscInt>(
+        std::lower_bound(needed.begin(), needed.end(), slip_first) - needed.begin());
+    single_local_end_ = static_cast<PetscInt>(
+        std::lower_bound(needed.begin(), needed.end(), slip_last) - needed.begin());
+    local_slip_indices_.resize(single_local_end_ - single_local_begin_);
+    for (PetscInt j = single_local_begin_; j < single_local_end_; ++j) {
+        local_slip_indices_[j - single_local_begin_] = needed[j] - slip_first;
+    }
+
     // Build the global-source -> compact-local map once, after checkpoint permutation.
     // PETSc resolves owners, including ranks with zero local slip entries. Every rank
     // participates in setup and updates, including ranks that request no values.
@@ -383,28 +397,51 @@ void SeasQDDiscreteGreenOperator::matmult_single_precision(Vec y) {
     CHKERRTHROW(PetscLogEventBegin(ev_gather_, 0, 0, 0, 0));
     CHKERRTHROW(VecScatterBegin(gather_slip_, S_->vec(), slip_all_, INSERT_VALUES,
                                 SCATTER_FORWARD));
-    CHKERRTHROW(VecScatterEnd(gather_slip_, S_->vec(), slip_all_, INSERT_VALUES,
-                              SCATTER_FORWARD));
     CHKERRTHROW(PetscLogEventEnd(ev_gather_, 0, 0, 0, 0));
-    CHKERRTHROW(PetscLogEventBegin(ev_mult_, 0, 0, 0, 0));
-    PetscScalar const* x;
-    PetscScalar* result;
-    CHKERRTHROW(VecGetArrayRead(slip_all_, &x));
-    CHKERRTHROW(VecGetArray(y, &result));
 
+    PetscScalar* result;
+    CHKERRTHROW(VecGetArray(y, &result));
     PetscInt const m = single_m_;
-    std::fill(result, result + m, 0.0);
-    float const* A = G_single_.data();
-    for (PetscInt j = 0; j < single_N_; ++j) {
-        double const xj = x[j];
-        float const* column = A + static_cast<std::size_t>(j) * m;
+    auto add_column = [&](PetscInt j, double xj) {
+        if (m == 0) {
+            return;
+        }
+        float const* column = G_single_.data() + static_cast<std::size_t>(j) * m;
         for (PetscInt i = 0; i < m; ++i) {
             result[i] += xj * static_cast<double>(column[i]);
         }
-    }
+    };
 
-    CHKERRTHROW(VecRestoreArray(y, &result));
+    // Read only the source vector while the scatter is in flight. Do not access
+    // slip_all_ until VecScatterEnd; it is the active receive buffer.
+    CHKERRTHROW(PetscLogEventBegin(ev_owned_mult_, 0, 0, 0, 0));
+    for (PetscInt i = 0; i < m; ++i) {
+        result[i] = 0.0;
+    }
+    PetscScalar const* local_x;
+    CHKERRTHROW(VecGetArrayRead(S_->vec(), &local_x));
+    for (PetscInt j = single_local_begin_; j < single_local_end_; ++j) {
+        add_column(j, local_x[local_slip_indices_[j - single_local_begin_]]);
+    }
+    CHKERRTHROW(VecRestoreArrayRead(S_->vec(), &local_x));
+    CHKERRTHROW(PetscLogEventEnd(ev_owned_mult_, 0, 0, 0, 0));
+
+    CHKERRTHROW(PetscLogEventBegin(ev_wait_slip_, 0, 0, 0, 0));
+    CHKERRTHROW(VecScatterEnd(gather_slip_, S_->vec(), slip_all_, INSERT_VALUES,
+                              SCATTER_FORWARD));
+    CHKERRTHROW(PetscLogEventEnd(ev_wait_slip_, 0, 0, 0, 0));
+
+    CHKERRTHROW(PetscLogEventBegin(ev_mult_, 0, 0, 0, 0));
+    PetscScalar const* x;
+    CHKERRTHROW(VecGetArrayRead(slip_all_, &x));
+    for (PetscInt j = 0; j < single_local_begin_; ++j) {
+        add_column(j, x[j]);
+    }
+    for (PetscInt j = single_local_end_; j < single_N_; ++j) {
+        add_column(j, x[j]);
+    }
     CHKERRTHROW(VecRestoreArrayRead(slip_all_, &x));
+    CHKERRTHROW(VecRestoreArray(y, &result));
     CHKERRTHROW(PetscLogEventEnd(ev_mult_, 0, 0, 0, 0));
 }
 

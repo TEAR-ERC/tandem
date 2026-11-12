@@ -179,11 +179,15 @@ private:
     std::vector<float> G_single_;
     PetscInt single_m_ = 0;
     PetscInt single_N_ = 0;
+    PetscInt single_local_begin_ = 0, single_local_end_ = 0;
+    std::vector<PetscInt> local_slip_indices_;
     VecScatter gather_slip_ = nullptr; // precomputed slip -> compact needed-column map
     Vec slip_all_ = nullptr; // compact slip entries in the order of G_single_ columns
     // Events for -log_view: where does the time of a right-hand-side evaluation go?
-    PetscLogEvent ev_gather_ = 0;       // slip vector to GF dependencies
-    PetscLogEvent ev_mult_ = 0;         // local part of G * slip
+    PetscLogEvent ev_gather_ = 0;       // start slip exchange
+    PetscLogEvent ev_owned_mult_ = 0;   // multiply locally owned slip columns
+    PetscLogEvent ev_wait_slip_ = 0;    // finish slip exchange
+    PetscLogEvent ev_mult_ = 0;         // multiply remaining columns
     PetscLogEvent ev_redistribute_ = 0; // result of G * slip to the layout of the fault
     PetscLogEvent ev_friction_ = 0;     // friction law (rate and state equations)
 };
