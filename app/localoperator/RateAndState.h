@@ -36,10 +36,13 @@ public:
     }
     void set_params(param_fun_t pfun) {
         auto num_nodes = fault_.storage().size();
+        auto nbf = space_.numBasisFunctions();
         law_.set_num_nodes(num_nodes);
         for (std::size_t index = 0; index < num_nodes; ++index) {
-            auto params = pfun(fault_.storage()[index].template get<Coords>(),
-                               fault_.storage()[index].template get<FaultTag>());
+            std::size_t face_idx = index / nbf;
+            long int tag = fault_tags_[face_idx];
+            auto const& x = fault_.storage()[index].template get<Coords>();
+            auto params = pfun(x, tag);
             law_.set_params(index, params);
         }
     }
@@ -88,7 +91,7 @@ private:
     }
     auto get_delta_tau(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
-        auto tag = fault_[faultNo].template get<FaultTag>()[node];
+        auto tag = fault_tags_[faultNo];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
@@ -96,7 +99,7 @@ private:
     }
     auto get_delta_sn(double time, std::size_t faultNo, std::size_t node) const {
         auto x = fault_[faultNo].template get<Coords>()[node];
-        auto tag = fault_[faultNo].template get<FaultTag>()[node];
+        auto tag = fault_tags_[faultNo];
         std::array<double, DomainDimension + 1> xt;
         std::copy(x.begin(), x.end(), xt.begin());
         xt.back() = time;
@@ -167,7 +170,6 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
     auto r_mat = state_mat(result);
     auto t_mat = traction_mat(traction);
     auto coords = fault_[faultNo].template get<Coords>();
-    auto tags = fault_[faultNo].template get<FaultTag>();
     int ierr = 0, ierr_max = 0;
     for (std::size_t node = 0; node < nbf; ++node) {
         auto const& x = coords[node];
@@ -195,10 +197,10 @@ double RateAndState<Law>::rhs(double time, std::size_t faultNo,
         r_mat(node, PsiIndex) = law_.state_rhs(index + node, V, psi);
     }
     if (source_) {
+        long int tag = fault_tags_[faultNo];
         std::array<double, DomainDimension + 1> xt;
         for (std::size_t node = 0; node < nbf; ++node) {
             auto const& x = coords[node];
-            auto& tag = tags[node];
             std::copy(x.begin(), x.end(), xt.begin());
             xt.back() = time;
             r_mat(node, PsiIndex) += (*source_)(xt, tag)[0];

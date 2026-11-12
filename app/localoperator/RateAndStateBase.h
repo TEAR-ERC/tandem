@@ -53,11 +53,9 @@ protected:
     struct Coords {
         using type = std::array<double, DomainDimension>;
     };
-    struct FaultTag {
-        using type = long int;
-    };
-    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords, FaultTag>;
+    using fault_t = mneme::MultiStorage<mneme::DataLayout::SoA, Coords>;
     mneme::StridedView<fault_t> fault_;
+    std::vector<long int> fault_tags_;
 };
 
 } // namespace tndm
