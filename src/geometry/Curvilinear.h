@@ -2,6 +2,7 @@
 #define CURVILINEAR_20200609_H
 
 #include "basis/WarpAndBlend.h"
+#include "form/FacetInfo.h"
 #include "form/RefElement.h"
 #include "mesh/Simplex.h"
 #include "tensor/Tensor.h"
@@ -62,7 +63,6 @@ public:
                     Tensor<double, 3u>& result) const;
     void facetBasisFromPlexTangents(std::size_t faceNo, Tensor<double, 3u> const& jacobian,
                                     Matrix<double> const& normal, Tensor<double, 3u>& result) const;
-
     std::array<double, D> facetParam(std::size_t faceNo,
                                      std::array<double, D - 1> const& chi) const;
 
