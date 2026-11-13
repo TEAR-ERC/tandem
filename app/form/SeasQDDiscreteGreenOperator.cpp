@@ -75,6 +75,29 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
         checkpoint_enabled_ = true;
     }
     get_discrete_greens_function(mesh);
+
+    // Match the vector backend selected by -vec_type.
+    PetscBool cuda = PETSC_FALSE, hip = PETSC_FALSE, kokkos = PETSC_FALSE;
+    CHKERRTHROW(
+        PetscObjectTypeCompareAny((PetscObject)S_->vec(), &cuda, VECSEQCUDA, VECMPICUDA, ""));
+    CHKERRTHROW(PetscObjectTypeCompareAny((PetscObject)S_->vec(), &hip, VECSEQHIP, VECMPIHIP, ""));
+    CHKERRTHROW(
+        PetscObjectTypeCompareAny((PetscObject)S_->vec(), &kokkos, VECSEQKOKKOS, VECMPIKOKKOS, ""));
+    MatType backend = cuda ? MATDENSECUDA : (hip ? MATDENSEHIP : nullptr);
+    if (backend) {
+        // we convert only now because checkpoint loading and permutation are on the CPU.
+        CHKERRTHROW(MatConvert(G_, backend, MAT_INPLACE_MATRIX, &G_));
+        // Warm up the device and upload the matrix before time integration.
+        CHKERRTHROW(VecZeroEntries(S_->vec()));
+        CHKERRTHROW(MatMult(G_, S_->vec(), base::traction_.vec()));
+        MatType type;
+        CHKERRTHROW(MatGetType(G_, &type));
+        CHKERRTHROW(PetscPrintf(base::comm(), "GF device backend: %s (double precision)\n", type));
+    } else if (kokkos) {
+        CHKERRTHROW(PetscPrintf(
+            base::comm(), "Warning: PETSc has no native dense Kokkos matrix backend; "
+                          "QDGreen products use the CPU dense backend with Kokkos vectors.\n"));
+    }
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
