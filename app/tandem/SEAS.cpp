@@ -74,6 +74,19 @@ auto add_writers(Config const& cfg, LocalSimplexMesh<DomainDimension> const& mes
     bool const checkpoint_enabled =
         cfg.ts_checkpoint_config.storage_type != TsCheckpointStorageType::NONE;
 #endif
+    bool const has_domain_probes =
+        cfg.domain_probe_output && !cfg.domain_probe_output->probes.empty();
+    if (cfg.mode == SeasMode::QuasiDynamicDiscreteGreen &&
+        (cfg.domain_output || has_domain_probes)) {
+        int rank;
+        MPI_Comm_rank(comm, &rank);
+        if (rank == 0) {
+            std::cerr << "Warning: mode=QDGreen with domain_probe_output or domain_output "
+                         "requires a full domain solve whenever displacement output is due, "
+                         "even for a few probes. Frequent output can offset or outweigh the "
+                         "Green's function speedup. Consider reducing the output frequency.\n";
+        }
+    }
     if (cfg.fault_output && cfg.domain_output) {
         if (cfg.fault_output->prefix == cfg.domain_output->prefix) {
             throw std::runtime_error(
