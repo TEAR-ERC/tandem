@@ -1,5 +1,7 @@
 
+#include "petsc_compat.h"
 #include "vecnest_util.h"
+
 #include <petsc.h>
 #include <petsc/private/tsimpl.h>
 #include <petscts.h>
@@ -1092,7 +1094,7 @@ ts_checkpoint_configure(TS ts, const char* tsCheckpointSaveDirectory, int tsChec
         /* Push checkpoint object into PetscContainer. Attach container to TS */
         PetscContainerCreate(PetscObjectComm((PetscObject)ts), &container);
         PetscContainerSetPointer(container, tsc);
-        PetscContainerSetUserDestroy(container, PetscContainerUserDestroyDefault);
+        TandemPetscContainerSetDestroy(container);
         PetscObjectCompose((PetscObject)ts, "_TSCheckPoint", (PetscObject)container);
         PetscObjectDereference((PetscObject)container); /* Let ts free container */
 
