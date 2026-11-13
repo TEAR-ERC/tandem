@@ -44,15 +44,65 @@
 #include <algorithm>
 #include <array>
 #include <ctime>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <string>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace tndm::detail {
+
+/**
+ * @brief Creates the parent directories of all output prefixes that do not exist yet.
+ *
+ * Done once on rank 0 and called at the very start, so that a failure is reported immediately and
+ * not after the (possibly long) setup. All ranks take part in the broadcast, so they either all
+ * continue after the directories exist, or all throw.
+ */
+void create_output_directories(Config const& cfg, MPI_Comm comm) {
+    std::vector<std::string> prefixes;
+    auto add = [&prefixes](auto const& output) {
+        if (output) {
+            prefixes.push_back(output->prefix);
+        }
+    };
+    add(cfg.fault_output);
+    add(cfg.fault_scalar_output);
+    add(cfg.domain_output);
+    add(cfg.fault_probe_output);
+    add(cfg.domain_probe_output);
+    add(cfg.moment_rate_output);
+
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    std::string error;
+    if (rank == 0) {
+        for (auto const& prefix : prefixes) {
+            auto dir = std::filesystem::path(prefix).parent_path();
+            if (dir.empty()) {
+                continue;
+            }
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            if (ec) {
+                error = "Could not create output directory '" + dir.string() + "': " + ec.message();
+                break;
+            }
+        }
+    }
+    int length = static_cast<int>(error.size());
+    MPI_Bcast(&length, 1, MPI_INT, 0, comm);
+    if (length > 0) {
+        error.resize(length);
+        MPI_Bcast(error.data(), length, MPI_CHAR, 0, comm);
+        throw std::runtime_error(error);
+    }
+}
 
 template <typename Type>
 auto make_context(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg,
@@ -622,6 +672,8 @@ void solve_seas_problem(LocalSimplexMesh<DomainDimension> const& mesh, Config co
 namespace tndm {
 
 void solveSEASProblem(LocalSimplexMesh<DomainDimension> const& mesh, Config const& cfg) {
+    detail::create_output_directories(cfg, MPI_COMM_WORLD);
+
     std::unique_ptr<seas::ContextBase> ctx = nullptr;
     switch (cfg.type) {
     case LocalOpType::Poisson:
