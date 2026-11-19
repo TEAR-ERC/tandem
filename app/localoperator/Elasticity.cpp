@@ -157,25 +157,25 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
                              Eigen::InnerStride<1>>;
     using RhoInvMap = Eigen::Map<Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>,
                                  Eigen::Unaligned, Eigen::InnerStride<1>>;
-
-    using LamVec = Eigen::Matrix<double, tensor::lam::Shape[0], 1>;      // vectors that OWN their numbers
+    // Initialize vectors
+    using LamVec = Eigen::Matrix<double, tensor::lam::Shape[0], 1>; 
     using MuVec = Eigen::Matrix<double, tensor::mu::Shape[0], 1>;
     using RhoInvVec = Eigen::Matrix<double, tensor::rhoInv::Shape[0], 1>;
 
     // Initialize mapping to Lam Mu and RhoInv
-    auto lam_eigen = LamMap(lam_field);                                 // window onto the box's lambda slots (holds b right now)
-    auto mu_eigen = MuMap(mu_field);                                    // window onto the mu slots
-    auto rhoInv_eigen = RhoInvMap(rhoInv_field);                        // window onto the 1/rho slots
+    auto lam_eigen = LamMap(lam_field);                            
+    auto mu_eigen = MuMap(mu_field);                                    
+    auto rhoInv_eigen = RhoInvMap(rhoInv_field);                   
 
 
-    // ==================== 1. THE ORIGINAL PROJECTION (k_proj), kept in separate vectors ====================
-    auto proj = MMap(Mmem).fullPivLu();                                 // prepare to solve equations with M
+    // ==================== 1. THE ORIGINAL PROJECTION (k_proj) ====================
+    auto proj = MMap(Mmem).fullPivLu();                     
     
     const LamVec lam_proj = proj.solve(lam_eigen);
     const MuVec mu_proj = proj.solve(mu_eigen);
     const RhoInvVec rhoInv_proj = proj.solve(rhoInv_eigen);
     
-    // ==================== 2. P0 projection  ==================== 
+    // ==================== 2. P0 projection (k_avg) ==================== 
     auto J_Q = vol[elNo].get<AbsDetJ>();                  // |detJ| at each quad point
     auto const& w = volRule.weights();                    // quadrature weights
 
@@ -210,7 +210,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     // ==================== 4. RANGE OF THE PROJECTED POLYNOMIAL ====================
     // Checked at every place the material is used later:
-    //   (a) volume quad points  (b) facet quad points of every facet  (c) nodal values (only if basis is nodal)
+    //   (a) volume quad points  (b) facet quad points of every facet  (c) nodal values
     const std::size_t n_nodes = tensor::lam::Shape[0];
 
     // Initialize from the polynomial evaluated at volume quadrature point q = 0
@@ -224,7 +224,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     double mu_proj_max = mu_proj_min;
     double rhoInv_proj_max = rhoInv_proj_min;
 
-    // (a) remaining volume quadrature points
+    // (a) volume quadrature points
     for (std::size_t q = 1; q < volRule.size(); ++q) {
         double lam_v = 0.0, mu_v = 0.0, rhoInv_v = 0.0;
         for (std::size_t i = 0; i < n_nodes; ++i) {
@@ -240,7 +240,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         if (rhoInv_v > rhoInv_proj_max) rhoInv_proj_max = rhoInv_v;
     }
 
-    // (b) facet quadrature points, for every facet of the element
+    // (b) facet quadrature points
     for (std::size_t f = 0; f < matE_q_T.size(); ++f) {
         for (std::size_t q = 0; q < fctRule.size(); ++q) {
             double lam_v = 0.0, mu_v = 0.0, rhoInv_v = 0.0;
@@ -258,8 +258,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         }
     }
 
-    // (c) nodal values -- ONLY valid if the material basis is nodal (Lagrange).
-    //     Keep this loop once you've confirmed that; delete it otherwise.
+    // (c) nodal values --
     for (std::size_t i = 0; i < n_nodes; ++i) {
         if (lam_proj(i) < lam_proj_min) lam_proj_min = lam_proj(i);
         if (lam_proj(i) > lam_proj_max) lam_proj_max = lam_proj(i);
@@ -270,7 +269,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     }
 
     // ==================== 5. COMPUTE THETA PER ELEMENT ====================
-    double theta_lam = 1.0;                                             // 1 = no shrinking
+    double theta_lam = 1.0;                                
     if (lam_proj_max > lam_avg) {
         double t = (lam_Q_max - lam_avg) / (lam_proj_max - lam_avg);   // overshoot
         if (t < theta_lam) theta_lam = t;
@@ -279,7 +278,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         double t = (lam_avg - lam_Q_min) / (lam_avg - lam_proj_min);   // undershoot
         if (t < theta_lam) theta_lam = t;
     }
-    if (theta_lam < 0.0) theta_lam = 0.0;                               // never negative
 
     double theta_mu = 1.0;
     if (mu_proj_max > mu_avg) {
@@ -290,7 +288,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         double t = (mu_avg - mu_Q_min) / (mu_avg - mu_proj_min);
         if (t < theta_mu) theta_mu = t;
     }
-    if (theta_mu < 0.0) theta_mu = 0.0;
 
     double theta_rhoInv = 1.0;
     if (rhoInv_proj_max > rhoInv_avg) {
@@ -301,7 +298,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         double t = (rhoInv_avg - rhoInv_Q_min) / (rhoInv_avg - rhoInv_proj_min);
         if (t < theta_rhoInv) theta_rhoInv = t;
     }
-    if (theta_rhoInv < 0.0) theta_rhoInv = 0.0;
 
     // ==================== 6. APPLY THE LIMITER TO THE COEFFICIENTS ====================
     for (std::size_t i = 0; i < n_nodes; ++i) {
@@ -310,51 +306,6 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         rhoInv_eigen(i) = rhoInv_avg + theta_rhoInv * (rhoInv_proj(i) - rhoInv_avg);
     }
 
-
-
-    // ---------- log theta values for this element ----------
-    
-    static std::FILE* lam_log = std::fopen("lam_log.txt", "w"); 
-    static std::FILE* mu_log = std::fopen("mu_log.txt", "w");
-    static std::FILE* rhoInv_log = std::fopen("rhoInv_log.txt", "w");
-    static std::FILE* theta_log = std::fopen("theta.log", "w");
-
-
-    if (lam_log) {                                                          // skip if the file could not be opened
-        flockfile(lam_log);                                                 // keep other threads out of this file until funlockfile
-        std::fprintf(lam_log, "element %zu avg = %.10g | proj:", elNo, lam_avg);
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(lam_log, " %.10g", lam_proj(i));   // projected values
-        std::fprintf(lam_log, " | final:");
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(lam_log, " %.10g", lam_field[i]);  // values after the limiter
-        std::fprintf(lam_log, "\n");
-        funlockfile(lam_log);
-    }
-
-    if (mu_log) {
-        flockfile(mu_log);
-        std::fprintf(mu_log, "element %zu avg = %.10g | proj:", elNo, mu_avg);
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(mu_log, " %.10g", mu_proj(i));
-        std::fprintf(mu_log, " | final:");
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(mu_log, " %.10g", mu_field[i]);
-        std::fprintf(mu_log, "\n");
-        funlockfile(mu_log);
-    }
-
-    if (rhoInv_log) {
-        flockfile(rhoInv_log);
-        std::fprintf(rhoInv_log, "element %zu avg = %.10g | proj:", elNo, rhoInv_avg);
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(rhoInv_log, " %.10g", rhoInv_proj(i));
-        std::fprintf(rhoInv_log, " | final:");
-        for (std::size_t i = 0; i < n_nodes; ++i) std::fprintf(rhoInv_log, " %.10g", rhoInv_field[i]);
-        std::fprintf(rhoInv_log, "\n");
-        funlockfile(rhoInv_log);
-    }
-
-    if (theta_log) {                                                        // one single call: the C library writes it whole
-        std::fprintf(theta_log, "element %zu theta_lam = %.10g theta_mu = %.10g theta_rhoInv = %.10g\n",
-                        elNo, theta_lam, theta_mu, theta_rhoInv);
-    }
-    
 
     // ---- transposed inverse Jacobian: unchanged ----
     auto G_Q = init::G::view::create(vol[elNo].get<JInv>().data()->data());
