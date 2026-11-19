@@ -210,25 +210,22 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
 
     // ==================== 4. RANGE OF THE PROJECTED POLYNOMIAL ====================
     // Checked at every place the material is used later:
-    //   (a) nodal values  (b) volume quad points  (c) facet quad points of every facet
+    //   (a) volume quad points  (b) facet quad points of every facet  (c) nodal values (only if basis is nodal)
     const std::size_t n_nodes = tensor::lam::Shape[0];
 
-    // (a) nodal values -- for a nodal basis these are just the coefficients
-    double lam_proj_min = lam_proj(0), lam_proj_max = lam_proj(0);
-    double mu_proj_min = mu_proj(0), mu_proj_max = mu_proj(0);
-    double rhoInv_proj_min = rhoInv_proj(0), rhoInv_proj_max = rhoInv_proj(0);
-
-    for (std::size_t i = 1; i < n_nodes; ++i) {
-        if (lam_proj(i) < lam_proj_min) lam_proj_min = lam_proj(i);
-        if (lam_proj(i) > lam_proj_max) lam_proj_max = lam_proj(i);
-        if (mu_proj(i) < mu_proj_min) mu_proj_min = mu_proj(i);
-        if (mu_proj(i) > mu_proj_max) mu_proj_max = mu_proj(i);
-        if (rhoInv_proj(i) < rhoInv_proj_min) rhoInv_proj_min = rhoInv_proj(i);
-        if (rhoInv_proj(i) > rhoInv_proj_max) rhoInv_proj_max = rhoInv_proj(i);
+    // Initialize from the polynomial evaluated at volume quadrature point q = 0
+    double lam_proj_min = 0.0, mu_proj_min = 0.0, rhoInv_proj_min = 0.0;
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        lam_proj_min += matE_Q_T(0, i) * lam_proj(i);
+        mu_proj_min += matE_Q_T(0, i) * mu_proj(i);
+        rhoInv_proj_min += matE_Q_T(0, i) * rhoInv_proj(i);
     }
+    double lam_proj_max = lam_proj_min;
+    double mu_proj_max = mu_proj_min;
+    double rhoInv_proj_max = rhoInv_proj_min;
 
-    // (b) volume quadrature points
-    for (std::size_t q = 0; q < volRule.size(); ++q) {
+    // (a) remaining volume quadrature points
+    for (std::size_t q = 1; q < volRule.size(); ++q) {
         double lam_v = 0.0, mu_v = 0.0, rhoInv_v = 0.0;
         for (std::size_t i = 0; i < n_nodes; ++i) {
             lam_v += matE_Q_T(q, i) * lam_proj(i);
@@ -243,7 +240,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         if (rhoInv_v > rhoInv_proj_max) rhoInv_proj_max = rhoInv_v;
     }
 
-    // (c) facet quadrature points, for every facet of the element
+    // (b) facet quadrature points, for every facet of the element
     for (std::size_t f = 0; f < matE_q_T.size(); ++f) {
         for (std::size_t q = 0; q < fctRule.size(); ++q) {
             double lam_v = 0.0, mu_v = 0.0, rhoInv_v = 0.0;
@@ -259,6 +256,17 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
             if (rhoInv_v < rhoInv_proj_min) rhoInv_proj_min = rhoInv_v;
             if (rhoInv_v > rhoInv_proj_max) rhoInv_proj_max = rhoInv_v;
         }
+    }
+
+    // (c) nodal values -- ONLY valid if the material basis is nodal (Lagrange).
+    //     Keep this loop once you've confirmed that; delete it otherwise.
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        if (lam_proj(i) < lam_proj_min) lam_proj_min = lam_proj(i);
+        if (lam_proj(i) > lam_proj_max) lam_proj_max = lam_proj(i);
+        if (mu_proj(i) < mu_proj_min) mu_proj_min = mu_proj(i);
+        if (mu_proj(i) > mu_proj_max) mu_proj_max = mu_proj(i);
+        if (rhoInv_proj(i) < rhoInv_proj_min) rhoInv_proj_min = rhoInv_proj(i);
+        if (rhoInv_proj(i) > rhoInv_proj_max) rhoInv_proj_max = rhoInv_proj(i);
     }
 
     // ==================== 5. COMPUTE THETA PER ELEMENT ====================
