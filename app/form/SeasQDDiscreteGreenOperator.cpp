@@ -483,6 +483,10 @@ PetscInt SeasQDDiscreteGreenOperator::load_discrete_greens_operator(
 
         CHKERRTHROW(MatMatMult(G_, Cperm, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &GCperm));
         CHKERRTHROW(MatMatMult(Rperm, GCperm, MAT_REUSE_MATRIX, PETSC_DEFAULT, &G_));
+        // MatMatMult() may enable MAT_NO_OFF_PROC_ENTRIES,
+        // causing subsequent off-process insertions to be lost.
+        // See https://gitlab.com/petsc/petsc/-/issues/2009
+        CHKERRTHROW(MatSetOption(G_, MAT_NO_OFF_PROC_ENTRIES, PETSC_FALSE));
         CHKERRTHROW(MatDestroy(&GCperm));
         CHKERRTHROW(MatDestroy(&Rperm));
         CHKERRTHROW(MatDestroy(&Cperm));
