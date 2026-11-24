@@ -211,6 +211,9 @@ void SeasQDDiscreteGreenOperator::write_discrete_greens_operator(
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
     CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    // Complete file truncation on all ranks before writing any headers.
+    CHKERRTHROW(PetscViewerSetUp(v));
+    CHKERRTHROW(PetscBarrier((PetscObject)v));
     {
         PetscInt commsize_checkpoint = (PetscInt)commsize;
         CHKERRTHROW(PetscViewerBinaryWrite(v, &commsize_checkpoint, 1, PETSC_INT));
@@ -267,6 +270,9 @@ void SeasQDDiscreteGreenOperator ::write_facet_labels_IS(
     CHKERRTHROW(PetscViewerBinaryOpen(PetscObjectComm((PetscObject)G_), new_filename.c_str(),
                                       FILE_MODE_WRITE, &v));
     CHKERRTHROW(PetscViewerBinarySetUseMPIIO(v, PETSC_TRUE));
+    // Complete file truncation on all ranks before writing any headers.
+    CHKERRTHROW(PetscViewerSetUp(v));
+    CHKERRTHROW(PetscBarrier((PetscObject)v));
     CHKERRTHROW(ISView(is, v));
     CHKERRTHROW(PetscViewerDestroy(&v));
     back_up_file(gf_facet_filename_);
