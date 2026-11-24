@@ -173,6 +173,14 @@ private:
     std::optional<volume_functional_t> fun_force = std::nullopt;
     std::optional<facet_functional_t> fun_dirichlet = std::nullopt;
     std::optional<facet_functional_t> fun_slip = std::nullopt;
+    
+    // Raw material functions (x, region): value, kept so the limiter can
+    // sample the data at facet quadrature points and nodes
+    functional_t_region<1> raw_lam_;
+    functional_t_region<1> raw_mu_;
+    std::optional<functional_t_region<1>> raw_rho_;
+    Managed<Matrix<double>> geoE_nodes_;   // geometry basis evaluated at the material nodes
+
 
     // Precomputed data
     struct lam {

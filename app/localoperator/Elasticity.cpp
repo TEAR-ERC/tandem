@@ -34,10 +34,13 @@ Elasticity::Elasticity(std::shared_ptr<Curvilinear<DomainDimension>> cl, functio
     : DGCurvilinearCommon<DomainDimension>(std::move(cl), MinQuadOrder()), method_(method),
       space_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
       materialSpace_(PolynomialDegree, WarpAndBlendFactory<DomainDimension>(), ALIGNMENT),
-      fun_lam(make_volume_functional(std::move(lam))),
-      fun_mu(make_volume_functional(std::move(mu))),
-      fun_rho(rho ? make_volume_functional(std::move(*rho)) : one_volume_function) {
-
+      fun_lam(make_volume_functional(lam)),
+      fun_mu(make_volume_functional(mu)),
+      fun_rho(rho ? make_volume_functional(*rho) : one_volume_function),
+      raw_lam_(std::move(lam)),
+      raw_mu_(std::move(mu)),
+      raw_rho_(std::move(rho)) {
+	      
     MhatInv = space_.inverseMassMatrix();
     E_Q = space_.evaluateBasisAt(volRule.points());
     E_Q_T = space_.evaluateBasisAt(volRule.points(), {1, 0});
@@ -147,7 +150,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     krnl_rhs.rhoInv_Q = rhoInv_Q_raw;
     krnl_rhs.W = volRule.weights().data();
     krnl_rhs.execute();
-
+    
+    // physical coordinates of the nodes
+    geoE_nodes_ = cl_->evaluateBasisAt(materialSpace_.refNodes());
     using MMap = Eigen::Map<Eigen::Matrix<double, tensor::matM::Shape[0], tensor::matM::Shape[1]>,
                             Eigen::Unaligned,
                             Eigen::OuterStride<init::matM::Stop[0] - init::matM::Start[0]>>;
@@ -165,7 +170,9 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     // Initialize mapping to Lam Mu and RhoInv
     auto lam_eigen = LamMap(lam_field);                            
     auto mu_eigen = MuMap(mu_field);                                    
-    auto rhoInv_eigen = RhoInvMap(rhoInv_field);                   
+    auto rhoInv_eigen = RhoInvMap(rhoInv_field);    
+    
+    const std::size_t n_nodes = tensor::lam::Shape[0];
 
 
     // ==================== 1. THE ORIGINAL PROJECTION (k_proj) ====================
@@ -194,7 +201,11 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
     const double mu_avg = mu_integral / volume_total;
     const double rhoInv_avg = rhoInv_integral / volume_total;
     
-    // ==================== 3. RANGE OF THE UNPROJECTED QUAD POINT DATA ====================
+    // ==================== 3. RANGE OF THE UNPROJECTED MATERIAL ====================
+    // Raw data sampled at every place the material is used later:
+    //   (a) volume quad points  (b) facet quad points of every facet  (c) nodes
+
+    // (a) volume quadrature points (already evaluated in lam_Q, mu_Q, rhoInv_Q)
     double lam_Q_min = lam_Q(0, 0), lam_Q_max = lam_Q(0, 0);
     double mu_Q_min = mu_Q(0, 0), mu_Q_max = mu_Q(0, 0);
     double rhoInv_Q_min = rhoInv_Q(0, 0), rhoInv_Q_max = rhoInv_Q(0, 0);
@@ -208,10 +219,53 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         if (rhoInv_Q(0, q) > rhoInv_Q_max) rhoInv_Q_max = rhoInv_Q(0, q);
     }
 
+    const long int tag = cl_->getVolumeTag(elNo);   // this element's region (correct side of interfaces)
+
+    // (b) facet quadrature points: map to physical coordinates, evaluate the raw functions
+    std::vector<double> Xf_raw(DomainDimension * fctRule.size());
+    auto Xf = Matrix<double>(Xf_raw.data(), DomainDimension, fctRule.size());
+    for (std::size_t f = 0; f < DomainDimension + 1u; ++f) {
+        cl_->map(elNo, geoE_q[f], Xf);
+        for (std::size_t q = 0; q < fctRule.size(); ++q) {
+            std::array<double, DomainDimension> x;
+            for (std::size_t d = 0; d < DomainDimension; ++d) x[d] = Xf(d, q);
+
+            const double lam_x = raw_lam_(x, tag)[0];
+            const double mu_x = raw_mu_(x, tag)[0];
+            const double rhoInv_x = raw_rho_ ? 1.0 / (*raw_rho_)(x, tag)[0] : 1.0;
+
+            if (lam_x < lam_Q_min) lam_Q_min = lam_x;
+            if (lam_x > lam_Q_max) lam_Q_max = lam_x;
+            if (mu_x < mu_Q_min) mu_Q_min = mu_x;
+            if (mu_x > mu_Q_max) mu_Q_max = mu_x;
+            if (rhoInv_x < rhoInv_Q_min) rhoInv_Q_min = rhoInv_x;
+            if (rhoInv_x > rhoInv_Q_max) rhoInv_Q_max = rhoInv_x;
+        }
+    }
+
+    // (c) nodes: map to physical coordinates, evaluate the raw functions
+    std::vector<double> Xn_raw(DomainDimension * n_nodes);
+    auto Xn = Matrix<double>(Xn_raw.data(), DomainDimension, n_nodes);
+    cl_->map(elNo, geoE_nodes_, Xn);
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        std::array<double, DomainDimension> x;
+        for (std::size_t d = 0; d < DomainDimension; ++d) x[d] = Xn(d, i);
+
+        const double lam_x = raw_lam_(x, tag)[0];
+        const double mu_x = raw_mu_(x, tag)[0];
+        const double rhoInv_x = raw_rho_ ? 1.0 / (*raw_rho_)(x, tag)[0] : 1.0;
+
+        if (lam_x < lam_Q_min) lam_Q_min = lam_x;
+        if (lam_x > lam_Q_max) lam_Q_max = lam_x;
+        if (mu_x < mu_Q_min) mu_Q_min = mu_x;
+        if (mu_x > mu_Q_max) mu_Q_max = mu_x;
+        if (rhoInv_x < rhoInv_Q_min) rhoInv_Q_min = rhoInv_x;
+        if (rhoInv_x > rhoInv_Q_max) rhoInv_Q_max = rhoInv_x;
+    }
+
     // ==================== 4. RANGE OF THE PROJECTED POLYNOMIAL ====================
     // Checked at every place the material is used later:
     //   (a) volume quad points  (b) facet quad points of every facet  (c) nodal values
-    const std::size_t n_nodes = tensor::lam::Shape[0];
 
     // Initialize from the polynomial evaluated at volume quadrature point q = 0
     double lam_proj_min = 0.0, mu_proj_min = 0.0, rhoInv_proj_min = 0.0;
@@ -240,6 +294,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         if (rhoInv_v > rhoInv_proj_max) rhoInv_proj_max = rhoInv_v;
     }
 
+
     // (b) facet quadrature points
     for (std::size_t f = 0; f < matE_q_T.size(); ++f) {
         for (std::size_t q = 0; q < fctRule.size(); ++q) {
@@ -258,7 +313,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         }
     }
 
-    // (c) nodal values --
+    // (c) nodal values
     for (std::size_t i = 0; i < n_nodes; ++i) {
         if (lam_proj(i) < lam_proj_min) lam_proj_min = lam_proj(i);
         if (lam_proj(i) > lam_proj_max) lam_proj_max = lam_proj(i);
@@ -267,6 +322,7 @@ void Elasticity::prepare_volume(std::size_t elNo, LinearAllocator<double>& scrat
         if (rhoInv_proj(i) < rhoInv_proj_min) rhoInv_proj_min = rhoInv_proj(i);
         if (rhoInv_proj(i) > rhoInv_proj_max) rhoInv_proj_max = rhoInv_proj(i);
     }
+
 
     // ==================== 5. COMPUTE THETA PER ELEMENT ====================
     double theta_lam = 1.0;                                
