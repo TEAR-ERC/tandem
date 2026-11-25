@@ -33,7 +33,7 @@ Time stepping checkpointing
 Time stepping checkpointing is parameterized by the **[ts_checkpoint]** section. Here are the key parameters and their descriptions:
 
 - **load_directory**: directory from which a checkpoint is loaded. Give path to last_checkpoint.txt to let tandem retrieve the name of the last checkpoint file.
-- **save_directory**: Directory where checkpoints are saved. If not specified, it defaults to checkpoint.
+- **save_directory**: Directory where checkpoints are saved. If not specified, it defaults to checkpoint. Missing parent directories are created.
 - **freq_step**: Time step frequency between checkpoints. This determines how often checkpoints are saved based on the number of time steps. The default value is 1000 steps.
 - **freq_cputime**: CPU time frequency between checkpoints, specified in minutes. Checkpoints are saved based on the elapsed CPU time. The default value is 30 minutes.
 - **freq_physical_time**: Physical time frequency between checkpoints. This determines how often checkpoints are saved based on the physical time of the simulation. Desactivated by default.
@@ -49,7 +49,7 @@ Five types of outputs are available: **fault output**, **fault probe output**, *
 
 Common options:
 
-- **prefix**: Output file name prefix.
+- **prefix**: Output file name prefix. Missing parent directories are created at startup, e.g. :code:`prefix = "output/fault"` creates the directory :code:`output`.
 - **atol**: Absolute tolerance for VMax. Default = 1e-50.
 - **rtol**: Relative tolerance for VMax. Default = 0.01.
 - **t_min**: Minimum time difference between samples. Default = 0.0.

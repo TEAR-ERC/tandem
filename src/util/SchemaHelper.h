@@ -6,6 +6,8 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <utility>
 
 #include <iostream>
 
@@ -26,6 +28,36 @@ public:
             return true;
         }
         return std::filesystem::exists(p.parent_path());
+    }
+};
+
+/**
+ * @brief Accepts a path whose parent directory exists or can be created.
+ *
+ * This holds if the nearest existing ancestor of the parent directory is a directory.
+ * The directories are not created here (validators run on every MPI rank); see
+ * create_output_directories in SEAS.cpp.
+ */
+class ParentPathExistsOrCreatable {
+public:
+    bool operator()(std::string const& path) {
+        namespace fs = std::filesystem;
+        auto p = fs::path(path);
+        if (!p.has_parent_path()) {
+            return true;
+        }
+        std::error_code ec;
+        auto dir = p.parent_path();
+        while (!dir.empty() && !fs::exists(dir, ec)) {
+            auto parent = dir.parent_path();
+            if (parent == dir) {
+                break;
+            }
+            dir = std::move(parent);
+        }
+        // dir is empty (relative path, nothing above exists, i.e. the working directory)
+        // or the nearest existing ancestor, which must be a directory.
+        return dir.empty() || fs::is_directory(dir, ec);
     }
 };
 
