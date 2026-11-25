@@ -152,7 +152,7 @@ endfunction()
 
 include(GetGitRevisionDescription)
 get_git_head_revision(refspec hash)
-git_describe(PACKAGE_GIT_VERSION --always)
+git_describe(PACKAGE_GIT_VERSION --tags --always)
 message(STATUS "Current Git description: " ${PACKAGE_GIT_VERSION})
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
