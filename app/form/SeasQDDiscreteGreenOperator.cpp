@@ -6,11 +6,45 @@
 #include "parallel/LocalGhostCompositeView.h"
 #include "util/Stopwatch.h"
 
+#include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <stdexcept>
+#include <unordered_map>
+#include <vector>
 namespace fs = std::filesystem;
 
 namespace tndm {
+
+GfSolver::GfSolver(std::unique_ptr<dg_t> dgop, std::unique_ptr<AbstractAdapterOperator> adapter,
+                   std::unique_ptr<AbstractFrictionOperator> friction, bool matrix_free,
+                   MGConfig const& mg_config)
+    : SeasQDOperator(std::move(dgop), std::move(adapter), std::move(friction), matrix_free,
+                     mg_config),
+      scatter_(SeasQDOperator::adapter().fault_map().scatter_plan()),
+      ghost_(
+          scatter_.recv_prototype<double>(SeasQDOperator::friction().slip_block_size(), ALIGNMENT)),
+      slip_(SeasQDOperator::friction().slip_block_size(),
+            SeasQDOperator::adapter().num_local_elements(), SeasQDOperator::comm()) {}
+
+void GfSolver::unit_slip_response(PetscInt global_slip_index) {
+    CHKERRTHROW(VecZeroEntries(slip_.vec()));
+    PetscInt first, last;
+    CHKERRTHROW(VecGetOwnershipRange(slip_.vec(), &first, &last));
+    if (global_slip_index >= first && global_slip_index < last) {
+        PetscScalar one = 1.0;
+        CHKERRTHROW(VecSetValue(slip_.vec(), global_slip_index, one, INSERT_VALUES));
+    }
+    slip_.begin_assembly();
+    slip_.end_assembly();
+
+    scatter_.begin_scatter(slip_, ghost_);
+    scatter_.wait_scatter();
+
+    auto slip_view = LocalGhostCompositeView(slip_, ghost_);
+    SeasQDOperator::solve(0.0, slip_view);
+    SeasQDOperator::update_traction(slip_view);
+}
 
 GreensFunctionIndices::GreensFunctionIndices(SeasQDDiscreteGreenOperator const& op) : n_bs(1) {
     slip_block_size = op.base::friction().slip_block_size();
@@ -33,8 +67,10 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
     std::unique_ptr<typename base::dg_t> dgop, std::unique_ptr<AbstractAdapterOperator> adapter,
     std::unique_ptr<AbstractFrictionOperator> friction,
     LocalSimplexMesh<DomainDimension> const& mesh, std::optional<std::string> prefix,
-    double gf_checkpoint_every_nmins, bool matrix_free, MGConfig const& mg_config)
-    : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config) {
+    double gf_checkpoint_every_nmins, bool matrix_free, MGConfig const& mg_config,
+    GfWorkerFactory worker_factory, unsigned gf_groups)
+    : base(std::move(dgop), std::move(adapter), std::move(friction), matrix_free, mg_config),
+      worker_factory_(std::move(worker_factory)), gf_groups_(gf_groups) {
 
     int rank;
 
@@ -75,6 +111,8 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
         checkpoint_enabled_ = true;
     }
     get_discrete_greens_function(mesh);
+    // Only needed for the computation above (and refers to objects that may not live on)
+    worker_factory_ = nullptr;
 }
 
 SeasQDDiscreteGreenOperator::~SeasQDDiscreteGreenOperator() {
@@ -503,6 +541,11 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
     if (start == N)
         return;
 
+    if (gf_groups_ > 1 && worker_factory_) {
+        partial_assemble_discrete_greens_function_grouped(mesh, start, N);
+        return;
+    }
+
     MPI_Comm_rank(comm, &rank);
 
     auto scatter = Scatter(base::adapter().fault_map().scatter_plan());
@@ -575,6 +618,211 @@ void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function(
 
     CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
     CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
+}
+
+/**
+ * Computes the Green's functions [start, N) with several groups of ranks working concurrently.
+ *
+ * Every Green's function is the traction response to a unit slip at one slip degree of freedom,
+ * and they are all independent. The ranks are split into `groups` groups of consecutive ranks.
+ * Each group owns a complete copy of the discretisation (its own mesh partition, operators and
+ * multigrid hierarchy) on its sub-communicator, which scales better than using all ranks for
+ * a single solve.
+ *
+ * Layouts. G_ lives on the full communicator, numbered by the fault elements of the full
+ * partition. A group numbers its fault elements differently, as its mesh is partitioned
+ * differently. The fault facets are identified by their (global) vertex indices, which gives
+ * the translation in both directions. Column j of G_ is the response to a unit slip at slip degree
+ * of freedom j, i.e. component (j % slip_block_size) of fault element (j / slip_block_size).
+ *
+ * Work distribution. The groups proceed in lock-step rounds: in round r, group g computes column
+ * start + r * groups + g (idle if that is beyond N). After each round G_ is assembled, which is
+ * collective on all ranks and moves the rows to the ranks owning them in the full layout. So
+ * after every round the columns [0, start + (r+1) * groups) are complete, which is exactly the
+ * invariant the checkpoints rely on.
+ */
+void SeasQDDiscreteGreenOperator::partial_assemble_discrete_greens_function_grouped(
+    LocalSimplexMesh<DomainDimension> const& mesh, PetscInt start, PetscInt N) {
+    using facet_t = Simplex<DomainDimension - 1u>;
+    constexpr int facet_size = DomainDimension;
+
+    GreensFunctionIndices ind(*this);
+    MPI_Comm comm = ind.comm;
+    int rank, size;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    int const groups = std::min(static_cast<int>(gf_groups_), size);
+    if (groups < static_cast<int>(gf_groups_)) {
+        CHKERRTHROW(PetscPrintf(comm,
+                                "Warning: gf_groups = %u exceeds the number of ranks (%d), "
+                                "using %d groups.\n",
+                                gf_groups_, size, groups));
+    }
+    // Groups of consecutive ranks (which are typically on the same node)
+    int const color = static_cast<int>((static_cast<long long>(rank) * groups) / size);
+
+    struct CommGuard {
+        MPI_Comm comm = MPI_COMM_NULL;
+        ~CommGuard() {
+            if (comm != MPI_COMM_NULL) {
+                MPI_Comm_free(&comm);
+            }
+        }
+    } group;
+    MPI_Comm_split(comm, color, rank, &group.comm);
+
+    CHKERRTHROW(PetscPrintf(comm,
+                            "Computing Green's functions with %d groups of about %d ranks each\n",
+                            groups, size / groups));
+
+    auto allgather = [](MPI_Comm c, std::vector<PetscInt> const& local) {
+        int csize;
+        MPI_Comm_size(c, &csize);
+        int const count = static_cast<int>(local.size());
+        std::vector<int> counts(csize), displs(csize);
+        MPI_Allgather(&count, 1, MPI_INT, counts.data(), 1, MPI_INT, c);
+        int total = 0;
+        for (int i = 0; i < csize; ++i) {
+            displs[i] = total;
+            total += counts[i];
+        }
+        std::vector<PetscInt> all(total);
+        MPI_Allgatherv(local.data(), count, MPIU_INT, all.data(), counts.data(), displs.data(),
+                       MPIU_INT, c);
+        return all;
+    };
+
+    // Index of every fault element in the full layout, by its facet. Elements of the full layout
+    // are numbered rank by rank, which is the order of the gathered keys.
+    auto const& fault_map = base::adapter().fault_map();
+    auto const& all_facets = mesh.facets();
+    PetscInt const num_local = static_cast<PetscInt>(fault_map.local_size());
+    if (num_local != ind.num_local_elements) {
+        throw std::logic_error("Number of local fault elements is inconsistent.");
+    }
+    std::vector<PetscInt> local_keys(num_local * facet_size);
+    for (PetscInt b = 0; b < num_local; ++b) {
+        auto const f = all_facets[fault_map.fctNo(b)];
+        for (int d = 0; d < facet_size; ++d) {
+            local_keys[b * facet_size + d] = static_cast<PetscInt>(f[d]);
+        }
+    }
+    auto const all_keys = allgather(comm, local_keys);
+    PetscInt const num_fault_elements = static_cast<PetscInt>(all_keys.size() / facet_size);
+    if (num_fault_elements * ind.slip_block_size != N) {
+        throw std::logic_error("Number of fault elements is inconsistent with the size of G.");
+    }
+    std::unordered_map<facet_t, PetscInt, SimplexHash<DomainDimension - 1u>> full_index(
+        num_fault_elements);
+    for (PetscInt n = 0; n < num_fault_elements; ++n) {
+        facet_t plex;
+        for (int d = 0; d < facet_size; ++d) {
+            plex[d] = all_keys[n * facet_size + d];
+        }
+        full_index[plex] = n;
+    }
+
+    // Collective on the group: builds the mesh partition and the operators of this group.
+    // (Declared after the communicator guard, so that it is destroyed before the communicator.)
+    auto worker = worker_factory_(group.comm);
+    GfSolver& solver = worker->solver();
+    auto const& worker_facets = worker->fault_facets();
+    if (static_cast<PetscInt>(solver.friction().slip_block_size()) != ind.slip_block_size ||
+        static_cast<PetscInt>(solver.adapter().traction_block_size()) != ind.m_bs) {
+        throw std::logic_error("Block sizes of the group solver differ from the full solver.");
+    }
+
+    // Translate between the layout of this group and the full layout.
+    PetscInt const num_worker = static_cast<PetscInt>(worker_facets.size());
+    std::vector<PetscInt> worker_to_full(num_worker);
+    for (PetscInt b = 0; b < num_worker; ++b) {
+        auto it = full_index.find(worker_facets[b]);
+        if (it == full_index.end()) {
+            throw std::runtime_error(
+                "Fault facet of a Green's function group not found in the full mesh.");
+        }
+        worker_to_full[b] = it->second;
+    }
+    // Position of every fault element in the layout of this group
+    auto const group_to_full = allgather(group.comm, worker_to_full);
+    if (static_cast<PetscInt>(group_to_full.size()) != num_fault_elements) {
+        throw std::runtime_error("Mesh of a Green's function group has a different number of "
+                                 "fault elements than the full mesh.");
+    }
+    std::vector<PetscInt> full_to_group(num_fault_elements, -1);
+    for (std::size_t s = 0; s < group_to_full.size(); ++s) {
+        full_to_group[group_to_full[s]] = static_cast<PetscInt>(s);
+    }
+    if (std::find(full_to_group.begin(), full_to_group.end(), -1) != full_to_group.end()) {
+        throw std::runtime_error("Fault elements of a Green's function group do not match the "
+                                 "fault elements of the full mesh.");
+    }
+
+    if (start > 0) {
+        CHKERRTHROW(PetscPrintf(comm,
+                                "partial_assemble_discrete_greens_function() [%" PetscInt_FMT
+                                " , %" PetscInt_FMT ")\n",
+                                start, N));
+    }
+
+    PetscInt const rounds = (N - start + groups - 1) / groups;
+    std::vector<PetscInt> rows(ind.m_bs);
+    Stopwatch sw;
+    double solve_time = 0.0;
+    double solve_time_from_start = 0.0;
+    for (PetscInt r = 0; r < rounds; ++r) {
+        PetscInt const first = start + r * groups;
+        PetscInt const last = std::min<PetscInt>(N, first + groups);
+        CHKERRTHROW(PetscPrintf(comm,
+                                "%s Computing Green's functions [%" PetscInt_FMT " , %" PetscInt_FMT
+                                ") / %" PetscInt_FMT "\n",
+                                tndm::get_current_date_time_string().c_str(), first, last, N));
+        sw.start();
+
+        PetscInt const j = first + color;
+        if (j < N) {
+            PetscInt const element = j / ind.slip_block_size;
+            PetscInt const component = j % ind.slip_block_size;
+            solver.unit_slip_response(full_to_group[element] * ind.slip_block_size + component);
+
+            auto& traction = solver.traction();
+            auto traction_handle = traction.begin_access_readonly();
+            for (PetscInt b = 0; b < num_worker; ++b) {
+                auto traction_block = traction_handle.subtensor(slice{}, b);
+                for (PetscInt c = 0; c < ind.m_bs; ++c) {
+                    rows[c] = worker_to_full[b] * ind.m_bs + c;
+                }
+                // Rows are in general owned by other ranks, they are sent when assembling
+                CHKERRTHROW(MatSetValues(G_, ind.m_bs, rows.data(), 1, &j, traction_block.data(),
+                                         INSERT_VALUES));
+            }
+            traction.end_access_readonly(traction_handle);
+        }
+
+        // Collective on all ranks: moves the rows to their owners
+        CHKERRTHROW(MatAssemblyBegin(G_, MAT_FINAL_ASSEMBLY));
+        CHKERRTHROW(MatAssemblyEnd(G_, MAT_FINAL_ASSEMBLY));
+
+        // All ranks use the same time, so that the checkpointing decision below is identical.
+        double const local_step_time = sw.stop();
+        double step_time;
+        MPI_Allreduce(&local_step_time, &step_time, 1, MPI_DOUBLE, MPI_MAX, comm);
+        solve_time += step_time;
+        solve_time_from_start += step_time;
+
+        double const avg_time = solve_time_from_start / (r + 1);
+        std::string const remaining_time = tndm::format_time(avg_time * (rounds - r - 1));
+        CHKERRTHROW(PetscPrintf(comm, "%s (%s left)\n",
+                                tndm::get_current_date_time_string().c_str(),
+                                remaining_time.c_str()));
+
+        if (checkpoint_enabled_ && solve_time / 60.0 > checkpoint_every_nmins_) {
+            // G_ is assembled, columns [0, last) are complete
+            write_discrete_greens_operator(mesh, last, N);
+            solve_time = 0.0;
+        }
+    }
 }
 
 void SeasQDDiscreteGreenOperator::get_discrete_greens_function(

@@ -393,7 +393,7 @@ private:
             }
         }
 
-        AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts));
+        AllToAllV a2aSharedRanks(std::move(sendcounts), std::move(recvcounts), comm);
         if (rankPermutation) {
             a2aSharedRanks.setRankPermutation(*rankPermutation);
         }

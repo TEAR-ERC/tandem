@@ -105,6 +105,7 @@ struct Config {
     std::array<double, DomainDimension> up;
     std::array<double, DomainDimension> ref_normal;
     bool boundary_linear;
+    unsigned gf_groups;
 
     bool matrix_free;
     MGStrategy mg_strategy;
