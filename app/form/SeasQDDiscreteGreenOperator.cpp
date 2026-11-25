@@ -122,7 +122,38 @@ SeasQDDiscreteGreenOperator::SeasQDDiscreteGreenOperator(
         checkpoint_enabled_ = true;
     }
     get_discrete_greens_function(mesh);
-    if (single_precision_) {
+
+    // Match the vector backend selected by -vec_type.
+    PetscBool cuda = PETSC_FALSE, hip = PETSC_FALSE, kokkos = PETSC_FALSE;
+    CHKERRTHROW(
+        PetscObjectTypeCompareAny((PetscObject)S_->vec(), &cuda, VECSEQCUDA, VECMPICUDA, ""));
+    CHKERRTHROW(PetscObjectTypeCompareAny((PetscObject)S_->vec(), &hip, VECSEQHIP, VECMPIHIP, ""));
+    CHKERRTHROW(
+        PetscObjectTypeCompareAny((PetscObject)S_->vec(), &kokkos, VECSEQKOKKOS, VECMPIKOKKOS, ""));
+    MatType backend = cuda ? MATDENSECUDA : (hip ? MATDENSEHIP : nullptr);
+    if (kokkos) {
+        CHKERRTHROW(PetscPrintf(base::comm(),
+                                "Warning: PETSc has no native dense Kokkos matrix backend; "
+                                "QDGreen products remain on the CPU with Kokkos vectors.\n"));
+    }
+    if (backend) {
+        if (single_precision_) {
+            throw std::runtime_error("Device GF products require gf_single_precision=false.");
+        }
+        // Convert after checkpoint loading and permutation.
+        CHKERRTHROW(MatConvert(G_, backend, MAT_INPLACE_MATRIX, &G_));
+        if (balance_rows_) {
+            // Preserve the row layout used by to_fault_layout_, but use a device vector.
+            CHKERRTHROW(VecDestroy(&y_balanced_));
+            CHKERRTHROW(MatCreateVecs(G_, nullptr, &y_balanced_));
+        }
+        // Warm up the device and upload the matrix before time integration.
+        CHKERRTHROW(VecZeroEntries(S_->vec()));
+        CHKERRTHROW(MatMult(G_, S_->vec(), balance_rows_ ? y_balanced_ : base::traction_.vec()));
+        MatType type;
+        CHKERRTHROW(MatGetType(G_, &type));
+        CHKERRTHROW(PetscPrintf(base::comm(), "GF device backend: %s (double precision)\n", type));
+    } else if (single_precision_) {
         convert_to_single_precision();
     }
     // Only needed for the computation above (and refers to objects that may not live on)
